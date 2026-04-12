@@ -22,4 +22,6 @@ contextBridge.exposeInMainWorld("api", {
   pickFolder: () => ipcRenderer.invoke("folder-pick"),
   listSessions: (cwd) => ipcRenderer.invoke("list-sessions", cwd),
   loadSession: (sessionId) => ipcRenderer.invoke("load-session", sessionId),
+  saveState: (state) => ipcRenderer.invoke("save-state", state),
+  loadState: () => ipcRenderer.invoke("load-state"),
 });

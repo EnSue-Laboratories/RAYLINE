@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { startAgent, cancelAgent, cancelAll } = require("./agent-manager.cjs");
 const { listSessions, loadSessionMessages } = require("./session-reader.cjs");
 
@@ -106,6 +107,42 @@ ipcMain.handle("list-sessions", async (_event, cwd) => {
 
 ipcMain.handle("load-session", async (_event, sessionId) => {
   return loadSessionMessages(sessionId);
+});
+
+// IPC: file-based state persistence (survives app name changes)
+const stateFilePath = path.join(app.getPath("userData"), "claudi-state.json");
+
+ipcMain.handle("save-state", async (_event, state) => {
+  try {
+    fs.writeFileSync(stateFilePath, JSON.stringify(state, null, 2));
+    return true;
+  } catch (e) {
+    console.error("Failed to save state:", e);
+    return false;
+  }
+});
+
+ipcMain.handle("load-state", async () => {
+  try {
+    if (fs.existsSync(stateFilePath)) {
+      return JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+    }
+    // Try migrating from old app name
+    const oldPaths = [
+      path.join(app.getPath("home"), "Library/Application Support/scaffold-tmp/claudi-state.json"),
+      path.join(app.getPath("home"), "Library/Application Support/Ensue/claudi-state.json"),
+    ];
+    for (const old of oldPaths) {
+      if (fs.existsSync(old)) {
+        const data = JSON.parse(fs.readFileSync(old, "utf-8"));
+        fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
+        return data;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to load state:", e);
+  }
+  return null;
 });
 
 app.on("before-quit", () => {

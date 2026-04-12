@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
@@ -10,31 +10,37 @@ export default function App() {
   const { conversations, getConversation, sendMessage, cancelMessage, editAndResend, loadMessages } = useAgent();
 
   // convos: array of { id, sessionId, title, model, ts }
-  const [convoList, setConvoList] = useState(() => {
-    try {
-      const saved = localStorage.getItem("ensue-convos");
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
-  const [active, setActive] = useState(() => {
-    try { return localStorage.getItem("ensue-active") || null; } catch { return null; }
-  });
+  const [convoList, setConvoList] = useState([]);
+  const [active, setActive] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [defaultModel, setDefaultModel] = useState("sonnet");
-  const [cwd, setCwd] = useState(() => {
-    try { return localStorage.getItem("ensue-cwd") || null; } catch { return null; }
-  });
+  const [cwd, setCwd] = useState(null);
+  const [stateLoaded, setStateLoaded] = useState(false);
 
-  // Persist state
+  // Load state from file on mount
   useEffect(() => {
-    localStorage.setItem("ensue-convos", JSON.stringify(convoList));
-  }, [convoList]);
+    if (!window.api) { setStateLoaded(true); return; }
+    window.api.loadState().then((state) => {
+      if (state) {
+        if (state.convos) setConvoList(state.convos);
+        if (state.active) setActive(state.active);
+        if (state.cwd) setCwd(state.cwd);
+        if (state.defaultModel) setDefaultModel(state.defaultModel);
+      }
+      setStateLoaded(true);
+    });
+  }, []);
+
+  // Persist state to file on changes (skip until initial load is done)
+  const saveTimer = useRef(null);
   useEffect(() => {
-    if (active) localStorage.setItem("ensue-active", active);
-  }, [active]);
-  useEffect(() => {
-    if (cwd) localStorage.setItem("ensue-cwd", cwd);
-  }, [cwd]);
+    if (!stateLoaded || !window.api) return;
+    // Debounce saves
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      window.api.saveState({ convos: convoList, active, cwd, defaultModel });
+    }, 300);
+  }, [convoList, active, cwd, defaultModel, stateLoaded]);
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
