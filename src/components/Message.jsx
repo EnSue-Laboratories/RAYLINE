@@ -294,11 +294,12 @@ export default function Message({ msg, onEdit, onAnswer }) {
               lineHeight: 1.7,
               fontFamily: "system-ui,-apple-system,sans-serif",
               fontWeight: 400,
-              whiteSpace: "pre-wrap",
               textAlign: "left",
               maxWidth: "85%",
             }}>
-              {displayText}
+              <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                {displayText}
+              </Markdown>
             </div>
           </>
         )}
