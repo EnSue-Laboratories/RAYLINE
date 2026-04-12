@@ -10,10 +10,26 @@ const TOOL_ICONS = {
   Glob: Search,
 };
 
+function getPreview(tool) {
+  const args = tool.args;
+  if (!args || typeof args !== "object") return null;
+  if (tool.name === "Bash") return args.command?.slice(0, 60);
+  if (tool.name === "Read") return args.file_path?.split("/").slice(-2).join("/");
+  if (tool.name === "Edit") return args.file_path?.split("/").slice(-2).join("/");
+  if (tool.name === "Write") return args.file_path?.split("/").slice(-2).join("/");
+  if (tool.name === "Grep") return args.pattern?.slice(0, 40);
+  if (tool.name === "Glob") return args.pattern?.slice(0, 40);
+  if (tool.name === "Agent") return args.description?.slice(0, 50);
+  if (tool.name === "WebSearch") return args.query?.slice(0, 50);
+  if (tool.name === "WebFetch") return args.url?.slice(0, 50);
+  return null;
+}
+
 export default function ToolCallBlock({ tool }) {
   const [expanded, setExpanded] = useState(false);
   const Icon = TOOL_ICONS[tool.name] || Code;
   const isRunning = tool.status === "running";
+  const preview = getPreview(tool);
 
   return (
     <div
@@ -45,12 +61,27 @@ export default function ToolCallBlock({ tool }) {
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         <Icon size={13} strokeWidth={1.5} />
         <span style={{ color: "rgba(255,255,255,0.7)" }}>{tool.name}</span>
-        {isRunning && (
-          <Loader2 size={10} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)", animation: "spin 1s linear infinite", marginLeft: 2 }} />
+        {preview && !expanded && (
+          <span style={{
+            color: "rgba(255,255,255,0.25)",
+            fontSize: 10,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            flex: 1,
+            minWidth: 0,
+          }}>
+            {preview}
+          </span>
         )}
-        {tool.status === "done" && (
-          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>done</span>
-        )}
+        <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
+          {isRunning && (
+            <Loader2 size={10} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)", animation: "spin 1s linear infinite" }} />
+          )}
+          {tool.status === "done" && (
+            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>done</span>
+          )}
+        </span>
       </button>
 
       {expanded && (
