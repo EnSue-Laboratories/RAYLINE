@@ -36,19 +36,19 @@ function initMermaid() {
       tertiaryColor: "#1e2d3d",
       tertiaryBorderColor: "#5a9ab5",
 
-      // Git graph
-      git0: "#3b82c4",
-      git1: "#6ab04c",
-      git2: "#e2b93d",
-      git3: "#e07b4c",
-      git4: "#9b59b6",
-      git5: "#1abc9c",
-      git6: "#e67e22",
-      git7: "#2ecc71",
-      gitBranchLabel0: "#3b82c4",
-      gitBranchLabel1: "#6ab04c",
-      gitBranchLabel2: "#e2b93d",
-      gitInv0: "#ffffff",
+      // Git graph — white/gray monochrome
+      git0: "#ffffff",
+      git1: "#bbbbbb",
+      git2: "#888888",
+      git3: "#cccccc",
+      git4: "#aaaaaa",
+      git5: "#dddddd",
+      git6: "#999999",
+      git7: "#eeeeee",
+      gitBranchLabel0: "#ffffff",
+      gitBranchLabel1: "#bbbbbb",
+      gitBranchLabel2: "#888888",
+      gitInv0: "#000000",
 
       // Pie chart
       pie1: "#3b82c4",
