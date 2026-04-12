@@ -4,6 +4,7 @@ import Message from "./Message";
 import EmptyState from "./EmptyState";
 import ModelPicker from "./ModelPicker";
 import ImagePreview from "./ImagePreview";
+import SelectionToolbar from "./SelectionToolbar";
 
 export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel }) {
   const [input, setInput]             = useState("");
@@ -130,6 +131,21 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Selection toolbar handlers
+  const handleQuote = useCallback((text) => {
+    const quoted = text.split("\n").map(l => `> ${l}`).join("\n");
+    setInput((prev) => prev ? `${prev}\n\n${quoted}\n\n` : `${quoted}\n\n`);
+    // Expand textarea to fit
+    setTimeout(() => {
+      if (inRef.current) {
+        inRef.current.style.height = "20px";
+        inRef.current.style.height = Math.min(inRef.current.scrollHeight, 120) + "px";
+        inRef.current.focus();
+      }
+    }, 0);
+  }, []);
+
+
   return (
     <div
       style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10 }}
@@ -248,6 +264,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           </div>
         )}
       </div>
+
+      <SelectionToolbar onQuote={handleQuote} model={convo?.model || defaultModel || "haiku"} />
 
       {/* Input bar */}
       <div

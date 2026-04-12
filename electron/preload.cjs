@@ -27,4 +27,5 @@ contextBridge.exposeInMainWorld("api", {
   getFilePath: (file) => {
     try { return webUtils.getPathForFile(file); } catch { return null; }
   },
+  quickExplain: (opts) => ipcRenderer.invoke("quick-explain", opts),
 });

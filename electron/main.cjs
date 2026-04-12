@@ -145,6 +145,32 @@ ipcMain.handle("load-state", async () => {
   return null;
 });
 
+// IPC: quick explain (one-shot, not in chat history)
+ipcMain.handle("quick-explain", async (_event, { text, model }) => {
+  const { spawn } = require("child_process");
+  return new Promise((resolve) => {
+    const args = [
+      "--print",
+      "--output-format", "text",
+      "--tools", "",
+      "--model", model || "haiku",
+      "--max-turns", "1",
+      "--no-session-persistence",
+      `Explain this briefly in 1-3 short sentences. Be concise and clear:\n\n${text}`,
+    ];
+    const child = spawn("claude", args, {
+      env: { ...process.env, FORCE_COLOR: "0", PATH: process.env.PATH + ":/opt/homebrew/bin:/usr/local/bin" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    child.stdout.on("data", (c) => { out += c.toString(); });
+    child.stderr.on("data", () => {});
+    child.on("close", () => resolve(out.trim()));
+    child.on("error", (err) => resolve(`Error: ${err.message}`));
+    setTimeout(() => { child.kill(); resolve(out.trim() || "Timed out"); }, 15000);
+  });
+});
+
 app.on("before-quit", () => {
   cancelAll();
 });
