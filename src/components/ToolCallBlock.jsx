@@ -18,15 +18,15 @@ function truncate(str, max) {
 function getPreview(tool) {
   const args = tool.args;
   if (!args || typeof args !== "object") return null;
-  if (tool.name === "Bash") return truncate(args.command?.replace(/\n/g, " "), 80);
-  if (tool.name === "Read") return args.file_path?.split("/").slice(-2).join("/");
-  if (tool.name === "Edit") return args.file_path?.split("/").slice(-2).join("/");
-  if (tool.name === "Write") return args.file_path?.split("/").slice(-2).join("/");
-  if (tool.name === "Grep") return truncate(args.pattern, 50);
-  if (tool.name === "Glob") return truncate(args.pattern, 50);
-  if (tool.name === "Agent") return truncate(args.description, 60);
-  if (tool.name === "WebSearch") return truncate(args.query, 60);
-  if (tool.name === "WebFetch") return truncate(args.url, 60);
+  if (tool.name === "Bash") return truncate(args.command?.replace(/\n/g, " "), 30);
+  if (tool.name === "Read") return args.file_path?.split("/").pop();
+  if (tool.name === "Edit") return args.file_path?.split("/").pop();
+  if (tool.name === "Write") return args.file_path?.split("/").pop();
+  if (tool.name === "Grep") return truncate(args.pattern, 25);
+  if (tool.name === "Glob") return truncate(args.pattern, 25);
+  if (tool.name === "Agent") return truncate(args.description, 30);
+  if (tool.name === "WebSearch") return truncate(args.query, 30);
+  if (tool.name === "WebFetch") return truncate(args.url, 30);
   return null;
 }
 
