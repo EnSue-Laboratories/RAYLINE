@@ -79,8 +79,9 @@ export default function SelectionToolbar({ onQuote, model }) {
     window.getSelection()?.removeAllRanges();
   };
 
-  // Clamp position so the toolbar doesn't go off-screen
-  const clampX = Math.max(120, Math.min(sel.x, window.innerWidth - 120));
+  // Clamp position and decide if toolbar goes above or below selection
+  const clampX = Math.max(180, Math.min(sel.x, window.innerWidth - 180));
+  const showBelow = sel.y < 280; // flip below if too close to top
 
   return (
     <div
@@ -88,59 +89,19 @@ export default function SelectionToolbar({ onQuote, model }) {
       style={{
         position: "fixed",
         left: clampX,
-        top: sel.y - 6,
-        transform: "translate(-50%, -100%)",
+        top: showBelow ? sel.y + 30 : sel.y - 6,
+        transform: showBelow ? "translate(-50%, 0)" : "translate(-50%, -100%)",
         zIndex: 9999,
         animation: "selToolbarIn .15s ease",
       }}
     >
       <div style={{
         display: "flex",
-        flexDirection: "column",
+        flexDirection: showBelow ? "column" : "column",
         alignItems: "center",
       }}>
-        {/* Explanation pane — above toolbar */}
-        {explanation && (
-          <div style={{
-            width: 300,
-            maxHeight: 200,
-            overflowY: "auto",
-            background: "rgba(24,24,24,0.97)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "10px 10px 0 0",
-            padding: "10px 14px",
-            backdropFilter: "blur(20px)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-            animation: "selInputIn .15s ease",
-            marginBottom: -1,
-          }}>
-            {explanation.loading ? (
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                color: "rgba(255,255,255,0.4)",
-                fontSize: 12,
-                fontFamily: "system-ui,sans-serif",
-              }}>
-                <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
-                Thinking...
-              </div>
-            ) : (
-              <div style={{
-                color: "rgba(255,255,255,0.7)",
-                fontSize: 13,
-                lineHeight: 1.6,
-                fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
-                letterSpacing: "0.005em",
-              }}>
-                <Markdown remarkPlugins={[remarkGfm]}>
-                  {explanation.text}
-                </Markdown>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Explanation pane — above toolbar (or below if flipped) */}
+        {!showBelow && explanation && <ExplainPane explanation={explanation} position="above" />}
 
         {/* Toolbar pill */}
         <div style={{
@@ -149,7 +110,9 @@ export default function SelectionToolbar({ onQuote, model }) {
           gap: 1,
           background: "rgba(30,30,30,0.95)",
           border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: explanation ? "0 0 10px 10px" : 10,
+          borderRadius: explanation
+            ? (showBelow ? "10px 10px 0 0" : "0 0 10px 10px")
+            : 10,
           padding: "3px 4px",
           backdropFilter: "blur(20px)",
           boxShadow: explanation ? "none" : "0 8px 32px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.06)",
@@ -168,8 +131,10 @@ export default function SelectionToolbar({ onQuote, model }) {
           />
         </div>
 
+        {showBelow && explanation && <ExplainPane explanation={explanation} position="below" />}
+
         {/* Arrow */}
-        {!explanation && (
+        {!explanation && !showBelow && (
           <div style={{
             width: 0,
             height: 0,
@@ -211,5 +176,49 @@ function ToolbarBtn({ icon, label, onClick, active }) {
       {icon}
       {label}
     </button>
+  );
+}
+
+function ExplainPane({ explanation, position }) {
+  return (
+    <div style={{
+      width: 340,
+      maxHeight: 260,
+      overflowY: "auto",
+      background: "rgba(24,24,24,0.97)",
+      border: "1px solid rgba(255,255,255,0.1)",
+      borderRadius: position === "above" ? "10px 10px 0 0" : "0 0 10px 10px",
+      padding: "10px 14px",
+      backdropFilter: "blur(20px)",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      marginBottom: position === "above" ? -1 : 0,
+      marginTop: position === "below" ? -1 : 0,
+    }}>
+      {explanation.loading ? (
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          color: "rgba(255,255,255,0.4)",
+          fontSize: 12,
+          fontFamily: "system-ui,sans-serif",
+        }}>
+          <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
+          Thinking...
+        </div>
+      ) : (
+        <div style={{
+          color: "rgba(255,255,255,0.7)",
+          fontSize: 13,
+          lineHeight: 1.6,
+          fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
+          letterSpacing: "0.005em",
+        }}>
+          <Markdown remarkPlugins={[remarkGfm]}>
+            {explanation.text}
+          </Markdown>
+        </div>
+      )}
+    </div>
   );
 }
