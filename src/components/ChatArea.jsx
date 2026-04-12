@@ -41,6 +41,19 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   const isStreaming = convo?.isStreaming;
 
+  // Slash command suggestions
+  const COMMANDS = [
+    { cmd: "/clear", desc: "Start a new conversation" },
+    { cmd: "/new", desc: "Start a new conversation" },
+    { cmd: "/compact", desc: "Compact conversation context" },
+    { cmd: "/model", desc: "Show current model" },
+  ];
+  const showCommands = input.startsWith("/") && !input.includes(" ");
+  const filteredCommands = showCommands
+    ? COMMANDS.filter(c => c.cmd.startsWith(input.toLowerCase()))
+    : [];
+  const [selectedCmd, setSelectedCmd] = useState(0);
+
   const send = useCallback(() => {
     if (!input.trim() && attachments.length === 0) return;
     onSend(input.trim(), attachments.length > 0 ? attachments : undefined);
@@ -57,6 +70,25 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   };
 
   const handleKeyDown = (e) => {
+    // Command palette navigation
+    if (filteredCommands.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedCmd((p) => Math.min(p + 1, filteredCommands.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedCmd((p) => Math.max(p - 1, 0));
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        setInput(filteredCommands[selectedCmd].cmd);
+        setSelectedCmd(0);
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       send();
@@ -300,6 +332,47 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
                   }}>{q.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Slash command palette */}
+          {filteredCommands.length > 0 && (
+            <div style={{
+              marginBottom: 6,
+              background: "rgba(24,24,24,0.95)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 10,
+              padding: "4px",
+              backdropFilter: "blur(20px)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            }}>
+              {filteredCommands.map((c, i) => (
+                <div
+                  key={c.cmd}
+                  onClick={() => { setInput(c.cmd); setSelectedCmd(0); }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "6px 10px",
+                    borderRadius: 7,
+                    cursor: "pointer",
+                    background: i === selectedCmd ? "rgba(255,255,255,0.06)" : "transparent",
+                    transition: "background .1s",
+                  }}
+                  onMouseEnter={() => setSelectedCmd(i)}
+                >
+                  <span style={{
+                    fontSize: 12,
+                    fontFamily: "'JetBrains Mono',monospace",
+                    color: "rgba(255,255,255,0.7)",
+                  }}>{c.cmd}</span>
+                  <span style={{
+                    fontSize: 11,
+                    color: "rgba(255,255,255,0.25)",
+                    fontFamily: "system-ui,sans-serif",
+                  }}>{c.desc}</span>
                 </div>
               ))}
             </div>

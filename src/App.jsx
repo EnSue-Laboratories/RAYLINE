@@ -138,6 +138,19 @@ export default function App() {
 
   const handleSend = useCallback(
     (text, attachments) => {
+      // Handle slash commands client-side
+      if (text.startsWith("/")) {
+        const cmd = text.trim().toLowerCase();
+        if (cmd === "/clear" || cmd === "/new") {
+          handleNew();
+          return;
+        }
+        if (cmd === "/compact") {
+          // Send as a regular message — Claude knows about /compact
+        }
+        // All other /commands pass through to Claude as regular text
+      }
+
       // Queue if currently streaming
       if (activeData.isStreaming && active) {
         messageQueue.current.push({ text, attachments });
