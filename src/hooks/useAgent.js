@@ -221,9 +221,21 @@ export default function useAgent() {
     }
   }, []);
 
+  const loadMessages = useCallback((conversationId, messages) => {
+    setConversations((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(conversationId);
+      // Only load if no messages in memory yet
+      if (!existing || existing.messages.length === 0) {
+        next.set(conversationId, { messages, isStreaming: false, error: null });
+      }
+      return next;
+    });
+  }, []);
+
   const getConversation = useCallback((id) => {
     return conversations.get(id) || { messages: [], isStreaming: false, error: null };
   }, [conversations]);
 
-  return { conversations, getConversation, sendMessage, cancelMessage, editAndResend };
+  return { conversations, getConversation, sendMessage, cancelMessage, editAndResend, loadMessages };
 }

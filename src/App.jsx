@@ -7,7 +7,7 @@ import useAgent     from "./hooks/useAgent";
 import { getM }     from "./data/models";
 
 export default function App() {
-  const { conversations, getConversation, sendMessage, cancelMessage, editAndResend } = useAgent();
+  const { conversations, getConversation, sendMessage, cancelMessage, editAndResend, loadMessages } = useAgent();
 
   // convos: array of { id, sessionId, title, model, ts }
   const [convoList, setConvoList] = useState(() => {
@@ -38,6 +38,28 @@ export default function App() {
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
+
+  // Load messages from Claude Code session files when selecting a conversation
+  const handleSelect = useCallback(async (id) => {
+    setActive(id);
+    const convo = convoList.find((c) => c.id === id);
+    const data = getConversation(id);
+    if (convo && data.messages.length === 0 && window.api) {
+      try {
+        const msgs = await window.api.loadSession(convo.sessionId);
+        if (msgs && msgs.length > 0) {
+          loadMessages(id, msgs);
+        }
+      } catch (e) {
+        console.error("Failed to load session:", e);
+      }
+    }
+  }, [convoList, getConversation, loadMessages]);
+
+  // Load active conversation on mount
+  useEffect(() => {
+    if (active) handleSelect(active);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -190,7 +212,7 @@ export default function App() {
         <Sidebar
           convos={convosForSidebar}
           active={active}
-          onSelect={setActive}
+          onSelect={handleSelect}
           onNew={handleNew}
           onDelete={handleDelete}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
