@@ -3,6 +3,23 @@ import { useState, useCallback, useEffect, useRef } from "react";
 let _msgId = 0;
 const uid = () => "m" + (++_msgId) + "-" + Date.now();
 
+// Helper: get or create the last text part on an assistant message
+function lastTextPart(parts) {
+  const last = parts[parts.length - 1];
+  if (last && last.type === "text") return last;
+  const p = { type: "text", text: "" };
+  parts.push(p);
+  return p;
+}
+
+// Helper: find a tool part by id across all parts
+function findToolPart(parts, toolId) {
+  for (const p of parts) {
+    if (p.type === "tool" && p.id === toolId) return p;
+  }
+  return null;
+}
+
 export default function useAgent() {
   const [conversations, setConversations] = useState(new Map());
   const cleanupRefs = useRef([]);
@@ -17,10 +34,9 @@ export default function useAgent() {
         const msgs = [...convo.messages];
         let lastMsg = msgs[msgs.length - 1];
 
-        // Ensure an assistant message exists
         const ensureAssistant = () => {
           if (!lastMsg || lastMsg.role !== "assistant") {
-            lastMsg = { id: uid(), role: "assistant", text: "", toolCalls: [], isStreaming: true, isThinking: false };
+            lastMsg = { id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false };
             msgs.push(lastMsg);
           }
           return lastMsg;
@@ -33,11 +49,12 @@ export default function useAgent() {
           if (inner.type === "content_block_start") {
             const block = inner.content_block;
             const am = ensureAssistant();
+            const parts = [...(am.parts || [])];
             if (block?.type === "thinking") {
-              msgs[msgs.length - 1] = { ...am, isThinking: true };
+              msgs[msgs.length - 1] = { ...am, parts, isThinking: true };
             } else if (block?.type === "tool_use") {
-              const toolCalls = [...(am.toolCalls || [])];
-              toolCalls.push({
+              parts.push({
+                type: "tool",
                 id: block.id || "tc" + uid(),
                 name: block.name || "unknown",
                 args: {},
@@ -45,27 +62,32 @@ export default function useAgent() {
                 result: null,
                 status: "running",
               });
-              msgs[msgs.length - 1] = { ...am, toolCalls, isThinking: false };
+              msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
             } else if (block?.type === "text") {
-              msgs[msgs.length - 1] = { ...am, isThinking: false };
+              // Start a new text part (don't merge with previous text that was before tool calls)
+              parts.push({ type: "text", text: "" });
+              msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
             }
           } else if (inner.type === "content_block_delta") {
             const am = ensureAssistant();
+            const parts = [...(am.parts || [])];
             const delta = inner.delta;
             if (delta?.type === "text_delta") {
-              msgs[msgs.length - 1] = { ...am, text: am.text + (delta.text || ""), isThinking: false };
+              const tp = lastTextPart(parts);
+              tp.text += (delta.text || "");
+              msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
             } else if (delta?.type === "input_json_delta") {
-              // Tool call args streaming
-              const toolCalls = [...(am.toolCalls || [])];
-              if (toolCalls.length > 0) {
-                const last = { ...toolCalls[toolCalls.length - 1] };
-                last.argsJson = (last.argsJson || "") + (delta.partial_json || "");
-                try { last.args = JSON.parse(last.argsJson); } catch {}
-                toolCalls[toolCalls.length - 1] = last;
+              // Find the last tool part
+              for (let i = parts.length - 1; i >= 0; i--) {
+                if (parts[i].type === "tool") {
+                  parts[i] = { ...parts[i] };
+                  parts[i].argsJson = (parts[i].argsJson || "") + (delta.partial_json || "");
+                  try { parts[i].args = JSON.parse(parts[i].argsJson); } catch {}
+                  break;
+                }
               }
-              msgs[msgs.length - 1] = { ...am, toolCalls };
+              msgs[msgs.length - 1] = { ...am, parts };
             } else if (delta?.type === "thinking_delta") {
-              // Thinking — just keep the indicator
               msgs[msgs.length - 1] = { ...am, isThinking: true };
             }
           } else if (inner.type === "content_block_stop") {
@@ -73,17 +95,23 @@ export default function useAgent() {
             msgs[msgs.length - 1] = { ...am, isThinking: false };
           }
         } else if (event.type === "assistant") {
-          // Full assistant message — may contain tool_use or text
           const am = ensureAssistant();
-          let text = "";
-          const toolCalls = [...(am.toolCalls || [])];
+          const parts = [...(am.parts || [])];
           if (event.message?.content) {
             for (const block of event.message.content) {
-              if (block.type === "text") text += block.text;
+              if (block.type === "text" && block.text) {
+                // Check if we should update the last text part or add new
+                const lastPart = parts[parts.length - 1];
+                if (lastPart && lastPart.type === "text") {
+                  lastPart.text = block.text; // replace (full message update)
+                } else {
+                  parts.push({ type: "text", text: block.text });
+                }
+              }
               if (block.type === "tool_use") {
-                const existing = toolCalls.find(t => t.id === block.id);
-                if (!existing) {
-                  toolCalls.push({
+                if (!findToolPart(parts, block.id)) {
+                  parts.push({
+                    type: "tool",
                     id: block.id,
                     name: block.name || "unknown",
                     args: block.input || {},
@@ -94,24 +122,19 @@ export default function useAgent() {
               }
             }
           }
-          if (text) {
-            msgs[msgs.length - 1] = { ...am, text, toolCalls, isThinking: false };
-          } else if (toolCalls.length > am.toolCalls?.length) {
-            msgs[msgs.length - 1] = { ...am, toolCalls, isThinking: false };
-          }
+          msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
         } else if (event.type === "user") {
-          // Tool results come as user messages
           if (event.message?.content) {
             for (const block of event.message.content) {
               if (block.type === "tool_result" && block.tool_use_id) {
-                // Find the assistant message with this tool call and mark it done
                 for (let mi = msgs.length - 1; mi >= 0; mi--) {
-                  if (msgs[mi].role === "assistant" && msgs[mi].toolCalls) {
-                    const toolCalls = [...msgs[mi].toolCalls];
-                    const idx = toolCalls.findIndex(t => t.id === block.tool_use_id);
-                    if (idx >= 0) {
-                      toolCalls[idx] = { ...toolCalls[idx], result: block.content, status: "done" };
-                      msgs[mi] = { ...msgs[mi], toolCalls };
+                  if (msgs[mi].role === "assistant" && msgs[mi].parts) {
+                    const parts = [...msgs[mi].parts];
+                    const tp = findToolPart(parts, block.tool_use_id);
+                    if (tp) {
+                      tp.result = block.content;
+                      tp.status = "done";
+                      msgs[mi] = { ...msgs[mi], parts };
                       break;
                     }
                   }
@@ -119,25 +142,6 @@ export default function useAgent() {
               }
             }
           }
-        } else if (event.type === "tool_use" || event.type === "tool_call") {
-          const am = ensureAssistant();
-          const toolCalls = [...(am.toolCalls || [])];
-          const subtype = event.subtype || "started";
-          if (subtype === "started" || subtype === "pending") {
-            toolCalls.push({
-              id: event.callId || event.id || "tc" + uid(),
-              name: event.toolName || event.name || "unknown",
-              args: event.args || event.input || {},
-              result: null,
-              status: "running",
-            });
-          } else if (subtype === "completed") {
-            const idx = toolCalls.findIndex((t) => t.id === (event.callId || event.id));
-            if (idx >= 0) {
-              toolCalls[idx] = { ...toolCalls[idx], result: event.result || event.output, status: "done" };
-            }
-          }
-          msgs[msgs.length - 1] = { ...am, toolCalls };
         } else if (event.type === "result") {
           if (lastMsg && lastMsg.role === "assistant") {
             msgs[msgs.length - 1] = { ...lastMsg, isStreaming: false, isThinking: false };
@@ -183,7 +187,7 @@ export default function useAgent() {
       const msgs = [
         ...convo.messages,
         { id: uid(), role: "user", text: prompt, images, files },
-        { id: uid(), role: "assistant", text: "", toolCalls: [], isStreaming: true, isThinking: true },
+        { id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: true },
       ];
       next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       return next;
@@ -228,7 +232,6 @@ export default function useAgent() {
     setConversations((prev) => {
       const next = new Map(prev);
       const existing = next.get(conversationId);
-      // Only load if no messages in memory yet
       if (!existing || existing.messages.length === 0) {
         next.set(conversationId, { messages, isStreaming: false, error: null });
       }

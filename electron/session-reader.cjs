@@ -102,14 +102,16 @@ async function loadSessionMessages(sessionId) {
         });
       }
     } else if (evt.type === "assistant") {
-      // Extract assistant text and tool calls
-      let text = "";
-      const toolCalls = [];
+      // Extract parts in order — text and tool calls interleaved
+      const newParts = [];
       if (evt.message?.content) {
         for (const block of evt.message.content) {
-          if (block.type === "text") text += block.text;
+          if (block.type === "text" && block.text) {
+            newParts.push({ type: "text", text: block.text });
+          }
           if (block.type === "tool_use") {
-            toolCalls.push({
+            newParts.push({
+              type: "tool",
               id: block.id || "tc" + Date.now() + Math.random(),
               name: block.name || "unknown",
               args: block.input || {},
@@ -119,22 +121,16 @@ async function loadSessionMessages(sessionId) {
           }
         }
       }
-      // Only add if it has text or tool calls (skip thinking-only messages)
-      if (text || toolCalls.length > 0) {
-        // Merge into the last assistant message if it exists (consecutive assistant turns)
+      if (newParts.length > 0) {
+        // Merge into the last assistant message if consecutive
         const lastMsg = messages[messages.length - 1];
         if (lastMsg && lastMsg.role === "assistant") {
-          // Append text and tool calls to existing assistant message
-          if (text) lastMsg.text = (lastMsg.text ? lastMsg.text + text : text);
-          if (toolCalls.length > 0) {
-            lastMsg.toolCalls = [...(lastMsg.toolCalls || []), ...toolCalls];
-          }
+          lastMsg.parts = [...(lastMsg.parts || []), ...newParts];
         } else {
           messages.push({
             id: evt.uuid || "a" + Date.now() + Math.random(),
             role: "assistant",
-            text,
-            toolCalls,
+            parts: newParts,
             isStreaming: false,
             isThinking: false,
           });
@@ -152,24 +148,18 @@ async function loadSessionMessages(sessionId) {
     if (evt.type === "user" && evt.message?.content && Array.isArray(evt.message.content)) {
       for (const block of evt.message.content) {
         if (block.type === "tool_result" && block.tool_use_id) {
-          // Find the tool call and set its result
           for (const msg of messages) {
-            if (msg.role === "assistant" && msg.toolCalls) {
-              const tc = msg.toolCalls.find(t => t.id === block.tool_use_id);
-              if (tc) {
-                tc.result = typeof block.content === "string" ? block.content : JSON.stringify(block.content);
-                tc.status = "done";
+            if (msg.role === "assistant" && msg.parts) {
+              const tp = msg.parts.find(p => p.type === "tool" && p.id === block.tool_use_id);
+              if (tp) {
+                tp.result = typeof block.content === "string" ? block.content : JSON.stringify(block.content);
+                tp.status = "done";
               }
             }
           }
         }
       }
     }
-  }
-
-  // Clean up internal fields
-  for (const msg of messages) {
-    delete msg._msgId;
   }
 
   return messages;

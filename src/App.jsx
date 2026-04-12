@@ -163,6 +163,22 @@ export default function App() {
     if (folder) setCwd(folder);
   };
 
+  // Update saved preview when active conversation messages change
+  useEffect(() => {
+    if (active && activeData.messages.length > 0) {
+      const lastMsg = activeData.messages[activeData.messages.length - 1];
+      const msgText = lastMsg?.parts
+        ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
+        : (lastMsg?.text || "");
+      const preview = msgText.slice(0, 60);
+      if (preview) {
+        setConvoList((p) =>
+          p.map((c) => c.id === active ? { ...c, lastPreview: preview } : c)
+        );
+      }
+    }
+  }, [active, activeData.messages.length]);
+
   // Build convo object for ChatArea
   const convo = activeConvo
     ? {
@@ -178,10 +194,14 @@ export default function App() {
     const data = getConversation(c.id);
     const msgs = data.messages;
     const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+    const lastText = lastMsg?.parts
+      ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
+      : (lastMsg?.text || "");
+    const preview = lastText ? lastText.slice(0, 45) : null;
     return {
       ...c,
       msgs,
-      lastPreview: lastMsg ? (lastMsg.text || "").slice(0, 45) : "Empty",
+      lastPreview: preview || c.lastPreview || "Empty",
       isStreaming: data.isStreaming,
     };
   });

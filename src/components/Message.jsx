@@ -249,7 +249,44 @@ export default function Message({ msg, onEdit }) {
         )}
       </div>
 
-      {msg.text && (
+      {/* Render parts in order — text and tool calls interleaved */}
+      {(msg.parts || []).map((part, i) => {
+        if (part.type === "text" && part.text) {
+          const isLastPart = i === (msg.parts || []).length - 1;
+          return (
+            <div key={i} style={{
+              color: "rgba(255,255,255,0.75)",
+              fontSize: 15,
+              lineHeight: 1.85,
+              fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
+              letterSpacing: "0.008em",
+              marginBottom: 4,
+            }}>
+              <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                {part.text}
+              </Markdown>
+              {msg.isStreaming && isLastPart && (
+                <span style={{
+                  display: "inline-block",
+                  width: 2,
+                  height: 16,
+                  background: "rgba(255,255,255,0.4)",
+                  marginLeft: 2,
+                  verticalAlign: "text-bottom",
+                  animation: "blink 1s steps(1) infinite",
+                }} />
+              )}
+            </div>
+          );
+        }
+        if (part.type === "tool") {
+          return <ToolCallBlock key={part.id || i} tool={part} />;
+        }
+        return null;
+      })}
+
+      {/* Fallback for old format messages (text + toolCalls) */}
+      {!msg.parts && msg.text && (
         <div style={{
           color: "rgba(255,255,255,0.75)",
           fontSize: 15,
@@ -260,31 +297,19 @@ export default function Message({ msg, onEdit }) {
           <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
             {msg.text}
           </Markdown>
-          {msg.isStreaming && (
-            <span style={{
-              display: "inline-block",
-              width: 2,
-              height: 16,
-              background: "rgba(255,255,255,0.4)",
-              marginLeft: 2,
-              verticalAlign: "text-bottom",
-              animation: "blink 1s steps(1) infinite",
-            }} />
-          )}
         </div>
       )}
+      {!msg.parts && msg.toolCalls && msg.toolCalls.map((tc) => (
+        <ToolCallBlock key={tc.id} tool={tc} />
+      ))}
 
-      {msg.toolCalls && msg.toolCalls.length > 0 && (
-        <div style={{ marginTop: msg.text ? 12 : 0 }}>
-          {msg.toolCalls.map((tc) => (
-            <ToolCallBlock key={tc.id} tool={tc} />
-          ))}
-        </div>
-      )}
-
-      {!msg.isStreaming && msg.text && (
+      {!msg.isStreaming && (msg.parts?.some(p => p.type === "text" && p.text) || msg.text) && (
         <div style={{ marginTop: 8 }}>
-          <CopyBtn text={msg.text} />
+          <CopyBtn text={
+            msg.parts
+              ? msg.parts.filter(p => p.type === "text").map(p => p.text).join("\n")
+              : msg.text
+          } />
         </div>
       )}
     </div>

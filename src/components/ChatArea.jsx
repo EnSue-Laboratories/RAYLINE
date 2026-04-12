@@ -13,10 +13,12 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const inRef   = useRef(null);
 
   // Scroll to bottom on new messages and during streaming
-  const lastMsgText = convo?.msgs?.[convo.msgs.length - 1]?.text;
+  const lastMsg = convo?.msgs?.[convo.msgs.length - 1];
+  const lastParts = lastMsg?.parts;
+  const lastPartText = lastParts?.[lastParts.length - 1]?.text || lastMsg?.text;
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [convo?.msgs?.length, convo?.isStreaming, lastMsgText]);
+  }, [convo?.msgs?.length, convo?.isStreaming, lastPartText]);
 
   const send = useCallback(() => {
     if (!input.trim() && attachments.length === 0) return;
