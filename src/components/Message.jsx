@@ -96,8 +96,11 @@ const mdComponents = {
       borderLeft: "2px solid rgba(255,255,255,0.15)",
       paddingLeft: 14,
       margin: "8px 0",
-      color: "rgba(255,255,255,0.5)",
+      color: "rgba(255,255,255,0.45)",
+      fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
       fontStyle: "italic",
+      fontSize: 13,
+      lineHeight: 1.7,
     }}>{children}</blockquote>
   ),
   a: ({ href, children }) => {
