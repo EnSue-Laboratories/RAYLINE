@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { ChevronRight, ChevronDown, Terminal, FileText, Pencil, Search, Code } from "lucide-react";
+import { useState } from "react";
+import { ChevronRight, ChevronDown, Terminal, FileText, Pencil, Search, Code, Loader2 } from "lucide-react";
 
 const TOOL_ICONS = {
   Bash: Terminal,
@@ -11,25 +11,14 @@ const TOOL_ICONS = {
 };
 
 export default function ToolCallBlock({ tool }) {
-  const [expanded, setExpanded] = useState(tool.status === "running");
-  const wasRunning = useRef(tool.status === "running");
-
-  // Auto-expand when running, auto-collapse when done
-  useEffect(() => {
-    if (tool.status === "running" && !wasRunning.current) {
-      setExpanded(true);
-    } else if (tool.status === "done" && wasRunning.current) {
-      setExpanded(false);
-    }
-    wasRunning.current = tool.status === "running";
-  }, [tool.status]);
+  const [expanded, setExpanded] = useState(false);
   const Icon = TOOL_ICONS[tool.name] || Code;
   const isRunning = tool.status === "running";
 
   return (
     <div
       style={{
-        margin: "8px 0",
+        margin: "6px 0",
         borderRadius: 8,
         border: "1px solid rgba(255,255,255,0.06)",
         background: "rgba(255,255,255,0.02)",
@@ -43,7 +32,7 @@ export default function ToolCallBlock({ tool }) {
           alignItems: "center",
           gap: 8,
           width: "100%",
-          padding: "8px 12px",
+          padding: "7px 12px",
           background: "none",
           border: "none",
           color: "rgba(255,255,255,0.5)",
@@ -57,15 +46,10 @@ export default function ToolCallBlock({ tool }) {
         <Icon size={13} strokeWidth={1.5} />
         <span style={{ color: "rgba(255,255,255,0.7)" }}>{tool.name}</span>
         {isRunning && (
-          <span style={{
-            width: 6, height: 6, borderRadius: "50%",
-            background: "rgba(130,200,255,0.6)",
-            animation: "blink 1.2s steps(1) infinite",
-            marginLeft: 4,
-          }} />
+          <Loader2 size={10} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)", animation: "spin 1s linear infinite", marginLeft: 2 }} />
         )}
         {tool.status === "done" && (
-          <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 10 }}>done</span>
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>done</span>
         )}
       </button>
 
