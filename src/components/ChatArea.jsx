@@ -85,14 +85,19 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     const files = e.dataTransfer?.files;
     if (!files) return;
     for (const file of files) {
+      // Get file path via Electron's webUtils (works with context isolation)
+      const filePath = window.api?.getFilePath?.(file) || file.path || null;
+
       if (file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onload = (ev) => {
-          setAttachments((prev) => [...prev, { type: "image", dataUrl: ev.target.result, name: file.name }]);
+          setAttachments((prev) => [...prev, { type: "image", dataUrl: ev.target.result, name: file.name, path: filePath }]);
         };
         reader.readAsDataURL(file);
       } else {
-        setAttachments((prev) => [...prev, { type: "file", name: file.name, path: file.path }]);
+        if (filePath) {
+          setAttachments((prev) => [...prev, { type: "file", name: file.name, path: filePath }]);
+        }
       }
     }
   };
@@ -106,7 +111,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   };
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10 }}>
+    <div
+      style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10 }}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+    >
       {/* Sidebar open button — outside drag region */}
       {!sidebarOpen && (
         <button
@@ -222,8 +231,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       {/* Input bar */}
       <div
         style={{ padding: "12px 28px 24px", display: "flex", justifyContent: "center" }}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
       >
         <div style={{ width: "100%", maxWidth: 560 }}>
           <ImagePreview items={attachments} onRemove={removeAttachment} />

@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
   agentStart: (opts) => ipcRenderer.send("agent-start", opts),
@@ -24,4 +24,7 @@ contextBridge.exposeInMainWorld("api", {
   loadSession: (sessionId) => ipcRenderer.invoke("load-session", sessionId),
   saveState: (state) => ipcRenderer.invoke("save-state", state),
   loadState: () => ipcRenderer.invoke("load-state"),
+  getFilePath: (file) => {
+    try { return webUtils.getPathForFile(file); } catch { return null; }
+  },
 });
