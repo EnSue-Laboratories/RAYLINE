@@ -139,16 +139,21 @@ export default function App() {
   const handleSend = useCallback(
     (text, attachments) => {
       // Handle slash commands client-side
-      if (text.startsWith("/")) {
-        const cmd = text.trim().toLowerCase();
+      const trimmed = text.trim();
+      if (trimmed.startsWith("/") && !trimmed.includes(" ")) {
+        const cmd = trimmed.toLowerCase();
         if (cmd === "/clear" || cmd === "/new") {
           handleNew();
           return;
         }
-        if (cmd === "/compact") {
-          // Send as a regular message — Claude knows about /compact
+        if (cmd === "/model") {
+          // No-op — model picker is in the top bar
+          return;
         }
-        // All other /commands pass through to Claude as regular text
+        if (cmd === "/" || cmd.length <= 1) {
+          return; // Don't send bare /
+        }
+        // /compact and others — send as regular text so Claude handles them
       }
 
       // Queue if currently streaming
