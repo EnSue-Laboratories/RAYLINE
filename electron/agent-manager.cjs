@@ -1,4 +1,7 @@
 const { spawn } = require("child_process");
+const path = require("path");
+const fs = require("fs");
+const os = require("os");
 
 const activeAgents = new Map();
 
@@ -21,9 +24,28 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
   }
 
   let fullPrompt = prompt;
+
+  // Save images to temp files and reference paths in prompt
+  if (images && images.length > 0) {
+    const imgPaths = [];
+    for (let i = 0; i < images.length; i++) {
+      const dataUrl = images[i];
+      const match = dataUrl.match(/^data:image\/([\w+.-]+);base64,(.+)$/);
+      if (match) {
+        const ext = match[1] === "jpeg" ? "jpg" : match[1];
+        const tmpPath = path.join(os.tmpdir(), `ensue-img-${Date.now()}-${i}.${ext}`);
+        fs.writeFileSync(tmpPath, Buffer.from(match[2], "base64"));
+        imgPaths.push(tmpPath);
+      }
+    }
+    if (imgPaths.length > 0) {
+      fullPrompt = `[Attached images: ${imgPaths.join(", ")}]\n\n${prompt}`;
+    }
+  }
+
   if (files && files.length > 0) {
     const filePaths = files.map((f) => f.path).join("\n");
-    fullPrompt = `[Attached files:\n${filePaths}]\n\n${prompt}`;
+    fullPrompt = `[Attached files:\n${filePaths}]\n\n${fullPrompt}`;
   }
 
   args.push(fullPrompt);

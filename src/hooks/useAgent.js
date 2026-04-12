@@ -1,5 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 
+let _msgId = 0;
+const uid = () => "m" + (++_msgId) + "-" + Date.now();
+
 export default function useAgent() {
   const [conversations, setConversations] = useState(new Map());
   const cleanupRefs = useRef([]);
@@ -17,7 +20,7 @@ export default function useAgent() {
         // Ensure an assistant message exists
         const ensureAssistant = () => {
           if (!lastMsg || lastMsg.role !== "assistant") {
-            lastMsg = { id: "a" + Date.now(), role: "assistant", text: "", toolCalls: [], isStreaming: true, isThinking: false };
+            lastMsg = { id: uid(), role: "assistant", text: "", toolCalls: [], isStreaming: true, isThinking: false };
             msgs.push(lastMsg);
           }
           return lastMsg;
@@ -35,7 +38,7 @@ export default function useAgent() {
             } else if (block?.type === "tool_use") {
               const toolCalls = [...(am.toolCalls || [])];
               toolCalls.push({
-                id: block.id || "tc" + Date.now(),
+                id: block.id || "tc" + uid(),
                 name: block.name || "unknown",
                 args: {},
                 argsJson: "",
@@ -122,7 +125,7 @@ export default function useAgent() {
           const subtype = event.subtype || "started";
           if (subtype === "started" || subtype === "pending") {
             toolCalls.push({
-              id: event.callId || event.id || "tc" + Date.now(),
+              id: event.callId || event.id || "tc" + uid(),
               name: event.toolName || event.name || "unknown",
               args: event.args || event.input || {},
               result: null,
@@ -179,8 +182,8 @@ export default function useAgent() {
       const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
       const msgs = [
         ...convo.messages,
-        { id: "u" + Date.now(), role: "user", text: prompt, images, files },
-        { id: "a" + Date.now(), role: "assistant", text: "", toolCalls: [], isStreaming: true, isThinking: true },
+        { id: uid(), role: "user", text: prompt, images, files },
+        { id: uid(), role: "assistant", text: "", toolCalls: [], isStreaming: true, isThinking: true },
       ];
       next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       return next;
@@ -203,7 +206,7 @@ export default function useAgent() {
       const convo = next.get(conversationId);
       if (convo) {
         const msgs = convo.messages.slice(0, messageIndex);
-        msgs.push({ id: "u" + Date.now(), role: "user", text: newText });
+        msgs.push({ id: uid(), role: "user", text: newText });
         next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       }
       return next;

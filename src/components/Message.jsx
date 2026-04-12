@@ -59,12 +59,15 @@ const mdComponents = {
       fontStyle: "italic",
     }}>{children}</blockquote>
   ),
-  a: ({ href, children }) => (
-    <a href={href} style={{ color: "rgba(140,180,255,0.8)", textDecoration: "none" }}
-       onMouseEnter={(e) => { e.target.style.textDecoration = "underline"; }}
-       onMouseLeave={(e) => { e.target.style.textDecoration = "none"; }}
-    >{children}</a>
-  ),
+  a: ({ href, children }) => {
+    const safe = href && !href.startsWith("javascript:");
+    return safe ? (
+      <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(140,180,255,0.8)", textDecoration: "none" }}
+         onMouseEnter={(e) => { e.target.style.textDecoration = "underline"; }}
+         onMouseLeave={(e) => { e.target.style.textDecoration = "none"; }}
+      >{children}</a>
+    ) : <span>{children}</span>;
+  },
   strong: ({ children }) => <strong style={{ fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>{children}</strong>,
   table: ({ children }) => (
     <table style={{
@@ -246,10 +249,6 @@ export default function Message({ msg, onEdit }) {
         )}
       </div>
 
-      {msg.toolCalls && msg.toolCalls.map((tc) => (
-        <ToolCallBlock key={tc.id} tool={tc} />
-      ))}
-
       {msg.text && (
         <div style={{
           color: "rgba(255,255,255,0.75)",
@@ -272,6 +271,14 @@ export default function Message({ msg, onEdit }) {
               animation: "blink 1s steps(1) infinite",
             }} />
           )}
+        </div>
+      )}
+
+      {msg.toolCalls && msg.toolCalls.length > 0 && (
+        <div style={{ marginTop: msg.text ? 12 : 0 }}>
+          {msg.toolCalls.map((tc) => (
+            <ToolCallBlock key={tc.id} tool={tc} />
+          ))}
         </div>
       )}
 
