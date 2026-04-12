@@ -257,30 +257,17 @@ export default function Message({ msg, onEdit, onAnswer }) {
             </div>
           </div>
         ) : (
-          <div style={{
-            color: "rgba(255,255,255,0.92)",
-            fontSize: 15,
-            lineHeight: 1.7,
-            fontFamily: "system-ui,-apple-system,sans-serif",
-            fontWeight: 400,
-            whiteSpace: "pre-wrap",
-            textAlign: "left",
-            maxWidth: "85%",
-          }}>
-            {displayText}
-          </div>
-        )}
+          <>
+            {msg.images && msg.images.length > 0 && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", marginBottom: 8 }}>
+                {msg.images.map((img, i) => (
+                  <img key={i} src={img} alt="" style={{ height: 40, borderRadius: 6, opacity: 0.8 }} />
+                ))}
+              </div>
+            )}
 
-        {msg.images && msg.images.length > 0 && (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 8 }}>
-            {msg.images.map((img, i) => (
-              <img key={i} src={img} alt="" style={{ height: 40, borderRadius: 6, opacity: 0.8 }} />
-            ))}
-          </div>
-        )}
-
-        {filesToShow && filesToShow.length > 0 && (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 8 }}>
+            {filesToShow && filesToShow.length > 0 && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", marginBottom: 8 }}>
             {filesToShow.map((f, i) => (
               <div key={i} style={{
                 display: "flex",
@@ -299,6 +286,21 @@ export default function Message({ msg, onEdit, onAnswer }) {
               </div>
             ))}
           </div>
+        )}
+
+            <div style={{
+              color: "rgba(255,255,255,0.92)",
+              fontSize: 15,
+              lineHeight: 1.7,
+              fontFamily: "system-ui,-apple-system,sans-serif",
+              fontWeight: 400,
+              whiteSpace: "pre-wrap",
+              textAlign: "left",
+              maxWidth: "85%",
+            }}>
+              {displayText}
+            </div>
+          </>
         )}
       </div>
     );
