@@ -17,6 +17,7 @@ export default function App() {
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const messageQueue = useRef([]);
+  const [queuedMessages, setQueuedMessages] = useState([]);
 
   // Load state from file on mount
   useEffect(() => {
@@ -130,7 +131,7 @@ export default function App() {
   useEffect(() => {
     if (!activeData.isStreaming && messageQueue.current.length > 0) {
       const next = messageQueue.current.shift();
-      // Small delay to let the UI settle
+      setQueuedMessages([...messageQueue.current]);
       setTimeout(() => handleSend(next.text, next.attachments), 300);
     }
   }, [activeData.isStreaming]);
@@ -140,6 +141,7 @@ export default function App() {
       // Queue if currently streaming
       if (activeData.isStreaming && active) {
         messageQueue.current.push({ text, attachments });
+        setQueuedMessages([...messageQueue.current]);
         return;
       }
 
@@ -309,6 +311,7 @@ export default function App() {
         sidebarOpen={sidebarOpen}
         onModelChange={handleModelChange}
         defaultModel={defaultModel}
+        queuedMessages={queuedMessages}
       />
     </div>
   );

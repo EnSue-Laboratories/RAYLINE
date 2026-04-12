@@ -6,7 +6,7 @@ import ModelPicker from "./ModelPicker";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel, queuedMessages }) {
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
@@ -272,6 +272,38 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         style={{ padding: "12px 28px 24px", display: "flex", justifyContent: "center" }}
       >
         <div style={{ width: "100%", maxWidth: 560 }}>
+          {queuedMessages && queuedMessages.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              {queuedMessages.map((q, i) => (
+                <div key={i} style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "5px 10px",
+                  marginBottom: 4,
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.05)",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.35)",
+                  fontFamily: "system-ui,sans-serif",
+                }}>
+                  <span style={{
+                    fontSize: 9,
+                    fontFamily: "'JetBrains Mono',monospace",
+                    color: "rgba(255,255,255,0.2)",
+                    letterSpacing: ".06em",
+                    flexShrink: 0,
+                  }}>QUEUED</span>
+                  <span style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}>{q.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <ImagePreview items={attachments} onRemove={removeAttachment} />
 
           <div
