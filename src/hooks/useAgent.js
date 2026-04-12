@@ -95,18 +95,15 @@ export default function useAgent() {
             msgs[msgs.length - 1] = { ...am, isThinking: false };
           }
         } else if (event.type === "assistant") {
+          // With --include-partial-messages, assistant events contain full accumulated text.
+          // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
           const am = ensureAssistant();
           const parts = [...(am.parts || [])];
-          if (event.message?.content) {
+          const hasStreamParts = parts.length > 0;
+          if (!hasStreamParts && event.message?.content) {
             for (const block of event.message.content) {
               if (block.type === "text" && block.text) {
-                // Check if we should update the last text part or add new
-                const lastPart = parts[parts.length - 1];
-                if (lastPart && lastPart.type === "text") {
-                  lastPart.text = block.text; // replace (full message update)
-                } else {
-                  parts.push({ type: "text", text: block.text });
-                }
+                parts.push({ type: "text", text: block.text });
               }
               if (block.type === "tool_use") {
                 if (!findToolPart(parts, block.id)) {
@@ -121,8 +118,8 @@ export default function useAgent() {
                 }
               }
             }
+            msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
           }
-          msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
         } else if (event.type === "user") {
           if (event.message?.content) {
             for (const block of event.message.content) {

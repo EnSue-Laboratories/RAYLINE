@@ -204,6 +204,7 @@ export default function Message({ msg, onEdit }) {
             lineHeight: 1.7,
             fontFamily: "system-ui,-apple-system,sans-serif",
             fontWeight: 400,
+            whiteSpace: "pre-wrap",
           }}>
             {msg.text}
           </div>
