@@ -9,12 +9,15 @@ export default function SelectionToolbar({ onQuote, model }) {
   const [explaining, setExplaining] = useState(false);
   const toolbarRef = useRef(null);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e) => {
+    // Ignore clicks inside the toolbar itself
+    if (toolbarRef.current && toolbarRef.current.contains(e.target)) return;
+
     requestAnimationFrame(() => {
       const s = window.getSelection();
       const text = s?.toString().trim();
       if (!text) {
-        if (!explanation) setSel(null);
+        if (!explanation && !explaining) setSel(null);
         return;
       }
 
@@ -25,9 +28,9 @@ export default function SelectionToolbar({ onQuote, model }) {
         x: rect.left + rect.width / 2,
         y: rect.top,
       });
-      setExplanation(null);
+      if (!explaining) setExplanation(null);
     });
-  }, [explanation]);
+  }, [explanation, explaining]);
 
   const dismiss = useCallback(() => {
     setSel(null);
