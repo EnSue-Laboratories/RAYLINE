@@ -96,9 +96,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         };
         reader.readAsDataURL(file);
       } else {
-        if (filePath) {
-          setAttachments((prev) => [...prev, { type: "file", name: file.name, path: filePath }]);
-        }
+        // Any file (PDF, code, docs, etc.) — pass the path to the agent
+        setAttachments((prev) => [...prev, { type: "file", name: file.name, path: filePath || file.name }]);
       }
     }
   };
