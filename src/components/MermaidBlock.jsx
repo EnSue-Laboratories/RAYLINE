@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import mermaid from "mermaid";
 
 let mermaidInitialized = false;
+let renderCounter = 0;
 
 function initMermaid() {
   if (mermaidInitialized) return;
   mermaid.initialize({
     startOnLoad: false,
     theme: "dark",
+    suppressErrorRendering: true,
     themeVariables: {
       darkMode: true,
       background: "transparent",
@@ -19,42 +21,47 @@ function initMermaid() {
       tertiaryColor: "rgba(255,255,255,0.03)",
       fontFamily: "system-ui,-apple-system,sans-serif",
       fontSize: "13px",
-      noteBkgColor: "rgba(255,255,255,0.06)",
-      noteTextColor: "rgba(255,255,255,0.7)",
-      noteBorderColor: "rgba(255,255,255,0.1)",
     },
   });
   mermaidInitialized = true;
 }
 
-let renderCounter = 0;
-
 export default function MermaidBlock({ code }) {
-  const containerRef = useRef(null);
   const [svg, setSvg] = useState(null);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(false);
+  const rendered = useRef(false);
 
   useEffect(() => {
-    if (!code?.trim()) return;
+    if (!code?.trim() || rendered.current) return;
+    rendered.current = true;
     initMermaid();
 
-    const id = `mermaid-${++renderCounter}`;
-    let cancelled = false;
+    const id = `mmd-${++renderCounter}-${Date.now()}`;
 
-    mermaid.render(id, code.trim()).then(({ svg: rendered }) => {
-      if (!cancelled) setSvg(rendered);
-    }).catch((err) => {
-      if (!cancelled) setError(err?.message || "Failed to render diagram");
+    // Render in a hidden off-screen container to avoid layout thrashing
+    const offscreen = document.createElement("div");
+    offscreen.style.position = "absolute";
+    offscreen.style.left = "-9999px";
+    offscreen.style.top = "-9999px";
+    offscreen.style.visibility = "hidden";
+    document.body.appendChild(offscreen);
+
+    mermaid.render(id, code.trim(), offscreen).then(({ svg: result }) => {
+      setSvg(result);
+    }).catch(() => {
+      setError(true);
+    }).finally(() => {
+      // Clean up offscreen container
+      try { document.body.removeChild(offscreen); } catch {}
     });
-
-    return () => { cancelled = true; };
   }, [code]);
 
   if (error) {
+    // Fallback: show as plain code
     return (
       <pre style={{
         background: "rgba(0,0,0,0.4)",
-        border: "1px solid rgba(200,80,80,0.2)",
+        border: "1px solid rgba(255,255,255,0.06)",
         borderRadius: 8,
         padding: "12px 14px",
         overflow: "auto",
@@ -89,14 +96,14 @@ export default function MermaidBlock({ code }) {
 
   return (
     <div
-      ref={containerRef}
       style={{
         background: "rgba(0,0,0,0.2)",
         border: "1px solid rgba(255,255,255,0.06)",
         borderRadius: 8,
         padding: "16px",
         margin: "8px 0 12px",
-        overflow: "auto",
+        overflowX: "auto",
+        overflowY: "hidden",
         textAlign: "center",
       }}
       dangerouslySetInnerHTML={{ __html: svg }}
