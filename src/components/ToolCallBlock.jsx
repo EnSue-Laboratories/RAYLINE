@@ -18,7 +18,12 @@ function truncate(str, max) {
 function getPreview(tool) {
   const args = tool.args;
   if (!args || typeof args !== "object") return null;
-  if (tool.name === "Bash") return truncate(args.command?.replace(/\n/g, " "), 30);
+  if (tool.name === "Bash") {
+    let cmd = args.command?.replace(/\n/g, " ") || "";
+    // Replace absolute paths with just the binary name
+    cmd = cmd.replace(/(?:^|\s)(\/[\w./-]+\/)([\w.-]+)/g, (_, _path, bin) => " " + bin);
+    return truncate(cmd.trim(), 30);
+  }
   if (tool.name === "Read") return args.file_path?.split("/").pop();
   if (tool.name === "Edit") return args.file_path?.split("/").pop();
   if (tool.name === "Write") return args.file_path?.split("/").pop();
