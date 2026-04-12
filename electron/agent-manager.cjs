@@ -78,6 +78,28 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
         const event = JSON.parse(line);
         log("Parsed event type:", event.type, "subtype:", event.subtype);
         webContents.send("agent-stream", { conversationId, event });
+
+        // Track when AskUserQuestion tool_use starts streaming
+        if (
+          event.type === "stream_event" &&
+          event.event?.type === "content_block_start" &&
+          event.event?.content_block?.type === "tool_use" &&
+          event.event?.content_block?.name === "AskUserQuestion"
+        ) {
+          child._waitingForQuestion = true;
+        }
+
+        // Kill the process once the AskUserQuestion args are fully streamed,
+        // so Claude pauses and the renderer can show the question UI.
+        if (
+          child._waitingForQuestion &&
+          event.type === "stream_event" &&
+          event.event?.type === "content_block_stop"
+        ) {
+          log("AskUserQuestion fully streamed — killing process to wait for user answer");
+          child._waitingForQuestion = false;
+          child.kill("SIGTERM");
+        }
       } catch (e) {
         log("Failed to parse JSON line:", line.slice(0, 200), "error:", e.message);
       }

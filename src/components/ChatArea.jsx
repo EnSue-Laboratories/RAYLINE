@@ -20,13 +20,16 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [convo?.msgs?.length, convo?.isStreaming, lastPartText]);
 
+  const isStreaming = convo?.isStreaming;
+
   const send = useCallback(() => {
+    if (isStreaming) return;
     if (!input.trim() && attachments.length === 0) return;
     onSend(input.trim(), attachments.length > 0 ? attachments : undefined);
     setInput("");
     setAttachments([]);
     if (inRef.current) inRef.current.style.height = "20px";
-  }, [input, attachments, convo, onSend]);
+  }, [input, attachments, convo, onSend, isStreaming]);
 
   const handleInput = (e) => {
     setInput(e.target.value);
@@ -84,8 +87,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const removeAttachment = (index) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
-
-  const isStreaming = convo?.isStreaming;
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10 }}>
@@ -192,6 +193,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 key={m.id}
                 msg={m}
                 onEdit={m.role === "user" ? (newText) => onEdit(i, newText) : undefined}
+                onAnswer={m.role === "assistant" ? (text) => onSend(text) : undefined}
               />
             ))}
             <div ref={endRef} />

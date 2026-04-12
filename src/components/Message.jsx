@@ -4,6 +4,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CopyBtn from "./CopyBtn";
 import ToolCallBlock from "./ToolCallBlock";
+import AskUserQuestionBlock from "./AskUserQuestionBlock";
 
 const mdComponents = {
   p: ({ children }) => <p style={{ margin: "0 0 12px" }}>{children}</p>,
@@ -83,7 +84,7 @@ const mdComponents = {
   hr: () => <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "16px 0" }} />,
 };
 
-export default function Message({ msg, onEdit }) {
+export default function Message({ msg, onEdit, onAnswer }) {
   const isUser = msg.role === "user";
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(msg.text);
@@ -279,6 +280,9 @@ export default function Message({ msg, onEdit }) {
           );
         }
         if (part.type === "tool") {
+          if (part.name === "AskUserQuestion") {
+            return <AskUserQuestionBlock key={part.id || i} tool={part} onAnswer={onAnswer} />;
+          }
           return <ToolCallBlock key={part.id || i} tool={part} />;
         }
         return null;
