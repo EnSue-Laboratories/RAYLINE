@@ -82,6 +82,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   // Drop handler for files and images
   const handleDrop = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     const files = e.dataTransfer?.files;
     if (!files) return;
     for (const file of files) {
@@ -102,9 +103,29 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     }
   };
 
+  const [dragOver, setDragOver] = useState(false);
+
   const handleDragOver = (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
   };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+  };
+
+  // Prevent Electron from navigating to dropped files (on window, not our drop zone)
+  useEffect(() => {
+    const preventNav = (e) => { e.preventDefault(); };
+    window.addEventListener("dragover", preventNav);
+    window.addEventListener("drop", preventNav);
+    return () => {
+      window.removeEventListener("dragover", preventNav);
+      window.removeEventListener("drop", preventNav);
+    };
+  }, []);
 
   const removeAttachment = (index) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
@@ -113,8 +134,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   return (
     <div
       style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10 }}
-      onDrop={handleDrop}
+      onDrop={(e) => { e.stopPropagation(); handleDrop(e); setDragOver(false); }}
       onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
     >
       {/* Sidebar open button — outside drag region */}
       {!sidebarOpen && (
