@@ -143,12 +143,14 @@ export default function App() {
       const m = getM(convo.model);
 
       // First message uses --session-id (new session), subsequent use --resume
-      const hasMessages = activeData.messages.length > 0;
+      // Check the actual conversation data for THIS convo, not the stale activeData
+      const thisConvoData = getConversation(convoId);
+      const isFirstMessage = thisConvoData.messages.length === 0;
 
       sendMessage({
         conversationId: convoId,
-        sessionId: hasMessages ? undefined : convo.sessionId,
-        resumeSessionId: hasMessages ? convo.sessionId : undefined,
+        sessionId: isFirstMessage ? convo.sessionId : undefined,
+        resumeSessionId: isFirstMessage ? undefined : convo.sessionId,
         prompt: text,
         model: m.cliFlag,
         cwd: cwd || undefined,

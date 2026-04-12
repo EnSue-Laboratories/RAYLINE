@@ -17,6 +17,11 @@ html, body, #root {
 ::-webkit-scrollbar-track  { background: transparent; }
 ::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.03); border-radius: 2px; }
 
+/* ── KaTeX dark theme overrides ── */
+.katex { color: inherit; }
+.katex-display { margin: 12px 0; overflow-x: auto; overflow-y: hidden; }
+.katex-display > .katex { text-align: center; }
+
 /* ── Form resets ── */
 textarea::placeholder,
 input::placeholder  { color: rgba(255, 255, 255, 0.25); }

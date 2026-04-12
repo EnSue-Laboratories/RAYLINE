@@ -2,9 +2,13 @@ import { useState } from "react";
 import { Pencil, Loader2 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import CopyBtn from "./CopyBtn";
 import ToolCallBlock from "./ToolCallBlock";
 import AskUserQuestionBlock from "./AskUserQuestionBlock";
+import MermaidBlock from "./MermaidBlock";
 
 const mdComponents = {
   p: ({ children }) => <p style={{ margin: "0 0 12px" }}>{children}</p>,
@@ -30,21 +34,30 @@ const mdComponents = {
       }} {...props}>{children}</code>
     );
   },
-  pre: ({ children }) => (
-    <pre style={{
-      background: "rgba(0,0,0,0.4)",
-      border: "1px solid rgba(255,255,255,0.06)",
-      borderRadius: 8,
-      padding: "12px 14px",
-      overflow: "auto",
-      fontSize: 12,
-      fontFamily: "'JetBrains Mono',monospace",
-      margin: "8px 0 12px",
-      lineHeight: 1.6,
-    }}>
-      {children}
-    </pre>
-  ),
+  pre: ({ node, children }) => {
+    // Detect mermaid code blocks via AST node: pre > code.language-mermaid
+    const codeNode = node?.children?.[0];
+    const classes = codeNode?.properties?.className || [];
+    if (classes.includes("language-mermaid")) {
+      const text = codeNode?.children?.map(c => c.value || "").join("") || "";
+      return <MermaidBlock code={text.replace(/\n$/, "")} />;
+    }
+    return (
+      <pre style={{
+        background: "rgba(0,0,0,0.4)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 8,
+        padding: "12px 14px",
+        overflow: "auto",
+        fontSize: 12,
+        fontFamily: "'JetBrains Mono',monospace",
+        margin: "8px 0 12px",
+        lineHeight: 1.6,
+      }}>
+        {children}
+      </pre>
+    );
+  },
   ul: ({ children }) => <ul style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ol>,
   li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
@@ -268,7 +281,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
               letterSpacing: "0.008em",
               marginBottom: 4,
             }}>
-              <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+              <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={mdComponents}>
                 {part.text}
               </Markdown>
               {msg.isStreaming && isLastPart && (
@@ -297,7 +310,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
           fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
           letterSpacing: "0.008em",
         }}>
-          <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+          <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={mdComponents}>
             {msg.text}
           </Markdown>
         </div>

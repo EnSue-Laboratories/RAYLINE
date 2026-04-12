@@ -12,12 +12,19 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const endRef  = useRef(null);
   const inRef   = useRef(null);
 
-  // Scroll to bottom on new messages and during streaming
+  // Scroll to bottom on new messages and during streaming,
+  // but only if user is already near the bottom (not scrolled up reading)
+  const scrollRef = useRef(null);
   const lastMsg = convo?.msgs?.[convo.msgs.length - 1];
   const lastParts = lastMsg?.parts;
   const lastPartText = lastParts?.[lastParts.length - 1]?.text || lastMsg?.text;
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (nearBottom) {
+      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [convo?.msgs?.length, convo?.isStreaming, lastPartText]);
 
   const isStreaming = convo?.isStreaming;
@@ -176,6 +183,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
       {/* Messages */}
       <div
+        ref={scrollRef}
         style={{
           flex: 1,
           overflowY: "auto",
