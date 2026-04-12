@@ -49,6 +49,16 @@ export default function App() {
         const msgs = await window.api.loadSession(convo.sessionId);
         if (msgs && msgs.length > 0) {
           loadMessages(id, msgs);
+          // Update sidebar preview from loaded messages
+          const lastMsg = msgs[msgs.length - 1];
+          const previewText = lastMsg?.parts
+            ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
+            : (lastMsg?.text || "");
+          if (previewText) {
+            setConvoList((p) =>
+              p.map((c) => c.id === id ? { ...c, lastPreview: previewText.slice(0, 60) } : c)
+            );
+          }
         }
       } catch (e) {
         console.error("Failed to load session:", e);
@@ -56,9 +66,30 @@ export default function App() {
     }
   }, [convoList, getConversation, loadMessages]);
 
-  // Load active conversation on mount
+  // Load active conversation + previews for all convos on mount
   useEffect(() => {
     if (active) handleSelect(active);
+    // Load previews for conversations that don't have one
+    if (window.api) {
+      convoList.forEach(async (c) => {
+        if (!c.lastPreview || c.lastPreview === "Empty") {
+          try {
+            const msgs = await window.api.loadSession(c.sessionId);
+            if (msgs && msgs.length > 0) {
+              const lastMsg = msgs[msgs.length - 1];
+              const previewText = lastMsg?.parts
+                ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
+                : (lastMsg?.text || "");
+              if (previewText) {
+                setConvoList((p) =>
+                  p.map((cv) => cv.id === c.id ? { ...cv, lastPreview: previewText.slice(0, 60) } : cv)
+                );
+              }
+            }
+          } catch {}
+        }
+      });
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Actions ────────────────────────────────────────────────────────────────

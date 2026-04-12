@@ -65,6 +65,8 @@ async function listSessions(cwd) {
   return sessions;
 }
 
+const MAX_MESSAGES = 50; // max user+assistant message pairs to load
+
 async function loadSessionMessages(sessionId) {
   const filePath = findSessionFile(sessionId);
   if (!filePath) return [];
@@ -160,6 +162,11 @@ async function loadSessionMessages(sessionId) {
         }
       }
     }
+  }
+
+  // Keep only the last MAX_MESSAGES messages to avoid slowdowns
+  if (messages.length > MAX_MESSAGES) {
+    return messages.slice(-MAX_MESSAGES);
   }
 
   return messages;
