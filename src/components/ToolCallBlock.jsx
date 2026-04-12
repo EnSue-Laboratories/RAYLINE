@@ -34,7 +34,7 @@ export default function ToolCallBlock({ tool }) {
   return (
     <div
       style={{
-        margin: "6px 0",
+        margin: "8px 0",
         borderRadius: 8,
         border: "1px solid rgba(255,255,255,0.06)",
         background: "rgba(255,255,255,0.02)",
@@ -48,7 +48,7 @@ export default function ToolCallBlock({ tool }) {
           alignItems: "center",
           gap: 8,
           width: "100%",
-          padding: "7px 12px",
+          padding: "8px 12px",
           background: "none",
           border: "none",
           color: "rgba(255,255,255,0.5)",
@@ -58,7 +58,6 @@ export default function ToolCallBlock({ tool }) {
           textAlign: "left",
         }}
       >
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         <Icon size={13} strokeWidth={1.5} />
         <span style={{ color: "rgba(255,255,255,0.7)" }}>{tool.name}</span>
         {preview && !expanded && (
@@ -74,13 +73,15 @@ export default function ToolCallBlock({ tool }) {
             {preview}
           </span>
         )}
-        <span style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
+        {!preview && <span style={{ flex: 1 }} />}
+        <span style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
           {isRunning && (
             <Loader2 size={10} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)", animation: "spin 1s linear infinite" }} />
           )}
           {tool.status === "done" && (
             <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>done</span>
           )}
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
       </button>
 
