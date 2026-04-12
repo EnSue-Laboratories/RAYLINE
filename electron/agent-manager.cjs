@@ -14,6 +14,16 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
 
   const args = ["--print", "--output-format=stream-json", "--verbose", "--include-partial-messages", "--dangerously-skip-permissions"];
 
+  // Inject Claudi-specific instructions (won't affect CLI usage)
+  args.push("--append-system-prompt", [
+    "You are running inside Claudi, a desktop GUI client for Claude Code.",
+    "The user is interacting via a chat interface, not a terminal.",
+    "Keep responses concise and conversational.",
+    "Use markdown formatting — the client renders headings, code blocks, tables, lists, and mermaid diagrams.",
+    "When showing diagrams, prefer mermaid code blocks (```mermaid).",
+    "Do not ask the user to run terminal commands — you have full tool access to do it yourself.",
+  ].join(" "));
+
   if (model) args.push("--model", model);
 
   if (resumeSessionId) {
