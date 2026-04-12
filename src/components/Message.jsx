@@ -197,14 +197,14 @@ export default function Message({ msg, onEdit, onAnswer }) {
               style={{
                 background: "none",
                 border: "none",
-                color: "rgba(255,255,255,0.15)",
+                color: "rgba(255,255,255,0.3)",
                 cursor: "pointer",
                 padding: 2,
                 display: "flex",
                 transition: "color .2s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.15)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
             >
               <Pencil size={10} strokeWidth={1.5} />
             </button>
