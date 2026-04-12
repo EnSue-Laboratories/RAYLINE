@@ -102,26 +102,36 @@ function initMermaid() {
 export default function MermaidBlock({ code }) {
   const [svg, setSvg] = useState(null);
   const [error, setError] = useState(false);
-  const rendered = useRef(false);
+  const lastRendered = useRef("");
+  const timerRef = useRef(null);
 
   useEffect(() => {
-    if (!code?.trim() || rendered.current) return;
-    rendered.current = true;
-    initMermaid();
+    const trimmed = code?.trim();
+    if (!trimmed) return;
+    if (trimmed === lastRendered.current && svg) return;
 
-    const id = `mmd-${++renderCounter}-${Date.now()}`;
+    // Debounce: wait 600ms after last code change (handles streaming)
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      lastRendered.current = trimmed;
+      initMermaid();
+      setError(false);
 
-    const offscreen = document.createElement("div");
-    offscreen.style.cssText = "position:absolute;left:-9999px;top:-9999px;visibility:hidden;width:800px";
-    document.body.appendChild(offscreen);
+      const id = `mmd-${++renderCounter}-${Date.now()}`;
+      const offscreen = document.createElement("div");
+      offscreen.style.cssText = "position:absolute;left:-9999px;top:-9999px;visibility:hidden;width:800px";
+      document.body.appendChild(offscreen);
 
-    mermaid.render(id, code.trim(), offscreen).then(({ svg: result }) => {
-      setSvg(result);
-    }).catch(() => {
-      setError(true);
-    }).finally(() => {
-      try { document.body.removeChild(offscreen); } catch {}
-    });
+      mermaid.render(id, trimmed, offscreen).then(({ svg: result }) => {
+        setSvg(result);
+      }).catch(() => {
+        setError(true);
+      }).finally(() => {
+        try { document.body.removeChild(offscreen); } catch {}
+      });
+    }, 600);
+
+    return () => clearTimeout(timerRef.current);
   }, [code]);
 
   if (error) {
