@@ -82,9 +82,15 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         setSelectedCmd((p) => Math.max(p - 1, 0));
         return;
       }
-      if (e.key === "Tab") {
+      if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
         e.preventDefault();
-        setInput(filteredCommands[selectedCmd].cmd);
+        setInput(filteredCommands[selectedCmd].cmd + " ");
+        setSelectedCmd(0);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setInput("");
         setSelectedCmd(0);
         return;
       }
