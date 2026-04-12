@@ -22,6 +22,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     "Use markdown formatting — the client renders headings, code blocks, tables, lists, and mermaid diagrams.",
     "When showing diagrams, prefer mermaid code blocks (```mermaid).",
     "Do not ask the user to run terminal commands — you have full tool access to do it yourself.",
+    "For math expressions, use LaTeX with dollar sign notation: $inline$ for inline and $$block$$ for display math. Never wrap LaTeX in code blocks.",
   ].join(" "));
 
   if (model) args.push("--model", model);
