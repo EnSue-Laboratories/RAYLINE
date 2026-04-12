@@ -8,6 +8,11 @@ function cloneParts(parts) {
   return (parts || []).map(p => ({ ...p }));
 }
 
+function findPartIndexByBlock(parts, blockIndex, type) {
+  if (blockIndex == null) return -1;
+  return parts.findIndex((p) => p.type === type && p.blockIndex === blockIndex);
+}
+
 // Helper: find a tool part by id across all parts
 function findToolPart(parts, toolId) {
   for (const p of parts) {
@@ -42,12 +47,25 @@ export default function useAgent() {
           const inner = event.event;
           if (!inner) { next.set(conversationId, { ...convo, messages: msgs }); return next; }
 
+          // Helper to update the last assistant message and keep lastMsg in sync
+          const updateAssistant = (updates) => {
+            const merged = { ...lastMsg, ...updates };
+            msgs[msgs.length - 1] = merged;
+            lastMsg = merged;
+          };
+
           if (inner.type === "content_block_start") {
             const block = inner.content_block;
-            const am = ensureAssistant();
-            const parts = cloneParts(am.parts);
+            ensureAssistant();
+            const parts = cloneParts(lastMsg.parts);
             if (block?.type === "thinking") {
-              msgs[msgs.length - 1] = { ...am, parts, isThinking: true };
+              const existingIdx = findPartIndexByBlock(parts, inner.index, "thinking");
+              if (existingIdx >= 0) {
+                parts[existingIdx] = { ...parts[existingIdx], type: "thinking" };
+              } else {
+                parts.push({ type: "thinking", text: "", blockIndex: inner.index });
+              }
+              updateAssistant({ parts, isThinking: true });
             } else if (block?.type === "tool_use") {
               parts.push({
                 type: "tool",
@@ -57,44 +75,54 @@ export default function useAgent() {
                 argsJson: "",
                 result: null,
                 status: "running",
+                blockIndex: inner.index,
               });
-              msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
+              updateAssistant({ parts });
             } else if (block?.type === "text") {
-              // Start a new text part (don't merge with previous text that was before tool calls)
-              parts.push({ type: "text", text: "" });
-              msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
+              parts.push({ type: "text", text: "", blockIndex: inner.index });
+              updateAssistant({ parts });
             }
           } else if (inner.type === "content_block_delta") {
-            const am = ensureAssistant();
-            const parts = cloneParts(am.parts);
+            ensureAssistant();
+            const parts = cloneParts(lastMsg.parts);
             const delta = inner.delta;
             if (delta?.type === "text_delta") {
-              // Find or create last text part — parts are already cloned so safe to update
-              const lastIdx = parts.length - 1;
-              if (lastIdx >= 0 && parts[lastIdx].type === "text") {
-                parts[lastIdx] = { ...parts[lastIdx], text: parts[lastIdx].text + (delta.text || "") };
+              const textIdx = findPartIndexByBlock(parts, inner.index, "text");
+              if (textIdx >= 0) {
+                parts[textIdx] = { ...parts[textIdx], text: parts[textIdx].text + (delta.text || "") };
               } else {
-                parts.push({ type: "text", text: delta.text || "" });
+                parts.push({ type: "text", text: delta.text || "", blockIndex: inner.index });
               }
-              msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
+              updateAssistant({ parts });
             } else if (delta?.type === "input_json_delta") {
-              // Find the last tool part — parts already cloned
-              for (let i = parts.length - 1; i >= 0; i--) {
-                if (parts[i].type === "tool") {
-                  const newJson = (parts[i].argsJson || "") + (delta.partial_json || "");
-                  let newArgs = parts[i].args;
-                  try { newArgs = JSON.parse(newJson); } catch {}
-                  parts[i] = { ...parts[i], argsJson: newJson, args: newArgs };
-                  break;
-                }
+              const toolIdx = findPartIndexByBlock(parts, inner.index, "tool");
+              if (toolIdx >= 0) {
+                const newJson = (parts[toolIdx].argsJson || "") + (delta.partial_json || "");
+                let newArgs = parts[toolIdx].args;
+                try { newArgs = JSON.parse(newJson); } catch {}
+                parts[toolIdx] = { ...parts[toolIdx], argsJson: newJson, args: newArgs };
               }
-              msgs[msgs.length - 1] = { ...am, parts };
+              updateAssistant({ parts });
             } else if (delta?.type === "thinking_delta") {
-              msgs[msgs.length - 1] = { ...am, isThinking: true };
+              const thinkingIdx = findPartIndexByBlock(parts, inner.index, "thinking");
+              if (thinkingIdx >= 0) {
+                parts[thinkingIdx] = {
+                  ...parts[thinkingIdx],
+                  text: parts[thinkingIdx].text + (delta.thinking || ""),
+                };
+              } else {
+                parts.push({ type: "thinking", text: delta.thinking || "", blockIndex: inner.index });
+              }
+              updateAssistant({ parts, isThinking: true });
             }
           } else if (inner.type === "content_block_stop") {
-            const am = ensureAssistant();
-            msgs[msgs.length - 1] = { ...am, isThinking: false };
+            ensureAssistant();
+            // Only clear isThinking if the stopped block was a thinking block
+            const stoppedIdx = inner.index;
+            const wasThinking = lastMsg.parts?.some(p => p.type === "thinking" && p.blockIndex === stoppedIdx);
+            if (wasThinking) {
+              updateAssistant({ isThinking: false });
+            }
           }
         } else if (event.type === "assistant") {
           // With --include-partial-messages, assistant events contain full accumulated text.

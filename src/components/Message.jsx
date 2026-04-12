@@ -6,13 +6,49 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import "katex/dist/katex.min.css";
 import CopyBtn from "./CopyBtn";
 import ToolCallBlock from "./ToolCallBlock";
 import AskUserQuestionBlock from "./AskUserQuestionBlock";
 import MermaidBlock from "./MermaidBlock";
+import InteractiveBlock from "./InteractiveBlock";
+import ThinkingBlock from "./ThinkingBlock";
 
-const mdComponents = {
+// Allow SVG tags in markdown (rehype-sanitize schema)
+const sanitizeSchema = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames || []), "svg", "path", "circle", "rect", "line", "polyline", "polygon", "ellipse", "g", "defs", "use", "text", "tspan", "marker", "pattern", "clipPath", "mask", "linearGradient", "radialGradient", "stop", "animate", "animateTransform", "animateMotion", "set", "foreignObject"],
+  attributes: {
+    ...defaultSchema.attributes,
+    svg: ["viewBox", "width", "height", "xmlns", "fill", "stroke", "strokeWidth", "style", "class", "id", "preserveAspectRatio", "opacity"],
+    path: ["d", "fill", "stroke", "strokeWidth", "strokeLinecap", "strokeLinejoin", "opacity", "transform", "style", "class", "id"],
+    circle: ["cx", "cy", "r", "fill", "stroke", "strokeWidth", "opacity", "transform", "style", "class", "id"],
+    rect: ["x", "y", "width", "height", "rx", "ry", "fill", "stroke", "strokeWidth", "opacity", "transform", "style", "class", "id"],
+    line: ["x1", "y1", "x2", "y2", "stroke", "strokeWidth", "opacity", "transform", "style", "class", "id"],
+    polyline: ["points", "fill", "stroke", "strokeWidth", "opacity", "transform", "style", "class", "id"],
+    polygon: ["points", "fill", "stroke", "strokeWidth", "opacity", "transform", "style", "class", "id"],
+    ellipse: ["cx", "cy", "rx", "ry", "fill", "stroke", "strokeWidth", "opacity", "transform", "style", "class", "id"],
+    g: ["transform", "fill", "stroke", "strokeWidth", "opacity", "style", "class", "id"],
+    text: ["x", "y", "dx", "dy", "textAnchor", "dominantBaseline", "fill", "fontSize", "fontFamily", "fontWeight", "transform", "style", "class", "id"],
+    tspan: ["x", "y", "dx", "dy", "fill", "style", "class", "id"],
+    linearGradient: ["id", "x1", "y1", "x2", "y2", "gradientUnits", "gradientTransform"],
+    radialGradient: ["id", "cx", "cy", "r", "fx", "fy", "gradientUnits", "gradientTransform"],
+    stop: ["offset", "stopColor", "stopOpacity", "style"],
+    animate: ["attributeName", "from", "to", "dur", "repeatCount", "fill", "begin"],
+    animateTransform: ["attributeName", "type", "from", "to", "dur", "repeatCount", "fill", "begin"],
+    use: ["href", "x", "y", "width", "height"],
+    defs: [],
+    clipPath: ["id"],
+    mask: ["id"],
+    marker: ["id", "viewBox", "refX", "refY", "markerWidth", "markerHeight", "orient"],
+    pattern: ["id", "x", "y", "width", "height", "patternUnits"],
+    foreignObject: ["x", "y", "width", "height"],
+  },
+};
+
+const makeMdComponents = (isStreaming = false) => ({
   p: ({ children }) => <p style={{ margin: "0 0 12px" }}>{children}</p>,
   code: ({ node, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || "");
@@ -30,6 +66,10 @@ const mdComponents = {
       );
     }
     const codeString = String(children).replace(/\n$/, "");
+    // Render interactive HTML blocks inline
+    if (match && match[1] === "render") {
+      return <InteractiveBlock code={codeString} isStreaming={isStreaming} />;
+    }
     if (match) {
       return (
         <SyntaxHighlighter
@@ -63,6 +103,10 @@ const mdComponents = {
     if (classes.includes("language-mermaid")) {
       const text = codeNode?.children?.map(c => c.value || "").join("") || "";
       return <MermaidBlock code={text.replace(/\n$/, "")} />;
+    }
+    if (classes.includes("language-render")) {
+      const text = codeNode?.children?.map(c => c.value || "").join("") || "";
+      return <InteractiveBlock code={text.replace(/\n$/, "")} isStreaming={isStreaming} />;
     }
     const rawText = codeNode?.children?.map(c => c.value || "").join("") || "";
     return (
@@ -125,10 +169,22 @@ const mdComponents = {
   th: ({ children }) => <th style={{ textAlign: "left", padding: "6px 12px 6px 0", fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{children}</th>,
   td: ({ children }) => <td style={{ padding: "4px 12px 4px 0", color: "rgba(255,255,255,0.55)" }}>{children}</td>,
   hr: () => <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "16px 0" }} />,
-};
+});
+
+// Escape non-standard HTML tags that rehype-raw would try to parse (e.g. <thinking>, </thinking>)
+// Wrap them in inline code so they display as-is instead of breaking rendering
+function sanitizeText(text) {
+  if (!text) return text;
+  return text.replace(/<\/?(?:thinking|antThinking)[^>]*>/gi, (match) => `\`${match}\``);
+}
+
+// Cache both variants to avoid recreating components on every render
+const mdComponentsStatic = makeMdComponents(false);
+const mdComponentsStreaming = makeMdComponents(true);
 
 export default function Message({ msg, onEdit, onAnswer, onFork }) {
   const isUser = msg.role === "user";
+  const hasThinkingPart = Boolean(msg.parts?.some((part) => part.type === "thinking"));
 
   // Strip [Attached files/images: ...] prefix from display text and extract file names
   let displayText = msg.text || "";
@@ -278,7 +334,7 @@ export default function Message({ msg, onEdit, onAnswer, onFork }) {
               textAlign: "left",
               maxWidth: "85%",
             }}>
-              <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+              <Markdown remarkPlugins={[remarkGfm]} components={mdComponentsStatic}>
                 {displayText}
               </Markdown>
             </div>
@@ -321,12 +377,6 @@ export default function Message({ msg, onEdit, onAnswer, onFork }) {
         gap: 8,
       }}>
         RESPONSE
-        {msg.isThinking && (
-          <span style={{ display: "flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.25)" }}>
-            <Loader2 size={10} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
-            <span style={{ fontSize: 8 }}>thinking</span>
-          </span>
-        )}
       </div>
 
       {/* Render parts in order — text and tool calls interleaved */}
@@ -342,8 +392,8 @@ export default function Message({ msg, onEdit, onAnswer, onFork }) {
               letterSpacing: "0.008em",
               marginBottom: 4,
             }}>
-              <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={mdComponents}>
-                {part.text}
+              <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]} components={(msg.isStreaming && isLastPart) ? mdComponentsStreaming : mdComponentsStatic}>
+                {sanitizeText(part.text)}
               </Markdown>
               {msg.isStreaming && isLastPart && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.2)", marginLeft: 4, verticalAlign: "middle" }}>
@@ -352,6 +402,9 @@ export default function Message({ msg, onEdit, onAnswer, onFork }) {
               )}
             </div>
           );
+        }
+        if (part.type === "thinking") {
+          return <ThinkingBlock key={"think-" + i} text={part.text} isThinking={msg.isThinking} />;
         }
         if (part.type === "tool") {
           if (part.name === "AskUserQuestion") {
@@ -362,6 +415,10 @@ export default function Message({ msg, onEdit, onAnswer, onFork }) {
         return null;
       })}
 
+      {msg.isThinking && !hasThinkingPart && (
+        <ThinkingBlock text="" isThinking={true} />
+      )}
+
       {/* Fallback for old format messages (text + toolCalls) */}
       {!msg.parts && msg.text && (
         <div style={{
@@ -371,8 +428,8 @@ export default function Message({ msg, onEdit, onAnswer, onFork }) {
           fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
           letterSpacing: "0.008em",
         }}>
-          <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} components={mdComponents}>
-            {msg.text}
+          <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]} components={mdComponentsStatic}>
+            {sanitizeText(msg.text)}
           </Markdown>
         </div>
       )}

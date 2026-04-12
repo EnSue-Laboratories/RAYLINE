@@ -104,6 +104,8 @@ export default function MermaidBlock({ code }) {
   const [error, setError] = useState(false);
   const lastRendered = useRef("");
   const timerRef = useRef(null);
+  const containerRef = useRef(null);
+  const lastHeight = useRef(null);
 
   useEffect(() => {
     const trimmed = code?.trim();
@@ -153,6 +155,13 @@ export default function MermaidBlock({ code }) {
     );
   }
 
+  // Capture height when SVG is rendered
+  useEffect(() => {
+    if (svg && containerRef.current) {
+      lastHeight.current = containerRef.current.offsetHeight;
+    }
+  }, [svg]);
+
   if (!svg) {
     return (
       <div style={{
@@ -165,6 +174,11 @@ export default function MermaidBlock({ code }) {
         color: "rgba(255,255,255,0.25)",
         fontSize: 11,
         fontFamily: "'JetBrains Mono',monospace",
+        // Preserve last known height to prevent scroll jumps
+        minHeight: lastHeight.current || undefined,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}>
         Rendering diagram...
       </div>
@@ -173,6 +187,7 @@ export default function MermaidBlock({ code }) {
 
   return (
     <div
+      ref={containerRef}
       style={{
         background: "rgba(0,0,0,0.2)",
         border: "1px solid rgba(255,255,255,0.06)",
