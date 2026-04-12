@@ -185,30 +185,8 @@ export default function Message({ msg, onEdit, onAnswer }) {
           color: "rgba(255,255,255,0.2)",
           letterSpacing: ".14em",
           marginBottom: 10,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: 8,
         }}>
           YOU
-          {onEdit && !editing && (
-            <button
-              onClick={() => setEditing(true)}
-              style={{
-                background: "none",
-                border: "none",
-                color: "rgba(255,255,255,0.3)",
-                cursor: "pointer",
-                padding: 2,
-                display: "flex",
-                transition: "color .2s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
-            >
-              <Pencil size={10} strokeWidth={1.5} />
-            </button>
-          )}
         </div>
 
         {editing ? (
@@ -305,6 +283,35 @@ export default function Message({ msg, onEdit, onAnswer }) {
               </Markdown>
             </div>
           </>
+        )}
+
+        {!editing && (
+          <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "flex-end" }}>
+            <CopyBtn text={displayText} />
+            {onEdit && (
+              <button
+                onClick={() => setEditing(true)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "rgba(255,255,255,0.3)",
+                  cursor: "pointer",
+                  padding: "2px 4px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                  fontSize: 10,
+                  fontFamily: "'JetBrains Mono',monospace",
+                  borderRadius: 3,
+                  transition: "color .2s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+              >
+                <Pencil size={10} strokeWidth={1.5} />
+              </button>
+            )}
+          </div>
         )}
       </div>
     );
