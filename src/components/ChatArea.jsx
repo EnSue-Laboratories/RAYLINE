@@ -46,7 +46,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     { cmd: "/clear", desc: "Start a new conversation" },
     { cmd: "/new", desc: "Start a new conversation" },
     { cmd: "/compact", desc: "Compact conversation context" },
-    { cmd: "/model", desc: "Show current model" },
   ];
   const showCommands = input.startsWith("/") && !input.includes(" ");
   const filteredCommands = showCommands
