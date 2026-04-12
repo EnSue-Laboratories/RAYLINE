@@ -10,18 +10,23 @@ const TOOL_ICONS = {
   Glob: Search,
 };
 
+function truncate(str, max) {
+  if (!str) return null;
+  return str.length > max ? str.slice(0, max) + "..." : str;
+}
+
 function getPreview(tool) {
   const args = tool.args;
   if (!args || typeof args !== "object") return null;
-  if (tool.name === "Bash") return args.command?.slice(0, 60);
+  if (tool.name === "Bash") return truncate(args.command?.replace(/\n/g, " "), 80);
   if (tool.name === "Read") return args.file_path?.split("/").slice(-2).join("/");
   if (tool.name === "Edit") return args.file_path?.split("/").slice(-2).join("/");
   if (tool.name === "Write") return args.file_path?.split("/").slice(-2).join("/");
-  if (tool.name === "Grep") return args.pattern?.slice(0, 40);
-  if (tool.name === "Glob") return args.pattern?.slice(0, 40);
-  if (tool.name === "Agent") return args.description?.slice(0, 50);
-  if (tool.name === "WebSearch") return args.query?.slice(0, 50);
-  if (tool.name === "WebFetch") return args.url?.slice(0, 50);
+  if (tool.name === "Grep") return truncate(args.pattern, 50);
+  if (tool.name === "Glob") return truncate(args.pattern, 50);
+  if (tool.name === "Agent") return truncate(args.description, 60);
+  if (tool.name === "WebSearch") return truncate(args.query, 60);
+  if (tool.name === "WebFetch") return truncate(args.url, 60);
   return null;
 }
 
