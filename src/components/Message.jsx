@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil, Loader2 } from "lucide-react";
+import { Pencil, Loader2, FileText } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -256,9 +256,31 @@ export default function Message({ msg, onEdit, onAnswer }) {
         )}
 
         {msg.images && msg.images.length > 0 && (
-          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 8 }}>
             {msg.images.map((img, i) => (
               <img key={i} src={img} alt="" style={{ height: 40, borderRadius: 6, opacity: 0.8 }} />
+            ))}
+          </div>
+        )}
+
+        {msg.files && msg.files.length > 0 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 8 }}>
+            {msg.files.map((f, i) => (
+              <div key={i} style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "4px 10px",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 6,
+                fontSize: 11,
+                fontFamily: "'JetBrains Mono',monospace",
+                color: "rgba(255,255,255,0.5)",
+              }}>
+                <FileText size={12} strokeWidth={1.5} />
+                {f.name || f.path?.split("/").pop() || "file"}
+              </div>
             ))}
           </div>
         )}
