@@ -271,15 +271,9 @@ export default function Message({ msg, onEdit }) {
                 {part.text}
               </Markdown>
               {msg.isStreaming && isLastPart && (
-                <span style={{
-                  display: "inline-block",
-                  width: 2,
-                  height: 16,
-                  background: "rgba(255,255,255,0.4)",
-                  marginLeft: 2,
-                  verticalAlign: "text-bottom",
-                  animation: "blink 1s steps(1) infinite",
-                }} />
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.2)", marginLeft: 4, verticalAlign: "middle" }}>
+                  <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
+                </span>
               )}
             </div>
           );
