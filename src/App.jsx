@@ -16,6 +16,7 @@ export default function App() {
   const [defaultModel, setDefaultModel] = useState("sonnet");
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
+  const messageQueue = useRef([]);
 
   // Load state from file on mount
   useEffect(() => {
@@ -125,8 +126,23 @@ export default function App() {
     if (active === id) setActive(remaining[0]?.id || null);
   };
 
+  // Process queued messages when streaming ends
+  useEffect(() => {
+    if (!activeData.isStreaming && messageQueue.current.length > 0) {
+      const next = messageQueue.current.shift();
+      // Small delay to let the UI settle
+      setTimeout(() => handleSend(next.text, next.attachments), 300);
+    }
+  }, [activeData.isStreaming]);
+
   const handleSend = useCallback(
     (text, attachments) => {
+      // Queue if currently streaming
+      if (activeData.isStreaming && active) {
+        messageQueue.current.push({ text, attachments });
+        return;
+      }
+
       let convo = activeConvo;
       let convoId = active;
 

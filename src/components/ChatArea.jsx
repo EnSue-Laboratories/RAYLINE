@@ -41,7 +41,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const isStreaming = convo?.isStreaming;
 
   const send = useCallback(() => {
-    if (isStreaming) return;
     if (!input.trim() && attachments.length === 0) return;
     onSend(input.trim(), attachments.length > 0 ? attachments : undefined);
     setInput("");
@@ -267,7 +266,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 overflow: "hidden",
               }}
             />
-            {isStreaming ? (
+            {isStreaming && !input.trim() ? (
               <button
                 onClick={onCancel}
                 style={{
@@ -278,14 +277,16 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                   height: 30,
                   borderRadius: 8,
                   flexShrink: 0,
-                  background: "rgba(200,80,80,0.7)",
-                  border: "none",
-                  color: "#fff",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  color: "rgba(255,255,255,0.5)",
                   cursor: "pointer",
                   transition: "all .2s",
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.12)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
               >
-                <Square size={12} fill="currentColor" />
+                <Square size={10} fill="currentColor" />
               </button>
             ) : (
               <button

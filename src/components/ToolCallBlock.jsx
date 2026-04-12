@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronRight, ChevronDown, Terminal, FileText, Pencil, Search, Code } from "lucide-react";
 
 const TOOL_ICONS = {
@@ -11,7 +11,18 @@ const TOOL_ICONS = {
 };
 
 export default function ToolCallBlock({ tool }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(tool.status === "running");
+  const wasRunning = useRef(tool.status === "running");
+
+  // Auto-expand when running, auto-collapse when done
+  useEffect(() => {
+    if (tool.status === "running" && !wasRunning.current) {
+      setExpanded(true);
+    } else if (tool.status === "done" && wasRunning.current) {
+      setExpanded(false);
+    }
+    wasRunning.current = tool.status === "running";
+  }, [tool.status]);
   const Icon = TOOL_ICONS[tool.name] || Code;
   const isRunning = tool.status === "running";
 
