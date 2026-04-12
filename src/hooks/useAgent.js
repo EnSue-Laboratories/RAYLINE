@@ -3,13 +3,9 @@ import { useState, useCallback, useEffect, useRef } from "react";
 let _msgId = 0;
 const uid = () => "m" + (++_msgId) + "-" + Date.now();
 
-// Helper: get or create the last text part on an assistant message
-function lastTextPart(parts) {
-  const last = parts[parts.length - 1];
-  if (last && last.type === "text") return last;
-  const p = { type: "text", text: "" };
-  parts.push(p);
-  return p;
+// Helper: deep-clone parts array (each part is a new object)
+function cloneParts(parts) {
+  return (parts || []).map(p => ({ ...p }));
 }
 
 // Helper: find a tool part by id across all parts
@@ -49,7 +45,7 @@ export default function useAgent() {
           if (inner.type === "content_block_start") {
             const block = inner.content_block;
             const am = ensureAssistant();
-            const parts = [...(am.parts || [])];
+            const parts = cloneParts(am.parts);
             if (block?.type === "thinking") {
               msgs[msgs.length - 1] = { ...am, parts, isThinking: true };
             } else if (block?.type === "tool_use") {
@@ -70,19 +66,25 @@ export default function useAgent() {
             }
           } else if (inner.type === "content_block_delta") {
             const am = ensureAssistant();
-            const parts = [...(am.parts || [])];
+            const parts = cloneParts(am.parts);
             const delta = inner.delta;
             if (delta?.type === "text_delta") {
-              const tp = lastTextPart(parts);
-              tp.text += (delta.text || "");
+              // Find or create last text part — parts are already cloned so safe to update
+              const lastIdx = parts.length - 1;
+              if (lastIdx >= 0 && parts[lastIdx].type === "text") {
+                parts[lastIdx] = { ...parts[lastIdx], text: parts[lastIdx].text + (delta.text || "") };
+              } else {
+                parts.push({ type: "text", text: delta.text || "" });
+              }
               msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
             } else if (delta?.type === "input_json_delta") {
-              // Find the last tool part
+              // Find the last tool part — parts already cloned
               for (let i = parts.length - 1; i >= 0; i--) {
                 if (parts[i].type === "tool") {
-                  parts[i] = { ...parts[i] };
-                  parts[i].argsJson = (parts[i].argsJson || "") + (delta.partial_json || "");
-                  try { parts[i].args = JSON.parse(parts[i].argsJson); } catch {}
+                  const newJson = (parts[i].argsJson || "") + (delta.partial_json || "");
+                  let newArgs = parts[i].args;
+                  try { newArgs = JSON.parse(newJson); } catch {}
+                  parts[i] = { ...parts[i], argsJson: newJson, args: newArgs };
                   break;
                 }
               }
@@ -98,7 +100,7 @@ export default function useAgent() {
           // With --include-partial-messages, assistant events contain full accumulated text.
           // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
           const am = ensureAssistant();
-          const parts = [...(am.parts || [])];
+          const parts = cloneParts(am.parts);
           const hasStreamParts = parts.length > 0;
           if (!hasStreamParts && event.message?.content) {
             for (const block of event.message.content) {
@@ -126,11 +128,10 @@ export default function useAgent() {
               if (block.type === "tool_result" && block.tool_use_id) {
                 for (let mi = msgs.length - 1; mi >= 0; mi--) {
                   if (msgs[mi].role === "assistant" && msgs[mi].parts) {
-                    const parts = [...msgs[mi].parts];
-                    const tp = findToolPart(parts, block.tool_use_id);
-                    if (tp) {
-                      tp.result = block.content;
-                      tp.status = "done";
+                    const parts = cloneParts(msgs[mi].parts);
+                    const tpIdx = parts.findIndex(p => p.type === "tool" && p.id === block.tool_use_id);
+                    if (tpIdx >= 0) {
+                      parts[tpIdx] = { ...parts[tpIdx], result: block.content, status: "done" };
                       msgs[mi] = { ...msgs[mi], parts };
                       break;
                     }
