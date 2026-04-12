@@ -58,14 +58,19 @@ export default function SelectionToolbar({ onQuote, model }) {
 
   if (!sel) return null;
 
+  const [explaining, setExplaining] = useState(false);
+
   const handleExplain = async () => {
+    if (explaining) return;
+    setExplaining(true);
     setExplanation({ text: "", loading: true });
     try {
       const result = await window.api.quickExplain({ text: sel.text, model });
-      setExplanation({ text: result, loading: false });
+      setExplanation({ text: result || "No response.", loading: false });
     } catch {
       setExplanation({ text: "Could not get explanation.", loading: false });
     }
+    setExplaining(false);
   };
 
   const handleQuote = () => {
@@ -151,8 +156,8 @@ export default function SelectionToolbar({ onQuote, model }) {
           boxShadow: explanation ? "none" : "0 8px 32px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.06)",
         }}>
           <ToolbarBtn
-            icon={<Sparkles size={12} strokeWidth={1.5} />}
-            label="Explain"
+            icon={explaining ? <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} /> : <Sparkles size={12} strokeWidth={1.5} />}
+            label={explaining ? "Thinking..." : "Explain"}
             onClick={handleExplain}
             active={!!explanation}
           />

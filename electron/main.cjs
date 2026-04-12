@@ -167,7 +167,7 @@ ipcMain.handle("quick-explain", async (_event, { text, model }) => {
     child.stderr.on("data", () => {});
     child.on("close", () => resolve(out.trim()));
     child.on("error", (err) => resolve(`Error: ${err.message}`));
-    setTimeout(() => { child.kill(); resolve(out.trim() || "Timed out"); }, 15000);
+    setTimeout(() => { child.kill(); resolve(out.trim() || "Timed out"); }, 30000);
   });
 });
 
