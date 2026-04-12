@@ -110,11 +110,13 @@ export default function Message({ msg, onEdit }) {
     return (
       <div
         style={{
-          marginBottom: 6,
+          marginBottom: 32,
           animation: "msgIn .4s cubic-bezier(.16,1,.3,1)",
-          textAlign: "right",
           paddingTop: 28,
           position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
         }}
       >
         <div style={{
@@ -205,6 +207,8 @@ export default function Message({ msg, onEdit }) {
             fontFamily: "system-ui,-apple-system,sans-serif",
             fontWeight: 400,
             whiteSpace: "pre-wrap",
+            textAlign: "left",
+            maxWidth: "85%",
           }}>
             {msg.text}
           </div>
