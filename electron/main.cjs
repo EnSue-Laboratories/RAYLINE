@@ -155,7 +155,8 @@ ipcMain.handle("quick-explain", async (_event, { text, model }) => {
       "--tools", "",
       "--model", model || "haiku",
       "--no-session-persistence",
-      `Explain this briefly in 1-3 short sentences. Be concise and clear:\n\n${text}`,
+      "--system-prompt", "You are a concise explainer. Give 1-3 sentence explanations. Use markdown for formatting.",
+      `Explain this briefly:\n\n${text}`,
     ];
     const child = spawn("claude", args, {
       env: { ...process.env, FORCE_COLOR: "0", PATH: process.env.PATH + ":/opt/homebrew/bin:/usr/local/bin" },
