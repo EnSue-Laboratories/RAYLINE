@@ -142,7 +142,15 @@ export default function useAgent() {
           }
         } else if (event.type === "result") {
           if (lastMsg && lastMsg.role === "assistant") {
-            msgs[msgs.length - 1] = { ...lastMsg, isStreaming: false, isThinking: false };
+            if (event.is_error || event.subtype === "error_during_execution") {
+              // Surface the error as text in the assistant message
+              const errorText = event.result || event.error || "An error occurred.";
+              const parts = cloneParts(lastMsg.parts);
+              parts.push({ type: "text", text: `**Error:** ${errorText}` });
+              msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };
+            } else {
+              msgs[msgs.length - 1] = { ...lastMsg, isStreaming: false, isThinking: false };
+            }
           }
         }
 
@@ -169,7 +177,15 @@ export default function useAgent() {
       setConversations((prev) => {
         const next = new Map(prev);
         const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
-        next.set(conversationId, { ...convo, error, isStreaming: false });
+        // Surface error in the last assistant message
+        const msgs = [...convo.messages];
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg && lastMsg.role === "assistant") {
+          const parts = cloneParts(lastMsg.parts);
+          parts.push({ type: "text", text: `**Error:** ${error}` });
+          msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };
+        }
+        next.set(conversationId, { messages: msgs, error, isStreaming: false });
         return next;
       });
     });
