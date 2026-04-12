@@ -226,6 +226,31 @@ export default function App() {
     [activeConvo, active, cwd, editAndResend]
   );
 
+  const handleFork = useCallback(
+    (messageIndex) => {
+      if (!activeConvo) return;
+      // Create a new conversation that forks from this point
+      const id = "c" + Date.now();
+      const sessionId = crypto.randomUUID();
+      const forkedConvo = {
+        id,
+        sessionId: activeConvo.sessionId, // same session to resume from
+        title: activeConvo.title + " (fork)",
+        model: activeConvo.model,
+        ts: Date.now(),
+        forkedFrom: activeConvo.sessionId,
+        forkIndex: messageIndex,
+      };
+      setConvoList((p) => [forkedConvo, ...p]);
+      setActive(id);
+
+      // Load messages up to the fork point
+      const msgs = activeData.messages.slice(0, messageIndex + 1);
+      loadMessages(id, msgs);
+    },
+    [activeConvo, active, activeData, loadMessages]
+  );
+
   const handleModelChange = (modelId) => {
     if (active) {
       setConvoList((p) =>
@@ -325,6 +350,7 @@ export default function App() {
         onSend={handleSend}
         onCancel={handleCancel}
         onEdit={handleEdit}
+        onFork={handleFork}
         onToggleSidebar={() => setSidebarOpen((o) => !o)}
         sidebarOpen={sidebarOpen}
         onModelChange={handleModelChange}

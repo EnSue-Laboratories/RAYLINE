@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil, Loader2, FileText } from "lucide-react";
+import { Pencil, Loader2, FileText, GitFork } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -127,7 +127,7 @@ const mdComponents = {
   hr: () => <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "16px 0" }} />,
 };
 
-export default function Message({ msg, onEdit, onAnswer }) {
+export default function Message({ msg, onEdit, onAnswer, onFork }) {
   const isUser = msg.role === "user";
 
   // Strip [Attached files/images: ...] prefix from display text and extract file names
@@ -288,28 +288,11 @@ export default function Message({ msg, onEdit, onAnswer }) {
         {!editing && (
           <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "flex-end" }}>
             <CopyBtn text={displayText} />
+            {onFork && (
+              <MsgBtn icon={<GitFork size={10} strokeWidth={1.5} />} onClick={onFork} />
+            )}
             {onEdit && (
-              <button
-                onClick={() => setEditing(true)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "rgba(255,255,255,0.3)",
-                  cursor: "pointer",
-                  padding: "2px 4px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 3,
-                  fontSize: 10,
-                  fontFamily: "'JetBrains Mono',monospace",
-                  borderRadius: 3,
-                  transition: "color .2s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
-              >
-                <Pencil size={10} strokeWidth={1.5} />
-              </button>
+              <MsgBtn icon={<Pencil size={10} strokeWidth={1.5} />} onClick={() => setEditing(true)} />
             )}
           </div>
         )}
@@ -398,14 +381,40 @@ export default function Message({ msg, onEdit, onAnswer }) {
       ))}
 
       {!msg.isStreaming && (msg.parts?.some(p => p.type === "text" && p.text) || msg.text) && (
-        <div style={{ marginTop: 8 }}>
+        <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
           <CopyBtn text={
             msg.parts
               ? msg.parts.filter(p => p.type === "text").map(p => p.text).join("\n")
               : msg.text
           } />
+          {onFork && (
+            <MsgBtn icon={<GitFork size={10} strokeWidth={1.5} />} onClick={onFork} />
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function MsgBtn({ icon, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: "none",
+        border: "none",
+        color: "rgba(255,255,255,0.3)",
+        cursor: "pointer",
+        padding: "2px 4px",
+        display: "inline-flex",
+        alignItems: "center",
+        borderRadius: 3,
+        transition: "color .2s",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+    >
+      {icon}
+    </button>
   );
 }
