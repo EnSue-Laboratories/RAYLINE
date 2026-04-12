@@ -52,21 +52,25 @@ export default function App() {
     setActive(id);
     const convo = convoList.find((c) => c.id === id);
     const data = getConversation(id);
-    if (convo && data.messages.length === 0 && window.api) {
+    if (convo && window.api) {
       try {
-        const msgs = await window.api.loadSession(convo.sessionId);
+        const result = await window.api.loadSession(convo.sessionId);
+        const msgs = result?.messages || result;
+        const sessionCwd = result?.cwd || null;
         if (msgs && msgs.length > 0) {
-          loadMessages(id, msgs);
-          // Update sidebar preview from loaded messages
+          if (data.messages.length === 0) loadMessages(id, msgs);
           const lastMsg = msgs[msgs.length - 1];
           const previewText = lastMsg?.parts
             ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
             : (lastMsg?.text || "");
-          if (previewText) {
-            setConvoList((p) =>
-              p.map((c) => c.id === id ? { ...c, lastPreview: previewText.slice(0, 60) } : c)
-            );
-          }
+          setConvoList((p) =>
+            p.map((c) => c.id === id ? {
+              ...c,
+              ...(previewText ? { lastPreview: previewText.slice(0, 60) } : {}),
+              // Always trust session file location for CWD
+              ...(sessionCwd ? { cwd: sessionCwd } : {}),
+            } : c)
+          );
         }
       } catch (e) {
         console.error("Failed to load session:", e);
@@ -84,19 +88,23 @@ export default function App() {
   useEffect(() => {
     if (!stateLoaded || !window.api) return;
     convoList.forEach(async (c) => {
-      if (!c.lastPreview || c.lastPreview === "Empty") {
+      if (!c.lastPreview || c.lastPreview === "Empty" || !c.cwd) {
         try {
-          const msgs = await window.api.loadSession(c.sessionId);
+          const result = await window.api.loadSession(c.sessionId);
+          const msgs = result?.messages || result;
+          const sessionCwd = result?.cwd || null;
           if (msgs && msgs.length > 0) {
             const lastMsg = msgs[msgs.length - 1];
             const previewText = lastMsg?.parts
               ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
               : (lastMsg?.text || "");
-            if (previewText) {
-              setConvoList((p) =>
-                p.map((cv) => cv.id === c.id ? { ...cv, lastPreview: previewText.slice(0, 60) } : cv)
-              );
-            }
+            setConvoList((p) =>
+              p.map((cv) => cv.id === c.id ? {
+                ...cv,
+                ...(previewText ? { lastPreview: previewText.slice(0, 60) } : {}),
+                ...(sessionCwd && !cv.cwd ? { cwd: sessionCwd } : {}),
+              } : cv)
+            );
           }
         } catch {}
       }
@@ -138,7 +146,7 @@ export default function App() {
   }, [activeData.isStreaming]);
 
   const handleSend = useCallback(
-    (text, attachments) => {
+    async (text, attachments) => {
       // Handle slash commands client-side
       const trimmed = text.trim();
       if (trimmed.startsWith("/") && !trimmed.includes(" ")) {
@@ -184,6 +192,8 @@ export default function App() {
         }
       }
 
+      const convoCwd = convo.cwd;
+
       const images = attachments?.filter((a) => a.type === "image").map((a) => a.dataUrl);
       const files  = attachments?.filter((a) => a.type === "file");
       const m = getM(convo.model);
@@ -199,7 +209,7 @@ export default function App() {
         resumeSessionId: isFirstMessage ? undefined : convo.sessionId,
         prompt: text,
         model: m.cliFlag,
-        cwd: convo.cwd || cwd || undefined,
+        cwd: convoCwd || cwd || undefined,
         images: images?.length ? images : undefined,
         files: files?.length ? files : undefined,
       });
@@ -264,7 +274,20 @@ export default function App() {
   const handlePickFolder = async () => {
     if (!window.api) return;
     const folder = await window.api.pickFolder();
-    if (folder) setCwd(folder);
+    if (folder) {
+      setCwd(folder);
+      // If there's an active conversation, copy its session to the new directory
+      if (activeConvo && activeConvo.cwd !== folder) {
+        try {
+          await window.api.moveSession(activeConvo.sessionId, folder);
+          setConvoList((p) =>
+            p.map((c) => c.id === active ? { ...c, cwd: folder } : c)
+          );
+        } catch (e) {
+          console.error("Failed to move session:", e);
+        }
+      }
+    }
   };
 
   // Update saved preview when active conversation messages change
@@ -340,7 +363,7 @@ export default function App() {
           onNew={handleNew}
           onDelete={handleDelete}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
-          cwd={cwd}
+          cwd={activeConvo?.cwd || cwd}
           onPickFolder={handlePickFolder}
         />
       </div>

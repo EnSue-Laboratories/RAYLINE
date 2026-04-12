@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell } = require("ele
 const path = require("path");
 const fs = require("fs");
 const { startAgent, cancelAgent, cancelAll } = require("./agent-manager.cjs");
-const { listSessions, loadSessionMessages } = require("./session-reader.cjs");
+const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 
 const isDev = !app.isPackaged;
 
@@ -107,6 +107,10 @@ ipcMain.handle("list-sessions", async (_event, cwd) => {
 
 ipcMain.handle("load-session", async (_event, sessionId) => {
   return loadSessionMessages(sessionId);
+});
+
+ipcMain.handle("move-session", async (_event, sessionId, newCwd) => {
+  return moveSession(sessionId, newCwd);
 });
 
 // IPC: file-based state persistence (survives app name changes)

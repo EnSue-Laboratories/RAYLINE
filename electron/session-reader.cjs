@@ -16,9 +16,49 @@ function findSessionFile(sessionId) {
   const projects = fs.readdirSync(projectsDir);
   for (const proj of projects) {
     const filePath = path.join(projectsDir, proj, sessionId + ".jsonl");
-    if (fs.existsSync(filePath)) return filePath;
+    if (fs.existsSync(filePath)) return { filePath, projectDir: proj };
   }
   return null;
+}
+
+function cwdFromProjectDir(projDir) {
+  // Project dir names encode paths by replacing / with -
+  // e.g. "-Users-kira-chan-Downloads-codex-research" -> "/Users/kira-chan/Downloads/codex-research"
+  // We can't naively replace - with / because dir names may contain dashes.
+  // Instead, walk common parent directories and match children against remaining encoded string.
+  if (!projDir.startsWith("-")) return projDir;
+
+  function walkAndMatch(dirPath, remaining) {
+    // remaining is the encoded string left to match (without leading -)
+    if (!remaining) {
+      try { if (fs.statSync(dirPath).isDirectory()) return dirPath; } catch {}
+      return null;
+    }
+
+    try {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const encoded = entry.name.replace(/\//g, "-");
+        // Check if remaining starts with this directory's encoded name
+        if (remaining === encoded) {
+          return path.join(dirPath, entry.name);
+        }
+        if (remaining.startsWith(encoded + "-")) {
+          const result = walkAndMatch(
+            path.join(dirPath, entry.name),
+            remaining.slice(encoded.length + 1)
+          );
+          if (result) return result;
+        }
+      }
+    } catch {}
+    return null;
+  }
+
+  // Remove leading - and walk from /
+  const result = walkAndMatch("/", projDir.slice(1));
+  return result || projDir.replace(/-/g, "/"); // fallback
 }
 
 async function listSessions(cwd) {
@@ -68,8 +108,11 @@ async function listSessions(cwd) {
 const MAX_MESSAGES = 50; // max user+assistant message pairs to load
 
 async function loadSessionMessages(sessionId) {
-  const filePath = findSessionFile(sessionId);
-  if (!filePath) return [];
+  const found = findSessionFile(sessionId);
+  if (!found) return { messages: [], cwd: null };
+
+  const { filePath, projectDir } = found;
+  const sessionCwd = cwdFromProjectDir(projectDir);
 
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
@@ -165,11 +208,28 @@ async function loadSessionMessages(sessionId) {
   }
 
   // Keep only the last MAX_MESSAGES messages to avoid slowdowns
-  if (messages.length > MAX_MESSAGES) {
-    return messages.slice(-MAX_MESSAGES);
-  }
-
-  return messages;
+  const result = messages.length > MAX_MESSAGES ? messages.slice(-MAX_MESSAGES) : messages;
+  return { messages: result, cwd: sessionCwd };
 }
 
-module.exports = { listSessions, loadSessionMessages };
+function moveSession(sessionId, newCwd) {
+  const found = findSessionFile(sessionId);
+  if (!found) return false;
+
+  const { filePath: srcPath } = found;
+  const destDir = path.join(CLAUDE_DIR, "projects", projectDirName(newCwd));
+  const destPath = path.join(destDir, sessionId + ".jsonl");
+
+  // Don't copy if already in the right place
+  if (srcPath === destPath) return true;
+
+  // Ensure destination project directory exists
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+
+  fs.copyFileSync(srcPath, destPath);
+  return true;
+}
+
+module.exports = { listSessions, loadSessionMessages, moveSession };

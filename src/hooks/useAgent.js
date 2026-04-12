@@ -144,7 +144,9 @@ export default function useAgent() {
           if (lastMsg && lastMsg.role === "assistant") {
             if (event.is_error || event.subtype === "error_during_execution") {
               // Surface the error as text in the assistant message
-              const errorText = event.result || event.error || "An error occurred.";
+              const errorText = event.result || event.error
+                || (event.errors && event.errors.length > 0 ? event.errors.join("\n") : null)
+                || "An error occurred.";
               const parts = cloneParts(lastMsg.parts);
               parts.push({ type: "text", text: `**Error:** ${errorText}` });
               msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };

@@ -61,8 +61,9 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
 
   args.push(fullPrompt);
 
-  log("Starting agent:", { conversationId, model, cwd, sessionId, resumeSessionId });
-  log("Command: claude", args.join(" ").slice(0, 200) + "...");
+  log("Starting agent:", { conversationId, model, cwd, sessionId, resumeSessionId, forkSession });
+  log("Full args:", args.filter(a => a !== fullPrompt).join(" "));
+  log("Prompt:", fullPrompt.slice(0, 100));
 
   const child = spawn("claude", args, {
     cwd: cwd || process.cwd(),
@@ -75,6 +76,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
   activeAgents.set(conversationId, child);
 
   let buffer = "";
+  let stderrBuffer = "";
 
   child.stdout.on("data", (chunk) => {
     const raw = chunk.toString();
@@ -88,6 +90,10 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
       try {
         const event = JSON.parse(line);
         log("Parsed event type:", event.type, "subtype:", event.subtype);
+        if (event.type === "result") {
+          log("Result keys:", Object.keys(event));
+          log("Result full:", JSON.stringify(event));
+        }
         webContents.send("agent-stream", { conversationId, event });
 
         // Track when AskUserQuestion tool_use starts streaming
@@ -119,12 +125,16 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
 
   child.stderr.on("data", (chunk) => {
     const text = chunk.toString();
-    log("stderr:", text.slice(0, 500));
-    webContents.send("agent-error", { conversationId, error: text });
+    log("stderr:", text);
+    stderrBuffer += text;
   });
 
   child.on("close", (exitCode) => {
     log("Process closed, exitCode:", exitCode);
+    if (stderrBuffer.trim()) {
+      log("Full stderr:", stderrBuffer);
+      webContents.send("agent-error", { conversationId, error: stderrBuffer.trim() });
+    }
     if (buffer.trim()) {
       log("Flushing remaining buffer:", buffer.slice(0, 200));
       try {
