@@ -20,8 +20,8 @@ function getPreview(tool) {
   if (!args || typeof args !== "object") return null;
   if (tool.name === "Bash") {
     let cmd = args.command?.replace(/\n/g, " ") || "";
-    // Replace absolute paths with just the binary name
-    cmd = cmd.replace(/(?:^|\s)(\/[\w./-]+\/)([\w.-]+)/g, (_, _path, bin) => " " + bin);
+    // Replace absolute/home paths with just the binary name
+    cmd = cmd.replace(/(?:^|\s)[~\/][\w.~\/-]+\/([\w.-]+)/g, (_, bin) => " " + bin);
     return truncate(cmd.trim(), 30);
   }
   if (tool.name === "Read") return args.file_path?.split("/").pop();
