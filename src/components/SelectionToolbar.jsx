@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 export default function SelectionToolbar({ onQuote, model }) {
   const [sel, setSel] = useState(null); // { text, x, y }
   const [explanation, setExplanation] = useState(null); // { text, loading }
+  const [explaining, setExplaining] = useState(false);
   const toolbarRef = useRef(null);
 
   const handleMouseUp = useCallback(() => {
@@ -57,8 +58,6 @@ export default function SelectionToolbar({ onQuote, model }) {
   }, [handleMouseUp]);
 
   if (!sel) return null;
-
-  const [explaining, setExplaining] = useState(false);
 
   const handleExplain = async () => {
     if (explaining) return;
