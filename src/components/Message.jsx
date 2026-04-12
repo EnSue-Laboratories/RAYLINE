@@ -126,8 +126,24 @@ const mdComponents = {
 
 export default function Message({ msg, onEdit, onAnswer }) {
   const isUser = msg.role === "user";
+
+  // Strip [Attached files/images: ...] prefix from display text and extract file names
+  let displayText = msg.text || "";
+  let extractedFiles = null;
+  const attachedMatch = displayText.match(/^\[Attached (?:files|images):\n?([^\]]*)\]\n*/s);
+  if (attachedMatch) {
+    displayText = displayText.slice(attachedMatch[0].length);
+    if (!msg.files || msg.files.length === 0) {
+      extractedFiles = attachedMatch[1].split("\n").filter(Boolean).map(p => ({
+        name: p.trim().split("/").pop(),
+        path: p.trim(),
+      }));
+    }
+  }
+  const filesToShow = msg.files || extractedFiles;
+
   const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState(msg.text);
+  const [editText, setEditText] = useState(displayText);
 
   const handleSubmitEdit = () => {
     if (editText.trim() && editText !== msg.text) {
@@ -251,7 +267,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
             textAlign: "left",
             maxWidth: "85%",
           }}>
-            {msg.text}
+            {displayText}
           </div>
         )}
 
@@ -263,9 +279,9 @@ export default function Message({ msg, onEdit, onAnswer }) {
           </div>
         )}
 
-        {msg.files && msg.files.length > 0 && (
+        {filesToShow && filesToShow.length > 0 && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 8 }}>
-            {msg.files.map((f, i) => (
+            {filesToShow.map((f, i) => (
               <div key={i} style={{
                 display: "flex",
                 alignItems: "center",
