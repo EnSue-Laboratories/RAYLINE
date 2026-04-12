@@ -154,7 +154,6 @@ ipcMain.handle("quick-explain", async (_event, { text, model }) => {
       "--output-format", "text",
       "--tools", "",
       "--model", model || "haiku",
-      "--max-turns", "1",
       "--no-session-persistence",
       `Explain this briefly in 1-3 short sentences. Be concise and clear:\n\n${text}`,
     ];
