@@ -12,20 +12,31 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const endRef  = useRef(null);
   const inRef   = useRef(null);
 
-  // Scroll to bottom on new messages and during streaming,
-  // but only if user is already near the bottom (not scrolled up reading)
+  // Scroll to bottom on new messages and during streaming
   const scrollRef = useRef(null);
-  const lastMsg = convo?.msgs?.[convo.msgs.length - 1];
+  const msgCount = convo?.msgs?.length || 0;
+  const lastMsg = convo?.msgs?.[msgCount - 1];
   const lastParts = lastMsg?.parts;
   const lastPartText = lastParts?.[lastParts.length - 1]?.text || lastMsg?.text;
+  const prevMsgCount = useRef(0);
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+
+    // Always scroll on new messages (count changed)
+    if (msgCount !== prevMsgCount.current) {
+      prevMsgCount.current = msgCount;
+      endRef.current?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    // During streaming, only scroll if near bottom
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 300;
     if (nearBottom) {
       endRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [convo?.msgs?.length, convo?.isStreaming, lastPartText]);
+  }, [msgCount, convo?.isStreaming, lastPartText]);
 
   const isStreaming = convo?.isStreaming;
 

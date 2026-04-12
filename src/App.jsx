@@ -72,31 +72,34 @@ export default function App() {
     }
   }, [convoList, getConversation, loadMessages]);
 
-  // Load active conversation + previews for all convos on mount
+  // Load active conversation + previews after state is loaded
   useEffect(() => {
+    if (!stateLoaded) return;
     if (active) handleSelect(active);
-    // Load previews for conversations that don't have one
-    if (window.api) {
-      convoList.forEach(async (c) => {
-        if (!c.lastPreview || c.lastPreview === "Empty") {
-          try {
-            const msgs = await window.api.loadSession(c.sessionId);
-            if (msgs && msgs.length > 0) {
-              const lastMsg = msgs[msgs.length - 1];
-              const previewText = lastMsg?.parts
-                ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
-                : (lastMsg?.text || "");
-              if (previewText) {
-                setConvoList((p) =>
-                  p.map((cv) => cv.id === c.id ? { ...cv, lastPreview: previewText.slice(0, 60) } : cv)
-                );
-              }
+  }, [stateLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load previews for conversations missing them (runs after state load)
+  useEffect(() => {
+    if (!stateLoaded || !window.api) return;
+    convoList.forEach(async (c) => {
+      if (!c.lastPreview || c.lastPreview === "Empty") {
+        try {
+          const msgs = await window.api.loadSession(c.sessionId);
+          if (msgs && msgs.length > 0) {
+            const lastMsg = msgs[msgs.length - 1];
+            const previewText = lastMsg?.parts
+              ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
+              : (lastMsg?.text || "");
+            if (previewText) {
+              setConvoList((p) =>
+                p.map((cv) => cv.id === c.id ? { ...cv, lastPreview: previewText.slice(0, 60) } : cv)
+              );
             }
-          } catch {}
-        }
-      });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+          }
+        } catch {}
+      }
+    });
+  }, [stateLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
