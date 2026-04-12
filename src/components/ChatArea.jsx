@@ -141,7 +141,15 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
           {convo && (
             <div style={{ animation: "dropIn .2s ease" }}>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.88)", fontFamily: "system-ui,sans-serif" }}>
+              <div style={{
+                fontSize: 13,
+                color: "rgba(255,255,255,0.88)",
+                fontFamily: "system-ui,sans-serif",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: 300,
+              }}>
                 {convo.title}
               </div>
               <div

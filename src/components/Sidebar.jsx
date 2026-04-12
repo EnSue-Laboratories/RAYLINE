@@ -165,8 +165,16 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                 transition: "all .12s",
                 animation: `fadeSlide .2s ease ${i * 0.03}s both`,
               }}
-              onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.018)"; }}
-              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+              onMouseEnter={(e) => {
+                if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.018)";
+                const actions = e.currentTarget.querySelector(".convo-actions");
+                if (actions) actions.style.opacity = "1";
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) e.currentTarget.style.background = "transparent";
+                const actions = e.currentTarget.querySelector(".convo-actions");
+                if (actions) actions.style.opacity = "0";
+              }}
             >
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -198,17 +206,15 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-                  {isActive && (
-                    <button
-                      onClick={(e) => onDelete(c.id, e)}
-                      style={{ background: "none", border: "none", color: "rgba(255,255,255,0.25)", cursor: "pointer", padding: 1, transition: "color .15s", display: "flex" }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(200,80,80,0.5)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
-                    >
-                      <Trash2 size={12} strokeWidth={1.5} />
-                    </button>
-                  )}
+                <div className="convo-actions" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, opacity: 0, transition: "opacity .15s" }}>
+                  <button
+                    onClick={(e) => onDelete(c.id, e)}
+                    style={{ background: "none", border: "none", color: "rgba(255,255,255,0.25)", cursor: "pointer", padding: 1, transition: "color .15s", display: "flex" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(200,80,80,0.5)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+                  >
+                    <Trash2 size={12} strokeWidth={1.5} />
+                  </button>
                 </div>
               </div>
 
