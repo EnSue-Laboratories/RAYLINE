@@ -112,8 +112,9 @@ export default function App() {
       id,
       sessionId,
       title: "New chat",
-      model: "sonnet",
+      model: defaultModel,
       ts: Date.now(),
+      cwd: cwd || undefined,
     };
     setConvoList((p) => [n, ...p]);
     setActive(id);
@@ -170,7 +171,7 @@ export default function App() {
       if (!convo) {
         const id = "c" + Date.now();
         const sessionId = crypto.randomUUID();
-        convo = { id, sessionId, title: text.slice(0, 50), model: defaultModel, ts: Date.now() };
+        convo = { id, sessionId, title: text.slice(0, 50), model: defaultModel, ts: Date.now(), cwd: cwd || undefined };
         convoId = id;
         setConvoList((p) => [convo, ...p]);
         setActive(id);
@@ -198,7 +199,7 @@ export default function App() {
         resumeSessionId: isFirstMessage ? undefined : convo.sessionId,
         prompt: text,
         model: m.cliFlag,
-        cwd: cwd || undefined,
+        cwd: convo.cwd || cwd || undefined,
         images: images?.length ? images : undefined,
         files: files?.length ? files : undefined,
       });
