@@ -4,6 +4,8 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import "katex/dist/katex.min.css";
 import CopyBtn from "./CopyBtn";
 import ToolCallBlock from "./ToolCallBlock";
@@ -12,8 +14,8 @@ import MermaidBlock from "./MermaidBlock";
 
 const mdComponents = {
   p: ({ children }) => <p style={{ margin: "0 0 12px" }}>{children}</p>,
-  code: ({ node, children, ...props }) => {
-    // Block code is wrapped in <pre><code>, inline is just <code>
+  code: ({ node, className, children, ...props }) => {
+    const match = /language-(\w+)/.exec(className || "");
     const isBlock = node?.position?.start?.line !== node?.position?.end?.line
       || String(children).includes("\n");
     if (!isBlock) {
@@ -27,6 +29,27 @@ const mdComponents = {
         }} {...props}>{children}</code>
       );
     }
+    const codeString = String(children).replace(/\n$/, "");
+    if (match) {
+      return (
+        <SyntaxHighlighter
+          style={oneDark}
+          language={match[1]}
+          PreTag="div"
+          customStyle={{
+            background: "transparent",
+            margin: 0,
+            padding: 0,
+            fontSize: 12,
+            fontFamily: "'JetBrains Mono',monospace",
+            lineHeight: 1.6,
+          }}
+          codeTagProps={{ style: { fontFamily: "'JetBrains Mono',monospace" } }}
+        >
+          {codeString}
+        </SyntaxHighlighter>
+      );
+    }
     return (
       <code style={{
         fontFamily: "'JetBrains Mono',monospace",
@@ -35,13 +58,13 @@ const mdComponents = {
     );
   },
   pre: ({ node, children }) => {
-    // Detect mermaid code blocks via AST node: pre > code.language-mermaid
     const codeNode = node?.children?.[0];
     const classes = codeNode?.properties?.className || [];
     if (classes.includes("language-mermaid")) {
       const text = codeNode?.children?.map(c => c.value || "").join("") || "";
       return <MermaidBlock code={text.replace(/\n$/, "")} />;
     }
+    const rawText = codeNode?.children?.map(c => c.value || "").join("") || "";
     return (
       <pre style={{
         background: "rgba(0,0,0,0.4)",
@@ -53,7 +76,11 @@ const mdComponents = {
         fontFamily: "'JetBrains Mono',monospace",
         margin: "8px 0 12px",
         lineHeight: 1.6,
+        position: "relative",
       }}>
+        <div style={{ position: "absolute", top: 6, right: 6 }}>
+          <CopyBtn text={rawText} />
+        </div>
         {children}
       </pre>
     );
