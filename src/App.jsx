@@ -421,7 +421,7 @@ export default function App() {
           position: "relative",
           zIndex: 10,
           background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
-          backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 56}px) saturate(1.1)`,
+          backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
           transition: "all .35s cubic-bezier(.16,1,.3,1)",
           overflow: "hidden",
         }}

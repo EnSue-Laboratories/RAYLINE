@@ -432,7 +432,7 @@ export default function TerminalDrawer({
         flexDirection: "column",
         height: "100%",
         background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
-        backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 56}px) saturate(1.1)`,
+        backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
         borderLeft: "1px solid rgba(255,255,255,0.025)",
         position: "relative",
         zIndex: 10,
