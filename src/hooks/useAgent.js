@@ -304,6 +304,7 @@ export default function useAgent() {
       if (convo) {
         const msgs = convo.messages.slice(0, messageIndex);
         msgs.push({ id: uid(), role: "user", text: newText });
+        msgs.push({ id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false });
         next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       }
       return next;
