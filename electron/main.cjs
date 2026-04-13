@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
@@ -201,6 +202,19 @@ ipcMain.handle("load-state", async () => {
   }
   return null;
 });
+
+// IPC: system info
+ipcMain.handle("system-info", () => ({
+  user: os.userInfo().username,
+  hostname: os.hostname(),
+  platform: os.platform(),
+  arch: os.arch(),
+  nodeVersion: process.versions.node,
+  electronVersion: process.versions.electron,
+  cpus: os.cpus().length,
+  memory: Math.round(os.totalmem() / (1024 * 1024 * 1024)) + " GB",
+  shell: (process.env.SHELL || process.env.COMSPEC || "unknown").split("/").pop(),
+}));
 
 // IPC: quick explain (one-shot, not in chat history)
 ipcMain.handle("quick-explain", async (_event, { text, model }) => {

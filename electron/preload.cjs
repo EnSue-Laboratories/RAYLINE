@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld("api", {
     try { return webUtils.getPathForFile(file); } catch { return null; }
   },
   quickExplain: (opts) => ipcRenderer.invoke("quick-explain", opts),
+  getSystemInfo: () => ipcRenderer.invoke("system-info"),
 
   // Terminal sessions
   terminalCreate: (opts) => ipcRenderer.invoke("terminal-create", opts),

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
 
 // ── Shared style helpers ──────────────────────────────────────────────────────
@@ -132,15 +132,34 @@ function TerminalViewport({
 
       const term = new Terminal({
         theme: {
-          background:          "#0a0a0a",
+          background:          "transparent",
           foreground:          "rgba(255,255,255,0.82)",
-          cursor:              "rgba(255,255,255,0.6)",
-          selectionBackground: "rgba(255,255,255,0.15)",
+          cursor:              "rgba(255,255,255,0.5)",
+          cursorAccent:        "transparent",
+          selectionBackground: "rgba(255,255,255,0.12)",
+          // ANSI colors — muted palette matching Claudi's dark theme
+          black:               "#1a1a1a",
+          red:                 "#e06c75",
+          green:               "#98c379",
+          yellow:              "#e5c07b",
+          blue:                "#7eaee0",
+          magenta:             "#c678dd",
+          cyan:                "#56b6c2",
+          white:               "rgba(255,255,255,0.75)",
+          brightBlack:         "#5c6370",
+          brightRed:           "#f2777a",
+          brightGreen:         "#addb67",
+          brightYellow:        "#ffd580",
+          brightBlue:          "#82aaff",
+          brightMagenta:       "#d19aff",
+          brightCyan:          "#7fdbca",
+          brightWhite:         "rgba(255,255,255,0.92)",
         },
         fontFamily:   FONT_FAMILY,
         fontSize:     13,
         lineHeight:   1.4,
         cursorBlink:  true,
+        cursorStyle:  "bar",
         allowProposedApi: true,
       });
 
@@ -363,6 +382,38 @@ export default function TerminalDrawer({
   unregisterTerminal,
   cwd,
 }) {
+  const [width, setWidth] = useState(480);
+  const dragging = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(480);
+
+  const handleRef = useRef(null);
+
+  const handlePointerDown = useCallback((e) => {
+    e.preventDefault();
+    dragging.current = true;
+    startX.current = e.clientX;
+    startWidth.current = width;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    handleRef.current?.setPointerCapture(e.pointerId);
+  }, [width]);
+
+  const handlePointerMove = useCallback((e) => {
+    if (!dragging.current) return;
+    const delta = startX.current - e.clientX;
+    const newWidth = Math.min(Math.max(startWidth.current + delta, 280), window.innerWidth - 400);
+    setWidth(newWidth);
+  }, []);
+
+  const handlePointerUp = useCallback((e) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    handleRef.current?.releasePointerCapture(e.pointerId);
+  }, []);
+
   if (!drawerOpen) return null;
 
   const handleCreate = () => {
@@ -372,19 +423,36 @@ export default function TerminalDrawer({
   return (
     <div
       style={{
-        width: 480,
-        minWidth: 480,
+        width,
+        minWidth: 280,
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: "rgba(0,0,0,0.85)",
+        background: "rgba(0,0,0,0.65)",
         backdropFilter: "blur(56px) saturate(1.1)",
         borderLeft: "1px solid rgba(255,255,255,0.025)",
         position: "relative",
-        zIndex: 20,
+        zIndex: 10,
         overflow: "hidden",
       }}
     >
+      {/* Resize handle */}
+      <div
+        ref={handleRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        style={{
+          position: "absolute",
+          left: -3,
+          top: 0,
+          bottom: 0,
+          width: 8,
+          cursor: "col-resize",
+          zIndex: 30,
+          touchAction: "none",
+        }}
+      />
       {/* Header */}
       <div
         style={{

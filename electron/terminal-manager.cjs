@@ -146,7 +146,7 @@ function createSession({ name, command, cwd } = {}) {
       cols: 80,
       rows: 24,
       cwd: workDir,
-      env: { ...process.env },
+      env: { ...process.env, PROMPT_EOL_MARK: "" },
     });
   } catch (err) {
     log("spawn error:", err.message);
@@ -183,6 +183,8 @@ function createSession({ name, command, cwd } = {}) {
 
   sessions.set(name, session);
   log(`session '${name}' started (PID ${ptyProcess.pid})`);
+
+
   return { ok: true, name };
 }
 
