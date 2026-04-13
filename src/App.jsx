@@ -6,6 +6,7 @@ import ChatArea     from "./components/ChatArea";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
+import Settings     from "./components/Settings";
 import { getM }     from "./data/models";
 
 function logCheckpoint(...args) {
@@ -23,6 +24,8 @@ export default function App() {
   const [defaultModel, setDefaultModel] = useState("sonnet");
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
+  const [wallpaper, setWallpaper] = useState(null); // { path, opacity, blur }
+  const [showSettings, setShowSettings] = useState(false);
   const messageQueue = useRef([]);
   const [queuedMessages, setQueuedMessages] = useState([]);
 
@@ -35,6 +38,15 @@ export default function App() {
         if (state.active) setActive(state.active);
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(state.defaultModel);
+        if (state.wallpaper) {
+          setWallpaper(state.wallpaper);
+          // Reload data URL from disk (not persisted — too large for JSON)
+          if (state.wallpaper.path && window.api.readImage) {
+            window.api.readImage(state.wallpaper.path).then((dataUrl) => {
+              if (dataUrl) setWallpaper((prev) => prev ? { ...prev, dataUrl } : prev);
+            });
+          }
+        }
       }
       setStateLoaded(true);
     });
@@ -47,9 +59,11 @@ export default function App() {
     // Debounce saves
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      window.api.saveState({ convos: convoList, active, cwd, defaultModel });
+      // Strip dataUrl before persisting (too large for JSON, reloaded on startup)
+      const wpSave = wallpaper ? { path: wallpaper.path, opacity: wallpaper.opacity, blur: wallpaper.blur, imgBlur: wallpaper.imgBlur, imgDarken: wallpaper.imgDarken } : null;
+      window.api.saveState({ convos: convoList, active, cwd, defaultModel, wallpaper: wpSave });
     }, 300);
-  }, [convoList, active, cwd, defaultModel, stateLoaded]);
+  }, [convoList, active, cwd, defaultModel, wallpaper, stateLoaded]);
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
@@ -365,8 +379,36 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative" }}>
-      <AuroraCanvas />
-      <Grain />
+      {wallpaper?.dataUrl ? (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+        }}>
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: `url(${wallpaper.dataUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            filter: wallpaper.imgBlur ? `blur(${wallpaper.imgBlur}px)` : "none",
+            transform: wallpaper.imgBlur ? "scale(1.05)" : "none", // prevent blur edge artifacts
+          }} />
+          {(wallpaper.imgDarken > 0) && (
+            <div style={{
+              position: "absolute",
+              inset: 0,
+              background: `rgba(0,0,0,${wallpaper.imgDarken / 100})`,
+            }} />
+          )}
+        </div>
+      ) : (
+        <>
+          <AuroraCanvas />
+          <Grain />
+        </>
+      )}
 
       {/* Sidebar */}
       <div
@@ -378,8 +420,8 @@ export default function App() {
           flexDirection: "column",
           position: "relative",
           zIndex: 10,
-          background: "rgba(0,0,0,0.65)",
-          backdropFilter: "blur(56px) saturate(1.1)",
+          background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
+          backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
           transition: "all .35s cubic-bezier(.16,1,.3,1)",
           overflow: "hidden",
         }}
@@ -393,24 +435,34 @@ export default function App() {
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           cwd={activeConvo?.cwd || cwd}
           onPickFolder={handlePickFolder}
+          onOpenSettings={() => setShowSettings(true)}
         />
       </div>
 
-      {/* Main chat area */}
-      <ChatArea
-        convo={convo}
-        onSend={handleSend}
-        onCancel={handleCancel}
-        onEdit={handleEdit}
-        onToggleSidebar={() => setSidebarOpen((o) => !o)}
-        sidebarOpen={sidebarOpen}
-        onModelChange={handleModelChange}
-        defaultModel={defaultModel}
-        queuedMessages={queuedMessages}
-        onToggleTerminal={() => terminal.setDrawerOpen((o) => !o)}
-        terminalOpen={terminal.drawerOpen}
-        terminalCount={terminal.sessions.length}
-      />
+      {/* Main content: Settings or Chat */}
+      {showSettings ? (
+        <Settings
+          wallpaper={wallpaper}
+          onWallpaperChange={setWallpaper}
+          onClose={() => setShowSettings(false)}
+        />
+      ) : (
+        <ChatArea
+          convo={convo}
+          onSend={handleSend}
+          onCancel={handleCancel}
+          onEdit={handleEdit}
+          onToggleSidebar={() => setSidebarOpen((o) => !o)}
+          sidebarOpen={sidebarOpen}
+          onModelChange={handleModelChange}
+          defaultModel={defaultModel}
+          queuedMessages={queuedMessages}
+          onToggleTerminal={() => terminal.setDrawerOpen((o) => !o)}
+          terminalOpen={terminal.drawerOpen}
+          terminalCount={terminal.sessions.length}
+          wallpaper={wallpaper}
+        />
+      )}
 
       {/* Terminal drawer */}
       <TerminalDrawer
@@ -426,6 +478,7 @@ export default function App() {
         onToggleDrawer={() => terminal.setDrawerOpen((o) => !o)}
         registerTerminal={terminal.registerTerminal}
         unregisterTerminal={terminal.unregisterTerminal}
+        wallpaper={wallpaper}
       />
     </div>
   );

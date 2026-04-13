@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeListener("agent-error", handler);
   },
   pickFolder: () => ipcRenderer.invoke("folder-pick"),
+  selectWallpaper: () => ipcRenderer.invoke("select-wallpaper"),
+  readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
   listSessions: (cwd) => ipcRenderer.invoke("list-sessions", cwd),
   loadSession: (sessionId) => ipcRenderer.invoke("load-session", sessionId),
   moveSession: (sessionId, newCwd) => ipcRenderer.invoke("move-session", sessionId, newCwd),

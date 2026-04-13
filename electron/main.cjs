@@ -113,6 +113,27 @@ ipcMain.handle("folder-pick", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+// IPC: wallpaper image picker
+ipcMain.handle("select-wallpaper", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openFile"],
+    filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"] }],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+// IPC: read image file as data URL (for wallpaper preview + background)
+ipcMain.handle("read-image", async (_event, filePath) => {
+  try {
+    const data = fs.readFileSync(filePath);
+    const ext = path.extname(filePath).toLowerCase().replace(".", "");
+    const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", bmp: "image/bmp", avif: "image/avif" }[ext] || "image/png";
+    return `data:${mime};base64,${data.toString("base64")}`;
+  } catch {
+    return null;
+  }
+});
+
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
   startAgent(opts, event.sender);

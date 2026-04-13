@@ -6,7 +6,7 @@ import ModelPicker from "./ModelPicker";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper }) {
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
@@ -185,7 +185,10 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   return (
     <div
-      style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10 }}
+      style={{
+        flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10,
+        background: wallpaper?.dataUrl ? `rgba(0,0,0,${wallpaper.opacity / 100})` : "transparent",
+      }}
       onDrop={(e) => { e.stopPropagation(); handleDrop(e); setDragOver(false); }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -379,11 +382,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           {filteredCommands.length > 0 && (
             <div style={{
               marginBottom: 6,
-              background: "rgba(24,24,24,0.95)",
+              background: wallpaper?.dataUrl ? `rgba(0,0,0,${(wallpaper.opacity / 100) * 0.95})` : "rgba(24,24,24,0.95)",
               border: "1px solid rgba(255,255,255,0.08)",
               borderRadius: 10,
               padding: "4px",
-              backdropFilter: "blur(20px)",
+              backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 20}px)`,
               boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
             }}>
               {filteredCommands.map((c, i) => (
@@ -427,7 +430,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               border: "1px solid " + (inputFocused ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)"),
               borderRadius: 12,
               padding: "9px 14px",
-              backdropFilter: "blur(20px)",
+              backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 20}px)`,
               transition: "border-color .25s",
             }}
           >

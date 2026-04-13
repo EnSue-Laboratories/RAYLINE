@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Plus, Search, Trash2, X, FolderOpen } from "lucide-react";
+import { Plus, Search, Trash2, X, FolderOpen, Settings as SettingsIcon } from "lucide-react";
 import { getM } from "../data/models";
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings }) {
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
 
@@ -265,6 +265,27 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
         >
           <FolderOpen size={10} strokeWidth={1.5} />
           {cwdShort || "SELECT FOLDER"}
+        </button>
+        <button
+          onClick={onOpenSettings}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 22,
+            height: 22,
+            borderRadius: 5,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "rgba(255,255,255,0.28)",
+            transition: "color .2s",
+            padding: 0,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.28)"; }}
+        >
+          <SettingsIcon size={12} strokeWidth={1.5} />
         </button>
         <span style={{ fontSize: 8, fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.2)", letterSpacing: ".06em" }}>
           {convos.length} CHATS
