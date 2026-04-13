@@ -79,10 +79,12 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
   return (
     <div
       style={{
+        flex: 1,
         display: "flex",
         flexDirection: "column",
-        height: "100%",
-        width: "100%",
+        minWidth: 0,
+        position: "relative",
+        zIndex: 10,
         background: "transparent",
         color: "rgba(255,255,255,0.85)",
         fontFamily: "system-ui, sans-serif",
