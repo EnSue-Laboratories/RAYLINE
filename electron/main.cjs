@@ -1,8 +1,9 @@
 const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { startAgent, cancelAgent, cancelAll } = require("./agent-manager.cjs");
+const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
+const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 
 const isDev = !app.isPackaged;
 
@@ -98,6 +99,18 @@ ipcMain.on("agent-cancel", (_event, { conversationId }) => {
 
 ipcMain.on("agent-edit-resend", (event, opts) => {
   startAgent({ ...opts, forkSession: true }, event.sender);
+});
+
+ipcMain.handle("rewind-files", async (_event, opts) => {
+  return rewindFiles(opts);
+});
+
+ipcMain.handle("checkpoint-create", async (_event, cwdPath) => {
+  return createCheckpoint(cwdPath);
+});
+
+ipcMain.handle("checkpoint-restore", async (_event, cwdPath, ref) => {
+  return restoreCheckpoint(cwdPath, ref);
 });
 
 // IPC: sessions

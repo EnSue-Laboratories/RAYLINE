@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld("api", {
   listSessions: (cwd) => ipcRenderer.invoke("list-sessions", cwd),
   loadSession: (sessionId) => ipcRenderer.invoke("load-session", sessionId),
   moveSession: (sessionId, newCwd) => ipcRenderer.invoke("move-session", sessionId, newCwd),
+  rewindFiles: (opts) => ipcRenderer.invoke("rewind-files", opts),
+  checkpointCreate: (cwdPath) => ipcRenderer.invoke("checkpoint-create", cwdPath),
+  checkpointRestore: (cwdPath, ref) => ipcRenderer.invoke("checkpoint-restore", cwdPath, ref),
   saveState: (state) => ipcRenderer.invoke("save-state", state),
   loadState: () => ipcRenderer.invoke("load-state"),
   getFilePath: (file) => {

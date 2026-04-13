@@ -195,4 +195,44 @@ function cancelAll() {
   activeAgents.clear();
 }
 
-module.exports = { startAgent, cancelAgent, cancelAll };
+function rewindFiles({ sessionId, messageUuid, cwd }) {
+  return new Promise((resolve, reject) => {
+    // --rewind-files is a standalone operation in --print mode: rewind files then exit
+    const args = [
+      "--print",
+      "--resume", sessionId,
+      "--rewind-files", messageUuid,
+    ];
+
+    log("Rewinding files:", { sessionId, messageUuid, cwd });
+
+    const child = spawn("claude", args, {
+      cwd: cwd || process.cwd(),
+      env: { ...process.env, FORCE_COLOR: "0", PATH: process.env.PATH + ":/opt/homebrew/bin:/usr/local/bin" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
+    child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+
+    child.on("close", (exitCode) => {
+      log("Rewind finished, exitCode:", exitCode);
+      if (stdout.trim()) log("Rewind stdout:", stdout.slice(0, 500));
+      if (stderr.trim()) log("Rewind stderr:", stderr.slice(0, 500));
+      if (exitCode === 0) {
+        resolve({ success: true });
+      } else {
+        reject(new Error(stderr || `Rewind failed with exit code ${exitCode}`));
+      }
+    });
+
+    child.on("error", (err) => {
+      reject(err);
+    });
+  });
+}
+
+module.exports = { startAgent, cancelAgent, cancelAll, rewindFiles };

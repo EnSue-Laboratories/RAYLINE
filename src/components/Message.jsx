@@ -246,7 +246,7 @@ export default function Message({ msg, onEdit, onAnswer, onFork }) {
         </div>
 
         {editing ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, width: "100%" }}>
             <textarea
               value={editText}
               onChange={(e) => setEditText(e.target.value)}

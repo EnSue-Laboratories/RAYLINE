@@ -187,6 +187,19 @@ export default function useAgent() {
             msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
           }
         } else if (event.type === "user") {
+          // Capture the UUID from user events — needed for rewind/edit
+          if (event.uuid) {
+            console.log("[useAgent] User event UUID:", event.uuid, "has tool_result:",
+              event.message?.content?.some?.(b => b.type === "tool_result"));
+            // Find the last user message and store the Claude-assigned UUID
+            for (let mi = msgs.length - 1; mi >= 0; mi--) {
+              if (msgs[mi].role === "user" && !msgs[mi].claudeUuid) {
+                msgs[mi] = { ...msgs[mi], claudeUuid: event.uuid };
+                console.log("[useAgent] Stored claudeUuid on user msg:", msgs[mi].text?.slice(0, 50));
+                break;
+              }
+            }
+          }
           if (event.message?.content) {
             for (const block of event.message.content) {
               if (block.type === "tool_result" && block.tool_use_id) {
