@@ -185,7 +185,10 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   return (
     <div
-      style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10 }}
+      style={{
+        flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10,
+        background: wallpaper?.dataUrl ? `rgba(0,0,0,${wallpaper.opacity / 100})` : "transparent",
+      }}
       onDrop={(e) => { e.stopPropagation(); handleDrop(e); setDragOver(false); }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

@@ -99,7 +99,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
         minWidth: 0,
         position: "relative",
         zIndex: 10,
-        background: "transparent",
+        background: local.dataUrl ? `rgba(0,0,0,${local.opacity / 100})` : "transparent",
         color: "rgba(255,255,255,0.85)",
         fontFamily: "system-ui, sans-serif",
       }}
