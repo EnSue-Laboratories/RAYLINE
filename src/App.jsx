@@ -6,6 +6,7 @@ import ChatArea     from "./components/ChatArea";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
+import Settings     from "./components/Settings";
 import { getM }     from "./data/models";
 
 function logCheckpoint(...args) {
@@ -368,8 +369,22 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative" }}>
-      <AuroraCanvas />
-      <Grain />
+      {wallpaper?.path ? (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+          backgroundImage: `url(file://${wallpaper.path})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }} />
+      ) : (
+        <>
+          <AuroraCanvas />
+          <Grain />
+        </>
+      )}
 
       {/* Sidebar */}
       <div
@@ -381,8 +396,8 @@ export default function App() {
           flexDirection: "column",
           position: "relative",
           zIndex: 10,
-          background: "rgba(0,0,0,0.65)",
-          backdropFilter: "blur(56px) saturate(1.1)",
+          background: `rgba(0,0,0,${wallpaper?.path ? (wallpaper.opacity / 100) : 0.65})`,
+          backdropFilter: `blur(${wallpaper?.path ? wallpaper.blur : 56}px) saturate(1.1)`,
           transition: "all .35s cubic-bezier(.16,1,.3,1)",
           overflow: "hidden",
         }}
@@ -396,24 +411,34 @@ export default function App() {
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           cwd={activeConvo?.cwd || cwd}
           onPickFolder={handlePickFolder}
+          onOpenSettings={() => setShowSettings(true)}
         />
       </div>
 
-      {/* Main chat area */}
-      <ChatArea
-        convo={convo}
-        onSend={handleSend}
-        onCancel={handleCancel}
-        onEdit={handleEdit}
-        onToggleSidebar={() => setSidebarOpen((o) => !o)}
-        sidebarOpen={sidebarOpen}
-        onModelChange={handleModelChange}
-        defaultModel={defaultModel}
-        queuedMessages={queuedMessages}
-        onToggleTerminal={() => terminal.setDrawerOpen((o) => !o)}
-        terminalOpen={terminal.drawerOpen}
-        terminalCount={terminal.sessions.length}
-      />
+      {/* Main content: Settings or Chat */}
+      {showSettings ? (
+        <Settings
+          wallpaper={wallpaper}
+          onWallpaperChange={setWallpaper}
+          onClose={() => setShowSettings(false)}
+        />
+      ) : (
+        <ChatArea
+          convo={convo}
+          onSend={handleSend}
+          onCancel={handleCancel}
+          onEdit={handleEdit}
+          onToggleSidebar={() => setSidebarOpen((o) => !o)}
+          sidebarOpen={sidebarOpen}
+          onModelChange={handleModelChange}
+          defaultModel={defaultModel}
+          queuedMessages={queuedMessages}
+          onToggleTerminal={() => terminal.setDrawerOpen((o) => !o)}
+          terminalOpen={terminal.drawerOpen}
+          terminalCount={terminal.sessions.length}
+          wallpaper={wallpaper}
+        />
+      )}
 
       {/* Terminal drawer */}
       <TerminalDrawer
