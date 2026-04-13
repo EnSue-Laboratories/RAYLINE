@@ -70,8 +70,13 @@ input:focus         { outline: none; }
 }
 
 /* ── xterm transparent background ── */
-.xterm-viewport, .xterm-screen { background: transparent !important; }
-.xterm .xterm-viewport { background-color: transparent !important; }
+.xterm,
+.xterm .xterm-screen,
+.xterm .xterm-viewport,
+.xterm .xterm-scrollable-element {
+  background: transparent !important;
+  background-color: transparent !important;
+}
 
 /* ── Range slider ── */
 input[type="range"] {

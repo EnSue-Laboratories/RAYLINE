@@ -4,6 +4,7 @@ import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
 // ── Shared style helpers ──────────────────────────────────────────────────────
 
 const FONT_FAMILY = "'JetBrains Mono','Fira Code',monospace";
+const XTERM_TRANSPARENT = "rgba(0,0,0,0)";
 
 const iconBtnStyle = {
   display: "flex",
@@ -86,13 +87,13 @@ function TerminalViewport({
     if (termRef.current) {
       const prevName = termRef.current.__sessionName;
       if (prevName) unregRef.current(prevName);
-      try { termRef.current.dispose(); } catch (_) {}
+      try { termRef.current.dispose(); } catch { /* ignore terminal dispose errors */ }
       termRef.current = null;
     }
 
     // Remove the xterm mount div
     if (xtermElRef.current && containerRef.current) {
-      try { containerRef.current.removeChild(xtermElRef.current); } catch (_) {}
+      try { containerRef.current.removeChild(xtermElRef.current); } catch { /* React may already remove the mount node */ }
     }
     xtermElRef.current = null;
     fitAddonRef.current = null;
@@ -107,7 +108,7 @@ function TerminalViewport({
       // Pull in xterm dynamically so it only loads when the drawer is first used
       try {
         await import("@xterm/xterm/css/xterm.css");
-      } catch (_) {
+      } catch {
         // If Vite can't dynamic-import the CSS, a static import in main.jsx is
         // the fallback — not a fatal error here.
       }
@@ -126,16 +127,16 @@ function TerminalViewport({
 
       // Create a fresh mount point
       const el = document.createElement("div");
-      el.style.cssText = "width:100%;height:100%;";
+      el.style.cssText = "width:100%;height:100%;background:transparent;";
       xtermElRef.current = el;
       containerRef.current.appendChild(el);
 
       const term = new Terminal({
         theme: {
-          background:          "transparent",
+          background:          XTERM_TRANSPARENT,
           foreground:          "rgba(255,255,255,0.82)",
           cursor:              "rgba(255,255,255,0.5)",
-          cursorAccent:        "transparent",
+          cursorAccent:        XTERM_TRANSPARENT,
           selectionBackground: "rgba(255,255,255,0.12)",
           // ANSI colors — muted palette matching Claudi's dark theme
           black:               "#1a1a1a",
@@ -160,6 +161,7 @@ function TerminalViewport({
         lineHeight:   1.4,
         cursorBlink:  true,
         cursorStyle:  "bar",
+        allowTransparency: true,
         allowProposedApi: true,
       });
 
@@ -173,7 +175,7 @@ function TerminalViewport({
       await new Promise((r) => setTimeout(r, 30));
       if (cancelled) { term.dispose(); return; }
 
-      try { fitAddon.fit(); } catch (_) {}
+      try { fitAddon.fit(); } catch { /* ignore early layout measurement failures */ }
 
       fitAddonRef.current = fitAddon;
       termRef.current     = term;
@@ -194,13 +196,13 @@ function TerminalViewport({
           if (!cancelled && result?.ok && result.lines?.length) {
             term.write(result.lines.join("\n"));
           }
-        } catch (_) {}
+        } catch { /* ignore scrollback preload failures */ }
       }
 
       // Observe container size changes and re-fit
       const ro = new ResizeObserver(() => {
         if (fitAddonRef.current) {
-          try { fitAddonRef.current.fit(); } catch (_) {}
+          try { fitAddonRef.current.fit(); } catch { /* ignore transient resize fit failures */ }
         }
       });
       ro.observe(containerRef.current);
