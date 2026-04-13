@@ -23,6 +23,8 @@ export default function App() {
   const [defaultModel, setDefaultModel] = useState("sonnet");
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
+  const [wallpaper, setWallpaper] = useState(null); // { path, opacity, blur }
+  const [showSettings, setShowSettings] = useState(false);
   const messageQueue = useRef([]);
   const [queuedMessages, setQueuedMessages] = useState([]);
 
@@ -35,6 +37,7 @@ export default function App() {
         if (state.active) setActive(state.active);
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(state.defaultModel);
+        if (state.wallpaper) setWallpaper(state.wallpaper);
       }
       setStateLoaded(true);
     });
@@ -47,9 +50,9 @@ export default function App() {
     // Debounce saves
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      window.api.saveState({ convos: convoList, active, cwd, defaultModel });
+      window.api.saveState({ convos: convoList, active, cwd, defaultModel, wallpaper });
     }, 300);
-  }, [convoList, active, cwd, defaultModel, stateLoaded]);
+  }, [convoList, active, cwd, defaultModel, wallpaper, stateLoaded]);
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
