@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ArrowLeft, Image } from "lucide-react";
 
-const DEFAULTS = { path: null, dataUrl: null, opacity: 50, blur: 32 };
+const DEFAULTS = { path: null, dataUrl: null, opacity: 50, blur: 32, imgBlur: 0, imgDarken: 0 };
 
 export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
   const [local, setLocal] = useState(() => wallpaper ?? { ...DEFAULTS });
@@ -66,6 +66,8 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
 
   const opacityPct = local.opacity;
   const blurPct = (local.blur / 64) * 100;
+  const imgBlurPct = ((local.imgBlur || 0) / 32) * 100;
+  const imgDarkenPct = local.imgDarken || 0;
 
   // Slider track style helper
   const sliderTrack = (pct) =>
@@ -294,6 +296,48 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
                 {pathHint}
               </div>
             )}
+          </div>
+
+          {/* Image Blur */}
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: 13,
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 10,
+              }}
+            >
+              Image Blur: {local.imgBlur || 0}
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={32}
+              value={local.imgBlur || 0}
+              onChange={(e) => update({ imgBlur: Number(e.target.value) })}
+              style={sliderStyle(imgBlurPct)}
+            />
+          </div>
+
+          {/* Image Darken */}
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: 13,
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 10,
+              }}
+            >
+              Image Darken: {local.imgDarken || 0}
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={local.imgDarken || 0}
+              onChange={(e) => update({ imgDarken: Number(e.target.value) })}
+              style={sliderStyle(imgDarkenPct)}
+            />
           </div>
 
           {/* Window Opacity */}

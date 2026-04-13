@@ -60,7 +60,7 @@ export default function App() {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       // Strip dataUrl before persisting (too large for JSON, reloaded on startup)
-      const wpSave = wallpaper ? { path: wallpaper.path, opacity: wallpaper.opacity, blur: wallpaper.blur } : null;
+      const wpSave = wallpaper ? { path: wallpaper.path, opacity: wallpaper.opacity, blur: wallpaper.blur, imgBlur: wallpaper.imgBlur, imgDarken: wallpaper.imgDarken } : null;
       window.api.saveState({ convos: convoList, active, cwd, defaultModel, wallpaper: wpSave });
     }, 300);
   }, [convoList, active, cwd, defaultModel, wallpaper, stateLoaded]);
@@ -384,11 +384,25 @@ export default function App() {
           position: "fixed",
           inset: 0,
           zIndex: 0,
-          backgroundImage: `url(${wallpaper.dataUrl})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }} />
+        }}>
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: `url(${wallpaper.dataUrl})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            filter: wallpaper.imgBlur ? `blur(${wallpaper.imgBlur}px)` : "none",
+            transform: wallpaper.imgBlur ? "scale(1.05)" : "none", // prevent blur edge artifacts
+          }} />
+          {(wallpaper.imgDarken > 0) && (
+            <div style={{
+              position: "absolute",
+              inset: 0,
+              background: `rgba(0,0,0,${wallpaper.imgDarken / 100})`,
+            }} />
+          )}
+        </div>
       ) : (
         <>
           <AuroraCanvas />
@@ -464,6 +478,7 @@ export default function App() {
         onToggleDrawer={() => terminal.setDrawerOpen((o) => !o)}
         registerTerminal={terminal.registerTerminal}
         unregisterTerminal={terminal.unregisterTerminal}
+        wallpaper={wallpaper}
       />
     </div>
   );
