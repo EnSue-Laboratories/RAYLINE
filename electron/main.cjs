@@ -113,6 +113,15 @@ ipcMain.handle("folder-pick", async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
+// IPC: wallpaper image picker
+ipcMain.handle("select-wallpaper", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openFile"],
+    filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"] }],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
   startAgent(opts, event.sender);
