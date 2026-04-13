@@ -1,0 +1,470 @@
+import { useEffect, useRef, useCallback } from "react";
+import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
+
+// ── Shared style helpers ──────────────────────────────────────────────────────
+
+const FONT_FAMILY = "'JetBrains Mono','Fira Code',monospace";
+
+const iconBtnStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 24,
+  height: 24,
+  borderRadius: 6,
+  background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.06)",
+  color: "rgba(255,255,255,0.45)",
+  cursor: "pointer",
+  flexShrink: 0,
+  WebkitAppRegion: "no-drag",
+  transition: "background .15s, color .15s",
+};
+
+function useHover(baseStyle, hoverStyle) {
+  return {
+    style: baseStyle,
+    onMouseEnter(e) {
+      Object.assign(e.currentTarget.style, hoverStyle);
+    },
+    onMouseLeave(e) {
+      // Restore each hovered key to its base value
+      for (const key of Object.keys(hoverStyle)) {
+        e.currentTarget.style[key] = baseStyle[key] ?? "";
+      }
+    },
+  };
+}
+
+// ── IconButton ────────────────────────────────────────────────────────────────
+
+function IconButton({ onClick, title, children }) {
+  const hover = useHover(iconBtnStyle, {
+    background: "rgba(255,255,255,0.09)",
+    color: "rgba(255,255,255,0.8)",
+  });
+
+  return (
+    <button onClick={onClick} title={title} {...hover}>
+      {children}
+    </button>
+  );
+}
+
+// ── TerminalViewport ──────────────────────────────────────────────────────────
+
+function TerminalViewport({
+  activeSession,
+  onSendInput,
+  onResizeSession,
+  registerTerminal,
+  unregisterTerminal,
+}) {
+  const containerRef = useRef(null);
+  const xtermElRef   = useRef(null);  // DOM div that xterm mounts into
+  const termRef      = useRef(null);  // current xterm.Terminal instance
+  const fitAddonRef  = useRef(null);
+  const roRef        = useRef(null);  // ResizeObserver
+
+  // Stable refs so the async IIFE captures up-to-date callbacks without
+  // restarting the effect every time parent re-renders.
+  const sendRef     = useRef(onSendInput);
+  const resizeRef   = useRef(onResizeSession);
+  const registerRef = useRef(registerTerminal);
+  const unregRef    = useRef(unregisterTerminal);
+  useEffect(() => { sendRef.current     = onSendInput;       }, [onSendInput]);
+  useEffect(() => { resizeRef.current   = onResizeSession;   }, [onResizeSession]);
+  useEffect(() => { registerRef.current = registerTerminal;  }, [registerTerminal]);
+  useEffect(() => { unregRef.current    = unregisterTerminal;}, [unregisterTerminal]);
+
+  const teardown = useCallback(() => {
+    // Disconnect observer
+    roRef.current?.disconnect();
+    roRef.current = null;
+
+    // Unregister + dispose previous term
+    if (termRef.current) {
+      const prevName = termRef.current.__sessionName;
+      if (prevName) unregRef.current(prevName);
+      try { termRef.current.dispose(); } catch (_) {}
+      termRef.current = null;
+    }
+
+    // Remove the xterm mount div
+    if (xtermElRef.current && containerRef.current) {
+      try { containerRef.current.removeChild(xtermElRef.current); } catch (_) {}
+    }
+    xtermElRef.current = null;
+    fitAddonRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!activeSession || !containerRef.current) return;
+
+    let cancelled = false;
+
+    (async () => {
+      // Pull in xterm dynamically so it only loads when the drawer is first used
+      try {
+        await import("@xterm/xterm/css/xterm.css");
+      } catch (_) {
+        // If Vite can't dynamic-import the CSS, a static import in main.jsx is
+        // the fallback — not a fatal error here.
+      }
+
+      const [{ Terminal }, { FitAddon }] = await Promise.all([
+        import("@xterm/xterm"),
+        import("@xterm/addon-fit"),
+      ]);
+
+      if (cancelled) return;
+
+      // Tear down any previous instance before mounting a new one
+      teardown();
+
+      if (!containerRef.current) return;
+
+      // Create a fresh mount point
+      const el = document.createElement("div");
+      el.style.cssText = "width:100%;height:100%;";
+      xtermElRef.current = el;
+      containerRef.current.appendChild(el);
+
+      const term = new Terminal({
+        theme: {
+          background:          "#0a0a0a",
+          foreground:          "rgba(255,255,255,0.82)",
+          cursor:              "rgba(255,255,255,0.6)",
+          selectionBackground: "rgba(255,255,255,0.15)",
+        },
+        fontFamily:   FONT_FAMILY,
+        fontSize:     13,
+        lineHeight:   1.4,
+        cursorBlink:  true,
+        allowProposedApi: true,
+      });
+
+      const fitAddon = new FitAddon();
+      term.loadAddon(fitAddon);
+      term.__sessionName = activeSession;
+
+      term.open(el);
+
+      // Small delay lets the element settle in the DOM before we measure
+      await new Promise((r) => setTimeout(r, 30));
+      if (cancelled) { term.dispose(); return; }
+
+      try { fitAddon.fit(); } catch (_) {}
+
+      fitAddonRef.current = fitAddon;
+      termRef.current     = term;
+
+      // Wire up user input
+      term.onData((data) => sendRef.current(activeSession, data));
+
+      // Propagate size changes to the pty
+      term.onResize(({ cols, rows }) => resizeRef.current(activeSession, cols, rows));
+
+      // Register so the IPC listener in useTerminal can write output
+      registerRef.current(activeSession, term);
+
+      // Load existing scrollback
+      if (window.api?.terminalRead) {
+        try {
+          const result = await window.api.terminalRead({ name: activeSession, lines: 500 });
+          if (!cancelled && result?.ok && result.lines?.length) {
+            term.write(result.lines.join("\n"));
+          }
+        } catch (_) {}
+      }
+
+      // Observe container size changes and re-fit
+      const ro = new ResizeObserver(() => {
+        if (fitAddonRef.current) {
+          try { fitAddonRef.current.fit(); } catch (_) {}
+        }
+      });
+      ro.observe(containerRef.current);
+      roRef.current = ro;
+    })();
+
+    return () => {
+      cancelled = true;
+      teardown();
+    };
+  }, [activeSession]); // eslint-disable-line react-hooks/exhaustive-deps
+  // teardown is stable (useCallback with no deps), intentionally excluded.
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        flex: 1,
+        overflow: "hidden",
+        padding: "8px 4px",
+        boxSizing: "border-box",
+        minHeight: 0,
+      }}
+    />
+  );
+}
+
+// ── EmptyState ────────────────────────────────────────────────────────────────
+
+function EmptyState({ onCreate }) {
+  const btnHover = useHover(
+    {
+      marginTop: 12,
+      padding: "6px 14px",
+      borderRadius: 7,
+      background: "rgba(255,255,255,0.06)",
+      border: "1px solid rgba(255,255,255,0.1)",
+      color: "rgba(255,255,255,0.45)",
+      cursor: "pointer",
+      fontSize: 11,
+      fontFamily: FONT_FAMILY,
+      letterSpacing: ".06em",
+      transition: "background .15s, color .15s",
+    },
+    {
+      background: "rgba(255,255,255,0.11)",
+      color: "rgba(255,255,255,0.75)",
+    }
+  );
+
+  return (
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+        userSelect: "none",
+      }}
+    >
+      <TerminalIcon size={32} strokeWidth={1} color="rgba(255,255,255,0.08)" />
+      <div
+        style={{
+          marginTop: 8,
+          fontSize: 11,
+          fontFamily: FONT_FAMILY,
+          color: "rgba(255,255,255,0.2)",
+          letterSpacing: ".06em",
+        }}
+      >
+        No active sessions
+      </div>
+      <button onClick={onCreate} {...btnHover}>
+        NEW TERMINAL
+      </button>
+    </div>
+  );
+}
+
+// ── TabBar ────────────────────────────────────────────────────────────────────
+
+function TabBar({ sessions, activeSession, onSelectSession, onKillSession }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        overflowX: "auto",
+        borderBottom: "1px solid rgba(255,255,255,0.04)",
+        flexShrink: 0,
+        scrollbarWidth: "none",
+      }}
+    >
+      {sessions.map((s) => {
+        const isActive = s.name === activeSession;
+        return (
+          <div
+            key={s.name}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "5px 10px",
+              cursor: "pointer",
+              flexShrink: 0,
+              background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
+              borderRight: "1px solid rgba(255,255,255,0.04)",
+              transition: "background .15s",
+            }}
+            onMouseEnter={(e) => {
+              if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+            }}
+            onMouseLeave={(e) => {
+              if (!isActive) e.currentTarget.style.background = "transparent";
+            }}
+            onClick={() => onSelectSession(s.name)}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                fontFamily: FONT_FAMILY,
+                color: isActive ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)",
+                maxWidth: 120,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                letterSpacing: ".04em",
+              }}
+            >
+              {s.name}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onKillSession(s.name);
+              }}
+              title="Kill session"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                background: "transparent",
+                border: "none",
+                color: "rgba(255,255,255,0.2)",
+                cursor: "pointer",
+                padding: 0,
+                flexShrink: 0,
+                transition: "color .15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(220,80,80,0.7)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+            >
+              <X size={10} strokeWidth={2} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── TerminalDrawer ────────────────────────────────────────────────────────────
+
+export default function TerminalDrawer({
+  sessions,
+  activeSession,
+  onSelectSession,
+  onCreateSession,
+  onKillSession,
+  onSendInput,
+  onResizeSession,
+  drawerOpen,
+  onToggleDrawer,
+  registerTerminal,
+  unregisterTerminal,
+  cwd,
+}) {
+  if (!drawerOpen) return null;
+
+  const handleCreate = () => {
+    onCreateSession({ name: `shell-${Date.now()}`, cwd: cwd || undefined });
+  };
+
+  return (
+    <div
+      style={{
+        width: 480,
+        minWidth: 480,
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        background: "rgba(0,0,0,0.85)",
+        backdropFilter: "blur(56px) saturate(1.1)",
+        borderLeft: "1px solid rgba(255,255,255,0.025)",
+        position: "relative",
+        zIndex: 20,
+        overflow: "hidden",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          height: 52,
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 14px",
+          WebkitAppRegion: "drag",
+        }}
+      >
+        {/* Left: icon + label */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            WebkitAppRegion: "drag",
+          }}
+        >
+          <TerminalIcon
+            size={13}
+            strokeWidth={1.5}
+            color="rgba(255,255,255,0.35)"
+          />
+          <span
+            style={{
+              fontSize: 10,
+              fontFamily: FONT_FAMILY,
+              color: "rgba(255,255,255,0.35)",
+              letterSpacing: ".08em",
+              userSelect: "none",
+            }}
+          >
+            TERMINALS
+          </span>
+        </div>
+
+        {/* Right: action buttons */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            WebkitAppRegion: "no-drag",
+          }}
+        >
+          <IconButton onClick={handleCreate} title="New terminal">
+            <Plus size={13} strokeWidth={1.5} />
+          </IconButton>
+          <IconButton onClick={onToggleDrawer} title="Close drawer">
+            <X size={13} strokeWidth={1.5} />
+          </IconButton>
+        </div>
+      </div>
+
+      {/* Tab bar — only when there are multiple sessions */}
+      {sessions.length > 1 && (
+        <TabBar
+          sessions={sessions}
+          activeSession={activeSession}
+          onSelectSession={onSelectSession}
+          onKillSession={onKillSession}
+        />
+      )}
+
+      {/* Content */}
+      {sessions.length === 0 ? (
+        <EmptyState onCreate={handleCreate} />
+      ) : (
+        <TerminalViewport
+          key={activeSession}
+          activeSession={activeSession}
+          onSendInput={onSendInput}
+          onResizeSession={onResizeSession}
+          registerTerminal={registerTerminal}
+          unregisterTerminal={unregisterTerminal}
+        />
+      )}
+    </div>
+  );
+}

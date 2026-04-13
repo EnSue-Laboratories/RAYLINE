@@ -4,6 +4,8 @@ import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
 import ChatArea     from "./components/ChatArea";
 import useAgent     from "./hooks/useAgent";
+import useTerminal  from "./hooks/useTerminal";
+import TerminalDrawer from "./components/TerminalDrawer";
 import { getM }     from "./data/models";
 
 function logCheckpoint(...args) {
@@ -12,6 +14,7 @@ function logCheckpoint(...args) {
 
 export default function App() {
   const { conversations, getConversation, sendMessage, cancelMessage, editAndResend, loadMessages } = useAgent();
+  const terminal = useTerminal();
 
   // convos: array of { id, sessionId, title, model, ts }
   const [convoList, setConvoList] = useState([]);
@@ -351,6 +354,13 @@ export default function App() {
     };
   });
 
+  // Refresh terminal sessions periodically (catches Claude-created sessions)
+  useEffect(() => {
+    terminal.refreshSessions();
+    const interval = setInterval(() => terminal.refreshSessions(), 3000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -397,6 +407,25 @@ export default function App() {
         onModelChange={handleModelChange}
         defaultModel={defaultModel}
         queuedMessages={queuedMessages}
+        onToggleTerminal={() => terminal.setDrawerOpen((o) => !o)}
+        terminalOpen={terminal.drawerOpen}
+        terminalCount={terminal.sessions.length}
+      />
+
+      {/* Terminal drawer */}
+      <TerminalDrawer
+        sessions={terminal.sessions}
+        activeSession={terminal.activeSession}
+        onSelectSession={terminal.setActiveSession}
+        onCreateSession={terminal.createSession}
+        cwd={activeConvo?.cwd || cwd}
+        onKillSession={terminal.killSession}
+        onSendInput={terminal.sendInput}
+        onResizeSession={terminal.resizeSession}
+        drawerOpen={terminal.drawerOpen}
+        onToggleDrawer={() => terminal.setDrawerOpen((o) => !o)}
+        registerTerminal={terminal.registerTerminal}
+        unregisterTerminal={terminal.unregisterTerminal}
       />
     </div>
   );

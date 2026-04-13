@@ -4,6 +4,7 @@ const fs = require("fs");
 const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
+const terminalManager = require("./terminal-manager.cjs");
 
 const isDev = !app.isPackaged;
 
@@ -70,6 +71,29 @@ app.whenReady().then(() => {
     if (!icon.isEmpty()) app.dock.setIcon(icon);
   }
   createWindow();
+
+  // Start terminal session WebSocket server + write MCP config
+  terminalManager.startServer().then((port) => {
+    console.log("[main] Terminal WebSocket server on port", port);
+    const mcpConfig = {
+      mcpServers: {
+        "terminal-sessions": {
+          command: "node",
+          args: [path.join(__dirname, "mcp-terminal-server.cjs"), String(port)],
+        },
+      },
+    };
+    const mcpConfigPath = path.join(app.getPath("userData"), "mcp-terminal.json");
+    fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2));
+    global.mcpConfigPath = mcpConfigPath;
+  });
+
+  // Forward terminal output to renderer
+  terminalManager.setOutputCallback((name, data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("terminal-output", { name, data });
+    }
+  });
 });
 
 app.on("window-all-closed", () => {
@@ -204,6 +228,57 @@ ipcMain.handle("quick-explain", async (_event, { text, model }) => {
   });
 });
 
+// IPC: terminal sessions
+ipcMain.handle("terminal-create", async (_event, opts) => {
+  return terminalManager.createSession(opts);
+});
+
+ipcMain.handle("terminal-send", async (_event, { name, text }) => {
+  return terminalManager.sendInput(name, text);
+});
+
+ipcMain.handle("terminal-read", async (_event, { name, lines }) => {
+  return terminalManager.readOutput(name, lines);
+});
+
+ipcMain.handle("terminal-kill", async (_event, { name }) => {
+  return terminalManager.killSession(name);
+});
+
+ipcMain.handle("terminal-list", async () => {
+  return terminalManager.listSessions();
+});
+
+ipcMain.handle("terminal-resize", async (_event, { name, cols, rows }) => {
+  return terminalManager.resizeSession(name, cols, rows);
+});
+
+ipcMain.handle("terminal-metadata", async () => {
+  return terminalManager.getSessionMetadata();
+});
+
+// IPC: saved terminal metadata for restore on launch
+const terminalMetaPath = path.join(app.getPath("userData"), "terminal-sessions.json");
+
+ipcMain.handle("terminal-saved-metadata", async () => {
+  try {
+    if (fs.existsSync(terminalMetaPath)) {
+      const data = JSON.parse(fs.readFileSync(terminalMetaPath, "utf-8"));
+      fs.unlinkSync(terminalMetaPath);
+      return data;
+    }
+  } catch {}
+  return [];
+});
+
 app.on("before-quit", () => {
+  // Save terminal session metadata for re-launch
+  const meta = terminalManager.getSessionMetadata();
+  if (meta.length > 0) {
+    try {
+      fs.writeFileSync(terminalMetaPath, JSON.stringify(meta, null, 2));
+    } catch {}
+  }
   cancelAll();
+  terminalManager.stopServer();
 });

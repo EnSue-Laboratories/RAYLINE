@@ -1,12 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { PanelLeft, ArrowRight, Square } from "lucide-react";
+import { PanelLeft, ArrowRight, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import ModelPicker from "./ModelPicker";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel, queuedMessages }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount }) {
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
@@ -268,8 +268,42 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           )}
         </div>
 
-        <div style={{ WebkitAppRegion: "no-drag" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
           <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />
+          {onToggleTerminal && (
+            <button
+              onClick={onToggleTerminal}
+              title="Toggle terminal"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 4,
+                width: terminalCount > 0 ? "auto" : 32,
+                height: 32,
+                padding: terminalCount > 0 ? "0 10px" : 0,
+                borderRadius: 8,
+                background: terminalOpen ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
+                border: "1px solid " + (terminalOpen ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)"),
+                color: terminalOpen ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)",
+                cursor: "pointer",
+                transition: "all .2s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = terminalOpen ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)"; e.currentTarget.style.color = terminalOpen ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)"; }}
+            >
+              <TerminalIcon size={14} strokeWidth={1.5} />
+              {terminalCount > 0 && (
+                <span style={{
+                  fontSize: 10,
+                  fontFamily: "'JetBrains Mono',monospace",
+                  color: "inherit",
+                }}>
+                  {terminalCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
         </div>
       </div>

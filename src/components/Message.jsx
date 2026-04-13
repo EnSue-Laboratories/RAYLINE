@@ -204,8 +204,10 @@ export default function Message({ msg, onEdit, onAnswer }) {
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(displayText);
 
+  const editChanged = editText.trim() && editText.trim() !== displayText.trim();
+
   const handleSubmitEdit = () => {
-    if (editText.trim() && editText !== msg.text) {
+    if (editChanged) {
       onEdit?.(editText.trim());
     }
     setEditing(false);
@@ -266,7 +268,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
                 minHeight: 60,
               }}
             />
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <button
                 onClick={() => { setEditing(false); setEditText(msg.text); }}
                 style={{
@@ -276,19 +278,22 @@ export default function Message({ msg, onEdit, onAnswer }) {
                   color: "rgba(255,255,255,0.4)",
                   padding: "4px 12px",
                   fontSize: 11,
+                  height: 26,
                   cursor: "pointer",
                 }}
               >Cancel</button>
               <button
                 onClick={handleSubmitEdit}
+                disabled={!editChanged}
                 style={{
-                  background: "rgba(255,255,255,0.8)",
-                  border: "none",
+                  background: editChanged ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.15)",
+                  border: "1px solid transparent",
                   borderRadius: 6,
-                  color: "#000",
-                  padding: "4px 12px",
+                  color: editChanged ? "#000" : "rgba(255,255,255,0.25)",
+                  padding: "3px 12px",
                   fontSize: 11,
-                  cursor: "pointer",
+                  height: 24,
+                  cursor: editChanged ? "pointer" : "default",
                 }}
               >Send</button>
             </div>
