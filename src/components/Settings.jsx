@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ArrowLeft, Image } from "lucide-react";
 
-const DEFAULTS = { path: null, opacity: 50, blur: 32 };
+const DEFAULTS = { path: null, dataUrl: null, opacity: 50, blur: 32 };
 
 export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
   const [local, setLocal] = useState(() => wallpaper ?? { ...DEFAULTS });
@@ -11,6 +11,18 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
   useEffect(() => {
     setLocal(wallpaper ?? { ...DEFAULTS });
   }, [wallpaper]);
+
+  // Load data URL when path is set but dataUrl is missing (e.g. after app restart)
+  useEffect(() => {
+    if (local.path && !local.dataUrl && window.api?.readImage) {
+      window.api.readImage(local.path).then((dataUrl) => {
+        if (dataUrl) {
+          setLocal((prev) => ({ ...prev, dataUrl }));
+          onWallpaperChange({ ...local, dataUrl });
+        }
+      });
+    }
+  }, [local.path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const propagate = useCallback(
     (next) => {
@@ -34,10 +46,10 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
   );
 
   const handleChooseImage = async () => {
-    const result = await window.api.selectWallpaper();
-    if (result) {
-      update({ path: result });
-    }
+    const filePath = await window.api.selectWallpaper();
+    if (!filePath) return;
+    const dataUrl = await window.api.readImage(filePath);
+    update({ path: filePath, dataUrl });
   };
 
   const handleRemove = () => {
@@ -202,8 +214,8 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
                   height: 72,
                   borderRadius: 8,
                   border: "1px solid rgba(255,255,255,0.08)",
-                  background: local.path
-                    ? `url("file://${local.path}") center/cover no-repeat`
+                  background: local.dataUrl
+                    ? `url("${local.dataUrl}") center/cover no-repeat`
                     : "rgba(255,255,255,0.03)",
                   display: "flex",
                   alignItems: "center",

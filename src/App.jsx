@@ -38,7 +38,15 @@ export default function App() {
         if (state.active) setActive(state.active);
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(state.defaultModel);
-        if (state.wallpaper) setWallpaper(state.wallpaper);
+        if (state.wallpaper) {
+          setWallpaper(state.wallpaper);
+          // Reload data URL from disk (not persisted — too large for JSON)
+          if (state.wallpaper.path && window.api.readImage) {
+            window.api.readImage(state.wallpaper.path).then((dataUrl) => {
+              if (dataUrl) setWallpaper((prev) => prev ? { ...prev, dataUrl } : prev);
+            });
+          }
+        }
       }
       setStateLoaded(true);
     });
@@ -51,7 +59,9 @@ export default function App() {
     // Debounce saves
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      window.api.saveState({ convos: convoList, active, cwd, defaultModel, wallpaper });
+      // Strip dataUrl before persisting (too large for JSON, reloaded on startup)
+      const wpSave = wallpaper ? { path: wallpaper.path, opacity: wallpaper.opacity, blur: wallpaper.blur } : null;
+      window.api.saveState({ convos: convoList, active, cwd, defaultModel, wallpaper: wpSave });
     }, 300);
   }, [convoList, active, cwd, defaultModel, wallpaper, stateLoaded]);
 
@@ -369,12 +379,12 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative" }}>
-      {wallpaper?.path ? (
+      {wallpaper?.dataUrl ? (
         <div style={{
           position: "fixed",
           inset: 0,
           zIndex: 0,
-          backgroundImage: `url(file://${wallpaper.path})`,
+          backgroundImage: `url(${wallpaper.dataUrl})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat",
@@ -396,8 +406,8 @@ export default function App() {
           flexDirection: "column",
           position: "relative",
           zIndex: 10,
-          background: `rgba(0,0,0,${wallpaper?.path ? (wallpaper.opacity / 100) : 0.65})`,
-          backdropFilter: `blur(${wallpaper?.path ? wallpaper.blur : 56}px) saturate(1.1)`,
+          background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
+          backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 56}px) saturate(1.1)`,
           transition: "all .35s cubic-bezier(.16,1,.3,1)",
           overflow: "hidden",
         }}

@@ -379,11 +379,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           {filteredCommands.length > 0 && (
             <div style={{
               marginBottom: 6,
-              background: wallpaper?.path ? `rgba(0,0,0,${(wallpaper.opacity / 100) * 0.95})` : "rgba(24,24,24,0.95)",
+              background: wallpaper?.dataUrl ? `rgba(0,0,0,${(wallpaper.opacity / 100) * 0.95})` : "rgba(24,24,24,0.95)",
               border: "1px solid rgba(255,255,255,0.08)",
               borderRadius: 10,
               padding: "4px",
-              backdropFilter: `blur(${wallpaper?.path ? wallpaper.blur : 20}px)`,
+              backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 20}px)`,
               boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
             }}>
               {filteredCommands.map((c, i) => (
@@ -427,7 +427,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               border: "1px solid " + (inputFocused ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)"),
               borderRadius: 12,
               padding: "9px 14px",
-              backdropFilter: `blur(${wallpaper?.path ? wallpaper.blur : 20}px)`,
+              backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 20}px)`,
               transition: "border-color .25s",
             }}
           >
