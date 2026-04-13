@@ -455,9 +455,6 @@ export default function Message({ msg, onEdit, onAnswer }) {
               ? msg.parts.filter(p => p.type === "text").map(p => p.text).join("\n")
               : msg.text
           } />
-          {onFork && (
-            <MsgBtn icon={<GitFork size={10} strokeWidth={1.5} />} onClick={onFork} />
-          )}
         </div>
       )}
     </div>
