@@ -6,7 +6,7 @@ import ModelPicker from "./ModelPicker";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onFork, onToggleSidebar, sidebarOpen, onModelChange, defaultModel, queuedMessages }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel, queuedMessages }) {
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
@@ -295,7 +295,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onFork, onTo
                 msg={m}
                 onEdit={m.role === "user" ? (newText) => onEdit(i, newText) : undefined}
                 onAnswer={m.role === "assistant" ? (text) => onSend(text) : undefined}
-                onFork={() => onFork(i)}
               />
             ))}
             <div ref={endRef} />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil, Loader2, FileText, GitFork } from "lucide-react";
+import { Pencil, Loader2, FileText } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -182,7 +182,7 @@ function sanitizeText(text) {
 const mdComponentsStatic = makeMdComponents(false);
 const mdComponentsStreaming = makeMdComponents(true);
 
-export default function Message({ msg, onEdit, onAnswer, onFork }) {
+export default function Message({ msg, onEdit, onAnswer }) {
   const isUser = msg.role === "user";
   const hasThinkingPart = Boolean(msg.parts?.some((part) => part.type === "thinking"));
 
@@ -344,9 +344,6 @@ export default function Message({ msg, onEdit, onAnswer, onFork }) {
         {!editing && (
           <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "flex-end" }}>
             <CopyBtn text={displayText} />
-            {onFork && (
-              <MsgBtn icon={<GitFork size={10} strokeWidth={1.5} />} onClick={onFork} />
-            )}
             {onEdit && (
               <MsgBtn icon={<Pencil size={10} strokeWidth={1.5} />} onClick={() => setEditing(true)} />
             )}

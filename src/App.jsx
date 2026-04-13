@@ -10,13 +10,6 @@ function logCheckpoint(...args) {
   console.log("[checkpoint-ui]", ...args);
 }
 
-function getSortedCheckpointEntries(checkpoints) {
-  return Object.entries(checkpoints || {})
-    .map(([index, ref]) => ({ index: Number(index), ref }))
-    .filter(({ index, ref }) => Number.isInteger(index) && Boolean(ref))
-    .sort((a, b) => a.index - b.index);
-}
-
 export default function App() {
   const { conversations, getConversation, sendMessage, cancelMessage, editAndResend, loadMessages } = useAgent();
 
@@ -71,8 +64,7 @@ export default function App() {
         if (msgs && msgs.length > 0) {
           if (data.messages.length === 0) {
             // For forked conversations, only load messages up to the fork point
-            const trimmed = convo.forkIndex != null ? msgs.slice(0, convo.forkIndex + 1) : msgs;
-            loadMessages(id, trimmed);
+            loadMessages(id, msgs);
           }
           const lastMsg = msgs[msgs.length - 1];
           const previewText = lastMsg?.parts
@@ -211,50 +203,13 @@ export default function App() {
       const effectiveCwd = convoCwd || cwd || undefined;
       const thisConvoData = getConversation(convoId);
       const isFirstMessage = thisConvoData.messages.length === 0;
-      const isForkFirstSend = Boolean(convo.forkedFrom && !convo._forkSent);
 
-      logCheckpoint("handleSend:start", {
-        convoId,
-        effectiveCwd,
-        messageCount: thisConvoData.messages.length,
-        isForkFirstSend,
-        checkpointRef: convo.checkpointRef || null,
-      });
-
-      // Forked conversations must rewind before creating the next checkpoint.
-      // Otherwise the fork's first checkpoint captures the wrong file state.
-      if (isForkFirstSend && effectiveCwd && window.api) {
-        if (convo.checkpointRef) {
-          try {
-            logCheckpoint("handleSend:restoringForkCheckpoint", {
-              convoId,
-              ref: convo.checkpointRef,
-              forkIndex: convo.forkIndex,
-            });
-            await window.api.checkpointRestore(effectiveCwd, convo.checkpointRef);
-          } catch (e) {
-            console.error("Checkpoint restore failed:", e);
-          }
-        } else {
-          logCheckpoint("handleSend:noForkCheckpointRef", {
-            convoId,
-            forkIndex: convo.forkIndex,
-          });
-        }
-      }
-
-      // Create a git checkpoint before sending (for future fork/edit rewind)
+      // Create a git checkpoint before sending (for future edit rewind)
       if (effectiveCwd && window.api) {
         try {
           const cp = await window.api.checkpointCreate(effectiveCwd);
           if (cp?.ref) {
-            // Store checkpoint ref on the convo for this message index
-            const msgIdx = getConversation(convoId).messages.length; // index of the new user message
-            logCheckpoint("handleSend:storeCheckpoint", {
-              convoId,
-              msgIdx,
-              ref: cp.ref,
-            });
+            const msgIdx = getConversation(convoId).messages.length;
             setConvoList((p) =>
               p.map((c) => {
                 if (c.id !== convoId) return c;
@@ -263,11 +218,9 @@ export default function App() {
                 return { ...c, checkpoints };
               })
             );
-          } else {
-            logCheckpoint("handleSend:checkpointCreateReturnedEmpty", { convoId });
           }
         } catch (e) {
-          console.warn("Checkpoint creation failed (not a git repo?):", e.message);
+          console.warn("Checkpoint creation failed:", e.message);
         }
       }
 
@@ -277,21 +230,14 @@ export default function App() {
 
       sendMessage({
         conversationId: convoId,
-        sessionId: isFirstMessage && !isForkFirstSend ? convo.sessionId : undefined,
-        resumeSessionId: !isFirstMessage || isForkFirstSend ? convo.sessionId : undefined,
-        forkSession: isForkFirstSend || undefined,
+        sessionId: isFirstMessage ? convo.sessionId : undefined,
+        resumeSessionId: isFirstMessage ? undefined : convo.sessionId,
         prompt: text,
         model: m.cliFlag,
         cwd: effectiveCwd,
         images: images?.length ? images : undefined,
         files: files?.length ? files : undefined,
       });
-
-      if (isForkFirstSend) {
-        setConvoList((p) =>
-          p.map((c) => c.id === convoId ? { ...c, _forkSent: true } : c)
-        );
-      }
     },
     [activeConvo, active, activeData, cwd, sendMessage]
   );
@@ -332,54 +278,6 @@ export default function App() {
       });
     },
     [activeConvo, active, cwd, editAndResend]
-  );
-
-  const handleFork = useCallback(
-    (messageIndex) => {
-      if (!activeConvo) return;
-
-      const forkMessage = activeData.messages[messageIndex];
-      const checkpointEntries = getSortedCheckpointEntries(activeConvo.checkpoints);
-      let checkpointRef = null;
-      let checkpointSourceIndex = null;
-
-      if (forkMessage?.role === "user") {
-        checkpointRef = activeConvo.checkpoints?.[messageIndex] || null;
-        checkpointSourceIndex = checkpointRef ? messageIndex : null;
-      } else {
-        const nextCheckpoint = checkpointEntries.find(({ index }) => index > messageIndex);
-        checkpointRef = nextCheckpoint?.ref || null;
-        checkpointSourceIndex = nextCheckpoint?.index ?? null;
-      }
-
-      logCheckpoint("handleFork", {
-        activeConvoId: active,
-        messageIndex,
-        messageRole: forkMessage?.role || "unknown",
-        checkpointSourceIndex,
-        checkpointRef,
-      });
-
-      const id = "c" + Date.now();
-      const forkedConvo = {
-        id,
-        sessionId: activeConvo.sessionId,
-        title: activeConvo.title + " (fork)",
-        model: activeConvo.model,
-        ts: Date.now(),
-        cwd: activeConvo.cwd || cwd || undefined,
-        forkedFrom: activeConvo.sessionId,
-        forkIndex: messageIndex,
-        checkpointRef, // git checkpoint for file rewind
-      };
-      setConvoList((p) => [forkedConvo, ...p]);
-      setActive(id);
-
-      // Load messages up to the fork point
-      const msgs = activeData.messages.slice(0, messageIndex + 1);
-      loadMessages(id, msgs);
-    },
-    [activeConvo, active, activeData, cwd, loadMessages]
   );
 
   const handleModelChange = (modelId) => {
@@ -494,7 +392,6 @@ export default function App() {
         onSend={handleSend}
         onCancel={handleCancel}
         onEdit={handleEdit}
-        onFork={handleFork}
         onToggleSidebar={() => setSidebarOpen((o) => !o)}
         sidebarOpen={sidebarOpen}
         onModelChange={handleModelChange}
