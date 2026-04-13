@@ -42,4 +42,20 @@ contextBridge.exposeInMainWorld("api", {
     try { return webUtils.getPathForFile(file); } catch { return null; }
   },
   quickExplain: (opts) => ipcRenderer.invoke("quick-explain", opts),
+  getSystemInfo: () => ipcRenderer.invoke("system-info"),
+
+  // Terminal sessions
+  terminalCreate: (opts) => ipcRenderer.invoke("terminal-create", opts),
+  terminalSend: ({ name, text }) => ipcRenderer.invoke("terminal-send", { name, text }),
+  terminalRead: ({ name, lines }) => ipcRenderer.invoke("terminal-read", { name, lines }),
+  terminalKill: ({ name }) => ipcRenderer.invoke("terminal-kill", { name }),
+  terminalList: () => ipcRenderer.invoke("terminal-list"),
+  terminalResize: ({ name, cols, rows }) => ipcRenderer.invoke("terminal-resize", { name, cols, rows }),
+  terminalMetadata: () => ipcRenderer.invoke("terminal-metadata"),
+  terminalSavedMetadata: () => ipcRenderer.invoke("terminal-saved-metadata"),
+  onTerminalOutput: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("terminal-output", handler);
+    return () => ipcRenderer.removeListener("terminal-output", handler);
+  },
 });

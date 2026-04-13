@@ -45,7 +45,22 @@ THEME for render blocks and SVGs — dark palette:
 - Text: rgba(255,255,255,0.75)
 - Grid/lines: rgba(255,255,255,0.08)
 - Data colors: rgba(180,220,255,0.7) blue, rgba(255,200,150,0.7) orange, rgba(180,255,200,0.7) green, rgba(255,180,180,0.7) red
-- Avoid saturated blue/violet/default chart colors.`);
+- Avoid saturated blue/violet/default chart colors.
+
+INTERACTIVE TERMINAL SESSIONS:
+Claudi has a built-in terminal panel (right side drawer). You have MCP tools to control it:
+- create_session(name, command?, cwd?) — spawn a persistent shell session visible to the user
+- send_input(name, text) — send keystrokes (use \\n for Enter, \\x03 for Ctrl+C)
+- read_output(name, lines?) — read recent terminal output
+- kill_session(name) — terminate a session
+- list_sessions() — see all active sessions
+Use these INSTEAD of the Bash tool when you need: long-running processes (dev servers, watchers), interactive prompts needing stdin, or persistent shells across turns.
+The user can see and type into these terminals in real time.`);
+
+  // Attach terminal session MCP server if available
+  if (global.mcpConfigPath && fs.existsSync(global.mcpConfigPath)) {
+    args.push("--mcp-config", global.mcpConfigPath);
+  }
 
   if (model) args.push("--model", model);
 
