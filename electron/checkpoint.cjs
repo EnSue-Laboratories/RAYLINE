@@ -1,6 +1,7 @@
 "use strict";
 
 const { execFile } = require("child_process");
+const { randomBytes } = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -48,6 +49,16 @@ async function execGit(args, cwdPath, envOverrides = {}) {
   }
 }
 
+async function resolveRepoRoot(cwdPath) {
+  const repoRootResult = await execGit(["rev-parse", "--show-toplevel"], cwdPath);
+  if (repoRootResult.exitCode !== 0) {
+    throw new Error(
+      `[checkpoint] Not a git repository: ${cwdPath}\n${repoRootResult.stderr}`
+    );
+  }
+  return repoRootResult.stdout;
+}
+
 // ---------------------------------------------------------------------------
 // createCheckpoint
 // ---------------------------------------------------------------------------
@@ -62,18 +73,13 @@ async function execGit(args, cwdPath, envOverrides = {}) {
  */
 async function createCheckpoint(cwdPath) {
   log("creating checkpoint in", cwdPath);
-
-  // 1. Verify this is a git repo
-  const gitDirResult = await execGit(["rev-parse", "--git-dir"], cwdPath);
-  if (gitDirResult.exitCode !== 0) {
-    throw new Error(
-      `[checkpoint] Not a git repository: ${cwdPath}\n${gitDirResult.stderr}`
-    );
-  }
+  const repoRoot = await resolveRepoRoot(cwdPath);
+  log("resolved repo root:", repoRoot);
 
   // 2. Generate checkpoint ID and ref name
   const now = new Date();
   const pad = (n, len = 2) => String(n).padStart(len, "0");
+  const entropy = randomBytes(3).toString("hex");
   const id = [
     "cp",
     [
@@ -87,14 +93,16 @@ async function createCheckpoint(cwdPath) {
         pad(now.getUTCMinutes()),
         pad(now.getUTCSeconds()),
       ].join("") +
+      pad(now.getUTCMilliseconds(), 3) +
       "Z",
+    entropy,
   ].join("-");
 
   const refName = `refs/claudi-checkpoints/${id}`;
   log("checkpoint id:", id, "ref:", refName);
 
   // 3. Capture HEAD OID (handle unborn HEAD gracefully)
-  const headResult = await execGit(["rev-parse", "HEAD"], cwdPath);
+  const headResult = await execGit(["rev-parse", "HEAD"], repoRoot);
   const headOid =
     headResult.exitCode === 0
       ? headResult.stdout
@@ -102,7 +110,7 @@ async function createCheckpoint(cwdPath) {
   log("HEAD OID:", headOid);
 
   // 4. Capture the current index tree (real index, untouched)
-  const indexTreeResult = await execGit(["write-tree"], cwdPath);
+  const indexTreeResult = await execGit(["write-tree"], repoRoot);
   if (indexTreeResult.exitCode !== 0) {
     throw new Error(
       `[checkpoint] git write-tree (index) failed:\n${indexTreeResult.stderr}`
@@ -118,7 +126,7 @@ async function createCheckpoint(cwdPath) {
   try {
     log("building worktree tree with temp index:", tempIndex);
 
-    const addResult = await execGit(["add", "-A", "--", "."], cwdPath, {
+    const addResult = await execGit(["add", "-A", "--", "."], repoRoot, {
       GIT_INDEX_FILE: tempIndex,
     });
     if (addResult.exitCode !== 0) {
@@ -127,7 +135,7 @@ async function createCheckpoint(cwdPath) {
       );
     }
 
-    const worktreeTreeResult = await execGit(["write-tree"], cwdPath, {
+    const worktreeTreeResult = await execGit(["write-tree"], repoRoot, {
       GIT_INDEX_FILE: tempIndex,
     });
     if (worktreeTreeResult.exitCode !== 0) {
@@ -170,7 +178,7 @@ async function createCheckpoint(cwdPath) {
     commitTreeArgs.push("-p", headOid);
   }
 
-  const commitResult = await execGit(commitTreeArgs, cwdPath, authorEnv);
+  const commitResult = await execGit(commitTreeArgs, repoRoot, authorEnv);
   if (commitResult.exitCode !== 0) {
     throw new Error(
       `[checkpoint] git commit-tree failed:\n${commitResult.stderr}`
@@ -182,7 +190,7 @@ async function createCheckpoint(cwdPath) {
   // 8. Store the ref
   const updateRefResult = await execGit(
     ["update-ref", refName, commitOid],
-    cwdPath
+    repoRoot
   );
   if (updateRefResult.exitCode !== 0) {
     throw new Error(
@@ -209,13 +217,15 @@ async function createCheckpoint(cwdPath) {
  */
 async function restoreCheckpoint(cwdPath, ref) {
   log("restoring checkpoint", ref, "in", cwdPath);
+  const repoRoot = await resolveRepoRoot(cwdPath);
+  log("resolved repo root:", repoRoot);
 
   const refName = `refs/claudi-checkpoints/${ref}`;
 
   // 1. Resolve the ref to a commit OID
   const resolveResult = await execGit(
     ["rev-parse", "--verify", refName],
-    cwdPath
+    repoRoot
   );
   if (resolveResult.exitCode !== 0) {
     throw new Error(
@@ -228,7 +238,7 @@ async function restoreCheckpoint(cwdPath, ref) {
   // 2. Read the commit message to extract metadata
   const catResult = await execGit(
     ["cat-file", "commit", commitOid],
-    cwdPath
+    repoRoot
   );
   if (catResult.exitCode !== 0) {
     throw new Error(
@@ -268,7 +278,7 @@ async function restoreCheckpoint(cwdPath, ref) {
     log("resetting HEAD to", headOid);
     const resetResult = await execGit(
       ["reset", "--hard", headOid],
-      cwdPath
+      repoRoot
     );
     if (resetResult.exitCode !== 0) {
       throw new Error(
@@ -281,7 +291,7 @@ async function restoreCheckpoint(cwdPath, ref) {
   log("restoring worktree from tree", worktreeTree);
   const readTreeWtResult = await execGit(
     ["read-tree", "--reset", "-u", worktreeTree],
-    cwdPath
+    repoRoot
   );
   if (readTreeWtResult.exitCode !== 0) {
     throw new Error(
@@ -291,7 +301,7 @@ async function restoreCheckpoint(cwdPath, ref) {
 
   // 5. Remove files that were untracked at snapshot time but exist now
   log("cleaning untracked files");
-  const cleanResult = await execGit(["clean", "-fd"], cwdPath);
+  const cleanResult = await execGit(["clean", "-fd"], repoRoot);
   if (cleanResult.exitCode !== 0) {
     // Non-fatal: log and continue
     log("warn: git clean -fd exited with", cleanResult.exitCode, cleanResult.stderr);
@@ -302,7 +312,7 @@ async function restoreCheckpoint(cwdPath, ref) {
     log("restoring index from tree", indexTree);
     const readTreeIdxResult = await execGit(
       ["read-tree", "--reset", indexTree],
-      cwdPath
+      repoRoot
     );
     if (readTreeIdxResult.exitCode !== 0) {
       // Non-fatal: the worktree is already correct; log and continue

@@ -1,5 +1,9 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
+function logCheckpoint(...args) {
+  console.log("[checkpoint-preload]", ...args);
+}
+
 contextBridge.exposeInMainWorld("api", {
   agentStart: (opts) => ipcRenderer.send("agent-start", opts),
   agentCancel: (id) => ipcRenderer.send("agent-cancel", id),
@@ -24,8 +28,14 @@ contextBridge.exposeInMainWorld("api", {
   loadSession: (sessionId) => ipcRenderer.invoke("load-session", sessionId),
   moveSession: (sessionId, newCwd) => ipcRenderer.invoke("move-session", sessionId, newCwd),
   rewindFiles: (opts) => ipcRenderer.invoke("rewind-files", opts),
-  checkpointCreate: (cwdPath) => ipcRenderer.invoke("checkpoint-create", cwdPath),
-  checkpointRestore: (cwdPath, ref) => ipcRenderer.invoke("checkpoint-restore", cwdPath, ref),
+  checkpointCreate: async (cwdPath) => {
+    logCheckpoint("checkpointCreate", { cwdPath });
+    return ipcRenderer.invoke("checkpoint-create", cwdPath);
+  },
+  checkpointRestore: async (cwdPath, ref) => {
+    logCheckpoint("checkpointRestore", { cwdPath, ref });
+    return ipcRenderer.invoke("checkpoint-restore", cwdPath, ref);
+  },
   saveState: (state) => ipcRenderer.invoke("save-state", state),
   loadState: () => ipcRenderer.invoke("load-state"),
   getFilePath: (file) => {

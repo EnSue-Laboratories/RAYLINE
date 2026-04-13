@@ -6,6 +6,17 @@ import ChatArea     from "./components/ChatArea";
 import useAgent     from "./hooks/useAgent";
 import { getM }     from "./data/models";
 
+function logCheckpoint(...args) {
+  console.log("[checkpoint-ui]", ...args);
+}
+
+function getSortedCheckpointEntries(checkpoints) {
+  return Object.entries(checkpoints || {})
+    .map(([index, ref]) => ({ index: Number(index), ref }))
+    .filter(({ index, ref }) => Number.isInteger(index) && Boolean(ref))
+    .sort((a, b) => a.index - b.index);
+}
+
 export default function App() {
   const { conversations, getConversation, sendMessage, cancelMessage, editAndResend, loadMessages } = useAgent();
 
@@ -198,6 +209,39 @@ export default function App() {
 
       const convoCwd = convo.cwd;
       const effectiveCwd = convoCwd || cwd || undefined;
+      const thisConvoData = getConversation(convoId);
+      const isFirstMessage = thisConvoData.messages.length === 0;
+      const isForkFirstSend = Boolean(convo.forkedFrom && !convo._forkSent);
+
+      logCheckpoint("handleSend:start", {
+        convoId,
+        effectiveCwd,
+        messageCount: thisConvoData.messages.length,
+        isForkFirstSend,
+        checkpointRef: convo.checkpointRef || null,
+      });
+
+      // Forked conversations must rewind before creating the next checkpoint.
+      // Otherwise the fork's first checkpoint captures the wrong file state.
+      if (isForkFirstSend && effectiveCwd && window.api) {
+        if (convo.checkpointRef) {
+          try {
+            logCheckpoint("handleSend:restoringForkCheckpoint", {
+              convoId,
+              ref: convo.checkpointRef,
+              forkIndex: convo.forkIndex,
+            });
+            await window.api.checkpointRestore(effectiveCwd, convo.checkpointRef);
+          } catch (e) {
+            console.error("Checkpoint restore failed:", e);
+          }
+        } else {
+          logCheckpoint("handleSend:noForkCheckpointRef", {
+            convoId,
+            forkIndex: convo.forkIndex,
+          });
+        }
+      }
 
       // Create a git checkpoint before sending (for future fork/edit rewind)
       if (effectiveCwd && window.api) {
@@ -206,6 +250,11 @@ export default function App() {
           if (cp?.ref) {
             // Store checkpoint ref on the convo for this message index
             const msgIdx = getConversation(convoId).messages.length; // index of the new user message
+            logCheckpoint("handleSend:storeCheckpoint", {
+              convoId,
+              msgIdx,
+              ref: cp.ref,
+            });
             setConvoList((p) =>
               p.map((c) => {
                 if (c.id !== convoId) return c;
@@ -214,6 +263,8 @@ export default function App() {
                 return { ...c, checkpoints };
               })
             );
+          } else {
+            logCheckpoint("handleSend:checkpointCreateReturnedEmpty", { convoId });
           }
         } catch (e) {
           console.warn("Checkpoint creation failed (not a git repo?):", e.message);
@@ -223,20 +274,6 @@ export default function App() {
       const images = attachments?.filter((a) => a.type === "image").map((a) => a.dataUrl);
       const files  = attachments?.filter((a) => a.type === "file");
       const m = getM(convo.model);
-
-      const thisConvoData = getConversation(convoId);
-      const isFirstMessage = thisConvoData.messages.length === 0;
-
-      // For forked conversations: restore checkpoint + fork session
-      const isForkFirstSend = Boolean(convo.forkedFrom && !convo._forkSent);
-
-      if (isForkFirstSend && convo.checkpointRef && effectiveCwd && window.api) {
-        try {
-          await window.api.checkpointRestore(effectiveCwd, convo.checkpointRef);
-        } catch (e) {
-          console.error("Checkpoint restore failed:", e);
-        }
-      }
 
       sendMessage({
         conversationId: convoId,
@@ -271,6 +308,12 @@ export default function App() {
 
       // Restore git checkpoint to the state before this message
       const checkpointRef = activeConvo.checkpoints?.[messageIndex];
+      logCheckpoint("handleEdit", {
+        convoId: active,
+        messageIndex,
+        checkpointRef: checkpointRef || null,
+        convoCwd,
+      });
       if (checkpointRef && convoCwd && window.api) {
         try {
           await window.api.checkpointRestore(convoCwd, checkpointRef);
@@ -295,16 +338,27 @@ export default function App() {
     (messageIndex) => {
       if (!activeConvo) return;
 
-      // Find the checkpoint ref at or before the fork point
+      const forkMessage = activeData.messages[messageIndex];
+      const checkpointEntries = getSortedCheckpointEntries(activeConvo.checkpoints);
       let checkpointRef = null;
-      if (activeConvo.checkpoints) {
-        for (let i = messageIndex; i >= 0; i--) {
-          if (activeConvo.checkpoints[i]) {
-            checkpointRef = activeConvo.checkpoints[i];
-            break;
-          }
-        }
+      let checkpointSourceIndex = null;
+
+      if (forkMessage?.role === "user") {
+        checkpointRef = activeConvo.checkpoints?.[messageIndex] || null;
+        checkpointSourceIndex = checkpointRef ? messageIndex : null;
+      } else {
+        const nextCheckpoint = checkpointEntries.find(({ index }) => index > messageIndex);
+        checkpointRef = nextCheckpoint?.ref || null;
+        checkpointSourceIndex = nextCheckpoint?.index ?? null;
       }
+
+      logCheckpoint("handleFork", {
+        activeConvoId: active,
+        messageIndex,
+        messageRole: forkMessage?.role || "unknown",
+        checkpointSourceIndex,
+        checkpointRef,
+      });
 
       const id = "c" + Date.now();
       const forkedConvo = {

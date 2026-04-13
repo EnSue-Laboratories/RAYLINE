@@ -106,11 +106,27 @@ ipcMain.handle("rewind-files", async (_event, opts) => {
 });
 
 ipcMain.handle("checkpoint-create", async (_event, cwdPath) => {
-  return createCheckpoint(cwdPath);
+  console.log("[checkpoint-main] checkpoint-create", { cwdPath });
+  try {
+    const result = await createCheckpoint(cwdPath);
+    console.log("[checkpoint-main] checkpoint-create:success", result);
+    return result;
+  } catch (error) {
+    console.error("[checkpoint-main] checkpoint-create:failed", error);
+    throw error;
+  }
 });
 
 ipcMain.handle("checkpoint-restore", async (_event, cwdPath, ref) => {
-  return restoreCheckpoint(cwdPath, ref);
+  console.log("[checkpoint-main] checkpoint-restore", { cwdPath, ref });
+  try {
+    const result = await restoreCheckpoint(cwdPath, ref);
+    console.log("[checkpoint-main] checkpoint-restore:success", result);
+    return result;
+  } catch (error) {
+    console.error("[checkpoint-main] checkpoint-restore:failed", error);
+    throw error;
+  }
 });
 
 // IPC: sessions
