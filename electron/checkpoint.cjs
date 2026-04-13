@@ -52,9 +52,26 @@ async function execGit(args, cwdPath, envOverrides = {}) {
 async function resolveRepoRoot(cwdPath) {
   const repoRootResult = await execGit(["rev-parse", "--show-toplevel"], cwdPath);
   if (repoRootResult.exitCode !== 0) {
-    throw new Error(
-      `[checkpoint] Not a git repository: ${cwdPath}\n${repoRootResult.stderr}`
+    // Auto-init git repo for checkpoint support
+    log("No git repo found, initializing:", cwdPath);
+    const initResult = await execGit(["init"], cwdPath);
+    if (initResult.exitCode !== 0) {
+      throw new Error(`[checkpoint] Failed to init git repo: ${cwdPath}\n${initResult.stderr}`);
+    }
+    // Create initial commit so HEAD exists
+    await execGit(["add", "-A", "--", "."], cwdPath);
+    await execGit(
+      ["commit", "--allow-empty", "-m", "claudi: initial checkpoint"],
+      cwdPath,
+      {
+        GIT_AUTHOR_NAME: "Claudi",
+        GIT_AUTHOR_EMAIL: "claudi@noreply",
+        GIT_COMMITTER_NAME: "Claudi",
+        GIT_COMMITTER_EMAIL: "claudi@noreply",
+      }
     );
+    log("Git repo initialized:", cwdPath);
+    return cwdPath;
   }
   return repoRootResult.stdout;
 }
