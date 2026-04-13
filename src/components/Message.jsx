@@ -419,6 +419,20 @@ export default function Message({ msg, onEdit, onAnswer, onFork }) {
         <ThinkingBlock text="" isThinking={true} />
       )}
 
+      {msg.isStreaming && !msg.isThinking && (msg.parts || []).length === 0 && (
+        <div style={{ display: "flex", gap: 5, alignItems: "center", padding: "4px 0" }}>
+          {[0, 1, 2].map(i => (
+            <span key={i} style={{
+              width: 5, height: 5,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.25)",
+              display: "inline-block",
+              animation: `dotPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+            }} />
+          ))}
+        </div>
+      )}
+
       {/* Fallback for old format messages (text + toolCalls) */}
       {!msg.parts && msg.text && (
         <div style={{

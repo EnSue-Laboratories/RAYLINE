@@ -27,8 +27,9 @@ function getPreview(tool) {
   if (tool.name === "Read") return args.file_path?.split("/").pop();
   if (tool.name === "Edit") return args.file_path?.split("/").pop();
   if (tool.name === "Write") return args.file_path?.split("/").slice(-2).join("/");
-  if (tool.name === "Grep") return truncate(args.pattern, 25);
-  if (tool.name === "Glob") return truncate(args.pattern, 25);
+  if (tool.name === "Grep") return truncate(args.pattern || args.query, 25);
+  if (tool.name === "Glob") return truncate(args.pattern || args.glob, 25);
+  if (tool.name === "Search") return truncate(args.query || args.pattern, 25);
   if (tool.name === "Agent") return truncate(args.description, 30);
   if (tool.name === "WebSearch") return truncate(args.query, 30);
   if (tool.name === "WebFetch") return truncate(args.url, 30);

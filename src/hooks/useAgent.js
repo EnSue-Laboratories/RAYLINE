@@ -8,9 +8,23 @@ function cloneParts(parts) {
   return (parts || []).map(p => ({ ...p }));
 }
 
-function findPartIndexByBlock(parts, blockIndex, type) {
-  if (blockIndex == null) return -1;
-  return parts.findIndex((p) => p.type === type && p.blockIndex === blockIndex);
+function cloneStreamState(streamState) {
+  const state = streamState || {};
+  return {
+    currentTurn: state.currentTurn || 0,
+    seenIndexes: { ...(state.seenIndexes || {}) },
+    activeBlocks: { ...(state.activeBlocks || {}) },
+    activeThinking: { ...(state.activeThinking || {}) },
+  };
+}
+
+function buildBlockKey(turn, blockIndex) {
+  return `${turn}:${blockIndex}`;
+}
+
+function findPartIndexByStreamKey(parts, streamKey, type) {
+  if (!streamKey) return -1;
+  return parts.findIndex((p) => p._streamKey === streamKey && (!type || p.type === type));
 }
 
 // Helper: find a tool part by id across all parts
@@ -37,7 +51,14 @@ export default function useAgent() {
 
         const ensureAssistant = () => {
           if (!lastMsg || lastMsg.role !== "assistant") {
-            lastMsg = { id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false };
+            lastMsg = {
+              id: uid(),
+              role: "assistant",
+              parts: [],
+              isStreaming: true,
+              isThinking: false,
+              _streamState: cloneStreamState(),
+            };
             msgs.push(lastMsg);
           }
           return lastMsg;
@@ -58,14 +79,24 @@ export default function useAgent() {
             const block = inner.content_block;
             ensureAssistant();
             const parts = cloneParts(lastMsg.parts);
+            const streamState = cloneStreamState(lastMsg._streamState);
+            const blockIndex = inner.index;
+
+            if (streamState.seenIndexes[blockIndex]) {
+              streamState.currentTurn += 1;
+              streamState.seenIndexes = {};
+              streamState.activeBlocks = {};
+              streamState.activeThinking = {};
+            }
+
+            streamState.seenIndexes[blockIndex] = true;
+            const streamKey = buildBlockKey(streamState.currentTurn, blockIndex);
+            streamState.activeBlocks[blockIndex] = streamKey;
+
             if (block?.type === "thinking") {
-              const existingIdx = findPartIndexByBlock(parts, inner.index, "thinking");
-              if (existingIdx >= 0) {
-                parts[existingIdx] = { ...parts[existingIdx], type: "thinking" };
-              } else {
-                parts.push({ type: "thinking", text: "", blockIndex: inner.index });
-              }
-              updateAssistant({ parts, isThinking: true });
+              parts.push({ type: "thinking", text: "", blockIndex, _streamKey: streamKey });
+              streamState.activeThinking[streamKey] = true;
+              updateAssistant({ parts, isThinking: true, _streamState: streamState });
             } else if (block?.type === "tool_use") {
               parts.push({
                 type: "tool",
@@ -75,54 +106,59 @@ export default function useAgent() {
                 argsJson: "",
                 result: null,
                 status: "running",
-                blockIndex: inner.index,
+                blockIndex,
+                _streamKey: streamKey,
               });
-              updateAssistant({ parts });
+              updateAssistant({ parts, _streamState: streamState });
             } else if (block?.type === "text") {
-              parts.push({ type: "text", text: "", blockIndex: inner.index });
-              updateAssistant({ parts });
+              parts.push({ type: "text", text: "", blockIndex, _streamKey: streamKey });
+              updateAssistant({ parts, _streamState: streamState });
             }
           } else if (inner.type === "content_block_delta") {
             ensureAssistant();
             const parts = cloneParts(lastMsg.parts);
+            const streamState = cloneStreamState(lastMsg._streamState);
             const delta = inner.delta;
+            const streamKey = streamState.activeBlocks[inner.index];
             if (delta?.type === "text_delta") {
-              const textIdx = findPartIndexByBlock(parts, inner.index, "text");
+              const textIdx = findPartIndexByStreamKey(parts, streamKey, "text");
               if (textIdx >= 0) {
                 parts[textIdx] = { ...parts[textIdx], text: parts[textIdx].text + (delta.text || "") };
-              } else {
-                parts.push({ type: "text", text: delta.text || "", blockIndex: inner.index });
               }
-              updateAssistant({ parts });
+              updateAssistant({ parts, _streamState: streamState });
             } else if (delta?.type === "input_json_delta") {
-              const toolIdx = findPartIndexByBlock(parts, inner.index, "tool");
+              const toolIdx = findPartIndexByStreamKey(parts, streamKey, "tool");
               if (toolIdx >= 0) {
                 const newJson = (parts[toolIdx].argsJson || "") + (delta.partial_json || "");
                 let newArgs = parts[toolIdx].args;
                 try { newArgs = JSON.parse(newJson); } catch {}
                 parts[toolIdx] = { ...parts[toolIdx], argsJson: newJson, args: newArgs };
               }
-              updateAssistant({ parts });
+              updateAssistant({ parts, _streamState: streamState });
             } else if (delta?.type === "thinking_delta") {
-              const thinkingIdx = findPartIndexByBlock(parts, inner.index, "thinking");
+              const thinkingIdx = findPartIndexByStreamKey(parts, streamKey, "thinking");
               if (thinkingIdx >= 0) {
                 parts[thinkingIdx] = {
                   ...parts[thinkingIdx],
                   text: parts[thinkingIdx].text + (delta.thinking || ""),
                 };
-              } else {
-                parts.push({ type: "thinking", text: delta.thinking || "", blockIndex: inner.index });
               }
-              updateAssistant({ parts, isThinking: true });
+              updateAssistant({ parts, isThinking: true, _streamState: streamState });
             }
           } else if (inner.type === "content_block_stop") {
             ensureAssistant();
-            // Only clear isThinking if the stopped block was a thinking block
-            const stoppedIdx = inner.index;
-            const wasThinking = lastMsg.parts?.some(p => p.type === "thinking" && p.blockIndex === stoppedIdx);
-            if (wasThinking) {
-              updateAssistant({ isThinking: false });
+            const streamState = cloneStreamState(lastMsg._streamState);
+            const stoppedKey = streamState.activeBlocks[inner.index];
+            delete streamState.activeBlocks[inner.index];
+
+            if (stoppedKey && streamState.activeThinking[stoppedKey]) {
+              delete streamState.activeThinking[stoppedKey];
             }
+
+            updateAssistant({
+              isThinking: Object.keys(streamState.activeThinking).length > 0,
+              _streamState: streamState,
+            });
           }
         } else if (event.type === "assistant") {
           // With --include-partial-messages, assistant events contain full accumulated text.
@@ -231,7 +267,7 @@ export default function useAgent() {
       const msgs = [
         ...convo.messages,
         { id: uid(), role: "user", text: prompt, images, files },
-        { id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: true },
+        { id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false },
       ];
       next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       return next;
