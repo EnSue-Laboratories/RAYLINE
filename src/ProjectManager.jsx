@@ -10,6 +10,7 @@ function GitHubIcon({ size = 48 }) {
 }
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain from "./components/Grain";
+import CreateForm from "./pm-components/CreateForm";
 import RepoManager from "./pm-components/RepoManager";
 import IssueList from "./pm-components/IssueList";
 import PRList from "./pm-components/PRList";
@@ -138,6 +139,8 @@ export default function ProjectManager() {
   const [removeMode, setRemoveMode] = useState(false);
   const [wallpaper, setWallpaper] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
+  const [showCreate, setShowCreate] = useState(null); // null | "issue" | "pr"
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     window.ghApi.checkAuth().then(({ ok }) => setAuthOk(ok));
@@ -407,6 +410,21 @@ export default function ProjectManager() {
               }}
             />
             <div style={{ flex: 1 }} />
+            {repos.length > 0 && (
+              <button
+                onClick={() => setShowCreate(activeTab === "issues" ? "issue" : "pr")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4,
+                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 6, padding: "4px 10px", cursor: "pointer",
+                  color: "rgba(255,255,255,0.5)", fontSize: 11,
+                  fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
+                  marginRight: 8, transition: "all .15s",
+                }}
+              >
+                <Plus size={11} strokeWidth={2} /> NEW
+              </button>
+            )}
             <StateToggle
               value={stateFilter}
               onChange={(v) => {
@@ -428,6 +446,7 @@ export default function ProjectManager() {
             />
           ) : activeTab === "issues" ? (
             <IssueList
+              key={`issues-${refreshKey}`}
               repos={repos}
               stateFilter={stateFilter}
               repoFilter={repoFilter}
@@ -435,6 +454,7 @@ export default function ProjectManager() {
             />
           ) : (
             <PRList
+              key={`prs-${refreshKey}`}
               repos={repos}
               stateFilter={stateFilter}
               repoFilter={repoFilter}
@@ -443,6 +463,16 @@ export default function ProjectManager() {
           )}
         </div>
       </div>
+
+      {/* Create issue/PR modal */}
+      {showCreate && (
+        <CreateForm
+          repos={repos}
+          type={showCreate}
+          onClose={() => setShowCreate(null)}
+          onCreated={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
 
       {/* Add repo modal */}
       {showAddRepo && (

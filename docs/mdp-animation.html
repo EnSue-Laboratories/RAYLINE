@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MDP — Markov Decision Process</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Sono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#020209;--bg1:#06061a;--bg2:#0c0c28;--border:#151535;
+  --text:#bbc0e8;--dim:#3a3a6a;
+  --cyan:#00e5ff;--cyan-a:rgba(0,229,255,0.18);
+  --green:#00ff9f;--green-a:rgba(0,255,159,0.18);
+  --red:#ff2d55;--red-a:rgba(255,45,85,0.18);
+  --gold:#ffd166;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:'Sono',monospace;display:flex;flex-direction:column}
+/* ── Header ── */
+header{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 24px;border-bottom:1px solid var(--border);background:var(--bg1);flex-shrink:0}
+.h-title{font-family:'Orbitron',sans-serif;font-weight:900;font-size:13px;
+  letter-spacing:.22em;color:var(--cyan);text-transform:uppercase}
+.h-sub{font-size:10px;color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin-top:2px}
+.h-badge{font-family:'Orbitron',sans-serif;font-size:10px;color:var(--dim);letter-spacing:.15em;text-align:right}
+.h-badge span{color:var(--cyan);font-weight:700}
+/* ── Main grid ── */
+.main{display:grid;grid-template-columns:190px 1fr 210px;flex:1;min-height:0;overflow:hidden}
+/* ── Side panels ── */
+.panel{background:var(--bg1);padding:18px 14px;display:flex;flex-direction:column;gap:16px;overflow:hidden}
+.panel-l{border-right:1px solid var(--border)}
+.panel-r{border-left:1px solid var(--border)}
+.sec-title{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:.22em;
+  color:var(--dim);text-transform:uppercase;margin-bottom:8px}
+.metric{margin-bottom:10px}
+.metric-lbl{font-size:9px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase}
+.metric-val{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:700;
+  color:var(--cyan);line-height:1.3;transition:color .3s}
+.metric-val.pos{color:var(--green)}
+.metric-val.neg{color:var(--red)}
+.state-badge{display:flex;align-items:center;gap:8px;background:var(--bg2);
+  border:1px solid var(--border);border-radius:3px;padding:8px 10px;
+  font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:.1em}
+.s-dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);
+  box-shadow:0 0 8px var(--cyan);transition:background .3s,box-shadow .3s;flex-shrink:0}
+.log-wrap{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px;min-height:0}
+.log-wrap::-webkit-scrollbar{width:3px}
+.log-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.log-item{font-size:9.5px;color:var(--dim);padding:3px 0;border-bottom:1px solid var(--border);
+  line-height:1.5;animation:fade-in .3s ease}
+@keyframes fade-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.rp{color:var(--green)}.rn{color:var(--red)}
+/* ── Q-Table ── */
+.qt{width:100%;font-size:10.5px;border-collapse:collapse}
+.qt th{font-size:8px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase;
+  text-align:left;padding:5px 6px;border-bottom:1px solid var(--border)}
+.qt td{padding:5px 6px;border-bottom:1px solid var(--border)}
+.qt tr.cur td{color:var(--cyan);background:var(--cyan-a)}
+.qbar{height:3px;background:var(--border);border-radius:2px;margin-top:3px}
+.qbar-fill{height:100%;border-radius:2px;background:var(--cyan);transition:width .4s ease}
+.qbar-fill.best{background:var(--green)}
+.legend{font-size:9.5px;color:var(--dim);line-height:2}
+/* ── Viz ── */
+.viz{position:relative;overflow:hidden;background:var(--bg)}
+.viz::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,20,.04) 3px,rgba(0,0,20,.04) 4px)}
+#mdp-svg{width:100%;height:100%}
+/* ── Controls ── */
+.controls{flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  gap:10px;padding:12px 24px;border-top:1px solid var(--border);background:var(--bg1);flex-wrap:wrap}
+.btn{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:.15em;text-transform:uppercase;
+  padding:9px 16px;border:1px solid var(--border);background:var(--bg2);color:var(--text);
+  cursor:pointer;border-radius:2px;transition:all .15s;white-space:nowrap}
+.btn:hover:not(:disabled){border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 14px var(--cyan-a)}
+.btn.on{background:var(--cyan-a);border-color:var(--cyan);color:var(--cyan)}
+.btn.danger{border-color:#ff2d5566;color:var(--red)}
+.btn.danger:hover{background:var(--red-a);box-shadow:0 0 14px var(--red-a)}
+.btn:disabled{opacity:.3;cursor:not-allowed}
+.sep{width:1px;height:22px;background:var(--border)}
+.spd{display:flex;align-items:center;gap:7px;font-size:9px;color:var(--dim);letter-spacing:.1em}
+input[type=range]{-webkit-appearance:none;width:72px;height:3px;background:var(--border);border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;
+  border-radius:50%;background:var(--cyan);cursor:pointer}
+.act-btn{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:.12em;
+  padding:8px 14px;border:1px solid var(--cyan);background:var(--cyan-a);color:var(--cyan);
+  cursor:pointer;border-radius:2px;transition:all .15s;text-transform:uppercase}
+.act-btn:hover{background:rgba(0,229,255,.3);box-shadow:0 0 16px var(--cyan-a)}
+.act-btn .qv{display:block;font-size:8px;opacity:.65;margin-top:2px}
+.act-area{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
+.terminal-lbl{font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:.1em;padding:0 12px}
+.terminal-lbl.goal{color:var(--green)}.terminal-lbl.trap{color:var(--red)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="h-title">Markov Decision Process</div>
+    <div class="h-sub">Reinforcement Learning — Interactive Agent Simulation</div>
+  </div>
+  <div class="h-badge">
+    EPISODE <span id="ep-num">1</span><br>
+    STEP <span id="st-num">0</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- Left panel -->
+  <div class="panel panel-l">
+    <div>
+      <div class="sec-title">Current State</div>
+      <div class="state-badge">
+        <div class="s-dot" id="s-dot"></div>
+        <span id="s-label">START</span>
+      </div>
+    </div>
+    <div>
+      <div class="sec-title">Metrics</div>
+      <div class="metric">
+        <div class="metric-lbl">Cumulative Reward</div>
+        <div class="metric-val" id="m-total">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-lbl">Last Reward</div>
+        <div class="metric-val" id="m-last">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-lbl">Goals Reached</div>
+        <div class="metric-val pos" id="m-wins">0</div>
+      </div>
+    </div>
+    <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0">
+      <div class="sec-title">Event Log</div>
+      <div class="log-wrap" id="log"></div>
+    </div>
+  </div>
+
+  <!-- Center SVG -->
+  <div class="viz" id="viz">
+    <svg id="mdp-svg" viewBox="0 0 740 460" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="f-cyan" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="3.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="f-green" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="f-red" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="f-agent" x="-150%" y="-150%" width="400%" height="400%">
+          <feGaussianBlur stdDeviation="7" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="f-active" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="9" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <marker id="ar-cyan" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="rgba(0,229,255,.75)"/>
+        </marker>
+        <marker id="ar-dim" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="rgba(58,58,106,.9)"/>
+        </marker>
+        <style>
+          @keyframes flow{from{stroke-dashoffset:0}to{stroke-dashoffset:-28}}
+          @keyframes pulse-r{0%,100%{opacity:.25;r:44}50%{opacity:.7;r:48}}
+          @keyframes burst{0%{opacity:.9;r:0}60%{opacity:.6}100%{opacity:0;r:55}}
+          @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-4px,0)}
+            40%{transform:translate(4px,0)}60%{transform:translate(-3px,0)}80%{transform:translate(3px,0)}}
+          .flow-path{animation:flow 1.8s linear infinite}
+          .pulse-ring{animation:pulse-r 2s ease-in-out infinite}
+          .burst-ring{animation:burst .8s ease-out forwards}
+          .trap-shake{animation:shake .5s ease-in-out}
+        </style>
+      </defs>
+
+      <!-- Subtle dot grid -->
+      <pattern id="dotgrid" width="30" height="30" patternUnits="userSpaceOnUse">
+        <circle cx="15" cy="15" r=".8" fill="#0e0e2a"/>
+      </pattern>
+      <rect width="740" height="460" fill="url(#dotgrid)"/>
+
+      <g id="g-edges"></g>
+      <g id="g-labels"></g>
+      <g id="g-nodes"></g>
+      <g id="g-trail"></g>
+      <circle id="agent" cx="110" cy="230" r="11" fill="white" filter="url(#f-agent)"/>
+      <g id="g-burst"></g>
+      <g id="g-reward"></g>
+    </svg>
+  </div>
+
+  <!-- Right panel -->
+  <div class="panel panel-r">
+    <div>
+      <div class="sec-title">Q-Value Table</div>
+      <table class="qt">
+        <thead><tr><th>S</th><th>Action</th><th>Q(s,a)</th></tr></thead>
+        <tbody id="qt-body"></tbody>
+      </table>
+    </div>
+    <div>
+      <div class="sec-title">MDP Parameters</div>
+      <div class="legend">
+        <div>γ = <span style="color:var(--cyan)">0.9</span></div>
+        <div>ε = <span style="color:var(--cyan)">0.15</span> exploration</div>
+        <div>|S| = <span style="color:var(--cyan)">5</span> states</div>
+        <div>|A| = <span style="color:var(--cyan)">2</span> actions</div>
+      </div>
+    </div>
+    <div>
+      <div class="sec-title">Legend</div>
+      <div class="legend">
+        <div><span style="color:var(--gold)">★</span> Optimal action</div>
+        <div>p= edge probability</div>
+        <div>Flow lines show direction</div>
+        <div style="margin-top:4px">
+          <span style="color:var(--green)">● GOAL</span> terminal +10<br>
+          <span style="color:var(--red)">● TRAP</span> terminal −5
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="act-area" id="act-area"></div>
+  <div class="sep"></div>
+  <button class="btn on" id="btn-step" onclick="stepOnce()">▶ Step</button>
+  <button class="btn" id="btn-auto" onclick="toggleAuto()">⟳ Auto</button>
+  <button class="btn danger" onclick="resetEp()">↺ Reset</button>
+  <div class="sep"></div>
+  <div class="spd">
+    <span>SPEED</span>
+    <input type="range" id="spd-slider" min="300" max="2200" value="900" step="100"
+      oninput="setSpeed(this.value)">
+    <span id="spd-lbl">1×</span>
+  </div>
+  <div class="sep"></div>
+  <button class="btn" id="btn-pol" onclick="togglePolicy()">ε-GREEDY</button>
+</div>
+
+<script>
+// ── MDP Definition ───────────────────────────────────────────────────
+const S = {
+  S0:{id:'S0',lbl:'START', x:110,y:230,type:'normal'},
+  S1:{id:'S1',lbl:'HIGH',  x:320,y:120,type:'normal'},
+  S2:{id:'S2',lbl:'LOW',   x:320,y:340,type:'normal'},
+  S3:{id:'S3',lbl:'GOAL',  x:575,y:165,type:'goal'},
+  S4:{id:'S4',lbl:'TRAP',  x:575,y:295,type:'trap'},
+};
+
+const T = {
+  S0:[
+    {a:'HIGH',  out:[{to:'S1',p:1.0,r:0}]},
+    {a:'LOW',   out:[{to:'S2',p:1.0,r:0}]},
+  ],
+  S1:[
+    {a:'ADVANCE',out:[{to:'S3',p:.7,r:10},{to:'S4',p:.3,r:-5}]},
+    {a:'BACK',   out:[{to:'S0',p:1.0,r:-1}]},
+  ],
+  S2:[
+    {a:'ADVANCE',out:[{to:'S3',p:.9,r:10},{to:'S4',p:.1,r:-5}]},
+    {a:'BACK',   out:[{to:'S0',p:1.0,r:-1}]},
+  ],
+  S3:[],S4:[],
+};
+
+const Q = {
+  S0:{HIGH:3.2, LOW:6.8},
+  S1:{ADVANCE:5.5,BACK:1.8},
+  S2:{ADVANCE:8.5,BACK:2.1},
+};
+
+// Edge definitions: from, to, action, bezier control pt, prob, labelPos
+const EDGES = [
+  {id:'e00',from:'S0',to:'S1',a:'HIGH',   cp:'Q 190,65',  lp:{x:188,y:125}},
+  {id:'e01',from:'S0',to:'S2',a:'LOW',    cp:'Q 190,395', lp:{x:188,y:335}},
+  {id:'e10',from:'S1',to:'S3',a:'ADVANCE',cp:'Q 450,80',  lp:{x:444,y:108},prob:.7},
+  {id:'e11',from:'S1',to:'S4',a:'ADVANCE',cp:'Q 430,255', lp:{x:418,y:218},prob:.3},
+  {id:'e20',from:'S2',to:'S3',a:'ADVANCE',cp:'Q 430,205', lp:{x:418,y:232},prob:.9},
+  {id:'e21',from:'S2',to:'S4',a:'ADVANCE',cp:'Q 460,350', lp:{x:458,y:340},prob:.1},
+  {id:'e12',from:'S1',to:'S0',a:'BACK',   cp:'Q 205,52',  lp:{x:194,y:100}},
+  {id:'e22',from:'S2',to:'S0',a:'BACK',   cp:'Q 205,408', lp:{x:194,y:400}},
+];
+
+// ── State ─────────────────────────────────────────────────────────────
+let cur='S0', totR=0, lastR=null, steps=0, episodes=1, wins=0;
+let autoOn=false, autoTimer=null, delay=900, animating=false, greedy=true;
+
+// ── SVG helpers ───────────────────────────────────────────────────────
+const svg=document.getElementById('mdp-svg');
+const gEdges=document.getElementById('g-edges');
+const gLabels=document.getElementById('g-labels');
+const gNodes=document.getElementById('g-nodes');
+const gTrail=document.getElementById('g-trail');
+const gBurst=document.getElementById('g-burst');
+const gReward=document.getElementById('g-reward');
+const agentEl=document.getElementById('agent');
+const R=36; // node radius
+
+function nodeColors(type){
+  if(type==='goal') return{fill:'#081e12',stroke:'#00ff9f',glow:'#00ff9f',f:'f-green'};
+  if(type==='trap') return{fill:'#190813',stroke:'#ff2d55',glow:'#ff2d55',f:'f-red'};
+  return{fill:'#070720',stroke:'#1e3a6a',glow:'#00aaff',f:'f-cyan'};
+}
+
+function ns(tag,attrs={}){
+  const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+  for(const[k,v] of Object.entries(attrs)) el.setAttribute(k,v);
+  return el;
+}
+
+function edgeEndpoints(from,to){
+  const f=S[from],t=S[to];
+  const dx=t.x-f.x,dy=t.y-f.y,len=Math.hypot(dx,dy);
+  return{
+    sx:f.x+(dx/len)*R, sy:f.y+(dy/len)*R,
+    ex:t.x-(dx/len)*R, ey:t.y-(dy/len)*R,
+  };
+}
+
+// ── Build SVG ─────────────────────────────────────────────────────────
+function buildSVG(){
+  EDGES.forEach(e=>{
+    const isBack=e.a==='BACK';
+    const{sx,sy,ex,ey}=edgeEndpoints(e.from,e.to);
+    const d=`M${sx},${sy} ${e.cp} ${ex},${ey}`;
+    const sw=e.prob?Math.max(1,e.prob*2.8):1.4;
+
+    // Static edge
+    const base=ns('path',{id:e.id,d,fill:'none',
+      stroke:isBack?'rgba(58,58,106,.5)':'rgba(0,229,255,.35)',
+      'stroke-width':sw,'marker-end':isBack?'url(#ar-dim)':'url(#ar-cyan)',
+    });
+    if(isBack) base.setAttribute('stroke-dasharray','4 3');
+    gEdges.appendChild(base);
+
+    // Flowing dots on advance edges
+    if(!isBack){
+      const flow=ns('path',{d,fill:'none',stroke:'rgba(0,229,255,.85)',
+        'stroke-width':'1.2','stroke-dasharray':'5 23',
+        'class':'flow-path','pointer-events':'none'});
+      flow.style.animationDelay=`${Math.random()*2.5}s`;
+      gEdges.appendChild(flow);
+    }
+
+    // Label
+    if(e.lp){
+      const txt=ns('text',{x:e.lp.x,y:e.lp.y,'text-anchor':'middle',
+        'font-size':'9','font-family':'Sono,monospace',
+        fill:isBack?'#2e2e56':'rgba(0,229,255,.55)','letter-spacing':'.04em'});
+      txt.textContent=e.prob!=null?`p=${e.prob}`:e.a.toLowerCase();
+      gLabels.appendChild(txt);
+    }
+  });
+
+  // Nodes
+  Object.values(S).forEach(state=>{
+    const c=nodeColors(state.type);
+    const g=ns('g',{id:`n-${state.id}`});
+
+    // Pulse ring (hidden by default)
+    const ring=ns('circle',{cx:state.x,cy:state.y,r:'0',
+      fill:'none',stroke:c.glow,'stroke-width':'1.2',opacity:'0',id:`r-${state.id}`});
+    g.appendChild(ring);
+
+    // Glow halo
+    const halo=ns('circle',{cx:state.x,cy:state.y,r:R+4,
+      fill:c.fill,stroke:c.stroke,'stroke-width':'.5',opacity:'.4'});
+    g.appendChild(halo);
+
+    // Main circle
+    const circ=ns('circle',{id:`c-${state.id}`,cx:state.x,cy:state.y,r:R,
+      fill:c.fill,stroke:c.stroke,'stroke-width':'1.8',filter:`url(#${c.f})`});
+    g.appendChild(circ);
+
+    // ID label
+    const idl=ns('text',{x:state.x,y:state.y-11,'text-anchor':'middle',
+      'font-size':'7.5','font-family':'Sono,monospace',
+      fill:'rgba(80,100,180,.55)','letter-spacing':'.12em'});
+    idl.textContent=state.id;
+    g.appendChild(idl);
+
+    // Main label
+    const lbl=ns('text',{x:state.x,y:state.y+4,'text-anchor':'middle',
+      'font-size':'10','font-weight':'600','font-family':'Orbitron,sans-serif',
+      fill:c.stroke,'letter-spacing':'.05em'});
+    lbl.textContent=state.lbl;
+    g.appendChild(lbl);
+
+    // Reward label for terminal
+    if(state.type!=='normal'){
+      const rl=ns('text',{x:state.x,y:state.y+18,'text-anchor':'middle',
+        'font-size':'11','font-weight':'700','font-family':'Orbitron,sans-serif',
+        fill:c.stroke});
+      rl.textContent=state.type==='goal'?'+10':'−5';
+      g.appendChild(rl);
+    }
+
+    gNodes.appendChild(g);
+  });
+
+  refreshAgent();
+  refreshActiveNode();
+  buildQTable();
+  refreshActions();
+}
+
+// ── Agent animation ───────────────────────────────────────────────────
+function refreshAgent(){
+  const s=S[cur];
+  agentEl.setAttribute('cx',s.x);
+  agentEl.setAttribute('cy',s.y);
+}
+
+function animateAlongPath(pathEl, dur, onDone){
+  if(!pathEl){onDone();return;}
+  const total=pathEl.getTotalLength();
+  const t0=performance.now();
+  const trail=[];
+  for(let i=0;i<5;i++){
+    const d=ns('circle',{r:String(8-i*1.3),fill:'white',opacity:String(.35-i*.055)});
+    gTrail.appendChild(d);trail.push(d);
+  }
+  function tick(now){
+    const p=Math.min((now-t0)/dur,1);
+    const e=p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2; // ease in-out cubic
+    const pt=pathEl.getPointAtLength(e*total);
+    agentEl.setAttribute('cx',pt.x);
+    agentEl.setAttribute('cy',pt.y);
+    trail.forEach((d,i)=>{
+      const tp=Math.max(0,e-(i+1)*.07);
+      const tpt=pathEl.getPointAtLength(tp*total);
+      d.setAttribute('cx',tpt.x);d.setAttribute('cy',tpt.y);
+    });
+    if(p<1){requestAnimationFrame(tick);}
+    else{trail.forEach(d=>gTrail.removeChild(d));onDone();}
+  }
+  requestAnimationFrame(tick);
+}
+
+function showRewardFX(reward,x,y){
+  // Floating reward text
+  const txt=ns('text',{x,y:String(y-44),'text-anchor':'middle',
+    'font-size':'20','font-weight':'900','font-family':'Orbitron,sans-serif',
+    fill:reward>=0?'#00ff9f':'#ff2d55'});
+  txt.textContent=(reward>0?'+':'')+reward;
+  gReward.appendChild(txt);
+  let t0=null;
+  (function anim(ts){
+    if(!t0)t0=ts;
+    const p=Math.min((ts-t0)/1400,1);
+    txt.setAttribute('opacity',String(1-p));
+    txt.setAttribute('y',String(y-44-p*55));
+    if(p<1)requestAnimationFrame(anim);
+    else gReward.removeChild(txt);
+  })(performance.now());
+
+  // Burst ring for goal
+  if(reward>0){
+    const br=ns('circle',{cx:x,cy:y,r:'0',fill:'none',
+      stroke:'#00ff9f','stroke-width':'2','class':'burst-ring'});
+    gBurst.appendChild(br);
+    setTimeout(()=>gBurst.contains(br)&&gBurst.removeChild(br),900);
+  }
+}
+
+// ── Active node highlight ─────────────────────────────────────────────
+function refreshActiveNode(prev=null){
+  Object.keys(S).forEach(id=>{
+    const ring=document.getElementById(`r-${id}`);
+    const circ=document.getElementById(`c-${id}`);
+    if(ring){ring.setAttribute('opacity','0');ring.classList.remove('pulse-ring');}
+    if(circ)circ.setAttribute('stroke-width','1.8');
+  });
+  const ring=document.getElementById(`r-${cur}`);
+  const circ=document.getElementById(`c-${cur}`);
+  if(ring){ring.setAttribute('opacity','1');ring.classList.add('pulse-ring');}
+  if(circ)circ.setAttribute('stroke-width','2.8');
+
+  document.getElementById('s-label').textContent=S[cur].lbl;
+  const dot=document.getElementById('s-dot');
+  const cmap={normal:'#00aaff',goal:'#00ff9f',trap:'#ff2d55'};
+  const c=cmap[S[cur].type];
+  dot.style.background=c;dot.style.boxShadow=`0 0 8px ${c}`;
+}
+
+// ── Q-Table ───────────────────────────────────────────────────────────
+function buildQTable(){
+  const tb=document.getElementById('qt-body');tb.innerHTML='';
+  Object.entries(Q).forEach(([sid,acts])=>{
+    const maxQ=Math.max(...Object.values(acts));
+    Object.entries(acts).forEach(([act,q])=>{
+      const best=q===maxQ,active=sid===cur;
+      const bw=Math.round(((q+6)/17)*100);
+      const tr=document.createElement('tr');
+      if(active)tr.className='cur';
+      tr.innerHTML=`<td style="font-size:9px;color:${active?'var(--cyan)':'var(--dim)'}">${sid}</td>
+        <td style="font-size:9px">${best?'<span style="color:var(--gold)">★ </span>':''}${act}</td>
+        <td><div style="font-family:Orbitron;font-size:9px">${q.toFixed(1)}</div>
+        <div class="qbar"><div class="qbar-fill${best?' best':''}" style="width:${bw}%"></div></div></td>`;
+      tb.appendChild(tr);
+    });
+    const sp=document.createElement('tr');
+    sp.innerHTML='<td colspan="3" style="padding:1px 0"></td>';
+    tb.appendChild(sp);
+  });
+}
+
+// ── Action area ───────────────────────────────────────────────────────
+function refreshActions(){
+  const area=document.getElementById('act-area');
+  const sb=document.getElementById('btn-step');
+  const acts=T[cur];
+  if(!acts||acts.length===0){
+    const type=S[cur].type;
+    area.innerHTML=`<div class="terminal-lbl ${type}">${type==='goal'?'✓ GOAL REACHED':'✗ TRAP HIT'} — Episode Complete</div>`;
+    sb.disabled=true;return;
+  }
+  sb.disabled=animating;
+  area.innerHTML=acts.map(a=>{
+    const qv=Q[cur]?.[a.a]?.toFixed(1)??'—';
+    return`<button class="act-btn" onclick="takeAction('${a.a}')">${a.a}<span class="qv">Q = ${qv}</span></button>`;
+  }).join('');
+}
+
+// ── MDP Logic ─────────────────────────────────────────────────────────
+function pickAction(state){
+  const acts=T[state];if(!acts||!acts.length)return null;
+  if(greedy&&Q[state]&&Math.random()>.15){
+    let best=null,bq=-Infinity;
+    Object.entries(Q[state]).forEach(([a,q])=>{if(q>bq){bq=q;best=a;}});
+    return best;
+  }
+  return acts[Math.floor(Math.random()*acts.length)].a;
+}
+
+function sampleOutcome(state,action){
+  const adef=T[state].find(x=>x.a===action);if(!adef)return null;
+  let r=Math.random(),cum=0;
+  for(const o of adef.out){cum+=o.p;if(r<=cum)return o;}
+  return adef.out[adef.out.length-1];
+}
+
+function takeAction(action){
+  if(animating)return;
+  const acts=T[cur];if(!acts||!acts.length)return;
+  animating=true;
+  document.getElementById('btn-step').disabled=true;
+
+  const outcome=sampleOutcome(cur,action);if(!outcome){animating=false;return;}
+  const from=cur,to=outcome.to,r=outcome.r;
+  const edgeDef=EDGES.find(e=>e.from===from&&e.to===to&&e.a===action);
+  const pathEl=edgeDef?document.getElementById(edgeDef.id):null;
+  const dur=Math.min(delay*.72,680);
+
+  animateAlongPath(pathEl,dur,()=>{
+    cur=to;totR+=r;lastR=r;steps++;
+    if(S[to].type==='goal')wins++;
+
+    // UI updates
+    const mTotal=document.getElementById('m-total');
+    mTotal.textContent=totR>0?'+'+totR:totR;
+    mTotal.className='metric-val'+(totR>0?' pos':totR<0?' neg':'');
+    const mLast=document.getElementById('m-last');
+    mLast.textContent=(r>0?'+':'')+r;
+    mLast.className='metric-val'+(r>0?' pos':r<0?' neg':'');
+    document.getElementById('m-wins').textContent=wins;
+    document.getElementById('st-num').textContent=steps;
+
+    if(r!==0)showRewardFX(r,S[to].x,S[to].y);
+    addLog(from,action,to,r);
+    refreshActiveNode(from);
+    buildQTable();
+    refreshActions();
+    animating=false;
+
+    if(autoOn){
+      const done=!T[cur]||!T[cur].length;
+      if(done){setTimeout(()=>{resetEp();if(autoOn)schedAuto();},delay);}
+      else schedAuto();
+    }
+  });
+}
+
+function stepOnce(){const a=pickAction(cur);if(a)takeAction(a);}
+
+function schedAuto(){
+  if(!autoOn)return;
+  autoTimer=setTimeout(()=>{
+    if(!autoOn)return;
+    if(!T[cur]||!T[cur].length){resetEp();if(autoOn)schedAuto();}
+    else stepOnce();
+  },delay);
+}
+
+function toggleAuto(){
+  autoOn=!autoOn;
+  document.getElementById('btn-auto').classList.toggle('on',autoOn);
+  if(autoOn)schedAuto();else clearTimeout(autoTimer);
+}
+
+function resetEp(){
+  clearTimeout(autoTimer);
+  cur='S0';totR=0;lastR=null;steps=0;episodes++;animating=false;
+  document.getElementById('ep-num').textContent=episodes;
+  document.getElementById('st-num').textContent='0';
+  document.getElementById('m-total').textContent='0';
+  document.getElementById('m-total').className='metric-val';
+  document.getElementById('m-last').textContent='—';
+  document.getElementById('m-last').className='metric-val';
+  refreshAgent();refreshActiveNode();buildQTable();refreshActions();
+  if(autoOn)schedAuto();
+}
+
+function addLog(from,action,to,r){
+  const wrap=document.getElementById('log');
+  const div=document.createElement('div');div.className='log-item';
+  const rc=r>0?'rp':r<0?'rn':'';
+  div.innerHTML=`${from}→${to} <em style="color:var(--dim)">${action}</em>`+
+    (r!==0?` <span class="${rc}">${r>0?'+':''}${r}</span>`:'');
+  wrap.insertBefore(div,wrap.firstChild);
+  while(wrap.children.length>15)wrap.removeChild(wrap.lastChild);
+}
+
+function setSpeed(v){
+  delay=parseInt(v);
+  const x=(2500-v)/1000;
+  document.getElementById('spd-lbl').textContent=x.toFixed(1)+'×';
+}
+
+function togglePolicy(){
+  greedy=!greedy;
+  const b=document.getElementById('btn-pol');
+  b.textContent=greedy?'ε-GREEDY':'RANDOM';
+  b.classList.toggle('on',greedy);
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────
+buildSVG();
+</script>
+</body>
+</html>

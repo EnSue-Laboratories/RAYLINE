@@ -536,6 +536,9 @@ ipcMain.handle("gh-checkout-pr", (_e, repo, prNumber) => ghManager.checkoutPR(re
 ipcMain.handle("gh-close-issue", (_e, repo, number) => ghManager.closeIssue(repo, number));
 ipcMain.handle("gh-merge-pr", (_e, repo, number) => ghManager.mergePR(repo, number));
 ipcMain.handle("gh-reopen-issue", (_e, repo, number) => ghManager.reopenIssue(repo, number));
+ipcMain.handle("gh-create-issue", (_e, repo, title, body) => ghManager.createIssue(repo, title, body));
+ipcMain.handle("gh-create-pr", (_e, repo, title, body, head, base) => ghManager.createPR(repo, title, body, head, base));
+ipcMain.handle("gh-list-branches", (_e, repo) => ghManager.listBranches(repo));
 
 ipcMain.handle("gh-load-pm-state", async () => {
   try {

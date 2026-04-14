@@ -181,6 +181,32 @@ async function reopenIssue(repo, number) {
   return JSON.parse(raw);
 }
 
+async function createIssue(repo, title, body) {
+  const args = ["api", `/repos/${repo}/issues`, "-f", `title=${title}`];
+  if (body) args.push("-f", `body=${body}`);
+  const raw = await gh(args);
+  return JSON.parse(raw);
+}
+
+async function createPR(repo, title, body, head, base) {
+  const args = [
+    "pr", "create",
+    "-R", repo,
+    "--title", title,
+    "--head", head,
+    "--base", base || "main",
+  ];
+  if (body) args.push("--body", body);
+  const raw = await gh(args);
+  // gh pr create outputs the PR URL, not JSON
+  return { url: raw };
+}
+
+async function listBranches(repo) {
+  const raw = await gh(["api", `/repos/${repo}/branches?per_page=100`]);
+  return JSON.parse(raw);
+}
+
 module.exports = {
   checkAuth,
   listUserRepos,
@@ -197,4 +223,7 @@ module.exports = {
   closeIssue,
   mergePR,
   reopenIssue,
+  createIssue,
+  createPR,
+  listBranches,
 };
