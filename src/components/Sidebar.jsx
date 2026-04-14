@@ -31,49 +31,42 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Drag region for window dragging — clears traffic lights */}
-      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0 }} />
-
-      {/* Header — close button */}
-      <div
-        style={{
-          padding: "0 20px 10px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-start",
-          WebkitAppRegion: "no-drag",
-        }}
-      >
+      {/* Drag region + collapse button */}
+      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0, position: "relative" }}>
         <button
           onClick={onToggleSidebar}
           style={{
+            position: "absolute",
+            top: 16,
+            right: 16,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 28,
-            height: 28,
-            borderRadius: 7,
-            background: "rgba(255,255,255,0.02)",
-            border: "1px solid rgba(255,255,255,0.04)",
-            color: "rgba(255,255,255,0.5)",
+            width: 24,
+            height: 24,
+            borderRadius: 6,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            color: "rgba(255,255,255,0.4)",
             cursor: "pointer",
             transition: "all .2s",
+            WebkitAppRegion: "no-drag",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.75)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+            e.currentTarget.style.color = "rgba(255,255,255,0.7)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.5)";
+            e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+            e.currentTarget.style.color = "rgba(255,255,255,0.4)";
           }}
         >
-          <X size={14} strokeWidth={1.5} />
+          <X size={12} strokeWidth={1.5} />
         </button>
       </div>
 
       {/* Menu items */}
-      <div style={{ padding: "0 12px 14px", display: "flex", flexDirection: "column", gap: 1, WebkitAppRegion: "no-drag" }}>
+      <div style={{ padding: "0 12px 14px", display: "flex", flexDirection: "column", gap: 2, WebkitAppRegion: "no-drag" }}>
         <button
           onClick={onNew}
           style={{
