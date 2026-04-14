@@ -365,8 +365,8 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           <>
             {/* Merge (PR only, open) */}
             {type === "pr" && isOpen && (
-              <button onClick={handleMerge} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(160,120,255,0.8)", borderColor: "rgba(160,120,255,0.2)" }}>
-                <GitMerge size={11} strokeWidth={1.5} />
+              <button onClick={handleMerge} disabled={actionLoading} style={smallBtnStyle}>
+                <GitMerge size={11} strokeWidth={1.5} color="rgba(160,120,255,0.8)" />
                 {actionLoading ? "Merging..." : "Merge"}
               </button>
             )}
