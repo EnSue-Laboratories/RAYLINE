@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { PanelLeft, ArrowRight, Square, Terminal as TerminalIcon } from "lucide-react";
+import { PanelLeftOpen, ArrowRight, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import ModelPicker from "./ModelPicker";
@@ -202,26 +202,26 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           onClick={onToggleSidebar}
           style={{
             position: "fixed",
-            top: 48,
-            left: 12,
+            top: 16,
+            left: 16,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 36,
-            height: 36,
-            borderRadius: 8,
+            width: 24,
+            height: 24,
+            borderRadius: 6,
             background: "rgba(255,255,255,0.04)",
             border: "1px solid rgba(255,255,255,0.06)",
-            color: "rgba(255,255,255,0.5)",
+            color: "rgba(255,255,255,0.4)",
             cursor: "pointer",
             transition: "all .2s",
             zIndex: 100,
             WebkitAppRegion: "no-drag",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
         >
-          <PanelLeft size={16} strokeWidth={1.5} />
+          <PanelLeftOpen size={14} strokeWidth={1.5} />
         </button>
       )}
 
