@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { ArrowLeft, GitBranch, UserPlus, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowLeft, GitBranch, Plus, Check, X, GitMerge, ExternalLink } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CommentBox from "./CommentBox";
@@ -17,6 +17,22 @@ function timeAgo(dateStr) {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+const smallBtnStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  background: "rgba(255,255,255,0.05)",
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 6,
+  padding: "4px 10px",
+  cursor: "pointer",
+  color: "rgba(255,255,255,0.55)",
+  fontSize: 11,
+  fontFamily: "'JetBrains Mono', monospace",
+  letterSpacing: ".04em",
+  transition: "all .15s",
+};
+
 export default function ItemDetail({ repo, number, type, onBack }) {
   const [item, setItem] = useState(null);
   const [comments, setComments] = useState([]);
@@ -25,6 +41,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
   const [error, setError] = useState(null);
   const [showAssignMenu, setShowAssignMenu] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const fetchAll = () => {
     setLoading(true);
@@ -68,28 +85,44 @@ export default function ItemDetail({ repo, number, type, onBack }) {
     setItem(updatedItem);
   };
 
+  const handleClose = async () => {
+    setActionLoading(true);
+    try {
+      const updated = await window.ghApi.closeIssue(repo, number);
+      setItem(updated);
+    } catch {}
+    setActionLoading(false);
+  };
+
+  const handleReopen = async () => {
+    setActionLoading(true);
+    try {
+      const updated = await window.ghApi.reopenIssue(repo, number);
+      setItem(updated);
+    } catch {}
+    setActionLoading(false);
+  };
+
+  const handleMerge = async () => {
+    setActionLoading(true);
+    try {
+      await window.ghApi.mergePR(repo, number);
+      const updated = await window.ghApi.getPR(repo, number);
+      setItem(updated);
+    } catch {}
+    setActionLoading(false);
+  };
+
   const refreshComments = async () => {
     try {
       const updated = await window.ghApi.listComments(repo, number);
       setComments(updated);
-    } catch (e) {
-      // silent
-    }
+    } catch {}
   };
 
   if (loading) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100%",
-          color: "rgba(255,255,255,0.4)",
-          fontSize: 13,
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "rgba(255,255,255,0.4)", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>
         Loading...
       </div>
     );
@@ -97,51 +130,11 @@ export default function ItemDetail({ repo, number, type, onBack }) {
 
   if (error) {
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100%",
-          gap: 12,
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
-        <div style={{ color: "rgba(255,100,100,0.8)", fontSize: 13 }}>
-          {error}
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, fontFamily: "system-ui, sans-serif" }}>
+        <div style={{ color: "rgba(255,100,100,0.8)", fontSize: 13 }}>{error}</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={fetchAll}
-            style={{
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 6,
-              padding: "6px 14px",
-              cursor: "pointer",
-              color: "rgba(255,255,255,0.7)",
-              fontSize: 12,
-              fontFamily: "'JetBrains Mono', monospace",
-            }}
-          >
-            Retry
-          </button>
-          <button
-            onClick={onBack}
-            style={{
-              background: "none",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 6,
-              padding: "6px 14px",
-              cursor: "pointer",
-              color: "rgba(255,255,255,0.5)",
-              fontSize: 12,
-              fontFamily: "'JetBrains Mono', monospace",
-            }}
-          >
-            Back
-          </button>
+          <button onClick={fetchAll} style={smallBtnStyle}>Retry</button>
+          <button onClick={onBack} style={{ ...smallBtnStyle, background: "none" }}>Back</button>
         </div>
       </div>
     );
@@ -149,15 +142,18 @@ export default function ItemDetail({ repo, number, type, onBack }) {
 
   const stateBadge = () => {
     if (type === "pr" && item.merged_at) {
-      return { label: "Merged", bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
+      return { label: "MERGED", bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
     }
     if (item.state === "closed") {
-      return { label: "Closed", bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
+      return { label: "CLOSED", bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
     }
-    return { label: "Open", bg: "rgba(80,200,120,0.15)", color: "rgba(120,230,150,0.9)" };
+    return { label: "OPEN", bg: "rgba(80,200,120,0.15)", color: "rgba(120,230,150,0.9)" };
   };
 
   const badge = stateBadge();
+  const ghUrl = `https://github.com/${repo}/${type === "pr" ? "pull" : "issues"}/${number}`;
+  const isOpen = item.state === "open";
+  const isMerged = type === "pr" && !!item.merged_at;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "auto" }}>
@@ -165,92 +161,61 @@ export default function ItemDetail({ repo, number, type, onBack }) {
       <button
         onClick={onBack}
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: "rgba(255,255,255,0.5)",
-          fontSize: 13,
-          fontFamily: "system-ui, sans-serif",
-          padding: "16px 20px",
+          display: "flex", alignItems: "center", gap: 6,
+          background: "none", border: "none", cursor: "pointer",
+          color: "rgba(255,255,255,0.5)", fontSize: 13,
+          fontFamily: "system-ui, sans-serif", padding: "16px 20px",
           transition: "color .15s",
         }}
       >
-        <ArrowLeft size={16} strokeWidth={1.5} /> Back
+        <ArrowLeft size={14} strokeWidth={1.5} /> Back
       </button>
 
       <div style={{ padding: "0 20px 20px" }}>
-        {/* Title section */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 6 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <span
-                style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 14,
-                  color: "rgba(255,255,255,0.35)",
-                }}
-              >
-                #{number}
-              </span>
-              <span
-                style={{
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: "rgba(255,255,255,0.95)",
-                  fontFamily: "system-ui, sans-serif",
-                }}
-              >
-                {item.title}
-              </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  letterSpacing: ".04em",
-                  padding: "2px 8px",
-                  borderRadius: 10,
-                  background: badge.bg,
-                  color: badge.color,
-                }}
-              >
-                {badge.label}
-              </span>
-            </div>
-            <div
+        {/* Title — clickable link to GitHub */}
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: "rgba(255,255,255,0.35)" }}>
+              #{number}
+            </span>
+            <a
+              href={ghUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               style={{
-                fontSize: 12,
-                color: "rgba(255,255,255,0.35)",
-                fontFamily: "system-ui, sans-serif",
-                marginTop: 4,
+                fontSize: 18, fontWeight: 600, color: "rgba(255,255,255,0.95)",
+                fontFamily: "system-ui, sans-serif", textDecoration: "none",
+                transition: "color .15s", cursor: "pointer",
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(140,180,255,0.95)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.95)"; }}
             >
-              {repo} &middot; by {item.user?.login} &middot; opened {timeAgo(item.created_at)}
-            </div>
+              {item.title}
+            </a>
+            <span style={{
+              fontSize: 10, fontFamily: "'JetBrains Mono', monospace",
+              letterSpacing: ".06em", padding: "2px 8px", borderRadius: 10,
+              background: badge.bg, color: badge.color,
+            }}>
+              {badge.label}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "system-ui, sans-serif", marginTop: 4 }}>
+            {repo} &middot; by {item.user?.login} &middot; opened {timeAgo(item.created_at)}
           </div>
         </div>
 
         {/* Labels */}
         {item.labels && item.labels.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
             {item.labels.map((label) => {
               const hex = `#${label.color}`;
               return (
-                <span
-                  key={label.id || label.name}
-                  style={{
-                    fontSize: 11,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    letterSpacing: ".03em",
-                    padding: "2px 8px",
-                    borderRadius: 10,
-                    background: `${hex}33`,
-                    color: hex,
-                    border: `1px solid ${hex}44`,
-                  }}
-                >
+                <span key={label.id || label.name} style={{
+                  fontSize: 10, fontFamily: "'JetBrains Mono', monospace",
+                  letterSpacing: ".03em", padding: "2px 8px", borderRadius: 10,
+                  background: `${hex}33`, color: hex, border: `1px solid ${hex}44`,
+                }}>
                   {label.name}
                 </span>
               );
@@ -258,112 +223,58 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           </div>
         )}
 
-        {/* Assignees */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginTop: 14,
-            fontSize: 12,
-            color: "rgba(255,255,255,0.4)",
-            fontFamily: "system-ui, sans-serif",
-            position: "relative",
-          }}
-        >
-          <span>Assignees:</span>
+        {/* Assignees — compact with + button */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, marginTop: 12,
+          fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui, sans-serif",
+          position: "relative",
+        }}>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Assignees:</span>
           {item.assignees && item.assignees.length > 0 ? (
             item.assignees.map((a) => (
-              <div
-                key={a.login}
-                style={{ display: "flex", alignItems: "center", gap: 4 }}
-              >
-                <img
-                  src={a.avatar_url}
-                  alt={a.login}
-                  style={{ width: 24, height: 24, borderRadius: 12 }}
-                />
-                <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
-                  {a.login}
-                </span>
+              <div key={a.login} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <img src={a.avatar_url} alt={a.login} style={{ width: 20, height: 20, borderRadius: 10 }} />
+                <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{a.login}</span>
               </div>
             ))
           ) : (
-            <span style={{ fontStyle: "italic" }}>None</span>
+            <span style={{ fontStyle: "italic", fontSize: 11 }}>None</span>
           )}
           <button
             onClick={() => setShowAssignMenu((v) => !v)}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 6,
-              padding: "3px 10px",
-              cursor: "pointer",
-              color: "rgba(255,255,255,0.5)",
-              fontSize: 11,
-              fontFamily: "'JetBrains Mono', monospace",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 20, height: 20, borderRadius: 10,
+              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
+              cursor: "pointer", color: "rgba(255,255,255,0.4)", padding: 0,
+              transition: "all .15s",
             }}
           >
-            <UserPlus size={12} strokeWidth={1.5} /> Assign
+            <Plus size={11} strokeWidth={2} />
           </button>
 
-          {/* Assign dropdown */}
           {showAssignMenu && (
-            <div
-              style={{
-                position: "absolute",
-                top: "100%",
-                left: 60,
-                marginTop: 4,
-                background: "#111",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 8,
-                padding: "4px 0",
-                minWidth: 180,
-                zIndex: 100,
-                maxHeight: 220,
-                overflowY: "auto",
-              }}
-            >
+            <div style={{
+              position: "absolute", top: "100%", left: 60, marginTop: 4,
+              background: "rgba(15,15,15,0.95)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 8, padding: "4px 0", minWidth: 180, zIndex: 100,
+              maxHeight: 220, overflowY: "auto", backdropFilter: "blur(20px)",
+            }}>
               {collaborators.map((c) => {
-                const isAssigned = item.assignees?.some(
-                  (a) => a.login === c.login
-                );
+                const isAssigned = item.assignees?.some((a) => a.login === c.login);
                 return (
                   <button
-                    key={c.login}
-                    onClick={() => handleToggleAssign(c.login)}
+                    key={c.login} onClick={() => handleToggleAssign(c.login)}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      width: "100%",
-                      background: "none",
-                      border: "none",
-                      padding: "6px 12px",
-                      cursor: "pointer",
-                      color: "rgba(255,255,255,0.7)",
-                      fontSize: 12,
-                      fontFamily: "system-ui, sans-serif",
-                      textAlign: "left",
+                      display: "flex", alignItems: "center", gap: 8, width: "100%",
+                      background: "none", border: "none", padding: "6px 12px",
+                      cursor: "pointer", color: "rgba(255,255,255,0.7)", fontSize: 12,
+                      fontFamily: "system-ui, sans-serif", textAlign: "left",
                     }}
                   >
-                    <img
-                      src={c.avatar_url}
-                      alt={c.login}
-                      style={{ width: 20, height: 20, borderRadius: 10 }}
-                    />
+                    <img src={c.avatar_url} alt={c.login} style={{ width: 18, height: 18, borderRadius: 9 }} />
                     <span style={{ flex: 1 }}>{c.login}</span>
-                    {isAssigned && (
-                      <Check
-                        size={14}
-                        strokeWidth={2}
-                        style={{ color: "rgba(120,230,150,0.8)" }}
-                      />
-                    )}
+                    {isAssigned && <Check size={12} strokeWidth={2} style={{ color: "rgba(120,230,150,0.8)" }} />}
                   </button>
                 );
               })}
@@ -371,102 +282,101 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           )}
         </div>
 
-        {/* Checkout button (PR only) */}
-        {type === "pr" && (
-          <button
-            onClick={async () => {
-              setCheckingOut(true);
-              try {
-                await window.ghApi.checkoutPR(repo, number);
-              } catch (e) {
-                // silent
-              }
-              setCheckingOut(false);
-            }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 6,
-              padding: "6px 14px",
-              cursor: "pointer",
-              color: "rgba(255,255,255,0.7)",
-              fontSize: 12,
-              fontFamily: "'JetBrains Mono', monospace",
-              letterSpacing: ".04em",
-              transition: "all .15s",
-              margin: "12px 0",
-            }}
-          >
-            <GitBranch size={14} strokeWidth={1.5} />
-            {checkingOut ? "Checking out..." : "Checkout"}
-          </button>
-        )}
+        {/* Action buttons row */}
+        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          {/* Checkout (PR only) */}
+          {type === "pr" && !isMerged && (
+            <button
+              onClick={async () => {
+                setCheckingOut(true);
+                try { await window.ghApi.checkoutPR(repo, number); } catch {}
+                setCheckingOut(false);
+              }}
+              style={smallBtnStyle}
+            >
+              <GitBranch size={11} strokeWidth={1.5} />
+              {checkingOut ? "Checking out..." : "Checkout"}
+            </button>
+          )}
 
-        {/* Body */}
+          {/* Merge (PR only, open) */}
+          {type === "pr" && isOpen && (
+            <button onClick={handleMerge} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(160,120,255,0.8)", borderColor: "rgba(160,120,255,0.2)" }}>
+              <GitMerge size={11} strokeWidth={1.5} />
+              {actionLoading ? "Merging..." : "Merge"}
+            </button>
+          )}
+
+          {/* Close (issue or open PR) */}
+          {isOpen && !isMerged && (
+            <button onClick={handleClose} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(248,81,73,0.7)", borderColor: "rgba(248,81,73,0.15)" }}>
+              <X size={11} strokeWidth={1.5} />
+              {actionLoading ? "Closing..." : "Close"}
+            </button>
+          )}
+
+          {/* Reopen (closed, not merged) */}
+          {!isOpen && !isMerged && (
+            <button onClick={handleReopen} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(120,230,150,0.8)", borderColor: "rgba(120,230,150,0.15)" }}>
+              {actionLoading ? "Reopening..." : "Reopen"}
+            </button>
+          )}
+
+          {/* Open in GitHub */}
+          <a href={ghUrl} target="_blank" rel="noopener noreferrer" style={{ ...smallBtnStyle, textDecoration: "none" }}>
+            <ExternalLink size={11} strokeWidth={1.5} /> GitHub
+          </a>
+        </div>
+
+        {/* Body — suppress list-style bullets before titles */}
         <div
           style={{
-            marginTop: 16,
-            paddingTop: 16,
+            marginTop: 16, paddingTop: 16,
             borderTop: "1px solid rgba(255,255,255,0.06)",
-            color: "rgba(255,255,255,0.75)",
-            fontSize: 13,
-            lineHeight: 1.7,
-            fontFamily: "system-ui, sans-serif",
+            color: "rgba(255,255,255,0.75)", fontSize: 13,
+            lineHeight: 1.7, fontFamily: "system-ui, sans-serif",
           }}
-          className="item-detail-markdown"
         >
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              ul: ({ children }) => <ul style={{ listStyle: "disc", paddingLeft: 20, margin: "8px 0" }}>{children}</ul>,
+              ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "8px 0" }}>{children}</ol>,
+              li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
+              a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(140,180,255,0.9)", textDecoration: "none" }}>{children}</a>,
+              p: ({ children }) => <p style={{ margin: "8px 0" }}>{children}</p>,
+              h1: ({ children }) => <h1 style={{ fontSize: 20, fontWeight: 600, margin: "16px 0 8px", color: "rgba(255,255,255,0.9)" }}>{children}</h1>,
+              h2: ({ children }) => <h2 style={{ fontSize: 17, fontWeight: 600, margin: "14px 0 6px", color: "rgba(255,255,255,0.85)" }}>{children}</h2>,
+              h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 600, margin: "12px 0 4px", color: "rgba(255,255,255,0.85)" }}>{children}</h3>,
+              code: ({ inline, children }) => inline
+                ? <code style={{ background: "rgba(255,255,255,0.06)", padding: "1px 5px", borderRadius: 4, fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{children}</code>
+                : <pre style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 6, padding: 12, overflowX: "auto", margin: "8px 0" }}><code style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{children}</code></pre>,
+            }}
+          >
             {item.body || ""}
           </ReactMarkdown>
         </div>
 
         {/* Comments */}
         <div style={{ marginTop: 24 }}>
-          <div
-            style={{
-              fontSize: 12,
-              color: "rgba(255,255,255,0.35)",
-              fontFamily: "'JetBrains Mono', monospace",
-              letterSpacing: ".04em",
-              marginBottom: 12,
-            }}
-          >
-            {comments.length} comment{comments.length !== 1 ? "s" : ""}
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em", marginBottom: 12 }}>
+            {comments.length} COMMENT{comments.length !== 1 ? "S" : ""}
           </div>
           {comments.map((comment) => (
-            <div
-              key={comment.id}
-              style={{
-                borderTop: "1px solid rgba(255,255,255,0.04)",
-                paddingTop: 12,
-                marginBottom: 12,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "rgba(255,255,255,0.4)",
-                  fontFamily: "system-ui, sans-serif",
-                  marginBottom: 6,
-                }}
-              >
-                <span style={{ color: "rgba(255,255,255,0.6)" }}>
-                  {comment.user?.login}
-                </span>{" "}
-                &middot; {timeAgo(comment.created_at)}
+            <div key={comment.id} style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui, sans-serif", marginBottom: 6 }}>
+                <span style={{ color: "rgba(255,255,255,0.6)" }}>{comment.user?.login}</span> &middot; {timeAgo(comment.created_at)}
               </div>
-              <div
-                style={{
-                  color: "rgba(255,255,255,0.7)",
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  fontFamily: "system-ui, sans-serif",
-                }}
-              >
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, lineHeight: 1.6, fontFamily: "system-ui, sans-serif" }}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    ul: ({ children }) => <ul style={{ listStyle: "disc", paddingLeft: 20, margin: "6px 0" }}>{children}</ul>,
+                    ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "6px 0" }}>{children}</ol>,
+                    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(140,180,255,0.9)", textDecoration: "none" }}>{children}</a>,
+                    p: ({ children }) => <p style={{ margin: "6px 0" }}>{children}</p>,
+                  }}
+                >
                   {comment.body || ""}
                 </ReactMarkdown>
               </div>
