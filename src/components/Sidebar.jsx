@@ -46,19 +46,17 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             width: SIDEBAR_TOGGLE_SIZE,
             height: SIDEBAR_TOGGLE_SIZE,
             borderRadius: 6,
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            background: "none",
+            border: "none",
             color: "rgba(255,255,255,0.4)",
             cursor: "pointer",
             transition: "all .2s",
             WebkitAppRegion: "no-drag",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
             e.currentTarget.style.color = "rgba(255,255,255,0.7)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.04)";
             e.currentTarget.style.color = "rgba(255,255,255,0.4)";
           }}
         >
