@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { Plus, Search, Trash2, X, FolderOpen, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon } from "lucide-react";
 
 function GitHubIcon({ size = 12 }) {
   return (
@@ -61,7 +61,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             e.currentTarget.style.color = "rgba(255,255,255,0.4)";
           }}
         >
-          <X size={12} strokeWidth={1.5} />
+          <PanelLeftClose size={14} strokeWidth={1.5} />
         </button>
       </div>
 
