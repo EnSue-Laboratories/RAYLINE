@@ -48,6 +48,25 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
       setIssues([]);
       setLoading(false);
     }
+    // Auto-refresh every 30s (silent, no loading spinner)
+    if (repos.length > 0) {
+      const interval = setInterval(async () => {
+        try {
+          const targetRepos = repoFilter ? [repoFilter] : repos;
+          const results = await Promise.all(
+            targetRepos.map(async (repo) => {
+              const items = await window.ghApi.listIssues(repo, stateFilter);
+              return items.map((item) => ({ ...item, _repo: repo }));
+            })
+          );
+          const merged = results.flat().sort(
+            (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+          );
+          setIssues(merged);
+        } catch {}
+      }, 30000);
+      return () => clearInterval(interval);
+    }
   }, [repos, stateFilter, repoFilter]);
 
   if (loading) {

@@ -48,6 +48,24 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem })
       setPrs([]);
       setLoading(false);
     }
+    if (repos.length > 0) {
+      const interval = setInterval(async () => {
+        try {
+          const targetRepos = repoFilter ? [repoFilter] : repos;
+          const results = await Promise.all(
+            targetRepos.map(async (repo) => {
+              const items = await window.ghApi.listPRs(repo, stateFilter);
+              return items.map((item) => ({ ...item, _repo: repo }));
+            })
+          );
+          const merged = results.flat().sort(
+            (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+          );
+          setPrs(merged);
+        } catch {}
+      }, 30000);
+      return () => clearInterval(interval);
+    }
   }, [repos, stateFilter, repoFilter]);
 
   if (loading) {
