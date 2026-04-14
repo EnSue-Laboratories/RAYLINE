@@ -129,6 +129,7 @@ export default function ProjectManager() {
   const [showAddRepo, setShowAddRepo] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
   const [wallpaper, setWallpaper] = useState(null);
+  const [stateLoaded, setStateLoaded] = useState(false);
 
   useEffect(() => {
     window.ghApi.checkAuth().then(({ ok }) => setAuthOk(ok));
@@ -140,11 +141,12 @@ export default function ProjectManager() {
           if (dataUrl) setWallpaper((prev) => prev ? { ...prev, dataUrl } : prev);
         });
       }
+      setStateLoaded(true);
     });
   }, []);
 
   useEffect(() => {
-    if (authOk !== null) {
+    if (stateLoaded) {
       window.ghApi.savePmState({ repos });
     }
   }, [repos]);
