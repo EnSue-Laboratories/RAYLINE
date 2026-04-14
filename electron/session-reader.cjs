@@ -3,6 +3,8 @@ const path = require("path");
 const os = require("os");
 
 const CLAUDE_DIR = path.join(os.homedir(), ".claude");
+const CODEX_DIR = path.join(os.homedir(), ".codex");
+const MAX_MESSAGES = 50; // max user+assistant message pairs to load
 
 function projectDirName(cwd) {
   return cwd.replace(/\//g, "-");
@@ -92,6 +94,105 @@ function findSessionCwd(sessionId) {
   return extractSessionCwdFromFile(found.filePath) || cwdFromProjectDir(found.projectDir);
 }
 
+function walkJsonlFiles(dir) {
+  const results = [];
+  if (!fs.existsSync(dir)) return results;
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...walkJsonlFiles(fullPath));
+      } else if (entry.name.endsWith(".jsonl")) {
+        results.push(fullPath);
+      }
+    }
+  } catch {}
+  return results;
+}
+
+function findCodexSessionFile(threadId) {
+  const sessionsDir = path.join(CODEX_DIR, "sessions");
+  const files = walkJsonlFiles(sessionsDir);
+  for (const filePath of files) {
+    if (path.basename(filePath).includes(threadId)) {
+      return filePath;
+    }
+  }
+  return null;
+}
+
+function loadCodexSessionMessages(filePath) {
+  const content = fs.readFileSync(filePath, "utf-8");
+  const lines = content.split("\n");
+  const messages = [];
+  let sessionCwd = null;
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let evt;
+    try { evt = JSON.parse(line); } catch { continue; }
+
+    if (evt.type === "session_meta" && evt.payload?.cwd) {
+      sessionCwd = evt.payload.cwd;
+      continue;
+    }
+
+    if (evt.type === "event_msg") continue;
+
+    if (evt.type === "response_item" && evt.payload?.role === "user") {
+      let text = "";
+      if (Array.isArray(evt.payload.content)) {
+        for (const block of evt.payload.content) {
+          if (block.type === "input_text" && block.text) {
+            text += block.text;
+          }
+        }
+      }
+      // Skip system injections
+      const trimmed = text.trim();
+      if (!trimmed || trimmed.startsWith("<") || trimmed.startsWith("#")) continue;
+
+      messages.push({
+        id: "u" + Date.now() + Math.random(),
+        role: "user",
+        text: trimmed,
+      });
+    } else if (
+      evt.type === "response_item" &&
+      evt.payload?.type === "message" &&
+      evt.payload?.role === "assistant"
+    ) {
+      let text = "";
+      if (Array.isArray(evt.payload.content)) {
+        for (const block of evt.payload.content) {
+          if (block.type === "output_text" && block.text) {
+            text += block.text;
+          }
+        }
+      }
+      if (text) {
+        const lastMsg = messages[messages.length - 1];
+        const part = { type: "text", text };
+        if (lastMsg && lastMsg.role === "assistant") {
+          lastMsg.parts.push(part);
+        } else {
+          messages.push({
+            id: "a" + Date.now() + Math.random(),
+            role: "assistant",
+            parts: [part],
+            isStreaming: false,
+            isThinking: false,
+          });
+        }
+      }
+    }
+  }
+
+  const result = messages.length > MAX_MESSAGES ? messages.slice(-MAX_MESSAGES) : messages;
+  return { messages: result, cwd: sessionCwd };
+}
+
 async function listSessions(cwd) {
   const projectDir = path.join(CLAUDE_DIR, "projects", projectDirName(cwd));
 
@@ -137,15 +238,62 @@ async function listSessions(cwd) {
     sessions.push({ id: sessionId, title, model, ts: stat.mtimeMs, cwd });
   }
 
+  // Scan Codex sessions
+  const codexSessionsDir = path.join(CODEX_DIR, "sessions");
+  const codexFiles = walkJsonlFiles(codexSessionsDir);
+  for (const codexFile of codexFiles) {
+    try {
+      const firstLine = fs.readFileSync(codexFile, "utf-8").split("\n")[0];
+      if (!firstLine.trim()) continue;
+      const meta = JSON.parse(firstLine);
+      if (meta.type !== "session_meta" || meta.payload?.cwd !== cwd) continue;
+
+      const threadId = meta.payload.id;
+      const stat = fs.statSync(codexFile);
+
+      // Find first user message for title
+      let title = "Untitled";
+      const content = fs.readFileSync(codexFile, "utf-8");
+      const allLines = content.split("\n").slice(0, 100);
+      for (const line of allLines) {
+        if (!line.trim()) continue;
+        let evt;
+        try { evt = JSON.parse(line); } catch { continue; }
+        if (evt.type === "response_item" && evt.payload?.role === "user") {
+          let text = "";
+          if (Array.isArray(evt.payload.content)) {
+            for (const block of evt.payload.content) {
+              if (block.type === "input_text" && block.text) {
+                text += block.text;
+              }
+            }
+          }
+          const trimmed = text.trim();
+          if (trimmed && !trimmed.startsWith("<") && !trimmed.startsWith("#")) {
+            title = trimmed.slice(0, 60);
+            break;
+          }
+        }
+      }
+
+      sessions.push({ id: threadId, title, model: null, ts: stat.mtimeMs, cwd, provider: "codex" });
+    } catch {}
+  }
+
   sessions.sort((a, b) => b.ts - a.ts);
   return sessions;
 }
 
-const MAX_MESSAGES = 50; // max user+assistant message pairs to load
-
 async function loadSessionMessages(sessionId) {
   const found = findSessionFile(sessionId);
-  if (!found) return { messages: [], cwd: null };
+  if (!found) {
+    // Fall back to Codex sessions
+    const codexFile = findCodexSessionFile(sessionId);
+    if (codexFile) {
+      return loadCodexSessionMessages(codexFile);
+    }
+    return { messages: [], cwd: null };
+  }
 
   const { filePath, projectDir } = found;
   const sessionCwd = extractSessionCwdFromFile(filePath) || cwdFromProjectDir(projectDir);
