@@ -172,6 +172,20 @@ export default function App() {
     }
   }, [activeData.isStreaming]);
 
+  // Capture Codex thread_id for session resume
+  useEffect(() => {
+    if (!active) return;
+    const data = getConversation(active);
+    if (data._codexThreadId) {
+      const convo = convoList.find(c => c.id === active);
+      if (convo && convo.sessionId !== data._codexThreadId) {
+        setConvoList((p) =>
+          p.map((c) => c.id === active ? { ...c, sessionId: data._codexThreadId } : c)
+        );
+      }
+    }
+  }, [active, conversations]);
+
   const handleSend = useCallback(
     async (text, attachments) => {
       // Handle slash commands client-side
@@ -254,6 +268,8 @@ export default function App() {
         resumeSessionId: isFirstMessage ? undefined : convo.sessionId,
         prompt: text,
         model: m.cliFlag,
+        provider: m.provider || "claude",
+        effort: m.effort,
         cwd: effectiveCwd,
         images: images?.length ? images : undefined,
         files: files?.length ? files : undefined,
@@ -294,6 +310,8 @@ export default function App() {
         messageIndex,
         newText,
         model: m.cliFlag,
+        provider: m.provider || "claude",
+        effort: m.effort,
         cwd: convoCwd,
       });
     },
