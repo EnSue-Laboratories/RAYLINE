@@ -37,8 +37,8 @@ export default function CommentBox({ repo, number, onCommentAdded, actions }) {
         }}
       />
       <div style={{ display: "flex", alignItems: "center", marginTop: 8, gap: 6 }}>
-        {actions}
         <div style={{ flex: 1 }} />
+        {actions}
         <button
           onClick={handleSubmit}
           disabled={!body.trim() || submitting}
