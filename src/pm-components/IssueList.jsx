@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Circle, CheckCircle2 } from "lucide-react";
+import { Circle, CheckCircle2, Copy } from "lucide-react";
 
 function timeAgo(dateStr) {
   const now = Date.now();
@@ -115,8 +115,8 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               cursor: "pointer",
               borderBottom: "1px solid rgba(255,255,255,0.03)",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; const b = e.currentTarget.querySelector(".copy-btn"); if (b) b.style.opacity = "1"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; const b = e.currentTarget.querySelector(".copy-btn"); if (b) b.style.opacity = "0"; }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {isOpen ? (
@@ -130,6 +130,22 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               <span style={{ color: "rgba(255,255,255,0.8)", fontFamily: "system-ui", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.title}
               </span>
+              <button
+                className="copy-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const url = `https://github.com/${item._repo}/issues/${item.number}`;
+                  navigator.clipboard.writeText(`#${item.number} ${item.title} ${url}`);
+                }}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "rgba(255,255,255,0.2)", padding: 2, flexShrink: 0,
+                  opacity: 0, transition: "opacity .15s",
+                }}
+              >
+                <Copy size={12} strokeWidth={1.5} />
+              </button>
               <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11, flexShrink: 0 }}>
                 {repoShort}
               </span>
