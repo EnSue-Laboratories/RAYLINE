@@ -345,21 +345,22 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            width: 22,
-            height: 22,
-            borderRadius: 5,
+            gap: 4,
             background: "none",
             border: "none",
             cursor: "pointer",
+            fontSize: s(8),
+            fontFamily: "'JetBrains Mono',monospace",
             color: "rgba(255,255,255,0.28)",
-            transition: "color .2s",
+            letterSpacing: ".08em",
             padding: 0,
+            transition: "color .2s",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.28)"; }}
         >
-          <GitHubIcon size={12} />
+          <GitHubIcon size={10} />
+          PROJECTS
         </button>
         <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.2)", letterSpacing: ".06em" }}>
           {convos.length} CHATS
