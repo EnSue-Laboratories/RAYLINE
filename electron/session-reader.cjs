@@ -86,12 +86,17 @@ async function listSessions(cwd) {
           if (evt.type === "user" || (evt.role === "user" && evt.type === "message")) {
             const text = evt.message?.content || evt.text || evt.display || "";
             if (typeof text === "string" && text.length > 0) {
-              title = text.slice(0, 60);
-              break;
+              if (!text.startsWith("Base directory for this skill:")) {
+                const cleaned = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
+                if (cleaned) { title = cleaned.slice(0, 60); break; }
+              }
             }
             if (Array.isArray(text)) {
-              const t = text.find((b) => b.type === "text");
-              if (t) { title = t.text.slice(0, 60); break; }
+              const t = text.find((b) => b.type === "text" && b.text && !b.text.startsWith("Base directory for this skill:"));
+              if (t) {
+                const cleaned = t.text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
+                if (cleaned) { title = cleaned.slice(0, 60); break; }
+              }
             }
           }
         } catch {}
@@ -137,7 +142,11 @@ async function loadSessionMessages(sessionId) {
           }
         }
       }
-      // Only add actual user messages (not tool results)
+      // Strip system-injected content (skill prompts, system-reminders)
+      if (text.startsWith("Base directory for this skill:")) text = "";
+      text = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
+
+      // Only add actual user messages (not tool results or system-injected content)
       if (text && !evt.message?.content?.some?.(b => b.type === "tool_result")) {
         messages.push({
           id: evt.uuid || "u" + Date.now() + Math.random(),
