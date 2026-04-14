@@ -7,6 +7,7 @@ const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-a
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
+const ghManager = require("./github-manager.cjs");
 
 const isDev = !app.isPackaged;
 const WALLPAPER_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
@@ -33,6 +34,7 @@ if (isDev && process.platform === "darwin") {
 }
 
 let mainWindow;
+let pmWindow;
 
 function getWallpaperStorageDir() {
   const dir = path.join(app.getPath("userData"), "wallpapers");
@@ -106,6 +108,43 @@ function createWindow() {
   }
 }
 
+function createProjectManagerWindow() {
+  if (pmWindow && !pmWindow.isDestroyed()) {
+    pmWindow.focus();
+    return;
+  }
+  pmWindow = new BrowserWindow({
+    title: "GitHub Projects",
+    width: 1000,
+    height: 700,
+    minWidth: 700,
+    minHeight: 500,
+    titleBarStyle: "hiddenInset",
+    trafficLightPosition: { x: 16, y: 18 },
+    backgroundColor: "#000000",
+    icon: path.join(__dirname, "../public/icon.png"),
+    webPreferences: {
+      preload: path.join(__dirname, "preload-pm.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  pmWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  if (isDev) {
+    const port = process.env.VITE_PORT || "5173";
+    pmWindow.loadURL(`http://localhost:${port}/src/project-manager.html`);
+  } else {
+    pmWindow.loadFile(path.join(__dirname, "../dist/src/project-manager.html"));
+  }
+
+  pmWindow.on("closed", () => { pmWindow = null; });
+}
+
 app.setName("Claudi");
 
 app.whenReady().then(() => {
@@ -156,6 +195,10 @@ ipcMain.handle("folder-pick", async () => {
     properties: ["openDirectory"],
   });
   return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.on("open-project-manager", () => {
+  createProjectManagerWindow();
 });
 
 // IPC: wallpaper image picker
@@ -464,6 +507,41 @@ ipcMain.handle("git-delete-branch", async (_event, cwd, branchName) => {
 ipcMain.handle("git-worktree-remove", async (_event, cwd, worktreePath) => {
   await git(["worktree", "remove", worktreePath], cwd);
   return { success: true };
+});
+
+// IPC: GitHub Project Manager
+ipcMain.handle("gh-check-auth", () => ghManager.checkAuth());
+ipcMain.handle("gh-list-user-repos", (_e, limit) => ghManager.listUserRepos(limit));
+ipcMain.handle("gh-list-issues", (_e, repo, state) => ghManager.listIssues(repo, state));
+ipcMain.handle("gh-list-prs", (_e, repo, state) => ghManager.listPRs(repo, state));
+ipcMain.handle("gh-get-issue", (_e, repo, number) => ghManager.getIssue(repo, number));
+ipcMain.handle("gh-get-pr", (_e, repo, number) => ghManager.getPR(repo, number));
+ipcMain.handle("gh-list-comments", (_e, repo, number) => ghManager.listComments(repo, number));
+ipcMain.handle("gh-add-comment", (_e, repo, number, body) => ghManager.addComment(repo, number, body));
+ipcMain.handle("gh-list-collaborators", (_e, repo) => ghManager.listCollaborators(repo));
+ipcMain.handle("gh-assign-issue", (_e, repo, number, assignees) => ghManager.assignIssue(repo, number, assignees));
+ipcMain.handle("gh-unassign-issue", (_e, repo, number, assignees) => ghManager.unassignIssue(repo, number, assignees));
+
+ipcMain.handle("gh-load-pm-state", async () => {
+  try {
+    if (fs.existsSync(stateFilePath)) {
+      const data = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+      return { repos: data.pmRepos || [] };
+    }
+  } catch {}
+  return { repos: [] };
+});
+
+ipcMain.handle("gh-save-pm-state", async (_e, pmState) => {
+  try {
+    let data = {};
+    if (fs.existsSync(stateFilePath)) {
+      data = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+    }
+    data.pmRepos = pmState.repos || [];
+    fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
+    return true;
+  } catch { return false; }
 });
 
 app.on("before-quit", () => {
