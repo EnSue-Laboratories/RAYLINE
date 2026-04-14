@@ -361,6 +361,8 @@ export default function ProjectManager() {
           overflow: "hidden",
           position: "relative",
           zIndex: 10,
+          background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
+          backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
         }}
       >
         {/* Traffic light spacer */}
