@@ -306,7 +306,18 @@ const stateFilePath = path.join(app.getPath("userData"), "claudi-state.json");
 
 ipcMain.handle("save-state", async (_event, state) => {
   try {
-    fs.writeFileSync(stateFilePath, JSON.stringify(state, null, 2));
+    // Preserve pmRepos from PM window (main app state doesn't include it)
+    let existing = {};
+    try {
+      if (fs.existsSync(stateFilePath)) {
+        existing = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+      }
+    } catch {}
+    const merged = { ...state };
+    if (existing.pmRepos !== undefined && state.pmRepos === undefined) {
+      merged.pmRepos = existing.pmRepos;
+    }
+    fs.writeFileSync(stateFilePath, JSON.stringify(merged, null, 2));
     return true;
   } catch (e) {
     console.error("Failed to save state:", e);
