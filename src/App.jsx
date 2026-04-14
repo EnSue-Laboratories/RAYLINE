@@ -458,6 +458,7 @@ export default function App() {
           cwd={activeConvo?.cwd || cwd}
           onPickFolder={handlePickFolder}
           onOpenSettings={() => setShowSettings(true)}
+          onOpenProjectManager={() => window.api?.openProjectManager()}
         />
       </div>
 

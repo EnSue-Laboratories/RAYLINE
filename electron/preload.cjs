@@ -70,4 +70,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("terminal-output", handler);
     return () => ipcRenderer.removeListener("terminal-output", handler);
   },
+
+  // Project Manager
+  openProjectManager: () => ipcRenderer.send("open-project-manager"),
 });

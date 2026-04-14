@@ -1,0 +1,25 @@
+const { contextBridge, ipcRenderer } = require("electron");
+
+contextBridge.exposeInMainWorld("ghApi", {
+  checkAuth: () => ipcRenderer.invoke("gh-check-auth"),
+  listUserRepos: (limit) => ipcRenderer.invoke("gh-list-user-repos", limit),
+  listIssues: (repo, state) => ipcRenderer.invoke("gh-list-issues", repo, state),
+  listPRs: (repo, state) => ipcRenderer.invoke("gh-list-prs", repo, state),
+  getIssue: (repo, number) => ipcRenderer.invoke("gh-get-issue", repo, number),
+  getPR: (repo, number) => ipcRenderer.invoke("gh-get-pr", repo, number),
+  listComments: (repo, number) => ipcRenderer.invoke("gh-list-comments", repo, number),
+  addComment: (repo, number, body) => ipcRenderer.invoke("gh-add-comment", repo, number, body),
+  listCollaborators: (repo) => ipcRenderer.invoke("gh-list-collaborators", repo),
+  assignIssue: (repo, number, assignees) => ipcRenderer.invoke("gh-assign-issue", repo, number, assignees),
+  unassignIssue: (repo, number, assignees) => ipcRenderer.invoke("gh-unassign-issue", repo, number, assignees),
+  checkoutPR: (repo, prNumber) => ipcRenderer.invoke("gh-checkout-pr", repo, prNumber),
+  closeIssue: (repo, number) => ipcRenderer.invoke("gh-close-issue", repo, number),
+  mergePR: (repo, number) => ipcRenderer.invoke("gh-merge-pr", repo, number),
+  reopenIssue: (repo, number) => ipcRenderer.invoke("gh-reopen-issue", repo, number),
+  createIssue: (repo, title, body) => ipcRenderer.invoke("gh-create-issue", repo, title, body),
+  createPR: (repo, title, body, head, base) => ipcRenderer.invoke("gh-create-pr", repo, title, body, head, base),
+  listBranches: (repo) => ipcRenderer.invoke("gh-list-branches", repo),
+  loadPmState: () => ipcRenderer.invoke("gh-load-pm-state"),
+  savePmState: (state) => ipcRenderer.invoke("gh-save-pm-state", state),
+  readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
+});
