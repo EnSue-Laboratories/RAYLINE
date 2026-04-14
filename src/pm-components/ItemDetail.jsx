@@ -365,13 +365,13 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           <>
             {/* Merge (PR only, open) */}
             {type === "pr" && isOpen && (
-              <button onClick={handleMerge} disabled={actionLoading} style={smallBtnStyle}>
+              <button onClick={handleMerge} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
                 <GitMerge size={11} strokeWidth={1.5} color="rgba(160,120,255,0.8)" />
                 {actionLoading ? "Merging..." : "Merge"}
               </button>
             )}
-            {/* Close */}
-            {isOpen && !isMerged && (
+            {/* Close (issues only) */}
+            {type === "issue" && isOpen && (
               <button onClick={handleClose} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
                 <CheckCircle2 size={11} strokeWidth={1.5} />
                 {actionLoading ? "Closing..." : "Close"}
@@ -379,7 +379,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
             )}
             {/* Reopen */}
             {!isOpen && !isMerged && (
-              <button onClick={handleReopen} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(120,230,150,0.8)", borderColor: "rgba(120,230,150,0.15)" }}>
+              <button onClick={handleReopen} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
                 <RotateCcw size={11} strokeWidth={1.5} />
                 {actionLoading ? "Reopening..." : "Reopen"}
               </button>
