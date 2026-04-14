@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { GitBranch, Plus, Check, X, ChevronDown } from "lucide-react";
+import { GitBranch, Plus, Check, X, ChevronDown, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
@@ -12,6 +12,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
   const [newName, setNewName] = useState("");
   const [mode, setMode] = useState("branch"); // "branch" | "worktree"
   const [error, setError] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // { type, name, path, branch }
+  const [deleteBranchToo, setDeleteBranchToo] = useState(false);
+  const [hoveredRow, setHoveredRow] = useState(null);
   const ref = useRef(null);
   const inputRef = useRef(null);
   const [alignRight, setAlignRight] = useState(false);
@@ -38,6 +41,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
         setOpen(false);
         setCreating(false);
         setError(null);
+        setConfirmDelete(null);
+        setDeleteBranchToo(false);
       }
     };
     document.addEventListener("mousedown", h);
@@ -97,6 +102,35 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
     if (wt.path === cwd) return;
     if (onCwdChange) onCwdChange(wt.path);
     setOpen(false);
+  };
+
+  const PROTECTED_BRANCHES = ["main", "master"];
+
+  const handleDeleteBranch = async (name) => {
+    setError(null);
+    try {
+      await window.api.gitDeleteBranch(cwd, name);
+      setConfirmDelete(null);
+      refresh();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  const handleDeleteWorktree = async () => {
+    if (!confirmDelete) return;
+    setError(null);
+    try {
+      await window.api.gitWorktreeRemove(cwd, confirmDelete.path);
+      if (deleteBranchToo && confirmDelete.branch) {
+        try { await window.api.gitDeleteBranch(cwd, confirmDelete.branch); } catch {}
+      }
+      setConfirmDelete(null);
+      setDeleteBranchToo(false);
+      refresh();
+    } catch (e) {
+      setError(e.message);
+    }
   };
 
   if (!cwd || !current) return null;
@@ -192,37 +226,111 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
           {/* Branch list */}
           {mode === "branch" && (
             <div style={{ maxHeight: 240, overflowY: "auto" }}>
-              {branches.map((b) => (
-                <button
-                  key={b}
-                  onClick={() => handleCheckout(b)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    width: "100%",
-                    padding: "8px 12px",
-                    background: b === current ? "rgba(255,255,255,0.04)" : "transparent",
-                    border: "none",
-                    borderRadius: 7,
-                    color: b === current ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
-                    fontSize: s(11),
-                    fontFamily: "'JetBrains Mono',monospace",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "all .12s",
-                  }}
-                  onMouseEnter={(e) => { if (b !== current) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-                  onMouseLeave={(e) => { if (b !== current) e.currentTarget.style.background = "transparent"; }}
-                >
-                  <span style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}>{b}</span>
-                  {b === current && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
-                </button>
-              ))}
+              {branches.map((b) => {
+                const isProtected = b === current || PROTECTED_BRANCHES.includes(b);
+                const isConfirming = confirmDelete?.type === "branch" && confirmDelete.name === b;
+
+                if (isConfirming) {
+                  return (
+                    <div key={b} style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      width: "100%",
+                      padding: "8px 12px",
+                      background: "rgba(255,180,180,0.06)",
+                      borderRadius: 7,
+                      gap: 8,
+                    }}>
+                      <span style={{
+                        fontSize: s(10),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        color: "rgba(255,180,180,0.7)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}>Delete {b}?</span>
+                      <span style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                        <button
+                          onClick={() => handleDeleteBranch(b)}
+                          style={{
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            width: 24, height: 24, borderRadius: 6,
+                            background: "rgba(255,180,180,0.12)", border: "none",
+                            color: "rgba(255,180,180,0.7)", cursor: "pointer",
+                          }}
+                        ><Check size={12} strokeWidth={2} /></button>
+                        <button
+                          onClick={() => { setConfirmDelete(null); setError(null); }}
+                          style={{
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            width: 24, height: 24, borderRadius: 6,
+                            background: "rgba(255,255,255,0.02)", border: "none",
+                            color: "rgba(255,255,255,0.3)", cursor: "pointer",
+                          }}
+                        ><X size={12} strokeWidth={2} /></button>
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={b}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      width: "100%",
+                      padding: "8px 12px",
+                      background: b === current ? "rgba(255,255,255,0.04)" : hoveredRow === `branch-${b}` ? "rgba(255,255,255,0.025)" : "transparent",
+                      borderRadius: 7,
+                      transition: "all .12s",
+                    }}
+                    onMouseEnter={() => setHoveredRow(`branch-${b}`)}
+                    onMouseLeave={() => setHoveredRow(null)}
+                  >
+                    <button
+                      onClick={() => handleCheckout(b)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        flex: 1,
+                        minWidth: 0,
+                        background: "none",
+                        border: "none",
+                        color: b === current ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+                        fontSize: s(11),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        padding: 0,
+                      }}
+                    >
+                      <span style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}>{b}</span>
+                    </button>
+                    {b === current && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
+                    {!isProtected && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmDelete({ type: "branch", name: b }); setError(null); }}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          width: 22, height: 22, borderRadius: 5,
+                          background: "transparent", border: "none",
+                          color: "rgba(255,255,255,0.15)", cursor: "pointer",
+                          opacity: hoveredRow === `branch-${b}` ? 1 : 0,
+                          transition: "opacity .12s",
+                          flexShrink: 0, marginLeft: 4,
+                        }}
+                      ><Trash2 size={11} strokeWidth={2} /></button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -272,46 +380,153 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
                   {!isInWorktree && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
                 </button>
               )}
-              {worktrees.filter((w) => !w.bare && w.path !== mainWorktree?.path).map((wt) => (
-                <button
-                  key={wt.path}
-                  onClick={() => !worktreeLocked && handleWorktreeSwitch(wt)}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    width: "100%",
-                    padding: "8px 12px",
-                    background: wt.path === cwd ? "rgba(255,255,255,0.04)" : "transparent",
-                    border: "none",
-                    borderRadius: 7,
-                    color: wt.path === cwd ? "rgba(255,255,255,0.9)" : worktreeLocked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
-                    fontSize: s(11),
-                    fontFamily: "'JetBrains Mono',monospace",
-                    cursor: worktreeLocked && wt.path !== cwd ? "default" : "pointer",
-                    textAlign: "left",
-                    transition: "all .12s",
-                    gap: 2,
-                  }}
-                  onMouseEnter={(e) => { if (!worktreeLocked && wt.path !== cwd) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-                  onMouseLeave={(e) => { if (wt.path !== cwd) e.currentTarget.style.background = "transparent"; }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 6 }}>
-                    <span>{wt.branch || "detached"}</span>
-                    {wt.path === cwd && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
-                  </span>
-                  <span style={{
-                    fontSize: s(8),
-                    color: "rgba(255,255,255,0.2)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    maxWidth: "100%",
-                  }}>
-                    {wt.path.split("/").pop()}
-                  </span>
-                </button>
-              ))}
+              {worktrees.filter((w) => !w.bare && w.path !== mainWorktree?.path).map((wt) => {
+                const isActive = wt.path === cwd;
+                const isConfirming = confirmDelete?.type === "worktree" && confirmDelete.path === wt.path;
+
+                if (isConfirming) {
+                  return (
+                    <div key={wt.path} style={{
+                      padding: "8px 12px",
+                      background: "rgba(255,180,180,0.06)",
+                      borderRadius: 7,
+                    }}>
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                      }}>
+                        <span style={{
+                          fontSize: s(10),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          color: "rgba(255,180,180,0.7)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>Delete {wt.branch || "worktree"}?</span>
+                        <span style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                          <button
+                            onClick={handleDeleteWorktree}
+                            style={{
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              width: 24, height: 24, borderRadius: 6,
+                              background: "rgba(255,180,180,0.12)", border: "none",
+                              color: "rgba(255,180,180,0.7)", cursor: "pointer",
+                            }}
+                          ><Check size={12} strokeWidth={2} /></button>
+                          <button
+                            onClick={() => { setConfirmDelete(null); setDeleteBranchToo(false); setError(null); }}
+                            style={{
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              width: 24, height: 24, borderRadius: 6,
+                              background: "rgba(255,255,255,0.02)", border: "none",
+                              color: "rgba(255,255,255,0.3)", cursor: "pointer",
+                            }}
+                          ><X size={12} strokeWidth={2} /></button>
+                        </span>
+                      </div>
+                      {wt.branch && (
+                        <label style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          marginTop: 6,
+                          fontSize: s(9),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          color: "rgba(255,255,255,0.3)",
+                          cursor: "pointer",
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={deleteBranchToo}
+                            onChange={(e) => setDeleteBranchToo(e.target.checked)}
+                            style={{ accentColor: "rgba(255,180,180,0.7)" }}
+                          />
+                          Also delete branch
+                        </label>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={wt.path}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      width: "100%",
+                      padding: "8px 12px",
+                      background: isActive ? "rgba(255,255,255,0.04)" : hoveredRow === `wt-${wt.path}` ? "rgba(255,255,255,0.025)" : "transparent",
+                      borderRadius: 7,
+                      transition: "all .12s",
+                    }}
+                    onMouseEnter={() => setHoveredRow(`wt-${wt.path}`)}
+                    onMouseLeave={() => setHoveredRow(null)}
+                  >
+                    <button
+                      onClick={() => !worktreeLocked && handleWorktreeSwitch(wt)}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        flex: 1,
+                        minWidth: 0,
+                        background: "none",
+                        border: "none",
+                        color: isActive ? "rgba(255,255,255,0.9)" : worktreeLocked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
+                        fontSize: s(11),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        cursor: worktreeLocked && !isActive ? "default" : "pointer",
+                        textAlign: "left",
+                        padding: 0,
+                        gap: 2,
+                      }}
+                    >
+                      <span style={{ display: "flex", alignItems: "center", width: "100%", gap: 6 }}>
+                        <span>{wt.branch || "detached"}</span>
+                        {isActive && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
+                      </span>
+                      <span style={{
+                        fontSize: s(8),
+                        color: "rgba(255,255,255,0.2)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        maxWidth: "100%",
+                      }}>
+                        {wt.path.split("/").pop()}
+                      </span>
+                    </button>
+                    {!isActive && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmDelete({ type: "worktree", path: wt.path, branch: wt.branch }); setDeleteBranchToo(false); setError(null); }}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          width: 22, height: 22, borderRadius: 5,
+                          background: "transparent", border: "none",
+                          color: "rgba(255,255,255,0.15)", cursor: "pointer",
+                          opacity: hoveredRow === `wt-${wt.path}` ? 1 : 0,
+                          transition: "opacity .12s",
+                          flexShrink: 0, marginLeft: 4,
+                        }}
+                      ><Trash2 size={11} strokeWidth={2} /></button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {error && !creating && (
+            <div style={{
+              fontSize: s(9),
+              color: "rgba(255,180,180,0.7)",
+              padding: "4px 12px",
+              fontFamily: "'JetBrains Mono',monospace",
+            }}>
+              {error}
             </div>
           )}
 

@@ -445,6 +445,11 @@ ipcMain.handle("git-worktree-add", async (_event, cwd, worktreePath, branchName)
   return { success: true, path: worktreePath };
 });
 
+ipcMain.handle("git-delete-branch", async (_event, cwd, branchName) => {
+  await git(["branch", "-D", branchName], cwd);
+  return { success: true };
+});
+
 ipcMain.handle("git-worktree-remove", async (_event, cwd, worktreePath) => {
   await git(["worktree", "remove", worktreePath], cwd);
   return { success: true };
