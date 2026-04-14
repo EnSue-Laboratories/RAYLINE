@@ -1,0 +1,391 @@
+import { useState, useEffect } from "react";
+import { Plus, Github, X } from "lucide-react";
+import RepoManager from "./pm-components/RepoManager";
+
+const iconBtnStyle = {
+  width: 28,
+  height: 28,
+  borderRadius: 7,
+  border: "1px solid rgba(255,255,255,0.06)",
+  background: "rgba(255,255,255,0.04)",
+  color: "rgba(255,255,255,0.5)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  transition: "background .15s, color .15s",
+  padding: 0,
+};
+
+function RepoFilterItem({ label, active, onClick, removeMode }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        width: "100%",
+        padding: "6px 10px",
+        borderRadius: 6,
+        border: "none",
+        cursor: "pointer",
+        fontSize: 12,
+        fontFamily: "system-ui, sans-serif",
+        color: active
+          ? "rgba(255,255,255,0.9)"
+          : "rgba(255,255,255,0.45)",
+        background: active
+          ? "rgba(255,255,255,0.07)"
+          : hovered
+            ? "rgba(255,255,255,0.04)"
+            : "transparent",
+        transition: "background .15s, color .15s",
+        textAlign: "left",
+        marginBottom: 1,
+      }}
+    >
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {label}
+      </span>
+      {removeMode && label !== "All" && hovered && (
+        <X size={12} style={{ color: "rgba(200,80,80,0.7)", flexShrink: 0, marginLeft: 4 }} />
+      )}
+    </button>
+  );
+}
+
+function TabButton({ label, active, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: "none",
+        border: "none",
+        borderBottom: active ? "2px solid rgba(255,255,255,0.8)" : "2px solid transparent",
+        color: active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+        fontSize: 13,
+        fontFamily: "system-ui, sans-serif",
+        padding: "10px 16px",
+        cursor: "pointer",
+        transition: "color .15s, border-color .15s",
+        ...(hovered && !active ? { color: "rgba(255,255,255,0.6)" } : {}),
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function StateToggle({ value, onChange }) {
+  const btn = (label, val) => {
+    const active = value === val;
+    return (
+      <button
+        onClick={() => onChange(val)}
+        style={{
+          background: active ? "rgba(255,255,255,0.08)" : "transparent",
+          border: "1px solid " + (active ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)"),
+          borderRadius: 6,
+          color: active ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.35)",
+          fontSize: 11,
+          fontFamily: "'JetBrains Mono', monospace",
+          letterSpacing: ".04em",
+          padding: "4px 10px",
+          cursor: "pointer",
+          transition: "all .15s",
+        }}
+      >
+        {label}
+      </button>
+    );
+  };
+  return (
+    <div style={{ display: "flex", gap: 4 }}>
+      {btn("Open", "open")}
+      {btn("Closed", "closed")}
+    </div>
+  );
+}
+
+export default function ProjectManager() {
+  const [repos, setRepos] = useState([]);
+  const [activeTab, setActiveTab] = useState("issues");
+  const [stateFilter, setStateFilter] = useState("open");
+  const [repoFilter, setRepoFilter] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [authOk, setAuthOk] = useState(null);
+  const [showAddRepo, setShowAddRepo] = useState(false);
+  const [removeMode, setRemoveMode] = useState(false);
+
+  useEffect(() => {
+    window.ghApi.checkAuth().then(({ ok }) => setAuthOk(ok));
+    window.ghApi.loadPmState().then(({ repos }) => setRepos(repos));
+  }, []);
+
+  useEffect(() => {
+    if (authOk !== null) {
+      window.ghApi.savePmState({ repos });
+    }
+  }, [repos]);
+
+  const handleAddRepo = (repo) => {
+    if (!repos.includes(repo)) {
+      setRepos([...repos, repo]);
+    }
+  };
+
+  const handleRemoveRepo = (repo) => {
+    setRepos(repos.filter((r) => r !== repo));
+    if (repoFilter === repo) setRepoFilter(null);
+  };
+
+  // Loading state
+  if (authOk === null) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          background: "#000",
+          color: "rgba(255,255,255,0.3)",
+          fontFamily: "system-ui, sans-serif",
+          fontSize: 14,
+        }}
+      >
+        Checking authentication...
+      </div>
+    );
+  }
+
+  // Auth failed
+  if (authOk === false) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          gap: 16,
+          background: "#000",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <Github size={48} style={{ color: "rgba(255,255,255,0.2)" }} />
+        <div style={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }}>
+          GitHub CLI not authenticated
+        </div>
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)" }}>
+          Run{" "}
+          <code
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              padding: "2px 6px",
+              borderRadius: 4,
+            }}
+          >
+            gh auth login
+          </code>{" "}
+          in your terminal
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        width: "100vw",
+        overflow: "hidden",
+        background: "#000",
+        color: "rgba(255,255,255,0.85)",
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
+      {/* Drag region */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 52,
+          WebkitAppRegion: "drag",
+          zIndex: 100,
+        }}
+      />
+
+      {/* Left sidebar */}
+      <div
+        style={{
+          width: 200,
+          minWidth: 200,
+          display: "flex",
+          flexDirection: "column",
+          borderRight: "1px solid rgba(255,255,255,0.04)",
+          background: "rgba(0,0,0,0.65)",
+          backdropFilter: "blur(56px) saturate(1.1)",
+        }}
+      >
+        {/* Spacer for traffic lights */}
+        <div style={{ height: 52, flexShrink: 0 }} />
+
+        {/* Header: title + add button */}
+        <div
+          style={{
+            padding: "0 16px 16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "rgba(255,255,255,0.5)",
+              letterSpacing: ".08em",
+            }}
+          >
+            REPOS
+          </span>
+          <button onClick={() => setShowAddRepo(true)} style={iconBtnStyle}>
+            <Plus size={14} strokeWidth={1.5} />
+          </button>
+        </div>
+
+        {/* Repo filter list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
+          <RepoFilterItem
+            label="All"
+            active={repoFilter === null}
+            onClick={() => setRepoFilter(null)}
+          />
+          {repos.map((r) => (
+            <RepoFilterItem
+              key={r}
+              label={r.split("/")[1]}
+              active={repoFilter === r}
+              onClick={() =>
+                removeMode ? handleRemoveRepo(r) : setRepoFilter(r)
+              }
+              removeMode={removeMode}
+            />
+          ))}
+        </div>
+
+        {/* Manage repos button */}
+        <div
+          style={{
+            padding: "12px 16px",
+            borderTop: "1px solid rgba(255,255,255,0.04)",
+          }}
+        >
+          <button
+            onClick={() => setRemoveMode(!removeMode)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 10,
+              fontFamily: "'JetBrains Mono', monospace",
+              color: removeMode
+                ? "rgba(200,80,80,0.6)"
+                : "rgba(255,255,255,0.3)",
+              letterSpacing: ".08em",
+              padding: 0,
+              transition: "color .2s",
+            }}
+          >
+            {removeMode ? "DONE" : "MANAGE REPOS"}
+          </button>
+        </div>
+      </div>
+
+      {/* Right content area */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Traffic light spacer */}
+        <div style={{ height: 52, flexShrink: 0 }} />
+
+        {/* Tab bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "0 20px",
+            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            flexShrink: 0,
+          }}
+        >
+          <TabButton
+            label="Issues"
+            active={activeTab === "issues"}
+            onClick={() => {
+              setActiveTab("issues");
+              setSelectedItem(null);
+            }}
+          />
+          <TabButton
+            label="Pull Requests"
+            active={activeTab === "prs"}
+            onClick={() => {
+              setActiveTab("prs");
+              setSelectedItem(null);
+            }}
+          />
+          <div style={{ flex: 1 }} />
+          <StateToggle
+            value={stateFilter}
+            onChange={(v) => {
+              setStateFilter(v);
+              setSelectedItem(null);
+            }}
+          />
+        </div>
+
+        {/* Content: list or detail */}
+        <div style={{ flex: 1, overflow: "auto" }}>
+          {selectedItem ? (
+            <div style={{ padding: 20, color: "rgba(255,255,255,0.4)" }}>
+              Detail view placeholder
+            </div>
+          ) : (
+            <div style={{ padding: 20, color: "rgba(255,255,255,0.4)" }}>
+              {activeTab === "issues"
+                ? "Issues list placeholder"
+                : "PRs list placeholder"}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add repo modal */}
+      {showAddRepo && (
+        <RepoManager
+          repos={repos}
+          onAdd={handleAddRepo}
+          onClose={() => setShowAddRepo(false)}
+        />
+      )}
+    </div>
+  );
+}
