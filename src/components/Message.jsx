@@ -190,6 +190,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
   const scaledMdStreaming = useMemo(() => makeMdComponents(true, s), [s]);
   const isUser = msg.role === "user";
   const hasThinkingPart = Boolean(msg.parts?.some((part) => part.type === "thinking"));
+  const activeThinkingByStreamKey = msg._streamState?.activeThinking || {};
 
   // Strip [Attached files/images: ...] prefix from display text and extract file names
   let displayText = msg.text || "";
@@ -411,7 +412,10 @@ export default function Message({ msg, onEdit, onAnswer }) {
           );
         }
         if (part.type === "thinking") {
-          return <ThinkingBlock key={"think-" + i} text={part.text} isThinking={msg.isThinking} />;
+          const isPartThinking = part._streamKey
+            ? Boolean(activeThinkingByStreamKey[part._streamKey])
+            : msg.isThinking;
+          return <ThinkingBlock key={"think-" + i} text={part.text} isThinking={isPartThinking} />;
         }
         if (part.type === "tool") {
           if (part.name === "AskUserQuestion") {
