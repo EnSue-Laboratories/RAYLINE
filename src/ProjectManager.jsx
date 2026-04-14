@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Github, X } from "lucide-react";
+import { Plus, GitFork, X } from "lucide-react";
 import RepoManager from "./pm-components/RepoManager";
 import IssueList from "./pm-components/IssueList";
 import PRList from "./pm-components/PRList";
@@ -184,7 +184,7 @@ export default function ProjectManager() {
           fontFamily: "system-ui, sans-serif",
         }}
       >
-        <Github size={48} style={{ color: "rgba(255,255,255,0.2)" }} />
+        <GitFork size={48} style={{ color: "rgba(255,255,255,0.2)" }} />
         <div style={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }}>
           GitHub CLI not authenticated
         </div>
