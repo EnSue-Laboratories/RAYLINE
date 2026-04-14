@@ -166,6 +166,21 @@ async function checkoutPR(repo, prNumber) {
   return { success: true };
 }
 
+async function closeIssue(repo, number) {
+  const raw = await gh(["api", `/repos/${repo}/issues/${number}`, "-X", "PATCH", "-f", "state=closed"]);
+  return JSON.parse(raw);
+}
+
+async function mergePR(repo, number) {
+  const raw = await gh(["api", `/repos/${repo}/pulls/${number}/merge`, "-X", "PUT"]);
+  return JSON.parse(raw);
+}
+
+async function reopenIssue(repo, number) {
+  const raw = await gh(["api", `/repos/${repo}/issues/${number}`, "-X", "PATCH", "-f", "state=open"]);
+  return JSON.parse(raw);
+}
+
 module.exports = {
   checkAuth,
   listUserRepos,
@@ -179,4 +194,7 @@ module.exports = {
   assignIssue,
   unassignIssue,
   checkoutPR,
+  closeIssue,
+  mergePR,
+  reopenIssue,
 };
