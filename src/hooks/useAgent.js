@@ -233,6 +233,67 @@ export default function useAgent() {
           }
         }
 
+        // --- Codex JSONL stream events ---
+        else if (event.type === "thread.started") {
+          convo._codexThreadId = event.thread_id;
+        } else if (event.type === "turn.started") {
+          ensureAssistant();
+        } else if (event.type === "item.started") {
+          const item = event.item || {};
+          if (item.type === "command_execution") {
+            const am = ensureAssistant();
+            const parts = cloneParts(am.parts);
+            parts.push({
+              type: "tool",
+              id: item.id || uid(),
+              name: item.command || "command",
+              args: { command: item.command },
+              result: null,
+              status: "running",
+            });
+            msgs[msgs.length - 1] = { ...am, parts };
+            lastMsg = msgs[msgs.length - 1];
+          }
+        } else if (event.type === "item.completed") {
+          const item = event.item || {};
+          if (item.type === "agent_message") {
+            const am = ensureAssistant();
+            const parts = cloneParts(am.parts);
+            parts.push({ type: "text", text: item.text || "" });
+            msgs[msgs.length - 1] = { ...am, parts };
+            lastMsg = msgs[msgs.length - 1];
+          } else if (item.type === "command_execution") {
+            const am = ensureAssistant();
+            const parts = cloneParts(am.parts);
+            const existingIdx = parts.findIndex(
+              (p) => p.type === "tool" && p.id === item.id
+            );
+            if (existingIdx >= 0) {
+              parts[existingIdx] = {
+                ...parts[existingIdx],
+                result: item.aggregated_output,
+                status: "done",
+              };
+            } else {
+              parts.push({
+                type: "tool",
+                id: item.id || uid(),
+                name: item.command || "command",
+                args: { command: item.command },
+                result: item.aggregated_output,
+                status: "done",
+              });
+            }
+            msgs[msgs.length - 1] = { ...am, parts };
+            lastMsg = msgs[msgs.length - 1];
+          }
+        } else if (event.type === "turn.completed") {
+          if (lastMsg && lastMsg.role === "assistant") {
+            msgs[msgs.length - 1] = { ...lastMsg, isStreaming: false, isThinking: false };
+            lastMsg = msgs[msgs.length - 1];
+          }
+        }
+
         next.set(conversationId, { ...convo, messages: msgs });
         return next;
       });
