@@ -54,8 +54,9 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
       } else {
         await window.ghApi.createPR(repo, title.trim(), body.trim(), head, base);
       }
-      onCreated();
       onClose();
+      // Small delay so GitHub API has time to index the new item
+      setTimeout(() => onCreated(), 500);
     } catch (e) {
       setError(e.message);
     }
