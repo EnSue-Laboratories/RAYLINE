@@ -131,6 +131,7 @@ app.whenReady().then(() => {
     const mcpConfigPath = path.join(app.getPath("userData"), "mcp-terminal.json");
     fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2));
     global.mcpConfigPath = mcpConfigPath;
+    global.terminalWsPort = port;
   });
 
   // Forward terminal output to renderer

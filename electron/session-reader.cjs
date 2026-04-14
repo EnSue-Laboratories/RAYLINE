@@ -5,6 +5,7 @@ const os = require("os");
 const CLAUDE_DIR = path.join(os.homedir(), ".claude");
 const CODEX_DIR = path.join(os.homedir(), ".codex");
 const MAX_MESSAGES = 50; // max user+assistant message pairs to load
+const CODEX_USER_PROMPT_MARKER = "--- USER PROMPT ---";
 
 function projectDirName(cwd) {
   return cwd.replace(/\//g, "-");
@@ -122,6 +123,19 @@ function findCodexSessionFile(threadId) {
   return null;
 }
 
+function stripCodexSystemContext(text) {
+  if (typeof text !== "string") return "";
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("System context for this run:")) {
+    return trimmed;
+  }
+
+  const markerIndex = trimmed.indexOf(CODEX_USER_PROMPT_MARKER);
+  if (markerIndex === -1) return trimmed;
+
+  return trimmed.slice(markerIndex + CODEX_USER_PROMPT_MARKER.length).trim();
+}
+
 function loadCodexSessionMessages(filePath) {
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
@@ -150,7 +164,7 @@ function loadCodexSessionMessages(filePath) {
         }
       }
       // Skip system injections
-      const trimmed = text.trim();
+      const trimmed = stripCodexSystemContext(text);
       if (!trimmed || trimmed.startsWith("<") || trimmed.startsWith("#")) continue;
 
       messages.push({
@@ -268,7 +282,7 @@ async function listSessions(cwd) {
               }
             }
           }
-          const trimmed = text.trim();
+          const trimmed = stripCodexSystemContext(text);
           if (trimmed && !trimmed.startsWith("<") && !trimmed.startsWith("#")) {
             title = trimmed.slice(0, 60);
             break;

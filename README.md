@@ -12,6 +12,7 @@ features that are hard to get from a plain terminal session:
 - message editing with checkpoint-based file rewind support
 - image and file attachments
 - embedded terminal sessions exposed through MCP
+- terminal session CLI fallback for agents that can run shell commands
 - quick system context and local workspace selection
 
 ## Tech Stack
@@ -101,6 +102,7 @@ Some files worth reading first:
 - `electron/main.cjs` - Electron bootstrap and IPC surface
 - `electron/agent-manager.cjs` - Claude process spawning and stream handling
 - `electron/terminal-manager.cjs` - persistent PTY-backed terminal sessions
+- `scripts/claudi-terminal.cjs` - shell-friendly wrapper for the terminal session backend
 - `src/App.jsx` - top-level chat application state and interaction flow
 - `src/hooks/useAgent.js` - streamed message assembly in the renderer
 
@@ -110,4 +112,3 @@ Some files worth reading first:
   snapshot in `src-ui-backup/`.
 - External links are opened in the system browser from the Electron shell.
 - App state is persisted to the Electron user data directory as `claudi-state.json`.
-
