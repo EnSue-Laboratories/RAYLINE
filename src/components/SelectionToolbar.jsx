@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Sparkles, Quote, Loader2 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function SelectionToolbar({ onQuote, model }) {
+  const s = useFontScale();
   const [sel, setSel] = useState(null); // { text, x, y }
   const [explanation, setExplanation] = useState(null); // { text, loading }
   const [explaining, setExplaining] = useState(false);
@@ -151,6 +153,7 @@ export default function SelectionToolbar({ onQuote, model }) {
 }
 
 function ToolbarBtn({ label, onClick, active }) {
+  const s = useFontScale();
   const [hovered, setHovered] = useState(false);
   return (
     <button
@@ -167,7 +170,7 @@ function ToolbarBtn({ label, onClick, active }) {
         background: active ? "rgba(255,255,255,0.1)" : hovered ? "rgba(255,255,255,0.06)" : "transparent",
         color: active ? "rgba(255,255,255,0.9)" : hovered ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.55)",
         cursor: "pointer",
-        fontSize: 11,
+        fontSize: s(11),
         fontFamily: "system-ui,sans-serif",
         fontWeight: 500,
         transition: "all .15s",
@@ -180,6 +183,7 @@ function ToolbarBtn({ label, onClick, active }) {
 }
 
 function ExplainPane({ explanation, position }) {
+  const s = useFontScale();
   return (
     <div style={{
       width: 340,
@@ -200,7 +204,7 @@ function ExplainPane({ explanation, position }) {
           alignItems: "center",
           gap: 6,
           color: "rgba(255,255,255,0.4)",
-          fontSize: 12,
+          fontSize: s(12),
           fontFamily: "system-ui,sans-serif",
         }}>
           <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
@@ -209,7 +213,7 @@ function ExplainPane({ explanation, position }) {
       ) : (
         <div style={{
           color: "rgba(255,255,255,0.7)",
-          fontSize: 13,
+          fontSize: s(13),
           lineHeight: 1.6,
           fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
           letterSpacing: "0.005em",

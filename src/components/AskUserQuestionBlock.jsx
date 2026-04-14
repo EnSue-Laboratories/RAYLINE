@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Check, ChevronRight } from "lucide-react";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function AskUserQuestionBlock({ tool, onAnswer }) {
   const [selections, setSelections] = useState({});
+  const s = useFontScale();
   const [customText, setCustomText] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const questions = tool.args?.questions || [];
@@ -73,7 +75,7 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
       >
         <span
           style={{
-            fontSize: 10,
+            fontSize: s(10),
             fontFamily: "'JetBrains Mono',monospace",
             color: "rgba(255,255,255,0.3)",
             letterSpacing: ".1em",
@@ -93,7 +95,7 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                 <span
                   style={{
                     display: "inline-block",
-                    fontSize: 9,
+                    fontSize: s(9),
                     fontFamily: "'JetBrains Mono',monospace",
                     color: "rgba(255,255,255,0.35)",
                     background: "rgba(255,255,255,0.05)",
@@ -110,7 +112,7 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
               {/* Question text */}
               <div
                 style={{
-                  fontSize: 14,
+                  fontSize: s(14),
                   color: "rgba(255,255,255,0.82)",
                   fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
                   lineHeight: 1.6,
@@ -186,7 +188,7 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
-                            fontSize: 13,
+                            fontSize: s(13),
                             fontFamily: "system-ui,-apple-system,sans-serif",
                             color: selected ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.6)",
                             fontWeight: 500,
@@ -198,7 +200,7 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                         {opt.description && (
                           <div
                             style={{
-                              fontSize: 11,
+                              fontSize: s(11),
                               color: "rgba(255,255,255,0.3)",
                               fontFamily: "system-ui,-apple-system,sans-serif",
                               lineHeight: 1.5,
@@ -238,7 +240,7 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                       border: "1px solid rgba(255,255,255,0.05)",
                       borderRadius: 8,
                       color: "rgba(255,255,255,0.6)",
-                      fontSize: 13,
+                      fontSize: s(13),
                       fontFamily: "system-ui,-apple-system,sans-serif",
                       fontWeight: 400,
                       lineHeight: 1.4,
@@ -261,7 +263,7 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                 padding: "6px 16px",
                 borderRadius: 6,
                 border: "none",
-                fontSize: 12,
+                fontSize: s(12),
                 fontFamily: "system-ui,-apple-system,sans-serif",
                 fontWeight: 500,
                 cursor: hasAnswer ? "pointer" : "default",
@@ -278,7 +280,7 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
         {submitted && (
           <div style={{
             marginTop: 10,
-            fontSize: 10,
+            fontSize: s(10),
             fontFamily: "'JetBrains Mono',monospace",
             color: "rgba(255,255,255,0.25)",
             letterSpacing: ".06em",

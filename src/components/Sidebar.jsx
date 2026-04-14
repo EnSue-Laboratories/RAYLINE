@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useFontScale } from "../contexts/FontSizeContext";
 import { Plus, Search, Trash2, X, FolderOpen, Settings as SettingsIcon } from "lucide-react";
 import { getM } from "../data/models";
 
 export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings }) {
+  const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
 
@@ -111,7 +113,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               background: "transparent",
               border: "none",
               color: "rgba(255,255,255,0.8)",
-              fontSize: 11,
+              fontSize: s(11),
               fontFamily: "'JetBrains Mono',monospace",
             }}
           />
@@ -132,7 +134,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             textAlign: "center",
           }}>
             <div style={{
-              fontSize: 11,
+              fontSize: s(11),
               fontFamily: "'JetBrains Mono',monospace",
               color: "rgba(255,255,255,0.15)",
               letterSpacing: ".08em",
@@ -140,7 +142,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               NO CONVERSATIONS
             </div>
             <div style={{
-              fontSize: 10,
+              fontSize: s(10),
               color: "rgba(255,255,255,0.1)",
               fontFamily: "system-ui,sans-serif",
             }}>
@@ -180,7 +182,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
                     style={{
-                      fontSize: 12.5,
+                      fontSize: s(12.5),
                       color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -193,7 +195,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                   </div>
                   <div
                     style={{
-                      fontSize: 11,
+                      fontSize: s(11),
                       color: "rgba(255,255,255,0.3)",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -221,7 +223,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               <div
                 style={{
                   marginTop: 6,
-                  fontSize: 9,
+                  fontSize: s(9),
                   fontFamily: "'JetBrains Mono',monospace",
                   color: "rgba(255,255,255,0.35)",
                   letterSpacing: ".08em",
@@ -253,7 +255,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             background: "none",
             border: "none",
             cursor: "pointer",
-            fontSize: 8,
+            fontSize: s(8),
             fontFamily: "'JetBrains Mono',monospace",
             color: "rgba(255,255,255,0.28)",
             letterSpacing: ".08em",
@@ -287,7 +289,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
         >
           <SettingsIcon size={12} strokeWidth={1.5} />
         </button>
-        <span style={{ fontSize: 8, fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.2)", letterSpacing: ".06em" }}>
+        <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.2)", letterSpacing: ".06em" }}>
           {convos.length} CHATS
         </span>
       </div>

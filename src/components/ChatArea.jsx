@@ -5,8 +5,10 @@ import EmptyState from "./EmptyState";
 import ModelPicker from "./ModelPicker";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper }) {
+  const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
@@ -246,7 +248,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           {convo && (
             <div style={{ animation: "dropIn .2s ease" }}>
               <div style={{
-                fontSize: 13,
+                fontSize: s(13),
                 color: "rgba(255,255,255,0.88)",
                 fontFamily: "system-ui,sans-serif",
                 overflow: "hidden",
@@ -258,7 +260,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               </div>
               <div
                 style={{
-                  fontSize: 9,
+                  fontSize: s(9),
                   fontFamily: "'JetBrains Mono',monospace",
                   color: "rgba(255,255,255,0.3)",
                   marginTop: 1,
@@ -298,7 +300,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               <TerminalIcon size={14} strokeWidth={1.5} />
               {terminalCount > 0 && (
                 <span style={{
-                  fontSize: 10,
+                  fontSize: s(10),
                   fontFamily: "'JetBrains Mono',monospace",
                   color: "inherit",
                 }}>
@@ -358,12 +360,12 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                   background: "rgba(255,255,255,0.03)",
                   border: "1px solid rgba(255,255,255,0.05)",
                   borderRadius: 8,
-                  fontSize: 12,
+                  fontSize: s(12),
                   color: "rgba(255,255,255,0.35)",
                   fontFamily: "system-ui,sans-serif",
                 }}>
                   <span style={{
-                    fontSize: 9,
+                    fontSize: s(9),
                     fontFamily: "'JetBrains Mono',monospace",
                     color: "rgba(255,255,255,0.2)",
                     letterSpacing: ".06em",
@@ -406,12 +408,12 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                   onMouseEnter={() => setSelectedCmd(i)}
                 >
                   <span style={{
-                    fontSize: 12,
+                    fontSize: s(12),
                     fontFamily: "'JetBrains Mono',monospace",
                     color: "rgba(255,255,255,0.7)",
                   }}>{c.cmd}</span>
                   <span style={{
-                    fontSize: 11,
+                    fontSize: s(11),
                     color: "rgba(255,255,255,0.25)",
                     fontFamily: "system-ui,sans-serif",
                   }}>{c.desc}</span>
@@ -450,11 +452,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 border: "none",
                 resize: "none",
                 color: "rgba(255,255,255,0.92)",
-                fontSize: 13,
-                lineHeight: "20px",
-                fontFamily: "system-ui,sans-serif",
+                fontSize: s(15),
+                lineHeight: 1.7,
+                fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
                 maxHeight: 120,
-                height: 20,
+                height: "auto",
                 display: "block",
                 overflow: "hidden",
               }}
@@ -510,7 +512,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             style={{
               textAlign: "center",
               marginTop: 8,
-              fontSize: 8,
+              fontSize: s(8),
               fontFamily: "'JetBrains Mono',monospace",
               color: "rgba(255,255,255,0.15)",
               letterSpacing: ".1em",

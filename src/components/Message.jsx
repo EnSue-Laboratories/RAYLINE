@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Pencil, Loader2, FileText } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -15,6 +15,7 @@ import AskUserQuestionBlock from "./AskUserQuestionBlock";
 import MermaidBlock from "./MermaidBlock";
 import InteractiveBlock from "./InteractiveBlock";
 import ThinkingBlock from "./ThinkingBlock";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 // Allow SVG tags in markdown (rehype-sanitize schema)
 const sanitizeSchema = {
@@ -48,7 +49,7 @@ const sanitizeSchema = {
   },
 };
 
-const makeMdComponents = (isStreaming = false) => ({
+const makeMdComponents = (isStreaming = false, s = (x) => x) => ({
   p: ({ children }) => <p style={{ margin: "0 0 12px" }}>{children}</p>,
   code: ({ node, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || "");
@@ -80,7 +81,7 @@ const makeMdComponents = (isStreaming = false) => ({
             background: "transparent",
             margin: 0,
             padding: 0,
-            fontSize: 12,
+            fontSize: s(12),
             fontFamily: "'JetBrains Mono',monospace",
             lineHeight: 1.6,
           }}
@@ -93,7 +94,7 @@ const makeMdComponents = (isStreaming = false) => ({
     return (
       <code style={{
         fontFamily: "'JetBrains Mono',monospace",
-        fontSize: 12,
+        fontSize: s(12),
       }} {...props}>{children}</code>
     );
   },
@@ -116,7 +117,7 @@ const makeMdComponents = (isStreaming = false) => ({
         borderRadius: 8,
         padding: "12px 14px",
         overflow: "auto",
-        fontSize: 12,
+        fontSize: s(12),
         fontFamily: "'JetBrains Mono',monospace",
         margin: "8px 0 12px",
         lineHeight: 1.6,
@@ -132,9 +133,9 @@ const makeMdComponents = (isStreaming = false) => ({
   ul: ({ children }) => <ul style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ol>,
   li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
-  h1: ({ children }) => <h1 style={{ fontSize: 20, fontWeight: 600, margin: "16px 0 8px" }}>{children}</h1>,
-  h2: ({ children }) => <h2 style={{ fontSize: 17, fontWeight: 600, margin: "14px 0 6px" }}>{children}</h2>,
-  h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 600, margin: "12px 0 4px" }}>{children}</h3>,
+  h1: ({ children }) => <h1 style={{ fontSize: s(20), fontWeight: 600, margin: "16px 0 8px" }}>{children}</h1>,
+  h2: ({ children }) => <h2 style={{ fontSize: s(17), fontWeight: 600, margin: "14px 0 6px" }}>{children}</h2>,
+  h3: ({ children }) => <h3 style={{ fontSize: s(15), fontWeight: 600, margin: "12px 0 4px" }}>{children}</h3>,
   blockquote: ({ children }) => (
     <blockquote style={{
       borderLeft: "2px solid rgba(255,255,255,0.15)",
@@ -143,7 +144,7 @@ const makeMdComponents = (isStreaming = false) => ({
       color: "rgba(255,255,255,0.45)",
       fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
       fontStyle: "italic",
-      fontSize: 13,
+      fontSize: s(13),
       lineHeight: 1.7,
     }}>{children}</blockquote>
   ),
@@ -162,7 +163,7 @@ const makeMdComponents = (isStreaming = false) => ({
       width: "100%",
       borderCollapse: "collapse",
       margin: "8px 0 12px",
-      fontSize: 13,
+      fontSize: s(13),
     }}>{children}</table>
   ),
   thead: ({ children }) => <thead style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>{children}</thead>,
@@ -179,10 +180,14 @@ function sanitizeText(text) {
 }
 
 // Cache both variants to avoid recreating components on every render
+// Default (unscaled) components for module-level fallback
 const mdComponentsStatic = makeMdComponents(false);
-const mdComponentsStreaming = makeMdComponents(true);
+const scaledMdStreaming = makeMdComponents(true);
 
 export default function Message({ msg, onEdit, onAnswer }) {
+  const s = useFontScale();
+  const scaledMdStatic = useMemo(() => makeMdComponents(false, s), [s]);
+  const scaledMdStreaming = useMemo(() => makeMdComponents(true, s), [s]);
   const isUser = msg.role === "user";
   const hasThinkingPart = Boolean(msg.parts?.some((part) => part.type === "thinking"));
 
@@ -238,7 +243,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
         }}
       >
         <div style={{
-          fontSize: 9,
+          fontSize: s(9),
           fontFamily: "'JetBrains Mono',monospace",
           color: "rgba(255,255,255,0.2)",
           letterSpacing: ".14em",
@@ -260,9 +265,9 @@ export default function Message({ msg, onEdit, onAnswer }) {
                 border: "1px solid rgba(255,255,255,0.1)",
                 borderRadius: 8,
                 color: "rgba(255,255,255,0.9)",
-                fontSize: 14,
+                fontSize: s(15),
                 lineHeight: 1.7,
-                fontFamily: "system-ui,sans-serif",
+                fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
                 padding: "10px 12px",
                 resize: "vertical",
                 minHeight: 60,
@@ -277,7 +282,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
                   borderRadius: 6,
                   color: "rgba(255,255,255,0.4)",
                   padding: "4px 12px",
-                  fontSize: 11,
+                  fontSize: s(11),
                   height: 26,
                   cursor: "pointer",
                 }}
@@ -291,7 +296,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
                   borderRadius: 6,
                   color: editChanged ? "#000" : "rgba(255,255,255,0.25)",
                   padding: "3px 12px",
-                  fontSize: 11,
+                  fontSize: s(11),
                   height: 24,
                   cursor: editChanged ? "pointer" : "default",
                 }}
@@ -319,7 +324,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.08)",
                 borderRadius: 6,
-                fontSize: 11,
+                fontSize: s(11),
                 fontFamily: "'JetBrains Mono',monospace",
                 color: "rgba(255,255,255,0.5)",
               }}>
@@ -332,14 +337,14 @@ export default function Message({ msg, onEdit, onAnswer }) {
 
             <div style={{
               color: "rgba(255,255,255,0.92)",
-              fontSize: 15,
+              fontSize: s(15),
               lineHeight: 1.7,
-              fontFamily: "system-ui,-apple-system,sans-serif",
+              fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
               fontWeight: 400,
               textAlign: "left",
               maxWidth: "85%",
             }}>
-              <Markdown remarkPlugins={[remarkGfm]} components={mdComponentsStatic}>
+              <Markdown remarkPlugins={[remarkGfm]} components={scaledMdStatic}>
                 {displayText}
               </Markdown>
             </div>
@@ -369,7 +374,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
       }}
     >
       <div style={{
-        fontSize: 9,
+        fontSize: s(9),
         fontFamily: "'JetBrains Mono',monospace",
         color: "rgba(255,255,255,0.2)",
         letterSpacing: ".14em",
@@ -388,13 +393,13 @@ export default function Message({ msg, onEdit, onAnswer }) {
           return (
             <div key={i} style={{
               color: "rgba(255,255,255,0.75)",
-              fontSize: 15,
+              fontSize: s(15),
               lineHeight: 1.85,
               fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
               letterSpacing: "0.008em",
               marginBottom: 4,
             }}>
-              <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]} components={(msg.isStreaming && isLastPart) ? mdComponentsStreaming : mdComponentsStatic}>
+              <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]} components={(msg.isStreaming && isLastPart) ? scaledMdStreaming : mdComponentsStatic}>
                 {sanitizeText(part.text)}
               </Markdown>
               {msg.isStreaming && isLastPart && (
@@ -439,12 +444,12 @@ export default function Message({ msg, onEdit, onAnswer }) {
       {!msg.parts && msg.text && (
         <div style={{
           color: "rgba(255,255,255,0.75)",
-          fontSize: 15,
+          fontSize: s(15),
           lineHeight: 1.85,
           fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
           letterSpacing: "0.008em",
         }}>
-          <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]} components={mdComponentsStatic}>
+          <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]} components={scaledMdStatic}>
             {sanitizeText(msg.text)}
           </Markdown>
         </div>

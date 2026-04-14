@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { MODELS, getM } from "../data/models";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function ModelPicker({ value, onChange }) {
+  const s = useFontScale();
   const [open, set] = useState(false);
   const ref = useRef(null);
   const m = getM(value);
@@ -28,7 +30,7 @@ export default function ModelPicker({ value, onChange }) {
           border: "1px solid rgba(255,255,255,0.04)",
           borderRadius: 7,
           color: "rgba(255,255,255,0.4)",
-          fontSize: 10,
+          fontSize: s(10),
           fontFamily: "'JetBrains Mono',monospace",
           cursor: "pointer",
           transition: "all .2s",
@@ -71,7 +73,7 @@ export default function ModelPicker({ value, onChange }) {
                 border: "none",
                 borderRadius: 7,
                 color: mm.id === value ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
-                fontSize: 11,
+                fontSize: s(11),
                 fontFamily: "'JetBrains Mono',monospace",
                 cursor: "pointer",
                 textAlign: "left",
@@ -81,7 +83,7 @@ export default function ModelPicker({ value, onChange }) {
               onMouseLeave={(e) => { if (mm.id !== value) e.currentTarget.style.background = "transparent"; }}
             >
               {mm.name}
-              <span style={{ fontSize: 9, opacity: 0.4, letterSpacing: ".1em" }}>{mm.tag}</span>
+              <span style={{ fontSize: s(9), opacity: 0.4, letterSpacing: ".1em" }}>{mm.tag}</span>
             </button>
           ))}
         </div>

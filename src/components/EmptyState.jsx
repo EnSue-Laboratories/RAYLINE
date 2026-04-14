@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function EmptyState() {
+  const s = useFontScale();
   const [info, setInfo] = useState(null);
 
   useEffect(() => {
@@ -76,20 +78,20 @@ export default function EmptyState() {
           fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
         }}>
           <div style={{
-            fontSize: 15,
+            fontSize: s(15),
             color: "rgba(255,255,255,0.18)",
             letterSpacing: ".06em",
             fontWeight: 500,
           }}>
             {info.user}@{info.hostname}
           </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.15)", letterSpacing: ".04em" }}>
+          <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.15)", letterSpacing: ".04em" }}>
             {info.platform} {info.arch} · {info.cpus} cores · {info.memory}
           </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.15)", letterSpacing: ".04em" }}>
+          <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.15)", letterSpacing: ".04em" }}>
             node {info.nodeVersion} · electron {info.electronVersion}
           </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.15)", letterSpacing: ".04em" }}>
+          <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.15)", letterSpacing: ".04em" }}>
             {info.shell}
           </div>
         </div>

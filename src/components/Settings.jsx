@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ArrowLeft, Image } from "lucide-react";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 const DEFAULTS = { path: null, dataUrl: null, opacity: 50, blur: 32, imgBlur: 0, imgDarken: 0 };
 
-export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, onClose }) {
+  const s = useFontScale();
   const [local, setLocal] = useState(() => wallpaper ?? { ...DEFAULTS });
   const debounceRef = useRef(null);
 
@@ -144,7 +146,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
         </button>
         <span
           style={{
-            fontSize: 14,
+            fontSize: s(14),
             fontWeight: 600,
             color: "rgba(255,255,255,0.85)",
           }}
@@ -168,7 +170,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
           <div
             style={{
               fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 10,
+              fontSize: s(10),
               fontWeight: 600,
               color: "rgba(255,255,255,0.25)",
               letterSpacing: ".12em",
@@ -183,7 +185,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
           <div style={{ marginBottom: 28 }}>
             <div
               style={{
-                fontSize: 13,
+                fontSize: s(13),
                 color: "rgba(255,255,255,0.8)",
                 marginBottom: 2,
               }}
@@ -192,7 +194,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
             </div>
             <div
               style={{
-                fontSize: 11,
+                fontSize: s(11),
                 color: "rgba(255,255,255,0.3)",
                 marginBottom: 12,
               }}
@@ -249,7 +251,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
                       : "rgba(255,255,255,0.06)",
                     border: "1px solid rgba(255,255,255,0.06)",
                     color: "rgba(255,255,255,0.75)",
-                    fontSize: 12,
+                    fontSize: s(12),
                     cursor: "pointer",
                     transition: "all .2s",
                     fontFamily: "system-ui, sans-serif",
@@ -270,7 +272,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
                         : "rgba(255,255,255,0.03)",
                       border: "1px solid rgba(255,255,255,0.06)",
                       color: "rgba(255,255,255,0.45)",
-                      fontSize: 12,
+                      fontSize: s(12),
                       cursor: "pointer",
                       transition: "all .2s",
                       fontFamily: "system-ui, sans-serif",
@@ -287,7 +289,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
               <div
                 style={{
                   fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 10,
+                  fontSize: s(10),
                   color: "rgba(255,255,255,0.15)",
                   marginTop: 4,
                   marginLeft: 2,
@@ -302,7 +304,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
           <div style={{ marginBottom: 24 }}>
             <div
               style={{
-                fontSize: 13,
+                fontSize: s(13),
                 color: "rgba(255,255,255,0.8)",
                 marginBottom: 10,
               }}
@@ -323,7 +325,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
           <div style={{ marginBottom: 24 }}>
             <div
               style={{
-                fontSize: 13,
+                fontSize: s(13),
                 color: "rgba(255,255,255,0.8)",
                 marginBottom: 10,
               }}
@@ -344,7 +346,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
           <div style={{ marginBottom: 24 }}>
             <div
               style={{
-                fontSize: 13,
+                fontSize: s(13),
                 color: "rgba(255,255,255,0.8)",
                 marginBottom: 10,
               }}
@@ -365,7 +367,7 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
           <div style={{ marginBottom: 24 }}>
             <div
               style={{
-                fontSize: 13,
+                fontSize: s(13),
                 color: "rgba(255,255,255,0.8)",
                 marginBottom: 10,
               }}
@@ -379,6 +381,43 @@ export default function Settings({ wallpaper, onWallpaperChange, onClose }) {
               value={local.blur}
               onChange={(e) => update({ blur: Number(e.target.value) })}
               style={sliderStyle(blurPct)}
+            />
+          </div>
+
+          {/* TYPOGRAPHY section label */}
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: s(10),
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.25)",
+              letterSpacing: ".12em",
+              textTransform: "uppercase",
+              marginBottom: 20,
+              marginTop: 12,
+            }}
+          >
+            TYPOGRAPHY
+          </div>
+
+          {/* Font Size */}
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 10,
+              }}
+            >
+              Font Size: {fontSize}px
+            </div>
+            <input
+              type="range"
+              min={12}
+              max={22}
+              value={fontSize}
+              onChange={(e) => onFontSizeChange(Number(e.target.value))}
+              style={sliderStyle(((fontSize - 12) / 10) * 100)}
             />
           </div>
         </div>
