@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, GitBranch, Plus, Check, X, GitMerge, ExternalLink } from "lucide-react";
+import { ArrowLeft, GitBranch, Plus, Check, CheckCircle2, GitMerge, RotateCcw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CommentBox from "./CommentBox";
@@ -245,8 +245,8 @@ export default function ItemDetail({ repo, number, type, onBack }) {
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 20, height: 20, borderRadius: 10,
-              background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
-              cursor: "pointer", color: "rgba(255,255,255,0.4)", padding: 0,
+              background: "none", border: "none",
+              cursor: "pointer", color: "rgba(255,255,255,0.35)", padding: 0,
               transition: "all .15s",
             }}
           >
@@ -255,7 +255,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
 
           {showAssignMenu && (
             <div style={{
-              position: "absolute", top: "100%", left: 60, marginTop: 4,
+              position: "absolute", top: "100%", left: 0, marginTop: 4,
               background: "rgba(15,15,15,0.95)", border: "1px solid rgba(255,255,255,0.1)",
               borderRadius: 8, padding: "4px 0", minWidth: 180, zIndex: 100,
               maxHeight: 220, overflowY: "auto", backdropFilter: "blur(20px)",
@@ -282,10 +282,9 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           )}
         </div>
 
-        {/* Action buttons row */}
-        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-          {/* Checkout (PR only) */}
-          {type === "pr" && !isMerged && (
+        {/* Action buttons row — only checkout stays here */}
+        {type === "pr" && !isMerged && (
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
             <button
               onClick={async () => {
                 setCheckingOut(true);
@@ -297,36 +296,8 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               <GitBranch size={11} strokeWidth={1.5} />
               {checkingOut ? "Checking out..." : "Checkout"}
             </button>
-          )}
-
-          {/* Merge (PR only, open) */}
-          {type === "pr" && isOpen && (
-            <button onClick={handleMerge} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(160,120,255,0.8)", borderColor: "rgba(160,120,255,0.2)" }}>
-              <GitMerge size={11} strokeWidth={1.5} />
-              {actionLoading ? "Merging..." : "Merge"}
-            </button>
-          )}
-
-          {/* Close (issue or open PR) */}
-          {isOpen && !isMerged && (
-            <button onClick={handleClose} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(248,81,73,0.7)", borderColor: "rgba(248,81,73,0.15)" }}>
-              <X size={11} strokeWidth={1.5} />
-              {actionLoading ? "Closing..." : "Close"}
-            </button>
-          )}
-
-          {/* Reopen (closed, not merged) */}
-          {!isOpen && !isMerged && (
-            <button onClick={handleReopen} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(120,230,150,0.8)", borderColor: "rgba(120,230,150,0.15)" }}>
-              {actionLoading ? "Reopening..." : "Reopen"}
-            </button>
-          )}
-
-          {/* Open in GitHub */}
-          <a href={ghUrl} target="_blank" rel="noopener noreferrer" style={{ ...smallBtnStyle, textDecoration: "none" }}>
-            <ExternalLink size={11} strokeWidth={1.5} /> GitHub
-          </a>
-        </div>
+          </div>
+        )}
 
         {/* Body — suppress list-style bullets before titles */}
         <div
@@ -385,8 +356,37 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         </div>
       </div>
 
-      {/* Comment box */}
-      <CommentBox repo={repo} number={number} onCommentAdded={refreshComments} />
+      {/* Comment box with actions */}
+      <CommentBox
+        repo={repo}
+        number={number}
+        onCommentAdded={refreshComments}
+        actions={
+          <>
+            {/* Merge (PR only, open) */}
+            {type === "pr" && isOpen && (
+              <button onClick={handleMerge} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(160,120,255,0.8)", borderColor: "rgba(160,120,255,0.2)" }}>
+                <GitMerge size={11} strokeWidth={1.5} />
+                {actionLoading ? "Merging..." : "Merge"}
+              </button>
+            )}
+            {/* Close */}
+            {isOpen && !isMerged && (
+              <button onClick={handleClose} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
+                <CheckCircle2 size={11} strokeWidth={1.5} />
+                {actionLoading ? "Closing..." : "Close"}
+              </button>
+            )}
+            {/* Reopen */}
+            {!isOpen && !isMerged && (
+              <button onClick={handleReopen} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(120,230,150,0.8)", borderColor: "rgba(120,230,150,0.15)" }}>
+                <RotateCcw size={11} strokeWidth={1.5} />
+                {actionLoading ? "Reopening..." : "Reopen"}
+              </button>
+            )}
+          </>
+        }
+      />
     </div>
   );
 }

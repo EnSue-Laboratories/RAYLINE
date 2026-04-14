@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function CommentBox({ repo, number, onCommentAdded }) {
+export default function CommentBox({ repo, number, onCommentAdded, actions }) {
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -16,46 +16,48 @@ export default function CommentBox({ repo, number, onCommentAdded }) {
   };
 
   return (
-    <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", padding: "12px 20px", display: "flex", gap: 8, alignItems: "flex-end" }}>
+    <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", padding: "12px 20px" }}>
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder="Write a comment..."
-        rows={1}
+        rows={3}
         style={{
-          flex: 1,
+          width: "100%",
           background: "rgba(255,255,255,0.04)",
           border: "1px solid rgba(255,255,255,0.08)",
           borderRadius: 6,
-          padding: "7px 10px",
+          padding: "8px 10px",
           color: "rgba(255,255,255,0.8)",
           fontSize: 12,
           fontFamily: "system-ui, sans-serif",
           resize: "vertical",
-          minHeight: 32,
-          maxHeight: 120,
+          minHeight: 64,
           boxSizing: "border-box",
         }}
       />
-      <button
-        onClick={handleSubmit}
-        disabled={!body.trim() || submitting}
-        style={{
-          background: body.trim() ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 6,
-          padding: "6px 12px",
-          cursor: body.trim() ? "pointer" : "default",
-          color: body.trim() ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
-          fontSize: 11,
-          fontFamily: "'JetBrains Mono', monospace",
-          letterSpacing: ".04em",
-          transition: "all .15s",
-          flexShrink: 0,
-        }}
-      >
-        {submitting ? "..." : "Comment"}
-      </button>
+      <div style={{ display: "flex", alignItems: "center", marginTop: 8, gap: 6 }}>
+        {actions}
+        <div style={{ flex: 1 }} />
+        <button
+          onClick={handleSubmit}
+          disabled={!body.trim() || submitting}
+          style={{
+            background: body.trim() ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 6,
+            padding: "5px 12px",
+            cursor: body.trim() ? "pointer" : "default",
+            color: body.trim() ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
+            fontSize: 11,
+            fontFamily: "'JetBrains Mono', monospace",
+            letterSpacing: ".04em",
+            transition: "all .15s",
+          }}
+        >
+          {submitting ? "..." : "Comment"}
+        </button>
+      </div>
     </div>
   );
 }
