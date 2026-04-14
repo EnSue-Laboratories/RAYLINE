@@ -8,6 +8,16 @@ const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
 
 const isDev = !app.isPackaged;
+const WALLPAPER_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
+const WALLPAPER_MIME_TYPES = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  bmp: "image/bmp",
+  avif: "image/avif",
+};
 
 // Override app name (in dev, Electron uses its own binary name)
 app.setName("Claudi");
@@ -22,6 +32,39 @@ if (isDev && process.platform === "darwin") {
 }
 
 let mainWindow;
+
+function getWallpaperStorageDir() {
+  const dir = path.join(app.getPath("userData"), "wallpapers");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function isManagedWallpaperPath(filePath) {
+  if (!filePath) return false;
+  const relative = path.relative(getWallpaperStorageDir(), path.resolve(filePath));
+  return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function removeManagedWallpaper(filePath) {
+  if (!isManagedWallpaperPath(filePath)) return;
+  try {
+    fs.unlinkSync(filePath);
+  } catch {}
+}
+
+function importWallpaperToStorage(sourcePath, previousPath) {
+  const ext = path.extname(sourcePath).toLowerCase();
+  const baseName = path.basename(sourcePath, ext)
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "wallpaper";
+  const storedPath = path.join(getWallpaperStorageDir(), `${Date.now()}-${baseName}${ext || ".png"}`);
+  fs.copyFileSync(sourcePath, storedPath);
+  if (previousPath && previousPath !== storedPath) {
+    removeManagedWallpaper(previousPath);
+  }
+  return storedPath;
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -114,12 +157,28 @@ ipcMain.handle("folder-pick", async () => {
 });
 
 // IPC: wallpaper image picker
-ipcMain.handle("select-wallpaper", async () => {
+ipcMain.handle("select-wallpaper", async (_event, previousPath) => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openFile"],
-    filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"] }],
+    filters: [{ name: "Images", extensions: WALLPAPER_EXTENSIONS }],
   });
-  return result.canceled ? null : result.filePaths[0];
+  if (result.canceled) return null;
+  try {
+    return importWallpaperToStorage(result.filePaths[0], previousPath);
+  } catch (error) {
+    console.error("Failed to import wallpaper:", error);
+    return null;
+  }
+});
+
+ipcMain.handle("delete-wallpaper", async (_event, filePath) => {
+  try {
+    removeManagedWallpaper(filePath);
+    return true;
+  } catch (error) {
+    console.error("Failed to delete wallpaper:", error);
+    return false;
+  }
 });
 
 // IPC: read image file as data URL (for wallpaper preview + background)
@@ -127,7 +186,7 @@ ipcMain.handle("read-image", async (_event, filePath) => {
   try {
     const data = fs.readFileSync(filePath);
     const ext = path.extname(filePath).toLowerCase().replace(".", "");
-    const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", bmp: "image/bmp", avif: "image/avif" }[ext] || "image/png";
+    const mime = WALLPAPER_MIME_TYPES[ext] || "image/png";
     return `data:${mime};base64,${data.toString("base64")}`;
   } catch {
     return null;
