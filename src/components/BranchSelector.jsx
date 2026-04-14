@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { GitBranch, Plus, Check, X, ChevronDown, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+
+const MENU_GAP = 6;
+const VIEWPORT_PADDING = 8;
 
 export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
   const s = useFontScale();
@@ -16,8 +20,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
   const [deleteBranchToo, setDeleteBranchToo] = useState(false);
   const [hoveredRow, setHoveredRow] = useState(null);
   const ref = useRef(null);
+  const menuRef = useRef(null);
   const inputRef = useRef(null);
-  const [alignRight, setAlignRight] = useState(false);
+  const [menuStyle, setMenuStyle] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!cwd || !window.api) return;
@@ -29,32 +34,31 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
       setCurrent(b.current);
       setBranches(b.branches);
       setWorktrees(w);
-    } catch {}
+    } catch (refreshError) {
+      void refreshError;
+    }
   }, [cwd]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    const refreshTimer = window.setTimeout(() => {
+      refresh();
+    }, 0);
+    return () => window.clearTimeout(refreshTimer);
+  }, [refresh]);
 
   // Close on outside click
   useEffect(() => {
     const h = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-        setCreating(false);
-        setError(null);
-        setConfirmDelete(null);
-        setDeleteBranchToo(false);
-      }
+      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+      setMenuStyle(null);
+      setCreating(false);
+      setError(null);
+      setConfirmDelete(null);
+      setDeleteBranchToo(false);
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, []);
-
-  // Compute alignment from button position before dropdown renders
-  const computeAlign = useCallback(() => {
-    if (ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      setAlignRight(rect.left + 240 > window.innerWidth - 8);
-    }
   }, []);
 
   // Focus input when creating
@@ -68,6 +72,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
     try {
       await window.api.gitCheckout(cwd, name);
       setCurrent(name);
+      setMenuStyle(null);
       setOpen(false);
     } catch (e) {
       setError(e.message);
@@ -91,6 +96,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
       }
       setNewName("");
       setCreating(false);
+      setMenuStyle(null);
       setOpen(false);
       refresh();
     } catch (e) {
@@ -101,8 +107,31 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
   const handleWorktreeSwitch = (wt) => {
     if (wt.path === cwd) return;
     if (onCwdChange) onCwdChange(wt.path);
+    setMenuStyle(null);
     setOpen(false);
   };
+
+  const updateMenuPosition = useCallback(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const width = Math.min(320, Math.max(240, rect.width + 24));
+    const alignRight = rect.left + width > window.innerWidth - VIEWPORT_PADDING;
+    const left = alignRight
+      ? Math.max(VIEWPORT_PADDING, rect.right - width)
+      : Math.min(rect.left, window.innerWidth - width - VIEWPORT_PADDING);
+    setMenuStyle({
+      top: rect.bottom + MENU_GAP,
+      left,
+      width,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleResize = () => updateMenuPosition();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [open, updateMenuPosition]);
 
   const PROTECTED_BRANCHES = ["main", "master"];
 
@@ -123,7 +152,11 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
     try {
       await window.api.gitWorktreeRemove(cwd, confirmDelete.path);
       if (deleteBranchToo && confirmDelete.branch) {
-        try { await window.api.gitDeleteBranch(cwd, confirmDelete.branch); } catch {}
+        try {
+          await window.api.gitDeleteBranch(cwd, confirmDelete.branch);
+        } catch (deleteBranchError) {
+          void deleteBranchError;
+        }
       }
       setConfirmDelete(null);
       setDeleteBranchToo(false);
@@ -145,7 +178,18 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button
-        onClick={() => { computeAlign(); setOpen(!open); setCreating(false); setError(null); refresh(); }}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+            setMenuStyle(null);
+          } else {
+            updateMenuPosition();
+            setOpen(true);
+          }
+          setCreating(false);
+          setError(null);
+          refresh();
+        }}
         style={{
           display: "flex",
           alignItems: "center",
@@ -175,15 +219,15 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
         <ChevronDown size={11} strokeWidth={2} />
       </button>
 
-      {open && (
+      {open && menuStyle && createPortal(
         <div
+          ref={menuRef}
           style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            ...(alignRight ? { right: 0 } : { left: 0 }),
-            zIndex: 200,
-            minWidth: 240,
-            maxWidth: 320,
+            position: "fixed",
+            top: menuStyle.top,
+            left: menuStyle.left,
+            zIndex: 400,
+            width: menuStyle.width,
             background: "rgba(8,8,12,0.55)",
             backdropFilter: "blur(48px) saturate(1.2)",
             border: "1px solid rgba(255,255,255,0.06)",
@@ -191,6 +235,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
             padding: 3,
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
             animation: "dropIn .15s ease",
+            WebkitAppRegion: "no-drag",
           }}
         >
           {/* Tab: Branches / Worktrees */}
@@ -659,7 +704,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
               {mode === "worktree" ? "New worktree" : "New branch"}
             </button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
