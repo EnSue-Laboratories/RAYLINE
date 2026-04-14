@@ -101,9 +101,9 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {isOpen ? (
-                <Circle size={16} color="rgba(63,185,80,0.7)" />
+                <Circle size={12} color="rgba(63,185,80,0.7)" />
               ) : (
-                <CheckCircle2 size={16} color="rgba(130,80,223,0.7)" />
+                <CheckCircle2 size={12} color="rgba(130,80,223,0.7)" />
               )}
               <span style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                 #{item.number}

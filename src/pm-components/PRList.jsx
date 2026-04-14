@@ -82,12 +82,12 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem })
 
   function getIcon(item) {
     if (item.state === "open") {
-      return <GitPullRequest size={16} color="rgba(63,185,80,0.7)" />;
+      return <GitPullRequest size={12} color="rgba(63,185,80,0.7)" />;
     }
     if (item.merged_at) {
-      return <GitMerge size={16} color="rgba(130,80,223,0.7)" />;
+      return <GitMerge size={12} color="rgba(130,80,223,0.7)" />;
     }
-    return <GitPullRequestClosed size={16} color="rgba(248,81,73,0.7)" />;
+    return <GitPullRequestClosed size={12} color="rgba(248,81,73,0.7)" />;
   }
 
   return (
