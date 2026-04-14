@@ -334,7 +334,7 @@ export default function useAgent() {
     return () => cleanupRefs.current.forEach((fn) => fn?.());
   }, []);
 
-  const sendMessage = useCallback(({ conversationId, sessionId, prompt, model, cwd, images, files, resumeSessionId, forkSession }) => {
+  const sendMessage = useCallback(({ conversationId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession }) => {
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
@@ -348,7 +348,7 @@ export default function useAgent() {
     });
 
     if (window.api) {
-      window.api.agentStart({ conversationId, sessionId, prompt, model, cwd, images, files, resumeSessionId, forkSession });
+      window.api.agentStart({ conversationId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession });
     }
   }, []);
 
@@ -358,7 +358,7 @@ export default function useAgent() {
     }
   }, []);
 
-  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, model, cwd }) => {
+  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, model, provider, effort, cwd }) => {
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId);
@@ -378,6 +378,8 @@ export default function useAgent() {
         forkSession: true,
         prompt: newText,
         model,
+        provider,
+        effort,
         cwd,
       });
     }
