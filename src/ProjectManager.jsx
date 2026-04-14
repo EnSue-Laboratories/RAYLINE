@@ -336,6 +336,7 @@ export default function ProjectManager() {
             alignItems: "center",
             padding: "0 20px",
             borderBottom: "1px solid rgba(255,255,255,0.04)",
+            marginBottom: 12,
             flexShrink: 0,
           }}
         >
