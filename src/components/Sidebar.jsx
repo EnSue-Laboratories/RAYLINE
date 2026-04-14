@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon } from "lucide-react";
+import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 
 function GitHubIcon({ size = 12 }) {
   return (
@@ -32,18 +33,18 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Drag region + collapse button */}
-      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0, position: "relative" }}>
+      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0, position: "relative" }}>
         <button
           onClick={onToggleSidebar}
           style={{
             position: "absolute",
-            top: 16,
-            right: 16,
+            top: SIDEBAR_TOGGLE_TOP,
+            left: SIDEBAR_TOGGLE_LEFT,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 24,
-            height: 24,
+            width: SIDEBAR_TOGGLE_SIZE,
+            height: SIDEBAR_TOGGLE_SIZE,
             borderRadius: 6,
             background: "rgba(255,255,255,0.04)",
             border: "1px solid rgba(255,255,255,0.06)",

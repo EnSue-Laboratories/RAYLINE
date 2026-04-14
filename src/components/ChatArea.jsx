@@ -7,6 +7,7 @@ import BranchSelector from "./BranchSelector";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 
 export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange }) {
   const s = useFontScale();
@@ -202,13 +203,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           onClick={onToggleSidebar}
           style={{
             position: "fixed",
-            top: 16,
-            left: 80,
+            top: SIDEBAR_TOGGLE_TOP,
+            left: SIDEBAR_TOGGLE_LEFT,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 24,
-            height: 24,
+            width: SIDEBAR_TOGGLE_SIZE,
+            height: SIDEBAR_TOGGLE_SIZE,
             borderRadius: 6,
             background: "rgba(255,255,255,0.04)",
             border: "1px solid rgba(255,255,255,0.06)",
@@ -226,7 +227,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       )}
 
       {/* Drag region matching sidebar spacer */}
-      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0 }} />
+      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0 }} />
 
       {/* Top bar — aligns with sidebar header */}
       <div
