@@ -65,6 +65,7 @@ against that renderer.
 - `npm run build` - build the renderer for production
 - `npm run build:electron` - build the renderer and package the desktop app
 - `npm run lint` - run ESLint
+- `npm run verify` - run the local build smoke check used in CI
 - `npm run preview` - preview the production renderer build
 - `npm run rebuild` - rebuild `node-pty` for the active Electron version
 
