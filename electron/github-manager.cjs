@@ -58,12 +58,44 @@ async function checkAuth() {
 }
 
 async function listUserRepos(limit = 100) {
-  const raw = await gh([
+  // Fetch personal repos
+  const personalRaw = await gh([
     "repo", "list",
     "--json", "nameWithOwner,description",
     "--limit", String(limit),
   ]);
-  return JSON.parse(raw);
+  const personal = JSON.parse(personalRaw);
+
+  // Fetch org repos
+  let orgRepos = [];
+  try {
+    const orgsRaw = await gh(["api", "/user/orgs", "--jq", ".[].login"]);
+    const orgs = orgsRaw.split("\n").filter(Boolean);
+    const orgResults = await Promise.all(
+      orgs.map(async (org) => {
+        try {
+          const raw = await gh([
+            "repo", "list", org,
+            "--json", "nameWithOwner,description",
+            "--limit", String(limit),
+          ]);
+          return JSON.parse(raw);
+        } catch { return []; }
+      })
+    );
+    orgRepos = orgResults.flat();
+  } catch { /* no orgs or no access */ }
+
+  // Deduplicate by nameWithOwner
+  const seen = new Set();
+  const all = [];
+  for (const r of [...personal, ...orgRepos]) {
+    if (!seen.has(r.nameWithOwner)) {
+      seen.add(r.nameWithOwner);
+      all.push(r);
+    }
+  }
+  return all;
 }
 
 async function listIssues(repo, state = "open") {
