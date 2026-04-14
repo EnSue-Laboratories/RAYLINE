@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { GitPullRequest, GitMerge, GitPullRequestClosed, Copy } from "lucide-react";
+import { GitPullRequest, GitMerge, GitPullRequestClosed, Copy, Check } from "lucide-react";
 
 function timeAgo(dateStr) {
   const now = Date.now();
@@ -19,6 +19,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem })
   const [prs, setPrs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
 
   async function fetchPRs() {
     setLoading(true);
@@ -154,15 +155,20 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem })
                   e.stopPropagation();
                   const url = `https://github.com/${item._repo}/pull/${item.number}`;
                   navigator.clipboard.writeText(`#${item.number} ${item.title} ${url}`);
+                  const id = `${item._repo}-${item.number}`;
+                  setCopiedId(id);
+                  setTimeout(() => setCopiedId((v) => v === id ? null : v), 1500);
                 }}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
                   background: "none", border: "none", cursor: "pointer",
-                  color: "rgba(255,255,255,0.2)", padding: 2, flexShrink: 0,
-                  opacity: 0, transition: "opacity .15s",
+                  color: copiedId === `${item._repo}-${item.number}` ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.2)",
+                  padding: 2, flexShrink: 0,
+                  opacity: copiedId === `${item._repo}-${item.number}` ? 1 : 0,
+                  transition: "opacity .15s, color .15s",
                 }}
               >
-                <Copy size={12} strokeWidth={1.5} />
+                {copiedId === `${item._repo}-${item.number}` ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
               </button>
               <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11, flexShrink: 0 }}>
                 {repoShort}
