@@ -112,7 +112,7 @@ export default function BranchSelector({ cwd, onCwdChange }) {
           cursor: "pointer",
           transition: "all .2s",
           letterSpacing: ".04em",
-          maxWidth: 160,
+          maxWidth: 220,
         }}
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
