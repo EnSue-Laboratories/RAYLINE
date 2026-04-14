@@ -82,11 +82,13 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, s
     args.push("-c", `model_reasoning_effort="${effort}"`);
   }
 
-  // Working directory
+  // Working directory — only pass -C for new sessions (resume doesn't accept it)
   let launchCwd = process.cwd();
   if (cwd && isDirectory(cwd)) {
     launchCwd = cwd;
-    args.push("-C", cwd);
+    if (!resumeSessionId) {
+      args.push("-C", cwd);
+    }
   } else if (cwd) {
     const error = `Invalid working directory: ${cwd}`;
     log(error);
