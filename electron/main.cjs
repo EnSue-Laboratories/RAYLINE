@@ -521,6 +521,7 @@ ipcMain.handle("gh-add-comment", (_e, repo, number, body) => ghManager.addCommen
 ipcMain.handle("gh-list-collaborators", (_e, repo) => ghManager.listCollaborators(repo));
 ipcMain.handle("gh-assign-issue", (_e, repo, number, assignees) => ghManager.assignIssue(repo, number, assignees));
 ipcMain.handle("gh-unassign-issue", (_e, repo, number, assignees) => ghManager.unassignIssue(repo, number, assignees));
+ipcMain.handle("gh-checkout-pr", (_e, repo, prNumber) => ghManager.checkoutPR(repo, prNumber));
 
 ipcMain.handle("gh-load-pm-state", async () => {
   try {

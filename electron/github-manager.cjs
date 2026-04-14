@@ -127,6 +127,13 @@ async function unassignIssue(repo, number, assignees) {
   return JSON.parse(raw);
 }
 
+async function checkoutPR(repo, prNumber) {
+  // Use gh pr checkout which handles fetching the branch
+  const [owner, name] = repo.split("/");
+  await gh(["pr", "checkout", String(prNumber), "-R", repo]);
+  return { success: true };
+}
+
 module.exports = {
   checkAuth,
   listUserRepos,
@@ -139,4 +146,5 @@ module.exports = {
   listCollaborators,
   assignIssue,
   unassignIssue,
+  checkoutPR,
 };

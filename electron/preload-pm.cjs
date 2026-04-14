@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("ghApi", {
   listCollaborators: (repo) => ipcRenderer.invoke("gh-list-collaborators", repo),
   assignIssue: (repo, number, assignees) => ipcRenderer.invoke("gh-assign-issue", repo, number, assignees),
   unassignIssue: (repo, number, assignees) => ipcRenderer.invoke("gh-unassign-issue", repo, number, assignees),
+  checkoutPR: (repo, prNumber) => ipcRenderer.invoke("gh-checkout-pr", repo, prNumber),
   loadPmState: () => ipcRenderer.invoke("gh-load-pm-state"),
   savePmState: (state) => ipcRenderer.invoke("gh-save-pm-state", state),
 });
