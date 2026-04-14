@@ -275,7 +275,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
-          <BranchSelector cwd={cwd} onCwdChange={onCwdChange} />
+          <BranchSelector cwd={cwd} onCwdChange={onCwdChange} hasMessages={convo?.msgs?.length > 0} />
           <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />
           {onToggleTerminal && (
             <button

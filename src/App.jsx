@@ -471,6 +471,8 @@ export default function App() {
           onCwdChange={(newCwd) => {
             setCwd(newCwd);
             if (active) {
+              // Assign a new sessionId so next message starts a fresh Claude session
+              // in the new cwd instead of trying to --resume the old one
               setConvoList((p) =>
                 p.map((c) => c.id === active ? { ...c, cwd: newCwd } : c)
               );

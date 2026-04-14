@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { GitBranch, Plus, GitFork, Check, X } from "lucide-react";
+import { GitBranch, Plus, Check, X, ChevronDown } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-export default function BranchSelector({ cwd, onCwdChange }) {
+export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
   const s = useFontScale();
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(null);
@@ -14,6 +14,7 @@ export default function BranchSelector({ cwd, onCwdChange }) {
   const [error, setError] = useState(null);
   const ref = useRef(null);
   const inputRef = useRef(null);
+  const [alignRight, setAlignRight] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!cwd || !window.api) return;
@@ -43,6 +44,14 @@ export default function BranchSelector({ cwd, onCwdChange }) {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  // Compute alignment from button position before dropdown renders
+  const computeAlign = useCallback(() => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      setAlignRight(rect.left + 240 > window.innerWidth - 8);
+    }
+  }, []);
+
   // Focus input when creating
   useEffect(() => {
     if (creating && inputRef.current) inputRef.current.focus();
@@ -66,9 +75,9 @@ export default function BranchSelector({ cwd, onCwdChange }) {
     setError(null);
     try {
       if (mode === "worktree") {
-        // Create worktree as sibling directory
+        // Create worktree in dedicated .worktrees/ directory
         const basePath = cwd.replace(/\/$/, "");
-        const wtPath = `${basePath}-${name}`;
+        const wtPath = `${basePath}/.worktrees/${name}`;
         await window.api.gitWorktreeAdd(cwd, wtPath, name);
         if (onCwdChange) onCwdChange(wtPath);
       } else {
@@ -92,12 +101,17 @@ export default function BranchSelector({ cwd, onCwdChange }) {
 
   if (!cwd || !current) return null;
 
-  const hasWorktrees = worktrees.length > 1;
+  // Find the main worktree (first one is always the main repo)
+  const mainWorktree = worktrees.find((w) => !w.bare) || null;
+  const isInWorktree = mainWorktree && cwd !== mainWorktree.path;
+
+  // Worktree switching is disabled mid-conversation
+  const worktreeLocked = hasMessages;
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button
-        onClick={() => { setOpen(!open); setCreating(false); setError(null); refresh(); }}
+        onClick={() => { computeAlign(); setOpen(!open); setCreating(false); setError(null); refresh(); }}
         style={{
           display: "flex",
           alignItems: "center",
@@ -117,7 +131,6 @@ export default function BranchSelector({ cwd, onCwdChange }) {
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
       >
-        <GitBranch size={11} strokeWidth={2} />
         <span style={{
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -125,9 +138,7 @@ export default function BranchSelector({ cwd, onCwdChange }) {
         }}>
           {current}
         </span>
-        {hasWorktrees && (
-          <GitFork size={9} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />
-        )}
+        <ChevronDown size={11} strokeWidth={2} />
       </button>
 
       {open && (
@@ -135,12 +146,12 @@ export default function BranchSelector({ cwd, onCwdChange }) {
           style={{
             position: "absolute",
             top: "calc(100% + 6px)",
-            left: 0,
+            ...(alignRight ? { right: 0 } : { left: 0 }),
             zIndex: 200,
             minWidth: 240,
             maxWidth: 320,
-            background: "rgba(8,8,12,0.92)",
-            backdropFilter: "blur(32px)",
+            background: "rgba(8,8,12,0.55)",
+            backdropFilter: "blur(48px) saturate(1.2)",
             border: "1px solid rgba(255,255,255,0.06)",
             borderRadius: 10,
             padding: 3,
@@ -149,36 +160,34 @@ export default function BranchSelector({ cwd, onCwdChange }) {
           }}
         >
           {/* Tab: Branches / Worktrees */}
-          {hasWorktrees && (
-            <div style={{
-              display: "flex",
-              gap: 2,
-              padding: "3px 3px 0",
-              marginBottom: 2,
-            }}>
-              {["branch", "worktree"].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setMode(t)}
-                  style={{
-                    flex: 1,
-                    padding: "5px 0",
-                    background: mode === t ? "rgba(255,255,255,0.04)" : "transparent",
-                    border: "none",
-                    borderRadius: 6,
-                    color: mode === t ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
-                    fontSize: s(9),
-                    fontFamily: "'JetBrains Mono',monospace",
-                    letterSpacing: ".08em",
-                    cursor: "pointer",
-                    transition: "all .15s",
-                  }}
-                >
-                  {t === "branch" ? "BRANCHES" : "WORKTREES"}
-                </button>
-              ))}
-            </div>
-          )}
+          <div style={{
+            display: "flex",
+            gap: 2,
+            padding: "3px 3px 0",
+            marginBottom: 2,
+          }}>
+            {["branch", "worktree"].map((t) => (
+              <button
+                key={t}
+                onClick={() => setMode(t)}
+                style={{
+                  flex: 1,
+                  padding: "5px 0",
+                  background: mode === t ? "rgba(255,255,255,0.04)" : "transparent",
+                  border: "none",
+                  borderRadius: 6,
+                  color: mode === t ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
+                  fontSize: s(9),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: ".08em",
+                  cursor: "pointer",
+                  transition: "all .15s",
+                }}
+              >
+                {t === "branch" ? "BRANCHES" : "WORKTREES"}
+              </button>
+            ))}
+          </div>
 
           {/* Branch list */}
           {mode === "branch" && (
@@ -220,10 +229,53 @@ export default function BranchSelector({ cwd, onCwdChange }) {
           {/* Worktree list */}
           {mode === "worktree" && (
             <div style={{ maxHeight: 240, overflowY: "auto" }}>
-              {worktrees.filter((w) => !w.bare).map((wt) => (
+              {worktreeLocked && (
+                <div style={{
+                  padding: "6px 12px",
+                  fontSize: s(9),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  color: "rgba(255,255,255,0.25)",
+                  letterSpacing: ".04em",
+                }}>
+                  Start a new chat to switch worktrees
+                </div>
+              )}
+              {/* None option — use main repo directly */}
+              {mainWorktree && (
+                <button
+                  onClick={() => {
+                    if (worktreeLocked || !isInWorktree) return;
+                    onCwdChange?.(mainWorktree.path);
+                    setOpen(false);
+                    refresh();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    padding: "8px 12px",
+                    background: !isInWorktree ? "rgba(255,255,255,0.04)" : "transparent",
+                    border: "none",
+                    borderRadius: 7,
+                    color: !isInWorktree ? "rgba(255,255,255,0.9)" : worktreeLocked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
+                    fontSize: s(11),
+                    fontFamily: "'JetBrains Mono',monospace",
+                    cursor: worktreeLocked && isInWorktree ? "default" : "pointer",
+                    textAlign: "left",
+                    transition: "all .12s",
+                  }}
+                  onMouseEnter={(e) => { if (!worktreeLocked && isInWorktree) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                  onMouseLeave={(e) => { if (isInWorktree) e.currentTarget.style.background = "transparent"; }}
+                >
+                  <span>None</span>
+                  {!isInWorktree && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
+                </button>
+              )}
+              {worktrees.filter((w) => !w.bare && w.path !== mainWorktree?.path).map((wt) => (
                 <button
                   key={wt.path}
-                  onClick={() => handleWorktreeSwitch(wt)}
+                  onClick={() => !worktreeLocked && handleWorktreeSwitch(wt)}
                   style={{
                     display: "flex",
                     flexDirection: "column",
@@ -233,21 +285,20 @@ export default function BranchSelector({ cwd, onCwdChange }) {
                     background: wt.path === cwd ? "rgba(255,255,255,0.04)" : "transparent",
                     border: "none",
                     borderRadius: 7,
-                    color: wt.path === cwd ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+                    color: wt.path === cwd ? "rgba(255,255,255,0.9)" : worktreeLocked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
                     fontSize: s(11),
                     fontFamily: "'JetBrains Mono',monospace",
-                    cursor: "pointer",
+                    cursor: worktreeLocked && wt.path !== cwd ? "default" : "pointer",
                     textAlign: "left",
                     transition: "all .12s",
                     gap: 2,
                   }}
-                  onMouseEnter={(e) => { if (wt.path !== cwd) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                  onMouseEnter={(e) => { if (!worktreeLocked && wt.path !== cwd) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
                   onMouseLeave={(e) => { if (wt.path !== cwd) e.currentTarget.style.background = "transparent"; }}
                 >
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <GitBranch size={10} strokeWidth={2} />
-                    {wt.branch || "detached"}
-                    {wt.path === cwd && <Check size={12} strokeWidth={2} style={{ opacity: 0.5 }} />}
+                  <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 6 }}>
+                    <span>{wt.branch || "detached"}</span>
+                    {wt.path === cwd && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
                   </span>
                   <span style={{
                     fontSize: s(8),
@@ -257,7 +308,7 @@ export default function BranchSelector({ cwd, onCwdChange }) {
                     whiteSpace: "nowrap",
                     maxWidth: "100%",
                   }}>
-                    {wt.path}
+                    {wt.path.split("/").pop()}
                   </span>
                 </button>
               ))}
@@ -380,7 +431,7 @@ export default function BranchSelector({ cwd, onCwdChange }) {
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
             >
               <Plus size={12} strokeWidth={2} />
-              New branch
+              {mode === "worktree" ? "New worktree" : "New branch"}
             </button>
           )}
         </div>
