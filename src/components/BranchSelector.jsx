@@ -427,24 +427,34 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
                         </span>
                       </div>
                       {wt.branch && (
-                        <label style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          marginTop: 6,
-                          fontSize: s(9),
-                          fontFamily: "'JetBrains Mono',monospace",
-                          color: "rgba(255,255,255,0.3)",
-                          cursor: "pointer",
-                        }}>
-                          <input
-                            type="checkbox"
-                            checked={deleteBranchToo}
-                            onChange={(e) => setDeleteBranchToo(e.target.checked)}
-                            style={{ accentColor: "rgba(255,180,180,0.7)" }}
-                          />
+                        <div
+                          onClick={() => setDeleteBranchToo(!deleteBranchToo)}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            marginTop: 6,
+                            fontSize: s(9),
+                            fontFamily: "'JetBrains Mono',monospace",
+                            color: "rgba(255,255,255,0.3)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 14,
+                            height: 14,
+                            borderRadius: 3,
+                            border: "1.5px solid rgba(255,255,255,0.2)",
+                            background: deleteBranchToo ? "rgba(255,180,180,0.5)" : "transparent",
+                            flexShrink: 0,
+                          }}>
+                            {deleteBranchToo && <Check size={10} strokeWidth={2.5} style={{ color: "#fff" }} />}
+                          </span>
                           Also delete branch
-                        </label>
+                        </div>
                       )}
                     </div>
                   );
@@ -485,7 +495,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
                       }}
                     >
                       <span style={{ display: "flex", alignItems: "center", width: "100%", gap: 6 }}>
-                        <span>{wt.branch || "detached"}</span>
+                        <span>{wt.path.split("/").pop()}</span>
                         {isActive && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
                       </span>
                       <span style={{
@@ -496,7 +506,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
                         whiteSpace: "nowrap",
                         maxWidth: "100%",
                       }}>
-                        {wt.path.split("/").pop()}
+                        {wt.branch || "detached"}
                       </span>
                     </button>
                     {!isActive && (
