@@ -202,8 +202,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           onClick={onToggleSidebar}
           style={{
             position: "fixed",
-            top: 52,
-            left: 16,
+            top: 16,
+            left: 80,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
