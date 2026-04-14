@@ -15,4 +15,5 @@ contextBridge.exposeInMainWorld("ghApi", {
   checkoutPR: (repo, prNumber) => ipcRenderer.invoke("gh-checkout-pr", repo, prNumber),
   loadPmState: () => ipcRenderer.invoke("gh-load-pm-state"),
   savePmState: (state) => ipcRenderer.invoke("gh-save-pm-state", state),
+  readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
 });

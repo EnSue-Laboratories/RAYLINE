@@ -527,10 +527,10 @@ ipcMain.handle("gh-load-pm-state", async () => {
   try {
     if (fs.existsSync(stateFilePath)) {
       const data = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
-      return { repos: data.pmRepos || [] };
+      return { repos: data.pmRepos || [], wallpaper: data.wallpaper || null };
     }
   } catch {}
-  return { repos: [] };
+  return { repos: [], wallpaper: null };
 });
 
 ipcMain.handle("gh-save-pm-state", async (_e, pmState) => {

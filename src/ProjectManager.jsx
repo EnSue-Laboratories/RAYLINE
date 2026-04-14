@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { Plus, GitFork, X } from "lucide-react";
+import AuroraCanvas from "./components/AuroraCanvas";
+import Grain from "./components/Grain";
 import RepoManager from "./pm-components/RepoManager";
 import IssueList from "./pm-components/IssueList";
 import PRList from "./pm-components/PRList";
@@ -126,10 +128,19 @@ export default function ProjectManager() {
   const [authOk, setAuthOk] = useState(null);
   const [showAddRepo, setShowAddRepo] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
+  const [wallpaper, setWallpaper] = useState(null);
 
   useEffect(() => {
     window.ghApi.checkAuth().then(({ ok }) => setAuthOk(ok));
-    window.ghApi.loadPmState().then(({ repos }) => setRepos(repos));
+    window.ghApi.loadPmState().then(({ repos, wallpaper: wp }) => {
+      setRepos(repos);
+      if (wp?.path) {
+        setWallpaper(wp);
+        window.ghApi.readImage(wp.path).then((dataUrl) => {
+          if (dataUrl) setWallpaper((prev) => prev ? { ...prev, dataUrl } : prev);
+        });
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -215,8 +226,30 @@ export default function ProjectManager() {
         background: "#000",
         color: "rgba(255,255,255,0.85)",
         fontFamily: "system-ui, sans-serif",
+        position: "relative",
       }}
     >
+      {/* Background — wallpaper or aurora */}
+      {wallpaper?.dataUrl ? (
+        <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
+          <div style={{
+            position: "absolute", inset: 0,
+            backgroundImage: `url(${wallpaper.dataUrl})`,
+            backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+            filter: wallpaper.imgBlur ? `blur(${wallpaper.imgBlur}px)` : "none",
+            transform: wallpaper.imgBlur ? "scale(1.05)" : "none",
+          }} />
+          {(wallpaper.imgDarken > 0) && (
+            <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${wallpaper.imgDarken / 100})` }} />
+          )}
+        </div>
+      ) : (
+        <>
+          <AuroraCanvas />
+          <Grain />
+        </>
+      )}
+
       {/* Drag region */}
       <div
         style={{
@@ -237,9 +270,11 @@ export default function ProjectManager() {
           minWidth: 200,
           display: "flex",
           flexDirection: "column",
-          borderRight: "1px solid rgba(255,255,255,0.04)",
-          background: "rgba(0,0,0,0.65)",
-          backdropFilter: "blur(56px) saturate(1.1)",
+          borderRight: "1px solid rgba(255,255,255,0.025)",
+          position: "relative",
+          zIndex: 10,
+          background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
+          backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
         }}
       >
         {/* Spacer for traffic lights */}
@@ -324,6 +359,8 @@ export default function ProjectManager() {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          position: "relative",
+          zIndex: 10,
         }}
       >
         {/* Traffic light spacer */}
