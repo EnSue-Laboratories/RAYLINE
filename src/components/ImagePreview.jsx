@@ -1,6 +1,8 @@
 import { X, FileText } from "lucide-react";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function ImagePreview({ items, onRemove }) {
+  const s = useFontScale();
   if (!items || items.length === 0) return null;
 
   return (
@@ -30,7 +32,7 @@ export default function ImagePreview({ items, onRemove }) {
               display: "flex",
               alignItems: "center",
               gap: 6,
-              fontSize: 11,
+              fontSize: s(11),
               fontFamily: "'JetBrains Mono',monospace",
               color: "rgba(255,255,255,0.5)",
             }}>

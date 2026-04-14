@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import mermaid from "mermaid";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 let mermaidInitialized = false;
 let renderCounter = 0;
@@ -100,6 +101,7 @@ function initMermaid() {
 }
 
 export default function MermaidBlock({ code }) {
+  const s = useFontScale();
   const [svg, setSvg] = useState(null);
   const [error, setError] = useState(false);
   const lastRendered = useRef("");
@@ -144,7 +146,7 @@ export default function MermaidBlock({ code }) {
         borderRadius: 8,
         padding: "12px 14px",
         overflow: "auto",
-        fontSize: 12,
+        fontSize: s(12),
         fontFamily: "'JetBrains Mono',monospace",
         margin: "8px 0 12px",
         lineHeight: 1.6,
@@ -172,7 +174,7 @@ export default function MermaidBlock({ code }) {
         margin: "8px 0 12px",
         textAlign: "center",
         color: "rgba(255,255,255,0.25)",
-        fontSize: 11,
+        fontSize: s(11),
         fontFamily: "'JetBrains Mono',monospace",
         // Preserve last known height to prevent scroll jumps
         minHeight: lastHeight.current || undefined,

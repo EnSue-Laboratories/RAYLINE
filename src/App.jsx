@@ -8,6 +8,7 @@ import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
 import { getM }     from "./data/models";
+import { FontSizeContext } from "./contexts/FontSizeContext";
 
 function logCheckpoint(...args) {
   console.log("[checkpoint-ui]", ...args);
@@ -25,6 +26,7 @@ export default function App() {
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [wallpaper, setWallpaper] = useState(null); // { path, opacity, blur }
+  const [fontSize, setFontSize] = useState(15);
   const [showSettings, setShowSettings] = useState(false);
   const messageQueue = useRef([]);
   const [queuedMessages, setQueuedMessages] = useState([]);
@@ -38,6 +40,7 @@ export default function App() {
         if (state.active) setActive(state.active);
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(state.defaultModel);
+        if (state.fontSize) setFontSize(state.fontSize);
         if (state.wallpaper) {
           setWallpaper(state.wallpaper);
           // Reload data URL from disk (not persisted — too large for JSON)
@@ -61,9 +64,9 @@ export default function App() {
     saveTimer.current = setTimeout(() => {
       // Strip dataUrl before persisting (too large for JSON, reloaded on startup)
       const wpSave = wallpaper ? { path: wallpaper.path, opacity: wallpaper.opacity, blur: wallpaper.blur, imgBlur: wallpaper.imgBlur, imgDarken: wallpaper.imgDarken } : null;
-      window.api.saveState({ convos: convoList, active, cwd, defaultModel, wallpaper: wpSave });
+      window.api.saveState({ convos: convoList, active, cwd, defaultModel, fontSize, wallpaper: wpSave });
     }, 300);
-  }, [convoList, active, cwd, defaultModel, wallpaper, stateLoaded]);
+  }, [convoList, active, cwd, defaultModel, fontSize, wallpaper, stateLoaded]);
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
@@ -378,6 +381,7 @@ export default function App() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
+    <FontSizeContext.Provider value={fontSize}>
     <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative" }}>
       {wallpaper?.dataUrl ? (
         <div style={{
@@ -444,6 +448,8 @@ export default function App() {
         <Settings
           wallpaper={wallpaper}
           onWallpaperChange={setWallpaper}
+          fontSize={fontSize}
+          onFontSizeChange={setFontSize}
           onClose={() => setShowSettings(false)}
         />
       ) : (
@@ -481,5 +487,6 @@ export default function App() {
         wallpaper={wallpaper}
       />
     </div>
+    </FontSizeContext.Provider>
   );
 }

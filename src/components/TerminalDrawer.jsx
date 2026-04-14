@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 // ── Shared style helpers ──────────────────────────────────────────────────────
 
@@ -233,6 +234,7 @@ function TerminalViewport({
 // ── EmptyState ────────────────────────────────────────────────────────────────
 
 function EmptyState({ onCreate }) {
+  const s = useFontScale();
   const btnHover = useHover(
     {
       marginTop: 12,
@@ -242,7 +244,7 @@ function EmptyState({ onCreate }) {
       border: "1px solid rgba(255,255,255,0.1)",
       color: "rgba(255,255,255,0.45)",
       cursor: "pointer",
-      fontSize: 11,
+      fontSize: s(11),
       fontFamily: FONT_FAMILY,
       letterSpacing: ".06em",
       transition: "background .15s, color .15s",
@@ -269,7 +271,7 @@ function EmptyState({ onCreate }) {
       <div
         style={{
           marginTop: 8,
-          fontSize: 11,
+          fontSize: s(11),
           fontFamily: FONT_FAMILY,
           color: "rgba(255,255,255,0.2)",
           letterSpacing: ".06em",
@@ -287,6 +289,7 @@ function EmptyState({ onCreate }) {
 // ── TabBar ────────────────────────────────────────────────────────────────────
 
 function TabBar({ sessions, activeSession, onSelectSession, onKillSession }) {
+  const s = useFontScale();
   return (
     <div
       style={{
@@ -323,7 +326,7 @@ function TabBar({ sessions, activeSession, onSelectSession, onKillSession }) {
           >
             <span
               style={{
-                fontSize: 11,
+                fontSize: s(11),
                 fontFamily: FONT_FAMILY,
                 color: isActive ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)",
                 maxWidth: 120,
@@ -385,6 +388,7 @@ export default function TerminalDrawer({
   cwd,
   wallpaper,
 }) {
+  const s = useFontScale();
   const [width, setWidth] = useState(480);
   const dragging = useRef(false);
   const startX = useRef(0);
@@ -484,7 +488,7 @@ export default function TerminalDrawer({
           />
           <span
             style={{
-              fontSize: 10,
+              fontSize: s(10),
               fontFamily: FONT_FAMILY,
               color: "rgba(255,255,255,0.35)",
               letterSpacing: ".08em",

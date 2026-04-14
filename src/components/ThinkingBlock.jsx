@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronRight, Loader2, Check } from "lucide-react";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function ThinkingBlock({ text, isThinking }) {
   const [open, setOpen] = useState(false);
+  const s = useFontScale();
   const hasText = Boolean(text && text.trim().length > 0);
   const startTime = useRef(Date.now());
   const [elapsed, setElapsed] = useState(0);
@@ -50,7 +52,7 @@ export default function ThinkingBlock({ text, isThinking }) {
         alignItems: "center",
         gap: 6,
         color: "rgba(255,255,255,0.25)",
-        fontSize: 11,
+        fontSize: s(11),
         fontFamily: "'JetBrains Mono',monospace",
         letterSpacing: ".04em",
       }}>
@@ -83,7 +85,7 @@ export default function ThinkingBlock({ text, isThinking }) {
           border: "none",
           cursor: "pointer",
           color: "rgba(255,255,255,0.3)",
-          fontSize: 11,
+          fontSize: s(11),
           fontFamily: "'JetBrains Mono',monospace",
           letterSpacing: ".04em",
           transition: "color .15s",
@@ -110,7 +112,7 @@ export default function ThinkingBlock({ text, isThinking }) {
       {open && hasText && (
         <div style={{
           padding: "0 12px 10px",
-          fontSize: 12,
+          fontSize: s(12),
           lineHeight: 1.6,
           fontFamily: "'JetBrains Mono',monospace",
           color: "rgba(255,255,255,0.25)",

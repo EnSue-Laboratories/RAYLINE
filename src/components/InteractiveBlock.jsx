@@ -1,7 +1,9 @@
 import { useRef, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function InteractiveBlock({ code, isStreaming }) {
+  const s = useFontScale();
   const iframeRef = useRef(null);
   const [height, setHeight] = useState(300);
   const [loaded, setLoaded] = useState(false);
@@ -31,7 +33,7 @@ export default function InteractiveBlock({ code, isStreaming }) {
           }}
         />
         <span style={{
-          fontSize: 9,
+          fontSize: s(9),
           fontFamily: "'JetBrains Mono',monospace",
           color: "rgba(255,255,255,0.2)",
           letterSpacing: ".1em",
@@ -86,7 +88,7 @@ ${code}
       position: "relative",
     }}>
       <div style={{
-        fontSize: 8,
+        fontSize: s(8),
         fontFamily: "'JetBrains Mono',monospace",
         color: "rgba(255,255,255,0.2)",
         letterSpacing: ".1em",

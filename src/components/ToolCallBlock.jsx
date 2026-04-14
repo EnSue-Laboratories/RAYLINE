@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, ChevronDown, Terminal, FileText, Pencil, Search, Code, Loader2 } from "lucide-react";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 const TOOL_ICONS = {
   Bash: Terminal,
@@ -41,6 +42,7 @@ function getPreview(tool) {
 
 export default function ToolCallBlock({ tool }) {
   const [expanded, setExpanded] = useState(false);
+  const s = useFontScale();
   const Icon = TOOL_ICONS[tool.name] || Code;
   const isRunning = tool.status === "running";
   const preview = getPreview(tool);
@@ -67,7 +69,7 @@ export default function ToolCallBlock({ tool }) {
           border: "none",
           color: "rgba(255,255,255,0.5)",
           cursor: "pointer",
-          fontSize: 11,
+          fontSize: s(11),
           fontFamily: "'JetBrains Mono',monospace",
           textAlign: "left",
         }}
@@ -77,7 +79,7 @@ export default function ToolCallBlock({ tool }) {
         {preview && !expanded && (
           <span style={{
             color: "rgba(255,255,255,0.25)",
-            fontSize: 10,
+            fontSize: s(10),
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -93,14 +95,14 @@ export default function ToolCallBlock({ tool }) {
             <Loader2 size={10} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)", animation: "spin 1s linear infinite" }} />
           )}
           {tool.status === "done" && (
-            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10 }}>done</span>
+            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: s(10) }}>done</span>
           )}
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
       </button>
 
       {expanded && (
-        <div style={{ padding: "0 12px 10px", fontSize: 11, fontFamily: "'JetBrains Mono',monospace" }}>
+        <div style={{ padding: "0 12px 10px", fontSize: s(11), fontFamily: "'JetBrains Mono',monospace" }}>
           {tool.args && Object.keys(tool.args).length > 0 && (
             <div style={{ marginBottom: 8 }}>
               <div style={{ color: "rgba(255,255,255,0.3)", marginBottom: 4 }}>ARGS</div>
@@ -112,7 +114,7 @@ export default function ToolCallBlock({ tool }) {
                 padding: 8,
                 background: "rgba(0,0,0,0.3)",
                 borderRadius: 6,
-                fontSize: 10,
+                fontSize: s(10),
                 maxHeight: 200,
                 overflow: "auto",
               }}>
@@ -131,7 +133,7 @@ export default function ToolCallBlock({ tool }) {
                 padding: 8,
                 background: "rgba(0,0,0,0.3)",
                 borderRadius: 6,
-                fontSize: 10,
+                fontSize: s(10),
                 maxHeight: 300,
                 overflow: "auto",
               }}>

@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
+import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function CopyBtn({ text }) {
   const [ok, set] = useState(false);
+  const s = useFontScale();
 
   const handleCopy = () => {
     if (navigator.clipboard) {
@@ -26,7 +28,7 @@ export default function CopyBtn({ text }) {
         display: "inline-flex",
         alignItems: "center",
         gap: 3,
-        fontSize: 10,
+        fontSize: s(10),
         fontFamily: "'JetBrains Mono',monospace",
       }}
       onMouseEnter={(e) => { if (!ok) e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
