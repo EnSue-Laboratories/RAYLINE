@@ -48,17 +48,21 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   );
 
   const handleChooseImage = async () => {
-    const filePath = await window.api.selectWallpaper();
+    const filePath = await window.api.selectWallpaper(local.path);
     if (!filePath) return;
     const dataUrl = await window.api.readImage(filePath);
     update({ path: filePath, dataUrl });
   };
 
-  const handleRemove = () => {
+  const handleRemove = async () => {
+    const previousPath = local.path;
     const next = { ...DEFAULTS };
     setLocal(next);
     clearTimeout(debounceRef.current);
     onWallpaperChange(null);
+    if (previousPath && window.api?.deleteWallpaper) {
+      await window.api.deleteWallpaper(previousPath);
+    }
   };
 
   const pathHint =
