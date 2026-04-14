@@ -230,13 +230,50 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               <div
                 style={{
                   marginTop: 6,
-                  fontSize: s(9),
-                  fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.35)",
-                  letterSpacing: ".08em",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
                 }}
               >
-                {cm.tag}
+                <div
+                  style={{
+                    fontSize: s(9),
+                    fontFamily: "'JetBrains Mono',monospace",
+                    color: "rgba(255,255,255,0.35)",
+                    letterSpacing: ".08em",
+                    minWidth: 0,
+                  }}
+                >
+                  {cm.tag}
+                </div>
+
+                {c.isStreaming && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      flexShrink: 0,
+                      fontSize: s(8.5),
+                      fontFamily: "'JetBrains Mono',monospace",
+                      color: isActive ? "rgba(165,255,210,0.9)" : "rgba(165,255,210,0.75)",
+                      letterSpacing: ".08em",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "rgba(165,255,210,0.95)",
+                        boxShadow: "0 0 10px rgba(120,255,190,0.45)",
+                        animation: "dotPulse 1.2s ease-in-out infinite",
+                      }}
+                    />
+                    RUNNING
+                  </div>
+                )}
               </div>
             </div>
           );
