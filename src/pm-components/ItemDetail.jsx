@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, GitBranch, Plus, Check, CheckCircle2, GitMerge, RotateCcw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -42,6 +42,18 @@ export default function ItemDetail({ repo, number, type, onBack }) {
   const [showAssignMenu, setShowAssignMenu] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const assignRef = useRef(null);
+
+  useEffect(() => {
+    if (!showAssignMenu) return;
+    const handleClick = (e) => {
+      if (assignRef.current && !assignRef.current.contains(e.target)) {
+        setShowAssignMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showAssignMenu]);
 
   const fetchAll = () => {
     setLoading(true);
@@ -240,6 +252,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           ) : (
             <span style={{ fontStyle: "italic", fontSize: 11 }}>None</span>
           )}
+          <div ref={assignRef} style={{ position: "relative" }}>
           <button
             onClick={() => setShowAssignMenu((v) => !v)}
             style={{
@@ -280,6 +293,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               })}
             </div>
           )}
+          </div>
         </div>
 
         {/* Action buttons row — only checkout stays here */}
