@@ -257,7 +257,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                       flexShrink: 0,
                       fontSize: s(8.5),
                       fontFamily: "'JetBrains Mono',monospace",
-                      color: isActive ? "rgba(165,255,210,0.9)" : "rgba(165,255,210,0.75)",
+                      color: "rgba(255,255,255,0.35)",
                       letterSpacing: ".08em",
                     }}
                   >
@@ -266,8 +266,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                         width: 6,
                         height: 6,
                         borderRadius: "50%",
-                        background: "rgba(165,255,210,0.95)",
-                        boxShadow: "0 0 10px rgba(120,255,190,0.45)",
+                        background: "rgba(255,255,255,0.35)",
                         animation: "dotPulse 1.2s ease-in-out infinite",
                       }}
                     />
