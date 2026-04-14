@@ -467,6 +467,15 @@ export default function App() {
           terminalOpen={terminal.drawerOpen}
           terminalCount={terminal.sessions.length}
           wallpaper={wallpaper}
+          cwd={activeConvo?.cwd || cwd}
+          onCwdChange={(newCwd) => {
+            setCwd(newCwd);
+            if (active) {
+              setConvoList((p) =>
+                p.map((c) => c.id === active ? { ...c, cwd: newCwd } : c)
+              );
+            }
+          }}
         />
       )}
 

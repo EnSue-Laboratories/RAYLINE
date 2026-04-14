@@ -306,6 +306,81 @@ ipcMain.handle("terminal-saved-metadata", async () => {
   return [];
 });
 
+// IPC: git operations
+const { execFile } = require("child_process");
+function git(args, cwd) {
+  return new Promise((resolve, reject) => {
+    execFile("git", args, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }, timeout: 10000 }, (err, stdout, stderr) => {
+      if (err) reject(new Error(stderr.trim() || err.message));
+      else resolve(stdout.trim());
+    });
+  });
+}
+
+ipcMain.handle("git-branches", async (_event, cwd) => {
+  if (!cwd) return { current: null, branches: [] };
+  try {
+    const raw = await git(["branch", "--format=%(refname:short)\t%(HEAD)"], cwd);
+    let current = null;
+    const branches = raw.split("\n").filter(Boolean).map((line) => {
+      const [name, head] = line.split("\t");
+      if (head === "*") current = name;
+      return name;
+    });
+    return { current, branches };
+  } catch {
+    return { current: null, branches: [] };
+  }
+});
+
+ipcMain.handle("git-create-branch", async (_event, cwd, branchName) => {
+  await git(["checkout", "-b", branchName], cwd);
+  return { success: true };
+});
+
+ipcMain.handle("git-checkout", async (_event, cwd, branchName) => {
+  await git(["checkout", branchName], cwd);
+  return { success: true };
+});
+
+ipcMain.handle("git-worktree-list", async (_event, cwd) => {
+  if (!cwd) return [];
+  try {
+    const raw = await git(["worktree", "list", "--porcelain"], cwd);
+    const worktrees = [];
+    let current = {};
+    for (const line of raw.split("\n")) {
+      if (line.startsWith("worktree ")) {
+        if (current.path) worktrees.push(current);
+        current = { path: line.slice(9) };
+      } else if (line.startsWith("HEAD ")) {
+        current.head = line.slice(5);
+      } else if (line.startsWith("branch ")) {
+        current.branch = line.slice(7).replace("refs/heads/", "");
+      } else if (line === "bare") {
+        current.bare = true;
+      } else if (line === "") {
+        if (current.path) worktrees.push(current);
+        current = {};
+      }
+    }
+    if (current.path) worktrees.push(current);
+    return worktrees;
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle("git-worktree-add", async (_event, cwd, worktreePath, branchName) => {
+  await git(["worktree", "add", worktreePath, "-b", branchName], cwd);
+  return { success: true, path: worktreePath };
+});
+
+ipcMain.handle("git-worktree-remove", async (_event, cwd, worktreePath) => {
+  await git(["worktree", "remove", worktreePath], cwd);
+  return { success: true };
+});
+
 app.on("before-quit", () => {
   // Save terminal session metadata for re-launch
   const meta = terminalManager.getSessionMetadata();

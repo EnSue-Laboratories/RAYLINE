@@ -46,6 +46,14 @@ contextBridge.exposeInMainWorld("api", {
   quickExplain: (opts) => ipcRenderer.invoke("quick-explain", opts),
   getSystemInfo: () => ipcRenderer.invoke("system-info"),
 
+  // Git operations
+  gitBranches: (cwd) => ipcRenderer.invoke("git-branches", cwd),
+  gitCreateBranch: (cwd, name) => ipcRenderer.invoke("git-create-branch", cwd, name),
+  gitCheckout: (cwd, name) => ipcRenderer.invoke("git-checkout", cwd, name),
+  gitWorktreeList: (cwd) => ipcRenderer.invoke("git-worktree-list", cwd),
+  gitWorktreeAdd: (cwd, path, branch) => ipcRenderer.invoke("git-worktree-add", cwd, path, branch),
+  gitWorktreeRemove: (cwd, path) => ipcRenderer.invoke("git-worktree-remove", cwd, path),
+
   // Terminal sessions
   terminalCreate: (opts) => ipcRenderer.invoke("terminal-create", opts),
   terminalSend: ({ name, text }) => ipcRenderer.invoke("terminal-send", { name, text }),
