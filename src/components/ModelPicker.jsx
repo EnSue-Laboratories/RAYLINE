@@ -59,32 +59,40 @@ export default function ModelPicker({ value, onChange }) {
             animation: "dropIn .15s ease",
           }}
         >
-          {MODELS.map((mm) => (
-            <button
-              key={mm.id}
-              onClick={() => { onChange(mm.id); set(false); }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                width: "100%",
-                padding: "9px 13px",
-                background: mm.id === value ? "rgba(255,255,255,0.04)" : "transparent",
-                border: "none",
-                borderRadius: 7,
-                color: mm.id === value ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
-                fontSize: s(11),
-                fontFamily: "'JetBrains Mono',monospace",
-                cursor: "pointer",
-                textAlign: "left",
-                transition: "all .12s",
-              }}
-              onMouseEnter={(e) => { if (mm.id !== value) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-              onMouseLeave={(e) => { if (mm.id !== value) e.currentTarget.style.background = "transparent"; }}
-            >
-              {mm.name}
-              <span style={{ fontSize: s(9), opacity: 0.4, letterSpacing: ".1em" }}>{mm.tag}</span>
-            </button>
+          {["claude", "codex"].map((provider, gi) => (
+            <div key={provider}>
+              {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
+              <div style={{ padding: "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
+                {provider.toUpperCase()}
+              </div>
+              {MODELS.filter(mm => mm.provider === provider).map((mm) => (
+                <button
+                  key={mm.id}
+                  onClick={() => { onChange(mm.id); set(false); }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    padding: "9px 13px",
+                    background: mm.id === value ? "rgba(255,255,255,0.04)" : "transparent",
+                    border: "none",
+                    borderRadius: 7,
+                    color: mm.id === value ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+                    fontSize: s(11),
+                    fontFamily: "'JetBrains Mono',monospace",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all .12s",
+                  }}
+                  onMouseEnter={(e) => { if (mm.id !== value) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                  onMouseLeave={(e) => { if (mm.id !== value) e.currentTarget.style.background = "transparent"; }}
+                >
+                  {mm.name}
+                  <span style={{ fontSize: s(9), opacity: 0.4, letterSpacing: ".1em" }}>{mm.tag}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       )}

@@ -300,11 +300,11 @@ function TabBar({ sessions, activeSession, onSelectSession, onKillSession }) {
         scrollbarWidth: "none",
       }}
     >
-      {sessions.map((s) => {
-        const isActive = s.name === activeSession;
+      {sessions.map((session) => {
+        const isActive = session.name === activeSession;
         return (
           <div
-            key={s.name}
+            key={session.name}
             style={{
               display: "flex",
               alignItems: "center",
@@ -322,7 +322,7 @@ function TabBar({ sessions, activeSession, onSelectSession, onKillSession }) {
             onMouseLeave={(e) => {
               if (!isActive) e.currentTarget.style.background = "transparent";
             }}
-            onClick={() => onSelectSession(s.name)}
+            onClick={() => onSelectSession(session.name)}
           >
             <span
               style={{
@@ -336,12 +336,12 @@ function TabBar({ sessions, activeSession, onSelectSession, onKillSession }) {
                 letterSpacing: ".04em",
               }}
             >
-              {s.name}
+              {session.name}
             </span>
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onKillSession(s.name);
+                onKillSession(session.name);
               }}
               title="Kill session"
               style={{

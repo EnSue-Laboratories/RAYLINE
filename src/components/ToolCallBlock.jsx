@@ -2,6 +2,8 @@ import { useState } from "react";
 import { ChevronRight, ChevronDown, Terminal, FileText, Pencil, Search, Code, Loader2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
+const BODY_PREVIEW_LIMIT = 2400;
+
 const TOOL_ICONS = {
   Bash: Terminal,
   Read: FileText,
@@ -16,6 +18,15 @@ function truncate(str, max) {
   return str.length > max ? str.slice(0, max) + "..." : str;
 }
 
+function getToolLabel(tool) {
+  if (!tool?.name) return "Tool";
+  if (tool.args?.command && tool.name === tool.args.command) return "Command";
+  if (tool.name.startsWith("/") || tool.name.includes(" -lc ") || tool.name.includes(" --")) {
+    return "Command";
+  }
+  return tool.name;
+}
+
 function getPreview(tool) {
   const args = tool.args;
   if (!args || typeof args !== "object") return null;
@@ -24,6 +35,9 @@ function getPreview(tool) {
     // Replace absolute/home paths with just the binary name
     cmd = cmd.replace(/(?:^|\s)[~\/][\w.~\/-]+\/([\w.-]+)/g, (_, bin) => " " + bin);
     return truncate(cmd.trim(), 30);
+  }
+  if (args.command) {
+    return truncate(args.command.replace(/\s+/g, " ").trim(), 48);
   }
   if (tool.name === "Read") return args.file_path?.split("/").pop();
   if (tool.name === "Edit") return args.file_path?.split("/").pop();
@@ -40,12 +54,74 @@ function getPreview(tool) {
   return null;
 }
 
+function serializeValue(value) {
+  if (value == null) return null;
+  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+
+function ToolBody({ label, value, maxHeight, fontScale }) {
+  const [showFull, setShowFull] = useState(false);
+  const serialized = serializeValue(value);
+  if (!serialized) return null;
+
+  const isTrimmed = serialized.length > BODY_PREVIEW_LIMIT;
+  const displayValue = !showFull && isTrimmed
+    ? `${serialized.slice(0, BODY_PREVIEW_LIMIT)}\n\n... [truncated ${serialized.length - BODY_PREVIEW_LIMIT} chars]`
+    : serialized;
+
+  return (
+    <div style={{ marginBottom: label === "ARGS" ? 8 : 0 }}>
+      <div style={{
+        color: "rgba(255,255,255,0.3)",
+        marginBottom: 4,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+      }}>
+        <span>{label}</span>
+        {isTrimmed && (
+          <button
+            onClick={() => setShowFull((prev) => !prev)}
+            style={{
+              border: "none",
+              background: "none",
+              color: "rgba(255,255,255,0.35)",
+              cursor: "pointer",
+              fontSize: fontScale(10),
+              fontFamily: "'JetBrains Mono',monospace",
+              padding: 0,
+            }}
+          >
+            {showFull ? "show less" : "show full"}
+          </button>
+        )}
+      </div>
+      <pre style={{
+        color: "rgba(255,255,255,0.5)",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-all",
+        margin: 0,
+        padding: 8,
+        background: "rgba(0,0,0,0.3)",
+        borderRadius: 6,
+        fontSize: fontScale(10),
+        maxHeight,
+        overflow: "auto",
+      }}>
+        {displayValue}
+      </pre>
+    </div>
+  );
+}
+
 export default function ToolCallBlock({ tool }) {
   const [expanded, setExpanded] = useState(false);
   const s = useFontScale();
   const Icon = TOOL_ICONS[tool.name] || Code;
   const isRunning = tool.status === "running";
   const preview = getPreview(tool);
+  const toolLabel = getToolLabel(tool);
 
   return (
     <div
@@ -75,7 +151,14 @@ export default function ToolCallBlock({ tool }) {
         }}
       >
         <Icon size={13} strokeWidth={1.5} />
-        <span style={{ color: "rgba(255,255,255,0.7)" }}>{tool.name}</span>
+        <span style={{
+          color: "rgba(255,255,255,0.7)",
+          flexShrink: 1,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}>{toolLabel}</span>
         {preview && !expanded && (
           <span style={{
             color: "rgba(255,255,255,0.25)",
@@ -103,44 +186,8 @@ export default function ToolCallBlock({ tool }) {
 
       {expanded && (
         <div style={{ padding: "0 12px 10px", fontSize: s(11), fontFamily: "'JetBrains Mono',monospace" }}>
-          {tool.args && Object.keys(tool.args).length > 0 && (
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ color: "rgba(255,255,255,0.3)", marginBottom: 4 }}>ARGS</div>
-              <pre style={{
-                color: "rgba(255,255,255,0.5)",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-all",
-                margin: 0,
-                padding: 8,
-                background: "rgba(0,0,0,0.3)",
-                borderRadius: 6,
-                fontSize: s(10),
-                maxHeight: 200,
-                overflow: "auto",
-              }}>
-                {typeof tool.args === "string" ? tool.args : JSON.stringify(tool.args, null, 2)}
-              </pre>
-            </div>
-          )}
-          {tool.result != null && (
-            <div>
-              <div style={{ color: "rgba(255,255,255,0.3)", marginBottom: 4 }}>RESULT</div>
-              <pre style={{
-                color: "rgba(255,255,255,0.5)",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-all",
-                margin: 0,
-                padding: 8,
-                background: "rgba(0,0,0,0.3)",
-                borderRadius: 6,
-                fontSize: s(10),
-                maxHeight: 300,
-                overflow: "auto",
-              }}>
-                {typeof tool.result === "string" ? tool.result : JSON.stringify(tool.result, null, 2)}
-              </pre>
-            </div>
-          )}
+          {tool.args && Object.keys(tool.args).length > 0 && <ToolBody label="ARGS" value={tool.args} maxHeight={200} fontScale={s} />}
+          {tool.result != null && <ToolBody label="RESULT" value={tool.result} maxHeight={300} fontScale={s} />}
         </div>
       )}
     </div>

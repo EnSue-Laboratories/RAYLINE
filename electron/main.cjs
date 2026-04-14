@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
+const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
@@ -130,6 +131,7 @@ app.whenReady().then(() => {
     const mcpConfigPath = path.join(app.getPath("userData"), "mcp-terminal.json");
     fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2));
     global.mcpConfigPath = mcpConfigPath;
+    global.terminalWsPort = port;
   });
 
   // Forward terminal output to renderer
@@ -195,15 +197,24 @@ ipcMain.handle("read-image", async (_event, filePath) => {
 
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
-  startAgent(opts, event.sender);
+  if (opts.provider === "codex") {
+    startCodexAgent(opts, event.sender);
+  } else {
+    startAgent(opts, event.sender);
+  }
 });
 
 ipcMain.on("agent-cancel", (_event, { conversationId }) => {
   cancelAgent(conversationId);
+  cancelCodexAgent(conversationId);
 });
 
 ipcMain.on("agent-edit-resend", (event, opts) => {
-  startAgent({ ...opts, forkSession: true }, event.sender);
+  if (opts.provider === "codex") {
+    startCodexAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
+  } else {
+    startAgent({ ...opts, forkSession: true }, event.sender);
+  }
 });
 
 ipcMain.handle("rewind-files", async (_event, opts) => {
@@ -464,5 +475,6 @@ app.on("before-quit", () => {
     } catch {}
   }
   cancelAll();
+  cancelAllCodex();
   terminalManager.stopServer();
 });
