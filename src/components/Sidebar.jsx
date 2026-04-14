@@ -12,7 +12,14 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
     c.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  const cwdShort = cwd ? cwd.split("/").slice(-2).join("/") : null;
+  const cwdShort = cwd ? (() => {
+    const parts = cwd.split("/");
+    const wtIdx = parts.indexOf(".worktrees");
+    if (wtIdx >= 0 && wtIdx + 1 < parts.length) {
+      return `${parts[wtIdx - 1]} / ${parts[wtIdx + 1]}`;
+    }
+    return parts.slice(-2).join("/");
+  })() : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
