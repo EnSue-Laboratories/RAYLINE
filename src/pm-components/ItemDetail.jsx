@@ -81,6 +81,20 @@ export default function ItemDetail({ repo, number, type, onBack }) {
 
   useEffect(() => {
     fetchAll();
+    const interval = setInterval(async () => {
+      try {
+        const fetchItem = type === "pr"
+          ? window.ghApi.getPR(repo, number)
+          : window.ghApi.getIssue(repo, number);
+        const [itemData, commentsData] = await Promise.all([
+          fetchItem,
+          window.ghApi.listComments(repo, number),
+        ]);
+        setItem(itemData);
+        setComments(commentsData);
+      } catch {}
+    }, 30000);
+    return () => clearInterval(interval);
   }, [repo, number, type]);
 
   const handleToggleAssign = async (login) => {
