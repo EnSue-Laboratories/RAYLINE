@@ -197,37 +197,36 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      {/* Sidebar open button — outside drag region */}
-      {!sidebarOpen && (
-        <button
-          onClick={onToggleSidebar}
-          style={{
-            position: "fixed",
-            top: SIDEBAR_TOGGLE_TOP,
-            left: SIDEBAR_TOGGLE_LEFT,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: SIDEBAR_TOGGLE_SIZE,
-            height: SIDEBAR_TOGGLE_SIZE,
-            borderRadius: 6,
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.06)",
-            color: "rgba(255,255,255,0.4)",
-            cursor: "pointer",
-            transition: "all .2s",
-            zIndex: 100,
-            WebkitAppRegion: "no-drag",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
-        >
-          <PanelLeftOpen size={14} strokeWidth={1.5} />
-        </button>
-      )}
-
-      {/* Drag region matching sidebar spacer */}
-      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0 }} />
+      {/* Drag region matching sidebar spacer — button inside so it can override drag */}
+      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0, position: "relative" }}>
+        {!sidebarOpen && (
+          <button
+            onClick={onToggleSidebar}
+            style={{
+              position: "absolute",
+              top: SIDEBAR_TOGGLE_TOP,
+              left: SIDEBAR_TOGGLE_LEFT,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: SIDEBAR_TOGGLE_SIZE,
+              height: SIDEBAR_TOGGLE_SIZE,
+              borderRadius: 6,
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              color: "rgba(255,255,255,0.4)",
+              cursor: "pointer",
+              transition: "all .2s",
+              zIndex: 100,
+              WebkitAppRegion: "no-drag",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
+          >
+            <PanelLeftOpen size={14} strokeWidth={1.5} />
+          </button>
+        )}
+      </div>
 
       {/* Top bar — aligns with sidebar header */}
       <div
