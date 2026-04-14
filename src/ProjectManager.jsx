@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { Plus, Github, X } from "lucide-react";
 import RepoManager from "./pm-components/RepoManager";
+import IssueList from "./pm-components/IssueList";
+import PRList from "./pm-components/PRList";
+import ItemDetail from "./pm-components/ItemDetail";
 
 const iconBtnStyle = {
   width: 28,
@@ -365,15 +368,26 @@ export default function ProjectManager() {
         {/* Content: list or detail */}
         <div style={{ flex: 1, overflow: "auto" }}>
           {selectedItem ? (
-            <div style={{ padding: 20, color: "rgba(255,255,255,0.4)" }}>
-              Detail view placeholder
-            </div>
+            <ItemDetail
+              repo={selectedItem.repo}
+              number={selectedItem.number}
+              type={selectedItem.type}
+              onBack={() => setSelectedItem(null)}
+            />
+          ) : activeTab === "issues" ? (
+            <IssueList
+              repos={repos}
+              stateFilter={stateFilter}
+              repoFilter={repoFilter}
+              onSelectItem={setSelectedItem}
+            />
           ) : (
-            <div style={{ padding: 20, color: "rgba(255,255,255,0.4)" }}>
-              {activeTab === "issues"
-                ? "Issues list placeholder"
-                : "PRs list placeholder"}
-            </div>
+            <PRList
+              repos={repos}
+              stateFilter={stateFilter}
+              repoFilter={repoFilter}
+              onSelectItem={setSelectedItem}
+            />
           )}
         </div>
       </div>
