@@ -2,11 +2,84 @@ const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const { findSessionCwd } = require("./session-reader.cjs");
 
 const activeAgents = new Map();
+const EXTRA_PATH_DIRS = [
+  "/opt/homebrew/bin",
+  "/usr/local/bin",
+  "/usr/bin",
+  "/bin",
+];
 
 function log(...args) {
   console.log("[agent-manager]", ...args);
+}
+
+function isDirectory(dirPath) {
+  try {
+    return !!dirPath && fs.statSync(dirPath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function isExecutable(filePath) {
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function buildSpawnPath() {
+  const pathParts = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
+  return [...new Set([...pathParts, ...EXTRA_PATH_DIRS])].join(path.delimiter);
+}
+
+let cachedClaudeBin = null;
+
+function resolveClaudeBin() {
+  if (cachedClaudeBin && isExecutable(cachedClaudeBin)) return cachedClaudeBin;
+
+  const searchPath = buildSpawnPath();
+  const candidates = [process.env.CLAUDE_BIN, "claude"].filter(Boolean);
+
+  for (const candidate of candidates) {
+    if (path.isAbsolute(candidate) && isExecutable(candidate)) {
+      cachedClaudeBin = candidate;
+      return candidate;
+    }
+    for (const dir of searchPath.split(path.delimiter).filter(Boolean)) {
+      const fullPath = path.join(dir, candidate);
+      if (isExecutable(fullPath)) {
+        cachedClaudeBin = fullPath;
+        return fullPath;
+      }
+    }
+  }
+
+  return null;
+}
+
+function resolveLaunchCwd({ cwd, sessionId }) {
+  if (!cwd) return process.cwd();
+  if (isDirectory(cwd)) return cwd;
+
+  if (sessionId) {
+    const recovered = findSessionCwd(sessionId);
+    if (isDirectory(recovered)) {
+      log("Recovered invalid cwd from session metadata", {
+        requestedCwd: cwd,
+        recoveredCwd: recovered,
+        sessionId,
+      });
+      return recovered;
+    }
+  }
+
+  throw new Error(`Invalid working directory: ${cwd}`);
 }
 
 function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents) {
@@ -98,13 +171,33 @@ The user can see and type into these terminals in real time.`);
 
   args.push(fullPrompt);
 
-  log("Starting agent:", { conversationId, model, cwd, sessionId, resumeSessionId, forkSession });
+  const agentSessionId = resumeSessionId || sessionId;
+  const claudeBin = resolveClaudeBin();
+  if (!claudeBin) {
+    const error = "Unable to locate the Claude CLI binary";
+    log(error);
+    webContents.send("agent-error", { conversationId, error });
+    webContents.send("agent-done", { conversationId, exitCode: -1 });
+    return null;
+  }
+
+  let launchCwd;
+  try {
+    launchCwd = resolveLaunchCwd({ cwd, sessionId: agentSessionId });
+  } catch (err) {
+    log("Invalid cwd:", { cwd, sessionId: agentSessionId, error: err.message });
+    webContents.send("agent-error", { conversationId, error: err.message });
+    webContents.send("agent-done", { conversationId, exitCode: -1 });
+    return null;
+  }
+
+  log("Starting agent:", { conversationId, model, cwd: launchCwd, sessionId, resumeSessionId, forkSession });
   log("Full args:", args.filter(a => a !== fullPrompt).join(" "));
   log("Prompt:", fullPrompt.slice(0, 100));
 
-  const child = spawn("claude", args, {
-    cwd: cwd || process.cwd(),
-    env: { ...process.env, FORCE_COLOR: "0", PATH: process.env.PATH + ":/opt/homebrew/bin:/usr/local/bin" },
+  const child = spawn(claudeBin, args, {
+    cwd: launchCwd,
+    env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -221,9 +314,23 @@ function rewindFiles({ sessionId, messageUuid, cwd }) {
 
     log("Rewinding files:", { sessionId, messageUuid, cwd });
 
-    const child = spawn("claude", args, {
-      cwd: cwd || process.cwd(),
-      env: { ...process.env, FORCE_COLOR: "0", PATH: process.env.PATH + ":/opt/homebrew/bin:/usr/local/bin" },
+    const claudeBin = resolveClaudeBin();
+    if (!claudeBin) {
+      reject(new Error("Unable to locate the Claude CLI binary"));
+      return;
+    }
+
+    let launchCwd;
+    try {
+      launchCwd = resolveLaunchCwd({ cwd, sessionId });
+    } catch (err) {
+      reject(err);
+      return;
+    }
+
+    const child = spawn(claudeBin, args, {
+      cwd: launchCwd,
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
       stdio: ["ignore", "pipe", "pipe"],
     });
 

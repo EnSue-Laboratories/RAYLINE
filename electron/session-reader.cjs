@@ -8,6 +8,22 @@ function projectDirName(cwd) {
   return cwd.replace(/\//g, "-");
 }
 
+function extractSessionCwdFromFile(filePath) {
+  try {
+    const lines = fs.readFileSync(filePath, "utf-8").split("\n").slice(0, 200);
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const evt = JSON.parse(line);
+        if (typeof evt.cwd === "string" && evt.cwd) {
+          return evt.cwd;
+        }
+      } catch {}
+    }
+  } catch {}
+  return null;
+}
+
 function findSessionFile(sessionId) {
   // Search all project dirs for this session
   const projectsDir = path.join(CLAUDE_DIR, "projects");
@@ -28,6 +44,15 @@ function cwdFromProjectDir(projDir) {
   // Instead, walk common parent directories and match children against remaining encoded string.
   if (!projDir.startsWith("-")) return projDir;
 
+  function encodedDirNames(entryName) {
+    const names = [entryName];
+    if (entryName.startsWith(".")) {
+      names.push(`-${entryName.slice(1)}`);
+      names.push(entryName.slice(1));
+    }
+    return [...new Set(names)];
+  }
+
   function walkAndMatch(dirPath, remaining) {
     // remaining is the encoded string left to match (without leading -)
     if (!remaining) {
@@ -39,17 +64,17 @@ function cwdFromProjectDir(projDir) {
       const entries = fs.readdirSync(dirPath, { withFileTypes: true });
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
-        const encoded = entry.name.replace(/\//g, "-");
-        // Check if remaining starts with this directory's encoded name
-        if (remaining === encoded) {
-          return path.join(dirPath, entry.name);
-        }
-        if (remaining.startsWith(encoded + "-")) {
-          const result = walkAndMatch(
-            path.join(dirPath, entry.name),
-            remaining.slice(encoded.length + 1)
-          );
-          if (result) return result;
+        for (const encoded of encodedDirNames(entry.name)) {
+          if (remaining === encoded) {
+            return path.join(dirPath, entry.name);
+          }
+          if (remaining.startsWith(encoded + "-")) {
+            const result = walkAndMatch(
+              path.join(dirPath, entry.name),
+              remaining.slice(encoded.length + 1)
+            );
+            if (result) return result;
+          }
         }
       }
     } catch {}
@@ -59,6 +84,12 @@ function cwdFromProjectDir(projDir) {
   // Remove leading - and walk from /
   const result = walkAndMatch("/", projDir.slice(1));
   return result || projDir.replace(/-/g, "/"); // fallback
+}
+
+function findSessionCwd(sessionId) {
+  const found = findSessionFile(sessionId);
+  if (!found) return null;
+  return extractSessionCwdFromFile(found.filePath) || cwdFromProjectDir(found.projectDir);
 }
 
 async function listSessions(cwd) {
@@ -117,7 +148,7 @@ async function loadSessionMessages(sessionId) {
   if (!found) return { messages: [], cwd: null };
 
   const { filePath, projectDir } = found;
-  const sessionCwd = cwdFromProjectDir(projectDir);
+  const sessionCwd = extractSessionCwdFromFile(filePath) || cwdFromProjectDir(projectDir);
 
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
@@ -241,4 +272,4 @@ function moveSession(sessionId, newCwd) {
   return true;
 }
 
-module.exports = { listSessions, loadSessionMessages, moveSession };
+module.exports = { listSessions, loadSessionMessages, moveSession, findSessionCwd };
