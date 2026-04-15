@@ -14,6 +14,12 @@ function logCheckpoint(...args) {
   console.log("[checkpoint-ui]", ...args);
 }
 
+function getMainRepoRoot(dir) {
+  if (!dir) return dir;
+  const wtIdx = dir.indexOf("/.worktrees/");
+  return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
+}
+
 export default function App() {
   const { conversations, getConversation, sendMessage, cancelMessage, editAndResend, loadMessages } = useAgent();
   const terminal = useTerminal();
@@ -156,7 +162,7 @@ export default function App() {
       title: "New chat",
       model: defaultModel,
       ts: Date.now(),
-      cwd: cwd || undefined,
+      cwd: activeConvo?.cwd || getMainRepoRoot(cwd) || undefined,
     };
     setConvoList((p) => [n, ...p]);
     setActive(id);
@@ -227,7 +233,7 @@ export default function App() {
       if (!convo) {
         const id = "c" + Date.now();
         const sessionId = crypto.randomUUID();
-        convo = { id, sessionId, title: text.slice(0, 50), model: defaultModel, ts: Date.now(), cwd: cwd || undefined };
+        convo = { id, sessionId, title: text.slice(0, 50), model: defaultModel, ts: Date.now(), cwd: getMainRepoRoot(cwd) || undefined };
         convoId = id;
         setConvoList((p) => [convo, ...p]);
         setActive(id);

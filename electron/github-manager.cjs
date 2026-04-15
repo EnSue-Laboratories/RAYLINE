@@ -207,6 +207,32 @@ async function listBranches(repo) {
   return JSON.parse(raw);
 }
 
+async function getLinkedPRs(repo, issueNumber) {
+  const raw = await gh([
+    "api", `/repos/${repo}/issues/${issueNumber}/timeline`,
+    "-H", "Accept: application/vnd.github.mockingbird-preview+json",
+    "--paginate",
+  ]);
+  const events = JSON.parse(raw);
+  const prs = [];
+  const seen = new Set();
+  for (const ev of events) {
+    if (ev.event === "cross-referenced" && ev.source?.issue?.pull_request) {
+      const pr = ev.source.issue;
+      if (!seen.has(pr.number)) {
+        seen.add(pr.number);
+        prs.push({
+          number: pr.number,
+          title: pr.title,
+          state: pr.state,
+          html_url: pr.html_url,
+        });
+      }
+    }
+  }
+  return prs;
+}
+
 module.exports = {
   checkAuth,
   listUserRepos,
@@ -226,4 +252,5 @@ module.exports = {
   createIssue,
   createPR,
   listBranches,
+  getLinkedPRs,
 };
