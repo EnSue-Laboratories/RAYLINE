@@ -41,10 +41,15 @@ export default function ModelPicker({ value, onChange }) {
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !ref.current) return;
     const handleResize = () => updateMenuPosition();
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const ro = new ResizeObserver(handleResize);
+    ro.observe(ref.current);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      ro.disconnect();
+    };
   }, [open, updateMenuPosition]);
 
   return (

@@ -127,10 +127,15 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !ref.current) return;
     const handleResize = () => updateMenuPosition();
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const ro = new ResizeObserver(handleResize);
+    ro.observe(ref.current);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      ro.disconnect();
+    };
   }, [open, updateMenuPosition]);
 
   const PROTECTED_BRANCHES = ["main", "master"];
@@ -188,7 +193,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
           }
           setCreating(false);
           setError(null);
-          refresh();
+          if (!open) refresh();
         }}
         style={{
           display: "flex",
