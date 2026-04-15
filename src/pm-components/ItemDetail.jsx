@@ -33,6 +33,53 @@ const smallBtnStyle = {
   transition: "all .15s",
 };
 
+const markdownCodeComponents = {
+  code: ({ node, children, ...props }) => {
+    const isBlock = node?.position?.start?.line !== node?.position?.end?.line
+      || String(children).includes("\n");
+
+    if (!isBlock) {
+      return (
+        <code
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            padding: "1px 5px",
+            borderRadius: 4,
+            fontSize: 12,
+            fontFamily: "'JetBrains Mono', monospace",
+          }}
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    }
+
+    return (
+      <code
+        style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  },
+  pre: ({ children }) => (
+    <pre
+      style={{
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 6,
+        padding: 12,
+        overflowX: "auto",
+        margin: "8px 0",
+      }}
+    >
+      {children}
+    </pre>
+  ),
+};
+
 export default function ItemDetail({ repo, number, type, onBack }) {
   const [item, setItem] = useState(null);
   const [comments, setComments] = useState([]);
@@ -350,9 +397,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               h1: ({ children }) => <h1 style={{ fontSize: 20, fontWeight: 600, margin: "16px 0 8px", color: "rgba(255,255,255,0.9)" }}>{children}</h1>,
               h2: ({ children }) => <h2 style={{ fontSize: 17, fontWeight: 600, margin: "14px 0 6px", color: "rgba(255,255,255,0.85)" }}>{children}</h2>,
               h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 600, margin: "12px 0 4px", color: "rgba(255,255,255,0.85)" }}>{children}</h3>,
-              code: ({ inline, children }) => inline
-                ? <code style={{ background: "rgba(255,255,255,0.06)", padding: "1px 5px", borderRadius: 4, fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{children}</code>
-                : <pre style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 6, padding: 12, overflowX: "auto", margin: "8px 0" }}><code style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>{children}</code></pre>,
+              ...markdownCodeComponents,
             }}
           >
             {item.body || ""}
@@ -377,6 +422,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
                     ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "6px 0" }}>{children}</ol>,
                     a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(140,180,255,0.9)", textDecoration: "none" }}>{children}</a>,
                     p: ({ children }) => <p style={{ margin: "6px 0" }}>{children}</p>,
+                    ...markdownCodeComponents,
                   }}
                 >
                   {comment.body || ""}
