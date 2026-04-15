@@ -369,7 +369,7 @@ ipcMain.handle("quick-explain", async (_event, { text, model }) => {
       "--print",
       "--output-format", "text",
       "--tools", "",
-      "--model", model || "haiku",
+      "--model", model || "sonnet",
       "--no-session-persistence",
       "--system-prompt", "You are a concise explainer. Give 1-3 sentence explanations. Use markdown for formatting.",
       `Explain this briefly:\n\n${text}`,

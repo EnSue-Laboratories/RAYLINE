@@ -6,7 +6,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
-const MENU_WIDTH = 180;
+const MIN_MENU_WIDTH = 220;
 
 export default function ModelPicker({ value, onChange }) {
   const s = useFontScale();
@@ -19,14 +19,15 @@ export default function ModelPicker({ value, onChange }) {
   const updateMenuPosition = useCallback(() => {
     if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
+    const menuWidth = Math.max(MIN_MENU_WIDTH, rect.width);
     const left = Math.max(
       VIEWPORT_PADDING,
-      Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING)
+      Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - VIEWPORT_PADDING)
     );
     setMenuStyle({
       top: rect.bottom + MENU_GAP,
       left,
-      width: MENU_WIDTH,
+      width: menuWidth,
     });
   }, []);
 
@@ -67,8 +68,9 @@ export default function ModelPicker({ value, onChange }) {
         style={{
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 6,
-          padding: "4px 10px",
+          padding: "4px 12px",
           background: "rgba(255,255,255,0.02)",
           border: "1px solid rgba(255,255,255,0.04)",
           borderRadius: 7,
@@ -107,7 +109,7 @@ export default function ModelPicker({ value, onChange }) {
           {["claude", "codex"].map((provider, gi) => (
             <div key={provider}>
               {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
-              <div style={{ padding: "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
+              <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
                 {provider.toUpperCase()}
               </div>
               {MODELS.filter(mm => mm.provider === provider).map((mm) => (

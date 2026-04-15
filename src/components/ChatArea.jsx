@@ -352,7 +352,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         )}
       </div>
 
-      <SelectionToolbar onQuote={handleQuote} model={convo?.model || defaultModel || "haiku"} />
+      <SelectionToolbar onQuote={handleQuote} model={convo?.model || defaultModel || "sonnet"} />
 
       {/* Input bar */}
       <div
