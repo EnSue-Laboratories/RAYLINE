@@ -204,7 +204,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       {!sidebarOpen && (
         <div style={{
           position: "fixed", top: WINDOW_DRAG_HEIGHT, left: 0,
-          display: "flex", flexDirection: "column", gap: 2,
+          display: "flex", flexDirection: "row", gap: 6,
           padding: "0 12px", zIndex: 50, WebkitAppRegion: "no-drag",
         }}>
           <button
