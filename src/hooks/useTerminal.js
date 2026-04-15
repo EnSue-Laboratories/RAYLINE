@@ -111,6 +111,24 @@ export default function useTerminal() {
     window.api.terminalResize({ name, cols, rows });
   }, []);
 
+  const focusSession = useCallback((name) => {
+    if (!name) return;
+    const term = terminalRefs.current.get(name);
+    if (!term || typeof term.focus !== "function") return;
+    window.requestAnimationFrame(() => {
+      try {
+        term.focus();
+      } catch (e) {
+        console.error("[useTerminal] focusSession failed:", e);
+      }
+    });
+  }, []);
+
+  const focusActiveSession = useCallback(() => {
+    if (!activeSession) return;
+    focusSession(activeSession);
+  }, [activeSession, focusSession]);
+
   const registerTerminal = useCallback((name, terminal) => {
     terminalRefs.current.set(name, terminal);
   }, []);
@@ -128,6 +146,8 @@ export default function useTerminal() {
     sendInput,
     killSession,
     resizeSession,
+    focusSession,
+    focusActiveSession,
     refreshSessions,
     registerTerminal,
     unregisterTerminal,

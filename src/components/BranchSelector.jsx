@@ -6,7 +6,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 
-export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
+export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocusTerminal }) {
   const s = useFontScale();
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(null);
@@ -74,6 +74,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
       setCurrent(name);
       setMenuStyle(null);
       setOpen(false);
+      onRefocusTerminal?.();
     } catch (e) {
       setError(e.message);
     }
@@ -93,6 +94,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages }) {
       } else {
         await window.api.gitCreateBranch(cwd, name);
         setCurrent(name);
+        onRefocusTerminal?.();
       }
       setNewName("");
       setCreating(false);

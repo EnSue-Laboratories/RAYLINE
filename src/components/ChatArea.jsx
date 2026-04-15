@@ -9,7 +9,7 @@ import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -284,7 +284,12 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
-          <BranchSelector cwd={cwd} onCwdChange={onCwdChange} hasMessages={convo?.msgs?.length > 0} />
+          <BranchSelector
+            cwd={cwd}
+            onCwdChange={onCwdChange}
+            hasMessages={convo?.msgs?.length > 0}
+            onRefocusTerminal={onRefocusTerminal}
+          />
           <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />
           {onToggleTerminal && (
             <button
