@@ -16,6 +16,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const filtered = convos.filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase())
@@ -98,15 +99,28 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           <GitHubIcon size={15} />
           GitHub Projects
         </button>
-      </div>
-
-      {/* Search — only show when there are conversations */}
-      {convos.length > 0 && <div style={{ padding: "0 12px 10px" }}>
-        <div
+        {convos.length > 0 && !searchOpen && <button
+          onClick={() => setSearchOpen(true)}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 7,
+            background: "none", border: "none", cursor: "pointer",
+            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            fontFamily: "system-ui, sans-serif", transition: "all .15s",
+            textAlign: "left",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+        >
+          <Search size={15} strokeWidth={1.5} />
+          Search
+        </button>}
+        {searchOpen && <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 7,
+            marginTop: 6,
             padding: "6px 10px",
             background: searchFocused ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.045)",
             border: "1px solid " + (searchFocused ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.08)"),
@@ -123,7 +137,8 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onFocus={() => setSF(true)}
-            onBlur={() => setSF(false)}
+            onBlur={() => { setSF(false); if (!search) { setSearchOpen(false); } }}
+            autoFocus
             style={{
               flex: 1,
               background: "transparent",
@@ -133,8 +148,8 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               fontFamily: "'JetBrains Mono',monospace",
             }}
           />
-        </div>
-      </div>}
+        </div>}
+      </div>
 
       {/* Conversation list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "2px 6px" }}>
