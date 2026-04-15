@@ -82,6 +82,21 @@ function resolveLaunchCwd({ cwd, sessionId }) {
   throw new Error(`Invalid working directory: ${cwd}`);
 }
 
+function requestAgentSteer(conversationId) {
+  const child = activeAgents.get(conversationId);
+  if (!child) return false;
+
+  log("Scheduling steer at next tool boundary:", conversationId);
+  child._pendingSteer = true;
+
+  if (typeof child._activeToolUseIndex === "number") {
+    child._pendingSteer = false;
+    child._pauseOnToolStop = "steer";
+  }
+
+  return true;
+}
+
 function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents) {
   cancelAgent(conversationId);
 
@@ -203,6 +218,9 @@ The user can see and type into these terminals in real time.`);
 
   log("Spawned PID:", child.pid);
 
+  child._activeToolUseIndex = null;
+  child._pauseOnToolStop = null;
+  child._pendingSteer = false;
   activeAgents.set(conversationId, child);
 
   let buffer = "";
@@ -228,26 +246,33 @@ The user can see and type into these terminals in real time.`);
         }
         webContents.send("agent-stream", { conversationId, event });
 
-        // Track when AskUserQuestion tool_use starts streaming
-        if (
-          event.type === "stream_event" &&
-          event.event?.type === "content_block_start" &&
-          event.event?.content_block?.type === "tool_use" &&
-          event.event?.content_block?.name === "AskUserQuestion"
-        ) {
-          child._waitingForQuestion = true;
-        }
+        if (event.type === "stream_event") {
+          const inner = event.event;
 
-        // Kill the process once the AskUserQuestion args are fully streamed,
-        // so Claude pauses and the renderer can show the question UI.
-        if (
-          child._waitingForQuestion &&
-          event.type === "stream_event" &&
-          event.event?.type === "content_block_stop"
-        ) {
-          log("AskUserQuestion fully streamed — killing process to wait for user answer");
-          child._waitingForQuestion = false;
-          child.kill("SIGTERM");
+          if (inner?.type === "content_block_start" && inner.content_block?.type === "tool_use") {
+            child._activeToolUseIndex = inner.index;
+            if (child._pendingSteer) {
+              log("Next tool boundary reached — pausing for steer:", conversationId);
+              child._pendingSteer = false;
+              child._pauseOnToolStop = "steer";
+            } else if (inner.content_block?.name === "AskUserQuestion") {
+              child._pauseOnToolStop = "question";
+            }
+          }
+
+          if (inner?.type === "content_block_stop" && child._activeToolUseIndex === inner.index) {
+            const pauseReason = child._pauseOnToolStop;
+            child._activeToolUseIndex = null;
+            child._pauseOnToolStop = null;
+
+            if (pauseReason === "steer") {
+              log("Tool args fully streamed — killing process to send queued steer message");
+              child.kill("SIGTERM");
+            } else if (pauseReason === "question") {
+              log("AskUserQuestion fully streamed — killing process to wait for user answer");
+              child.kill("SIGTERM");
+            }
+          }
         }
       } catch (e) {
         log("Failed to parse JSON line:", line.slice(0, 200), "error:", e.message);
@@ -357,4 +382,4 @@ function rewindFiles({ sessionId, messageUuid, cwd }) {
   });
 }
 
-module.exports = { startAgent, cancelAgent, cancelAll, rewindFiles };
+module.exports = { startAgent, cancelAgent, cancelAll, rewindFiles, requestAgentSteer };

@@ -147,7 +147,7 @@ export default function App() {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  const handleNew = () => {
+  const handleNew = useCallback(() => {
     const id = "c" + Date.now();
     const sessionId = crypto.randomUUID();
     const n = {
@@ -160,24 +160,17 @@ export default function App() {
     };
     setConvoList((p) => [n, ...p]);
     setActive(id);
-  };
+  }, [cwd, defaultModel]);
 
   const handleDelete = (id, e) => {
     e.stopPropagation();
     cancelMessage(id);
+    messageQueue.current = messageQueue.current.filter((item) => item.conversationId !== id);
+    setQueuedMessages([...messageQueue.current]);
     const remaining = convoList.filter((c) => c.id !== id);
     setConvoList(remaining);
     if (active === id) setActive(remaining[0]?.id || null);
   };
-
-  // Process queued messages when streaming ends
-  useEffect(() => {
-    if (!activeData.isStreaming && messageQueue.current.length > 0) {
-      const next = messageQueue.current.shift();
-      setQueuedMessages([...messageQueue.current]);
-      setTimeout(() => handleSend(next.text, next.attachments), 300);
-    }
-  }, [activeData.isStreaming]);
 
   // Capture Codex thread_id for session resume
   useEffect(() => {
@@ -194,7 +187,9 @@ export default function App() {
   }, [active, conversations]);
 
   const handleSend = useCallback(
-    async (text, attachments) => {
+    async (text, attachments, mode = "send", options = {}) => {
+      const { conversationId: requestedConversationId, bypassQueue = false } = options;
+
       // Handle slash commands client-side
       const trimmed = text.trim();
       if (trimmed.startsWith("/") && !trimmed.includes(" ")) {
@@ -213,15 +208,35 @@ export default function App() {
         // /compact and others — send as regular text so Claude handles them
       }
 
-      // Queue if currently streaming
-      if (activeData.isStreaming && active) {
-        messageQueue.current.push({ text, attachments });
+      const targetConversationId = requestedConversationId || active;
+      const targetConvo = targetConversationId
+        ? convoList.find((c) => c.id === targetConversationId)
+        : null;
+      const targetData = targetConversationId
+        ? getConversation(targetConversationId)
+        : { messages: [], isStreaming: false, error: null };
+      const targetModel = getM(targetConvo?.model || defaultModel);
+      const queueMode = mode === "steer" && targetModel.provider === "claude"
+        ? "steer"
+        : "queue";
+
+      // Queue if the target conversation is currently streaming
+      if (!bypassQueue && targetData.isStreaming && targetConversationId) {
+        messageQueue.current.push({
+          conversationId: targetConversationId,
+          text,
+          attachments,
+          mode: queueMode,
+        });
         setQueuedMessages([...messageQueue.current]);
+        if (queueMode === "steer" && window.api?.agentSteer) {
+          window.api.agentSteer({ conversationId: targetConversationId });
+        }
         return;
       }
 
-      let convo = activeConvo;
-      let convoId = active;
+      let convo = targetConvo;
+      let convoId = targetConversationId;
 
       // Auto-create conversation if none exists
       if (!convo) {
@@ -230,10 +245,10 @@ export default function App() {
         convo = { id, sessionId, title: text.slice(0, 50), model: defaultModel, ts: Date.now(), cwd: cwd || undefined };
         convoId = id;
         setConvoList((p) => [convo, ...p]);
-        setActive(id);
+        if (!requestedConversationId) setActive(id);
       } else {
         // Update title from first message
-        if (activeData.messages.length === 0) {
+        if (targetData.messages.length === 0) {
           setConvoList((p) =>
             p.map((c) => c.id === convoId ? { ...c, title: text.slice(0, 50) } : c)
           );
@@ -282,8 +297,27 @@ export default function App() {
         files: files?.length ? files : undefined,
       });
     },
-    [activeConvo, active, activeData, cwd, sendMessage]
+    [active, convoList, cwd, defaultModel, getConversation, handleNew, sendMessage]
   );
+
+  // Flush the next queued item as soon as its conversation is idle
+  useEffect(() => {
+    if (messageQueue.current.length === 0) return;
+    const nextQueued = messageQueue.current[0];
+    const queuedData = getConversation(nextQueued.conversationId);
+    if (queuedData.isStreaming) return;
+
+    const next = messageQueue.current.shift();
+    if (!next) return;
+
+    setQueuedMessages([...messageQueue.current]);
+    setTimeout(() => {
+      handleSend(next.text, next.attachments, "send", {
+        conversationId: next.conversationId,
+        bypassQueue: true,
+      });
+    }, 300);
+  }, [conversations, getConversation, handleSend]);
 
   const handleCancel = useCallback(() => {
     if (active) cancelMessage(active);
@@ -378,6 +412,8 @@ export default function App() {
         error: activeData.error,
       }
     : null;
+  const activeQueuedMessages = queuedMessages.filter((item) => item.conversationId === active);
+  const steeringSupported = getM(activeConvo?.model || defaultModel).provider === "claude";
 
   // Build convos for Sidebar
   const convosForSidebar = convoList.map((c) => {
@@ -489,7 +525,8 @@ export default function App() {
           onNew={handleNew}
           onModelChange={handleModelChange}
           defaultModel={defaultModel}
-          queuedMessages={queuedMessages}
+          queuedMessages={activeQueuedMessages}
+          steeringSupported={steeringSupported}
           onToggleTerminal={() => terminal.setDrawerOpen((o) => !o)}
           terminalOpen={terminal.drawerOpen}
           terminalCount={terminal.sessions.length}

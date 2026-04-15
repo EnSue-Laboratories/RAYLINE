@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell } = require("ele
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
+const { startAgent, cancelAgent, cancelAll, rewindFiles, requestAgentSteer } = require("./agent-manager.cjs");
 const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
@@ -250,6 +250,10 @@ ipcMain.on("agent-start", (event, opts) => {
 ipcMain.on("agent-cancel", (_event, { conversationId }) => {
   cancelAgent(conversationId);
   cancelCodexAgent(conversationId);
+});
+
+ipcMain.on("agent-steer", (_event, { conversationId }) => {
+  requestAgentSteer(conversationId);
 });
 
 ipcMain.on("agent-edit-resend", (event, opts) => {

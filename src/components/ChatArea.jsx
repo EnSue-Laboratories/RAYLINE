@@ -9,11 +9,12 @@ import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, steeringSupported, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
+  const [composeMode, setComposeMode]   = useState("queue");
   const endRef  = useRef(null);
   const inRef   = useRef(null);
 
@@ -44,6 +45,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   }, [msgCount, convo?.isStreaming, lastPartText]);
 
   const isStreaming = convo?.isStreaming;
+  const hasDraft = Boolean(input.trim() || attachments.length > 0);
+  const showSteerOptions = isStreaming && steeringSupported && hasDraft;
 
   // Slash command suggestions
   const COMMANDS = [
@@ -59,11 +62,16 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   const send = useCallback(() => {
     if (!input.trim() && attachments.length === 0) return;
-    onSend(input.trim(), attachments.length > 0 ? attachments : undefined);
+    onSend(
+      input.trim(),
+      attachments.length > 0 ? attachments : undefined,
+      isStreaming ? composeMode : "send"
+    );
     setInput("");
     setAttachments([]);
+    setComposeMode("queue");
     if (inRef.current) inRef.current.style.height = "20px";
-  }, [input, attachments, convo, onSend, isStreaming]);
+  }, [attachments, composeMode, input, isStreaming, onSend]);
 
   const handleInput = (e) => {
     setInput(e.target.value);
@@ -378,15 +386,15 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                   <span style={{
                     fontSize: s(9),
                     fontFamily: "'JetBrains Mono',monospace",
-                    color: "rgba(255,255,255,0.2)",
+                    color: q.mode === "steer" ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.2)",
                     letterSpacing: ".06em",
                     flexShrink: 0,
-                  }}>QUEUED</span>
+                  }}>{q.mode === "steer" ? "STEER" : "QUEUED"}</span>
                   <span style={{
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
-                  }}>{q.text}</span>
+                  }}>{q.text || `${q.attachments?.length || 0} attachment${(q.attachments?.length || 0) === 1 ? "" : "s"}`}</span>
                 </div>
               ))}
             </div>
@@ -432,6 +440,55 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               ))}
             </div>
           )}
+          {showSteerOptions && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+              marginBottom: 8,
+              padding: "7px 10px",
+              background: "rgba(255,255,255,0.025)",
+              border: "1px solid rgba(255,255,255,0.05)",
+              borderRadius: 10,
+            }}>
+              <div style={{
+                fontSize: s(10),
+                fontFamily: "'JetBrains Mono',monospace",
+                color: "rgba(255,255,255,0.24)",
+                letterSpacing: ".08em",
+              }}>
+                ACTIVE RUN
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {[
+                  { id: "queue", label: "Queue after turn" },
+                  { id: "steer", label: "Steer before tool" },
+                ].map((option) => {
+                  const selected = composeMode === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => setComposeMode(option.id)}
+                      style={{
+                        padding: "5px 10px",
+                        borderRadius: 999,
+                        border: "1px solid " + (selected ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.06)"),
+                        background: selected ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
+                        color: selected ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.38)",
+                        fontSize: s(11),
+                        fontFamily: "system-ui,-apple-system,sans-serif",
+                        cursor: "pointer",
+                        transition: "all .18s ease",
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <ImagePreview items={attachments} onRemove={removeAttachment} />
 
           <div
@@ -472,7 +529,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 overflow: "hidden",
               }}
             />
-            {isStreaming && !input.trim() ? (
+            {isStreaming && !hasDraft ? (
               <button
                 onClick={onCancel}
                 style={{
@@ -497,7 +554,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             ) : (
               <button
                 onClick={send}
-                disabled={!input.trim() && attachments.length === 0}
+                disabled={!hasDraft}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -506,12 +563,12 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                   height: 30,
                   borderRadius: 8,
                   flexShrink: 0,
-                  background: (input.trim() || attachments.length > 0) ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.02)",
+                  background: hasDraft ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.02)",
                   border: "none",
-                  color: (input.trim() || attachments.length > 0) ? "#000000" : "rgba(255,255,255,0.06)",
-                  cursor: (input.trim() || attachments.length > 0) ? "pointer" : "default",
+                  color: hasDraft ? "#000000" : "rgba(255,255,255,0.06)",
+                  cursor: hasDraft ? "pointer" : "default",
                   transition: "all .3s cubic-bezier(.16,1,.3,1)",
-                  transform: (input.trim() || attachments.length > 0) ? "scale(1)" : "scale(0.88)",
+                  transform: hasDraft ? "scale(1)" : "scale(0.88)",
                 }}
               >
                 <ArrowRight size={16} strokeWidth={1.5} />
@@ -529,7 +586,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               letterSpacing: ".1em",
             }}
           >
-            ENTER TO SEND  //  SHIFT+ENTER NEWLINE  //  PASTE IMAGES
+            {showSteerOptions && composeMode === "steer"
+              ? "STEER SENDS AT THE NEXT TOOL BOUNDARY  //  SHIFT+ENTER NEWLINE  //  PASTE IMAGES"
+              : "ENTER TO SEND  //  SHIFT+ENTER NEWLINE  //  PASTE IMAGES"}
           </div>
         </div>
       </div>

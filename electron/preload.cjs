@@ -7,6 +7,7 @@ function logCheckpoint(...args) {
 contextBridge.exposeInMainWorld("api", {
   agentStart: (opts) => ipcRenderer.send("agent-start", opts),
   agentCancel: (id) => ipcRenderer.send("agent-cancel", id),
+  agentSteer: (opts) => ipcRenderer.send("agent-steer", opts),
   agentEditAndResend: (opts) => ipcRenderer.send("agent-edit-resend", opts),
   onAgentStream: (cb) => {
     const handler = (_e, data) => cb(data);
