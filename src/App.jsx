@@ -495,6 +495,7 @@ export default function App() {
           terminalCount={terminal.sessions.length}
           wallpaper={wallpaper}
           cwd={activeConvo?.cwd || cwd}
+          onRefocusTerminal={terminal.focusActiveSession}
           onCwdChange={(newCwd) => {
             setCwd(newCwd);
             if (active) {

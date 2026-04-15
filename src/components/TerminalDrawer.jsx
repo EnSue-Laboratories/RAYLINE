@@ -200,6 +200,8 @@ function TerminalViewport({
         } catch { /* ignore scrollback preload failures */ }
       }
 
+      term.focus();
+
       // Observe container size changes and re-fit
       const ro = new ResizeObserver(() => {
         if (fitAddonRef.current) {
