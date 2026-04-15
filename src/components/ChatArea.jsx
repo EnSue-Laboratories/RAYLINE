@@ -218,38 +218,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, WebkitAppRegion: "no-drag" }}>
 
-          {/* Sidebar collapsed: show open sidebar + new chat buttons */}
-          {!sidebarOpen && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <button
-                onClick={onToggleSidebar}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 28, height: 28, borderRadius: 7,
-                  background: "rgba(255,255,255,0.04)", border: "none",
-                  color: "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all .15s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-              >
-                <PanelLeftOpen size={15} strokeWidth={1.5} />
-              </button>
-              <button
-                onClick={onNew}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 28, height: 28, borderRadius: 7,
-                  background: "rgba(255,255,255,0.04)", border: "none",
-                  color: "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all .15s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-              >
-                <Plus size={16} strokeWidth={1.5} />
-              </button>
-            </div>
-          )}
-
           {convo && (
             <div style={{ animation: "dropIn .2s ease" }}>
               <div style={{
@@ -275,6 +243,38 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 {convo.msgs.length} MESSAGES
               </div>
             </div>
+          )}
+
+          {/* Sidebar collapsed: open sidebar + new chat buttons after title */}
+          {!sidebarOpen && (
+            <>
+              <button
+                onClick={onToggleSidebar}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 26, height: 26, borderRadius: 6,
+                  background: "rgba(255,255,255,0.04)", border: "none",
+                  color: "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all .15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+              >
+                <PanelLeftOpen size={14} strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={onNew}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 26, height: 26, borderRadius: 6,
+                  background: "rgba(255,255,255,0.04)", border: "none",
+                  color: "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all .15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+              >
+                <Plus size={15} strokeWidth={1.5} />
+              </button>
+            </>
           )}
         </div>
 
