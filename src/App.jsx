@@ -479,6 +479,7 @@ export default function App() {
           onEdit={handleEdit}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           sidebarOpen={sidebarOpen}
+          onNew={handleNew}
           onModelChange={handleModelChange}
           defaultModel={defaultModel}
           queuedMessages={queuedMessages}

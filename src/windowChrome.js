@@ -4,6 +4,6 @@ const TRAFFIC_LIGHT_LEFT = 16;
 const TRAFFIC_LIGHT_GROUP_WIDTH = 56;
 const TRAFFIC_LIGHT_GAP = 12;
 
-export const SIDEBAR_TOGGLE_TOP = 13;
-export const SIDEBAR_TOGGLE_LEFT = 146;
-export const SIDEBAR_TOGGLE_SIZE = 24;
+export const SIDEBAR_TOGGLE_TOP = 11;
+export const SIDEBAR_TOGGLE_LEFT = 220;
+export const SIDEBAR_TOGGLE_SIZE = 29;
