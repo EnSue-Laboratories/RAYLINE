@@ -177,17 +177,16 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               >
                 {copiedId === `${item._repo}-${item.number}` ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
               </button>
-              {linkedPRs[`${item._repo}/${item.number}`] && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "rgba(255,255,255,0.35)" }} title={`${linkedPRs[`${item._repo}/${item.number}`].length} linked PR${linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "s" : ""}`}>
-                  <GitPullRequest size={12} strokeWidth={1.5} />
-                  {linkedPRs[`${item._repo}/${item.number}`].length > 1 && (
-                    <span style={{ fontSize: 10, fontFamily: "system-ui" }}>{linkedPRs[`${item._repo}/${item.number}`].length}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                <span style={{ width: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.35)" }} title={linkedPRs[`${item._repo}/${item.number}`] ? `${linkedPRs[`${item._repo}/${item.number}`].length} linked PR${linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "s" : ""}` : undefined}>
+                  {linkedPRs[`${item._repo}/${item.number}`] && (
+                    <GitPullRequest size={12} strokeWidth={1.5} />
                   )}
                 </span>
-              )}
-              <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11, flexShrink: 0 }}>
-                {repoShort}
-              </span>
+                <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11, minWidth: 70, textAlign: "right" }}>
+                  {repoShort}
+                </span>
+              </div>
             </div>
             <div style={{ marginLeft: 26, color: "rgba(255,255,255,0.3)", fontFamily: "system-ui", fontSize: 12, marginTop: 2 }}>
               by {item.user?.login || "unknown"} · updated {timeAgo(item.updated_at)}
