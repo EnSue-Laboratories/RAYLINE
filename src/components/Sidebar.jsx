@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { Plus, Search, Trash2, X, FolderOpen, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon } from "lucide-react";
+import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 
 function GitHubIcon({ size = 12 }) {
   return (
@@ -31,71 +32,71 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Drag region for window dragging — clears traffic lights */}
-      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0 }} />
-
-      {/* Header */}
-      <div
-        style={{
-          padding: "0 20px 18px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          WebkitAppRegion: "no-drag",
-        }}
-      >
+      {/* Drag region + collapse button */}
+      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0, position: "relative" }}>
         <button
           onClick={onToggleSidebar}
           style={{
+            position: "absolute",
+            top: SIDEBAR_TOGGLE_TOP,
+            left: SIDEBAR_TOGGLE_LEFT,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 28,
-            height: 28,
-            borderRadius: 7,
-            background: "rgba(255,255,255,0.02)",
-            border: "1px solid rgba(255,255,255,0.04)",
-            color: "rgba(255,255,255,0.5)",
+            width: SIDEBAR_TOGGLE_SIZE,
+            height: SIDEBAR_TOGGLE_SIZE,
+            borderRadius: 6,
+            background: "none",
+            border: "none",
+            color: "rgba(255,255,255,0.4)",
             cursor: "pointer",
             transition: "all .2s",
+            WebkitAppRegion: "no-drag",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.75)";
+            e.currentTarget.style.color = "rgba(255,255,255,0.7)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.5)";
+            e.currentTarget.style.color = "rgba(255,255,255,0.4)";
           }}
         >
-          <X size={14} strokeWidth={1.5} />
+          <PanelLeftClose size={14} strokeWidth={1.5} />
         </button>
+      </div>
 
+      {/* Menu items */}
+      <div style={{ padding: "0 12px 14px", display: "flex", flexDirection: "column", gap: 2, WebkitAppRegion: "no-drag" }}>
         <button
           onClick={onNew}
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 28,
-            height: 28,
-            borderRadius: 7,
-            background: "rgba(255,255,255,0.02)",
-            border: "1px solid rgba(255,255,255,0.04)",
-            color: "rgba(255,255,255,0.5)",
-            cursor: "pointer",
-            transition: "all .2s",
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 7,
+            background: "none", border: "none", cursor: "pointer",
+            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            fontFamily: "system-ui, sans-serif", transition: "all .15s",
+            textAlign: "left",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.75)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.5)";
-          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
-          <Plus size={16} strokeWidth={1.5} />
+          <Plus size={15} strokeWidth={1.5} />
+          New Chat
+        </button>
+        <button
+          onClick={onOpenProjectManager}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 7,
+            background: "none", border: "none", cursor: "pointer",
+            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            fontFamily: "system-ui, sans-serif", transition: "all .15s",
+            textAlign: "left",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+        >
+          <GitHubIcon size={15} />
+          GitHub Projects
         </button>
       </div>
 
@@ -339,27 +340,6 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.28)"; }}
         >
           <SettingsIcon size={12} strokeWidth={1.5} />
-        </button>
-        <button
-          onClick={onOpenProjectManager}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 22,
-            height: 22,
-            borderRadius: 5,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "rgba(255,255,255,0.28)",
-            transition: "color .2s",
-            padding: 0,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.28)"; }}
-        >
-          <GitHubIcon size={12} />
         </button>
         <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.2)", letterSpacing: ".06em" }}>
           {convos.length} CHATS
