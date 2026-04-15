@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, GitBranch, Plus, Check, CheckCircle2, GitMerge, RotateCcw } from "lucide-react";
+import { ArrowLeft, GitBranch, Plus, Check, CheckCircle2, GitMerge, RotateCcw, Copy } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CommentBox from "./CommentBox";
@@ -40,7 +40,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAssignMenu, setShowAssignMenu] = useState(false);
-  const [checkingOut, setCheckingOut] = useState(false);
+  const [copiedCheckout, setCopiedCheckout] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const assignRef = useRef(null);
 
@@ -310,19 +310,22 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           </div>
         </div>
 
-        {/* Action buttons row — only checkout stays here */}
+        {/* Copy checkout command */}
         {type === "pr" && !isMerged && (
           <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
             <button
-              onClick={async () => {
-                setCheckingOut(true);
-                try { await window.ghApi.checkoutPR(repo, number); } catch {}
-                setCheckingOut(false);
+              onClick={() => {
+                const cmd = `gh pr checkout ${number} -R ${repo}`;
+                navigator.clipboard.writeText(cmd);
+                setCopiedCheckout(true);
+                setTimeout(() => setCopiedCheckout(false), 1500);
               }}
               style={smallBtnStyle}
             >
-              <GitBranch size={11} strokeWidth={1.5} />
-              {checkingOut ? "Checking out..." : "Checkout"}
+              {copiedCheckout
+                ? <><Check size={11} strokeWidth={1.5} /> Copied!</>
+                : <><Copy size={11} strokeWidth={1.5} /> Checkout</>
+              }
             </button>
           </div>
         )}
