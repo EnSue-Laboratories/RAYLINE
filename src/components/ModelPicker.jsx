@@ -6,7 +6,6 @@ import { useFontScale } from "../contexts/FontSizeContext";
 
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
-const MIN_BUTTON_WIDTH = 132;
 const MIN_MENU_WIDTH = 220;
 
 export default function ModelPicker({ value, onChange }) {
@@ -71,7 +70,6 @@ export default function ModelPicker({ value, onChange }) {
           alignItems: "center",
           justifyContent: "space-between",
           gap: 6,
-          minWidth: MIN_BUTTON_WIDTH,
           padding: "4px 12px",
           background: "rgba(255,255,255,0.02)",
           border: "1px solid rgba(255,255,255,0.04)",
@@ -111,7 +109,7 @@ export default function ModelPicker({ value, onChange }) {
           {["claude", "codex"].map((provider, gi) => (
             <div key={provider}>
               {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
-              <div style={{ padding: "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
+              <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
                 {provider.toUpperCase()}
               </div>
               {MODELS.filter(mm => mm.provider === provider).map((mm) => (
