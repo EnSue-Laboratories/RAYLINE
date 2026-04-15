@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Circle, CheckCircle2, Copy, Check } from "lucide-react";
+import { Circle, CheckCircle2, Copy, Check, GitPullRequest } from "lucide-react";
 
 function timeAgo(dateStr) {
   const now = Date.now();
@@ -20,6 +20,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [linkedPRs, setLinkedPRs] = useState({});
 
   async function fetchIssues() {
     setLoading(true);
@@ -69,6 +70,30 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
       return () => clearInterval(interval);
     }
   }, [repos, stateFilter, repoFilter]);
+
+  useEffect(() => {
+    if (issues.length === 0) return;
+    let cancelled = false;
+    async function fetchLinkedPRs() {
+      const results = await Promise.allSettled(
+        issues.map(async (item) => {
+          const key = `${item._repo}/${item.number}`;
+          const prs = await window.ghApi.getLinkedPRs(item._repo, item.number);
+          return { key, prs };
+        })
+      );
+      if (cancelled) return;
+      const map = {};
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value.prs.length > 0) {
+          map[r.value.key] = r.value.prs;
+        }
+      }
+      setLinkedPRs(map);
+    }
+    fetchLinkedPRs();
+    return () => { cancelled = true; };
+  }, [issues]);
 
   if (loading) {
     return (
@@ -128,6 +153,14 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               <span style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                 #{item.number}
               </span>
+              {linkedPRs[`${item._repo}/${item.number}`] && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "rgba(255,255,255,0.35)" }} title={`${linkedPRs[`${item._repo}/${item.number}`].length} linked PR${linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "s" : ""}`}>
+                  <GitPullRequest size={12} strokeWidth={1.5} />
+                  {linkedPRs[`${item._repo}/${item.number}`].length > 1 && (
+                    <span style={{ fontSize: 10, fontFamily: "system-ui" }}>{linkedPRs[`${item._repo}/${item.number}`].length}</span>
+                  )}
+                </span>
+              )}
               <span style={{ color: "rgba(255,255,255,0.8)", fontFamily: "system-ui", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.title}
               </span>
