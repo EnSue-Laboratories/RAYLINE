@@ -153,14 +153,6 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               <span style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
                 #{item.number}
               </span>
-              {linkedPRs[`${item._repo}/${item.number}`] && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "rgba(255,255,255,0.35)" }} title={`${linkedPRs[`${item._repo}/${item.number}`].length} linked PR${linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "s" : ""}`}>
-                  <GitPullRequest size={12} strokeWidth={1.5} />
-                  {linkedPRs[`${item._repo}/${item.number}`].length > 1 && (
-                    <span style={{ fontSize: 10, fontFamily: "system-ui" }}>{linkedPRs[`${item._repo}/${item.number}`].length}</span>
-                  )}
-                </span>
-              )}
               <span style={{ color: "rgba(255,255,255,0.8)", fontFamily: "system-ui", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.title}
               </span>
@@ -185,6 +177,14 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               >
                 {copiedId === `${item._repo}-${item.number}` ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
               </button>
+              {linkedPRs[`${item._repo}/${item.number}`] && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "rgba(255,255,255,0.35)" }} title={`${linkedPRs[`${item._repo}/${item.number}`].length} linked PR${linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "s" : ""}`}>
+                  <GitPullRequest size={12} strokeWidth={1.5} />
+                  {linkedPRs[`${item._repo}/${item.number}`].length > 1 && (
+                    <span style={{ fontSize: 10, fontFamily: "system-ui" }}>{linkedPRs[`${item._repo}/${item.number}`].length}</span>
+                  )}
+                </span>
+              )}
               <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11, flexShrink: 0 }}>
                 {repoShort}
               </span>
