@@ -539,6 +539,7 @@ ipcMain.handle("gh-reopen-issue", (_e, repo, number) => ghManager.reopenIssue(re
 ipcMain.handle("gh-create-issue", (_e, repo, title, body) => ghManager.createIssue(repo, title, body));
 ipcMain.handle("gh-create-pr", (_e, repo, title, body, head, base) => ghManager.createPR(repo, title, body, head, base));
 ipcMain.handle("gh-list-branches", (_e, repo) => ghManager.listBranches(repo));
+ipcMain.handle("gh-linked-prs", (_e, repo, number) => ghManager.getLinkedPRs(repo, number));
 
 ipcMain.handle("gh-load-pm-state", async () => {
   try {

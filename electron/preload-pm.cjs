@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld("ghApi", {
   createIssue: (repo, title, body) => ipcRenderer.invoke("gh-create-issue", repo, title, body),
   createPR: (repo, title, body, head, base) => ipcRenderer.invoke("gh-create-pr", repo, title, body, head, base),
   listBranches: (repo) => ipcRenderer.invoke("gh-list-branches", repo),
+  getLinkedPRs: (repo, number) => ipcRenderer.invoke("gh-linked-prs", repo, number),
   loadPmState: () => ipcRenderer.invoke("gh-load-pm-state"),
   savePmState: (state) => ipcRenderer.invoke("gh-save-pm-state", state),
   readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
