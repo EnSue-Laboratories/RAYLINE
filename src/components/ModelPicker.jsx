@@ -1,26 +1,69 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { MODELS, getM } from "../data/models";
 import { useFontScale } from "../contexts/FontSizeContext";
+
+const MENU_GAP = 6;
+const VIEWPORT_PADDING = 8;
+const MENU_WIDTH = 180;
 
 export default function ModelPicker({ value, onChange }) {
   const s = useFontScale();
   const [open, set] = useState(false);
   const ref = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
   const m = getM(value);
+
+  const updateMenuPosition = useCallback(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const left = Math.max(
+      VIEWPORT_PADDING,
+      Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING)
+    );
+    setMenuStyle({
+      top: rect.bottom + MENU_GAP,
+      left,
+      width: MENU_WIDTH,
+    });
+  }, []);
 
   useEffect(() => {
     const h = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) set(false);
+      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setMenuStyle(null);
+      set(false);
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  useEffect(() => {
+    if (!open || !ref.current) return;
+    const handleResize = () => updateMenuPosition();
+    window.addEventListener("resize", handleResize);
+    const ro = new ResizeObserver(handleResize);
+    ro.observe(ref.current);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      ro.disconnect();
+    };
+  }, [open, updateMenuPosition]);
+
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button
-        onClick={() => set(!open)}
+        onClick={() => {
+          if (open) {
+            set(false);
+            setMenuStyle(null);
+            return;
+          }
+          updateMenuPosition();
+          set(true);
+        }}
         style={{
           display: "flex",
           alignItems: "center",
@@ -42,14 +85,15 @@ export default function ModelPicker({ value, onChange }) {
         {m.tag} <ChevronDown size={11} strokeWidth={2} />
       </button>
 
-      {open && (
+      {open && menuStyle && createPortal(
         <div
+          ref={menuRef}
           style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            right: 0,
-            zIndex: 200,
-            minWidth: 180,
+            position: "fixed",
+            top: menuStyle.top,
+            left: menuStyle.left,
+            zIndex: 400,
+            width: menuStyle.width,
             background: "rgba(8,8,12,0.55)",
             backdropFilter: "blur(48px) saturate(1.2)",
             border: "1px solid rgba(255,255,255,0.06)",
@@ -57,6 +101,7 @@ export default function ModelPicker({ value, onChange }) {
             padding: 3,
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
             animation: "dropIn .15s ease",
+            WebkitAppRegion: "no-drag",
           }}
         >
           {["claude", "codex"].map((provider, gi) => (
@@ -68,7 +113,7 @@ export default function ModelPicker({ value, onChange }) {
               {MODELS.filter(mm => mm.provider === provider).map((mm) => (
                 <button
                   key={mm.id}
-                  onClick={() => { onChange(mm.id); set(false); }}
+                  onClick={() => { onChange(mm.id); setMenuStyle(null); set(false); }}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -94,7 +139,8 @@ export default function ModelPicker({ value, onChange }) {
               ))}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
