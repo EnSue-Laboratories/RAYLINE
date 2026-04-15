@@ -155,7 +155,7 @@ export default function App() {
       title: "New chat",
       model: defaultModel,
       ts: Date.now(),
-      cwd: getMainRepoRoot(cwd) || undefined,
+      cwd: activeConvo?.cwd || getMainRepoRoot(cwd) || undefined,
     };
     setConvoList((p) => [n, ...p]);
     setActive(id);
