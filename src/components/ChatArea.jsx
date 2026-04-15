@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { PanelLeft, ArrowRight, Square, Terminal as TerminalIcon } from "lucide-react";
+import { PanelLeftOpen, Plus, ArrowRight, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import ModelPicker from "./ModelPicker";
@@ -7,8 +7,9 @@ import BranchSelector from "./BranchSelector";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -196,37 +197,44 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      {/* Sidebar open button — outside drag region */}
-      {!sidebarOpen && (
-        <button
-          onClick={onToggleSidebar}
-          style={{
-            position: "fixed",
-            top: 48,
-            left: 12,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.06)",
-            color: "rgba(255,255,255,0.5)",
-            cursor: "pointer",
-            transition: "all .2s",
-            zIndex: 100,
-            WebkitAppRegion: "no-drag",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-        >
-          <PanelLeft size={16} strokeWidth={1.5} />
-        </button>
-      )}
-
       {/* Drag region matching sidebar spacer */}
-      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0 }} />
+      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0 }} />
+
+      {/* Sidebar collapsed: icon buttons below traffic lights */}
+      {!sidebarOpen && (
+        <div style={{
+          position: "fixed", top: WINDOW_DRAG_HEIGHT, left: 34,
+          display: "flex", gap: 4,
+          zIndex: 50, WebkitAppRegion: "no-drag",
+        }}>
+          <button
+            onClick={onToggleSidebar}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 28, height: 28, borderRadius: 7,
+              background: "none", border: "none", cursor: "pointer",
+              color: "rgba(255,255,255,0.4)", transition: "all .15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
+          >
+            <PanelLeftOpen size={16} strokeWidth={1.5} />
+          </button>
+          <button
+            onClick={onNew}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 28, height: 28, borderRadius: 7,
+              background: "none", border: "none", cursor: "pointer",
+              color: "rgba(255,255,255,0.4)", transition: "all .15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
+          >
+            <Plus size={16} strokeWidth={1.5} />
+          </button>
+        </div>
+      )}
 
       {/* Top bar — aligns with sidebar header */}
       <div
@@ -272,6 +280,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               </div>
             </div>
           )}
+
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>

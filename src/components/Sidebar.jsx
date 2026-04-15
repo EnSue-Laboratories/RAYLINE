@@ -1,9 +1,18 @@
 import { useState } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { Plus, Search, Trash2, X, FolderOpen, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon } from "lucide-react";
+import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
+
+function GitHubIcon({ size = 12 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+    </svg>
+  );
+}
 import { getM } from "../data/models";
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
@@ -23,71 +32,71 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Drag region for window dragging — clears traffic lights */}
-      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0 }} />
-
-      {/* Header */}
-      <div
-        style={{
-          padding: "0 20px 18px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          WebkitAppRegion: "no-drag",
-        }}
-      >
+      {/* Drag region + collapse button */}
+      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0, position: "relative" }}>
         <button
           onClick={onToggleSidebar}
           style={{
+            position: "absolute",
+            top: SIDEBAR_TOGGLE_TOP,
+            left: SIDEBAR_TOGGLE_LEFT,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 28,
-            height: 28,
-            borderRadius: 7,
-            background: "rgba(255,255,255,0.02)",
-            border: "1px solid rgba(255,255,255,0.04)",
-            color: "rgba(255,255,255,0.5)",
+            width: SIDEBAR_TOGGLE_SIZE,
+            height: SIDEBAR_TOGGLE_SIZE,
+            borderRadius: 6,
+            background: "none",
+            border: "none",
+            color: "rgba(255,255,255,0.4)",
             cursor: "pointer",
             transition: "all .2s",
+            WebkitAppRegion: "no-drag",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.75)";
+            e.currentTarget.style.color = "rgba(255,255,255,0.7)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.5)";
+            e.currentTarget.style.color = "rgba(255,255,255,0.4)";
           }}
         >
-          <X size={14} strokeWidth={1.5} />
+          <PanelLeftClose size={14} strokeWidth={1.5} />
         </button>
+      </div>
 
+      {/* Menu items */}
+      <div style={{ padding: "0 12px 14px", display: "flex", flexDirection: "column", gap: 2, WebkitAppRegion: "no-drag" }}>
         <button
           onClick={onNew}
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 28,
-            height: 28,
-            borderRadius: 7,
-            background: "rgba(255,255,255,0.02)",
-            border: "1px solid rgba(255,255,255,0.04)",
-            color: "rgba(255,255,255,0.5)",
-            cursor: "pointer",
-            transition: "all .2s",
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 7,
+            background: "none", border: "none", cursor: "pointer",
+            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            fontFamily: "system-ui, sans-serif", transition: "all .15s",
+            textAlign: "left",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.75)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.5)";
-          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
-          <Plus size={16} strokeWidth={1.5} />
+          <Plus size={15} strokeWidth={1.5} />
+          New Chat
+        </button>
+        <button
+          onClick={onOpenProjectManager}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 7,
+            background: "none", border: "none", cursor: "pointer",
+            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            fontFamily: "system-ui, sans-serif", transition: "all .15s",
+            textAlign: "left",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+        >
+          <GitHubIcon size={15} />
+          GitHub Projects
         </button>
       </div>
 
@@ -230,13 +239,49 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               <div
                 style={{
                   marginTop: 6,
-                  fontSize: s(9),
-                  fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.35)",
-                  letterSpacing: ".08em",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
                 }}
               >
-                {cm.tag}
+                <div
+                  style={{
+                    fontSize: s(9),
+                    fontFamily: "'JetBrains Mono',monospace",
+                    color: "rgba(255,255,255,0.35)",
+                    letterSpacing: ".08em",
+                    minWidth: 0,
+                  }}
+                >
+                  {cm.tag}
+                </div>
+
+                {c.isStreaming && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      flexShrink: 0,
+                      fontSize: s(8.5),
+                      fontFamily: "'JetBrains Mono',monospace",
+                      color: "rgba(165,255,210,0.5)",
+                      letterSpacing: ".08em",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "rgba(165,255,210,0.5)",
+                        animation: "dotPulse 1.2s ease-in-out infinite",
+                      }}
+                    />
+                    RUNNING
+                  </div>
+                )}
               </div>
             </div>
           );
