@@ -203,7 +203,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       {/* Sidebar collapsed: icon buttons below traffic lights */}
       {!sidebarOpen && (
         <div style={{
-          position: "fixed", top: WINDOW_DRAG_HEIGHT, left: 18,
+          position: "fixed", top: WINDOW_DRAG_HEIGHT, left: 34,
           display: "flex", gap: 4,
           zIndex: 50, WebkitAppRegion: "no-drag",
         }}>
