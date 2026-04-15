@@ -178,12 +178,12 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
                 {copiedId === `${item._repo}-${item.number}` ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
               </button>
               <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                <span style={{ width: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.35)" }} title={linkedPRs[`${item._repo}/${item.number}`] ? `${linkedPRs[`${item._repo}/${item.number}`].length} linked PR${linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "s" : ""}` : undefined}>
+                <span style={{ width: 25, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.35)" }} title={linkedPRs[`${item._repo}/${item.number}`] ? `${linkedPRs[`${item._repo}/${item.number}`].length} linked PR${linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "s" : ""}` : undefined}>
                   {linkedPRs[`${item._repo}/${item.number}`] && (
                     <GitPullRequest size={12} strokeWidth={1.5} />
                   )}
                 </span>
-                <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11, minWidth: 70, textAlign: "right" }}>
+                <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11 }}>
                   {repoShort}
                 </span>
               </div>
