@@ -41,6 +41,22 @@ const DEFAULT_SHELL =
   process.env.SHELL ||
   (process.platform === "win32" ? "cmd.exe" : "/bin/sh");
 
+// Environment variables to strip from the PTY.  When the Electron app is
+// launched from VS Code (or another IDE), variables like TERM_PROGRAM,
+// VSCODE_*, and ZDOTDIR leak into process.env.  These cause the shell inside
+// our xterm.js terminal to load foreign shell-integration scripts that send
+// escape sequences xterm.js cannot handle, producing garbled output.
+const STRIP_ENV_PREFIXES = [
+  "VSCODE_",
+  "TERM_PROGRAM",  // also catches TERM_PROGRAM_VERSION
+  "USER_ZDOTDIR",
+];
+const STRIP_ENV_EXACT = new Set([
+  "CODESPACES",
+  "GIT_ASKPASS",
+  "ELECTRON_RUN_AS_NODE",
+]);
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -139,6 +155,20 @@ function createSession({ name, command, cwd } = {}) {
 
   log(`createSession name=${name} shell=${shell} cwd=${workDir}`);
 
+  // Build a clean environment: strip IDE-injected variables that confuse the
+  // shell into loading integrations meant for a different terminal emulator.
+  // Preserve the user's original ZDOTDIR if VS Code overwrote it.
+  const userZdotdir = process.env.USER_ZDOTDIR;
+  const cleanEnv = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (STRIP_ENV_EXACT.has(k)) continue;
+    if (STRIP_ENV_PREFIXES.some((p) => k.startsWith(p))) continue;
+    cleanEnv[k] = v;
+  }
+  if (userZdotdir) cleanEnv.ZDOTDIR = userZdotdir;
+  cleanEnv.PROMPT_EOL_MARK = "";
+  cleanEnv.TERM_PROGRAM = "Claudi";
+
   let ptyProcess;
   try {
     ptyProcess = pty.spawn(shell, [], {
@@ -146,7 +176,7 @@ function createSession({ name, command, cwd } = {}) {
       cols: 80,
       rows: 24,
       cwd: workDir,
-      env: { ...process.env, PROMPT_EOL_MARK: "" },
+      env: cleanEnv,
     });
   } catch (err) {
     log("spawn error:", err.message);
