@@ -7,7 +7,7 @@ import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
-import { getM }     from "./data/models";
+import { DEFAULT_MODEL_ID, getM, normalizeModelId } from "./data/models";
 import { FontSizeContext } from "./contexts/FontSizeContext";
 
 function logCheckpoint(...args) {
@@ -22,7 +22,7 @@ export default function App() {
   const [convoList, setConvoList] = useState([]);
   const [active, setActive] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [defaultModel, setDefaultModel] = useState("sonnet");
+  const [defaultModel, setDefaultModel] = useState(DEFAULT_MODEL_ID);
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [wallpaper, setWallpaper] = useState(null); // { path, opacity, blur }
@@ -36,10 +36,17 @@ export default function App() {
     if (!window.api) { setStateLoaded(true); return; }
     window.api.loadState().then((state) => {
       if (state) {
-        if (state.convos) setConvoList(state.convos);
+        if (state.convos) {
+          setConvoList(
+            state.convos.map((convo) => ({
+              ...convo,
+              model: normalizeModelId(convo.model),
+            }))
+          );
+        }
         if (state.active) setActive(state.active);
         if (state.cwd) setCwd(state.cwd);
-        if (state.defaultModel) setDefaultModel(state.defaultModel);
+        if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
         if (state.fontSize) setFontSize(state.fontSize);
         if (state.wallpaper) {
           setWallpaper(state.wallpaper);
