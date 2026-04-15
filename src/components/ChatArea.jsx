@@ -200,44 +200,38 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       {/* Drag region matching sidebar spacer */}
       <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0 }} />
 
-      {/* Sidebar collapsed: menu buttons below traffic lights */}
+      {/* Sidebar collapsed: icon buttons below traffic lights */}
       {!sidebarOpen && (
         <div style={{
-          position: "fixed", top: WINDOW_DRAG_HEIGHT, left: 12,
-          display: "flex", flexDirection: "column", gap: 2,
-          padding: "0 12px", zIndex: 50, WebkitAppRegion: "no-drag",
+          position: "fixed", top: WINDOW_DRAG_HEIGHT, left: 18,
+          display: "flex", gap: 4,
+          zIndex: 50, WebkitAppRegion: "no-drag",
         }}>
           <button
             onClick={onToggleSidebar}
             style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "8px 10px", borderRadius: 7,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 28, height: 28, borderRadius: 7,
               background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.55)", fontSize: 13,
-              fontFamily: "system-ui, sans-serif", transition: "all .15s",
-              textAlign: "left",
+              color: "rgba(255,255,255,0.4)", transition: "all .15s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
           >
-            <PanelLeftOpen size={15} strokeWidth={1.5} />
-            Open Sidebar
+            <PanelLeftOpen size={16} strokeWidth={1.5} />
           </button>
           <button
             onClick={onNew}
             style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "8px 10px", borderRadius: 7,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 28, height: 28, borderRadius: 7,
               background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.55)", fontSize: 13,
-              fontFamily: "system-ui, sans-serif", transition: "all .15s",
-              textAlign: "left",
+              color: "rgba(255,255,255,0.4)", transition: "all .15s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
           >
-            <Plus size={15} strokeWidth={1.5} />
-            New Chat
+            <Plus size={16} strokeWidth={1.5} />
           </button>
         </div>
       )}
