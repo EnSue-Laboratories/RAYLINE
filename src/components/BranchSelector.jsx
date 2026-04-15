@@ -19,9 +19,11 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
   const [confirmDelete, setConfirmDelete] = useState(null); // { type, name, path, branch }
   const [deleteBranchToo, setDeleteBranchToo] = useState(false);
   const [hoveredRow, setHoveredRow] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const ref = useRef(null);
   const menuRef = useRef(null);
   const inputRef = useRef(null);
+  const searchRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
 
   const refresh = useCallback(async () => {
@@ -46,25 +48,37 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
     return () => window.clearTimeout(refreshTimer);
   }, [refresh]);
 
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    setMenuStyle(null);
+    setCreating(false);
+    setError(null);
+    setConfirmDelete(null);
+    setDeleteBranchToo(false);
+    setHoveredRow(null);
+    setSearchQuery("");
+  }, []);
+
   // Close on outside click
   useEffect(() => {
     const h = (e) => {
       if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
-      setOpen(false);
-      setMenuStyle(null);
-      setCreating(false);
-      setError(null);
-      setConfirmDelete(null);
-      setDeleteBranchToo(false);
+      closeMenu();
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, []);
+  }, [closeMenu]);
 
   // Focus input when creating
   useEffect(() => {
     if (creating && inputRef.current) inputRef.current.focus();
   }, [creating]);
+
+  useEffect(() => {
+    if (!open || creating || !searchRef.current) return;
+    const timer = window.setTimeout(() => searchRef.current?.focus(), 0);
+    return () => window.clearTimeout(timer);
+  }, [creating, mode, open]);
 
   const handleCheckout = async (name) => {
     if (!cwd || name === current) return;
@@ -72,8 +86,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
     try {
       await window.api.gitCheckout(cwd, name);
       setCurrent(name);
-      setMenuStyle(null);
-      setOpen(false);
+      closeMenu();
       onRefocusTerminal?.();
     } catch (e) {
       setError(e.message);
@@ -97,9 +110,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
         onRefocusTerminal?.();
       }
       setNewName("");
-      setCreating(false);
-      setMenuStyle(null);
-      setOpen(false);
+      closeMenu();
       refresh();
     } catch (e) {
       setError(e.message);
@@ -109,8 +120,17 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
   const handleWorktreeSwitch = (wt) => {
     if (wt.path === cwd) return;
     if (onCwdChange) onCwdChange(wt.path);
-    setMenuStyle(null);
-    setOpen(false);
+    closeMenu();
+  };
+
+  const handleModeChange = (nextMode) => {
+    if (nextMode === mode) return;
+    setMode(nextMode);
+    setSearchQuery("");
+    setConfirmDelete(null);
+    setDeleteBranchToo(false);
+    setHoveredRow(null);
+    setError(null);
   };
 
   const updateMenuPosition = useCallback(() => {
@@ -181,20 +201,35 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
 
   // Worktree switching is disabled mid-conversation
   const worktreeLocked = hasMessages;
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredBranches = normalizedQuery
+    ? branches.filter((branch) => branch.toLowerCase().includes(normalizedQuery))
+    : branches;
+  const listedWorktrees = worktrees.filter((w) => !w.bare && w.path !== mainWorktree?.path);
+  const filteredWorktrees = normalizedQuery
+    ? listedWorktrees.filter((wt) => {
+      const name = wt.path.split("/").pop() || "";
+      return name.toLowerCase().includes(normalizedQuery)
+        || wt.path.toLowerCase().includes(normalizedQuery)
+        || (wt.branch || "").toLowerCase().includes(normalizedQuery);
+    })
+    : listedWorktrees;
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button
         onClick={() => {
           if (open) {
-            setOpen(false);
-            setMenuStyle(null);
+            closeMenu();
           } else {
             updateMenuPosition();
             setOpen(true);
+            setError(null);
+            setConfirmDelete(null);
+            setDeleteBranchToo(false);
+            setHoveredRow(null);
           }
           setCreating(false);
-          setError(null);
           if (!open) refresh();
         }}
         style={{
@@ -255,7 +290,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
             {["branch", "worktree"].map((t) => (
               <button
                 key={t}
-                onClick={() => setMode(t)}
+                onClick={() => handleModeChange(t)}
                 style={{
                   flex: 1,
                   padding: "5px 0",
@@ -275,10 +310,48 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
             ))}
           </div>
 
+          <div style={{ padding: "6px 8px 4px" }}>
+            <input
+              ref={searchRef}
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setConfirmDelete(null);
+                setDeleteBranchToo(false);
+                setError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  if (searchQuery) {
+                    setSearchQuery("");
+                    setConfirmDelete(null);
+                    setDeleteBranchToo(false);
+                    setError(null);
+                  } else {
+                    closeMenu();
+                  }
+                }
+              }}
+              placeholder={mode === "worktree" ? "Search worktrees" : "Search branches"}
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 6,
+                color: "rgba(255,255,255,0.8)",
+                fontSize: s(10),
+                fontFamily: "'JetBrains Mono',monospace",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
           {/* Branch list */}
           {mode === "branch" && (
             <div style={{ maxHeight: 240, overflowY: "auto" }}>
-              {branches.map((b) => {
+              {filteredBranches.map((b) => {
                 const isProtected = b === current || PROTECTED_BRANCHES.includes(b);
                 const isConfirming = confirmDelete?.type === "branch" && confirmDelete.name === b;
 
@@ -383,6 +456,16 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   </div>
                 );
               })}
+              {filteredBranches.length === 0 && (
+                <div style={{
+                  padding: "10px 12px",
+                  fontSize: s(9),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  color: "rgba(255,255,255,0.25)",
+                }}>
+                  No branches match
+                </div>
+              )}
             </div>
           )}
 
@@ -406,7 +489,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   onClick={() => {
                     if (worktreeLocked || !isInWorktree) return;
                     onCwdChange?.(mainWorktree.path);
-                    setOpen(false);
+                    closeMenu();
                     refresh();
                   }}
                   style={{
@@ -432,7 +515,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   {!isInWorktree && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
                 </button>
               )}
-              {worktrees.filter((w) => !w.bare && w.path !== mainWorktree?.path).map((wt) => {
+              {filteredWorktrees.map((wt) => {
                 const isActive = wt.path === cwd;
                 const isConfirming = confirmDelete?.type === "worktree" && confirmDelete.path === wt.path;
 
@@ -578,6 +661,16 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   </div>
                 );
               })}
+              {filteredWorktrees.length === 0 && (
+                <div style={{
+                  padding: "10px 12px",
+                  fontSize: s(9),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  color: "rgba(255,255,255,0.25)",
+                }}>
+                  No worktrees match
+                </div>
+              )}
             </div>
           )}
 
@@ -600,7 +693,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
               <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
                 {/* Toggle: branch vs worktree */}
                 <button
-                  onClick={() => setMode(mode === "worktree" ? "branch" : "worktree")}
+                  onClick={() => handleModeChange(mode === "worktree" ? "branch" : "worktree")}
                   style={{
                     padding: "3px 7px",
                     background: "rgba(255,255,255,0.04)",
@@ -688,7 +781,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
             </div>
           ) : (
             <button
-              onClick={() => { setCreating(true); setError(null); }}
+              onClick={() => { setCreating(true); setError(null); setSearchQuery(""); }}
               style={{
                 display: "flex",
                 alignItems: "center",
