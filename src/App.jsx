@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
@@ -46,6 +46,9 @@ export default function App() {
   const [wallpaper, setWallpaper] = useState(null); // { path, opacity, blur }
   const [fontSize, setFontSize] = useState(15);
   const [showSettings, setShowSettings] = useState(false);
+  const [projects, setProjects] = useState({});
+  const [draftsCollapsed, setDraftsCollapsed] = useState(false);
+  const [showNewChatCard, setShowNewChatCard] = useState(false);
   const messageQueue = useRef([]);
   const [queuedMessages, setQueuedMessages] = useState([]);
 
@@ -75,6 +78,8 @@ export default function App() {
             });
           }
         }
+        if (state.projects) setProjects(state.projects);
+        if (state.draftsCollapsed != null) setDraftsCollapsed(state.draftsCollapsed);
       }
       setStateLoaded(true);
     });
@@ -89,15 +94,16 @@ export default function App() {
     saveTimer.current = setTimeout(() => {
       // Strip dataUrl before persisting (too large for JSON, reloaded on startup)
       const wpSave = wallpaper ? { path: wallpaper.path, opacity: wallpaper.opacity, blur: wallpaper.blur, imgBlur: wallpaper.imgBlur, imgDarken: wallpaper.imgDarken } : null;
-      window.api.saveState({ convos: convoList, active, cwd, defaultModel, fontSize, wallpaper: wpSave });
+      window.api.saveState({ convos: convoList, active, cwd, defaultModel, fontSize, wallpaper: wpSave, projects, draftsCollapsed });
     }, 300);
-  }, [convoList, active, cwd, defaultModel, fontSize, wallpaper, stateLoaded]);
+  }, [convoList, active, cwd, defaultModel, fontSize, wallpaper, projects, draftsCollapsed, stateLoaded]);
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
 
   // Load messages from Claude Code session files when selecting a conversation
   const handleSelect = useCallback(async (id) => {
+    setShowNewChatCard(false);
     setActive(id);
     const convo = convoList.find((c) => c.id === id);
     const data = getConversation(id);
@@ -166,18 +172,42 @@ export default function App() {
   // ── Actions ────────────────────────────────────────────────────────────────
 
   const handleNew = () => {
+    setShowNewChatCard(true);
+  };
+
+  const handleToggleProjectCollapse = (cwdRoot) => {
+    setProjects((prev) => ({
+      ...prev,
+      [cwdRoot]: { ...prev[cwdRoot], collapsed: !prev[cwdRoot]?.collapsed },
+    }));
+  };
+
+  const handleHideProject = (cwdRoot) => {
+    setProjects((prev) => ({
+      ...prev,
+      [cwdRoot]: { ...prev[cwdRoot], hidden: true },
+    }));
+  };
+
+  const handleNewInProject = (cwdRoot) => {
     const id = "c" + Date.now();
     const sessionId = crypto.randomUUID();
     const n = {
-      id,
-      sessionId,
+      id, sessionId,
       title: "New chat",
       model: defaultModel,
       ts: Date.now(),
-      cwd: activeConvo?.cwd || getMainRepoRoot(cwd) || undefined,
+      cwd: cwdRoot || undefined,
     };
     setConvoList((p) => [n, ...p]);
     setActive(id);
+    setShowNewChatCard(false);
+    if (cwdRoot && projects[cwdRoot]?.hidden) {
+      setProjects((prev) => ({
+        ...prev,
+        [cwdRoot]: { ...prev[cwdRoot], hidden: false },
+      }));
+    }
   };
 
   const handleDelete = (id, e) => {
@@ -349,6 +379,57 @@ export default function App() {
     [activeConvo, active, activeData, cwd, getConversation, prepareMessage, startPreparedMessage]
   );
 
+  const handleCreateChat = useCallback(async (opts) => {
+    const id = "c" + Date.now();
+    const sessionId = crypto.randomUUID();
+    const effectiveCwd = opts.cwd !== undefined ? opts.cwd : (getMainRepoRoot(cwd) || undefined);
+    const n = {
+      id, sessionId,
+      title: opts.title || opts.prompt?.slice(0, 50) || "New chat",
+      model: opts.model || defaultModel,
+      ts: Date.now(),
+      cwd: effectiveCwd,
+    };
+
+    if (opts.branch && effectiveCwd) {
+      if (opts.worktree) {
+        const wtPath = `${effectiveCwd}/.worktrees/${opts.branch}`;
+        await window.api?.gitWorktreeAdd(effectiveCwd, wtPath, opts.branch);
+        n.cwd = wtPath;
+      } else {
+        await window.api?.gitCreateBranch(effectiveCwd, opts.branch);
+      }
+    }
+
+    setConvoList((p) => [n, ...p]);
+    setActive(id);
+    setShowNewChatCard(false);
+
+    if (opts.cwd && !projects[opts.cwd]) {
+      setProjects((prev) => ({
+        ...prev,
+        [opts.cwd]: { name: opts.cwd.split("/").pop(), manual: true },
+      }));
+    }
+
+    // Unhide if hidden
+    if (effectiveCwd && projects[effectiveCwd]?.hidden) {
+      setProjects((prev) => ({
+        ...prev,
+        [effectiveCwd]: { ...prev[effectiveCwd], hidden: false },
+      }));
+    }
+
+    let prompt = opts.prompt || "";
+    if (opts.issueContext) {
+      prompt = `${opts.issueContext}\n\n${prompt}`;
+    }
+
+    if (prompt) {
+      setTimeout(() => handleSend(prompt, opts.attachments), 50);
+    }
+  }, [cwd, defaultModel, projects, handleSend]);
+
   const handleCancel = useCallback(() => {
     if (active) cancelMessage(active);
   }, [active, cancelMessage]);
@@ -467,6 +548,13 @@ export default function App() {
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const allCwdRoots = useMemo(() => {
+    const roots = new Set();
+    convoList.forEach(c => { if (c.cwd) roots.add(getMainRepoRoot(c.cwd)); });
+    Object.keys(projects).forEach(r => roots.add(r));
+    return [...roots];
+  }, [convoList, projects]);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -530,6 +618,12 @@ export default function App() {
           onPickFolder={handlePickFolder}
           onOpenSettings={() => setShowSettings(true)}
           onOpenProjectManager={() => window.api?.openProjectManager()}
+          projects={projects}
+          onToggleProjectCollapse={handleToggleProjectCollapse}
+          onHideProject={handleHideProject}
+          onNewInProject={handleNewInProject}
+          draftsCollapsed={draftsCollapsed}
+          onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
         />
       </div>
 
@@ -570,6 +664,11 @@ export default function App() {
               );
             }
           }}
+          showNewChatCard={showNewChatCard}
+          onCreateChat={handleCreateChat}
+          onCancelNewChat={() => setShowNewChatCard(false)}
+          allCwdRoots={allCwdRoots}
+          projects={projects}
         />
       )}
 
