@@ -3,7 +3,6 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight } from "lucide-react";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
-import { relativeTime } from "../utils/time";
 import { getM } from "../data/models";
 
 function getMainRepoRoot(dir) {
@@ -31,11 +30,13 @@ function groupConvosByProject(convos, projectsMeta) {
     groups[root].convos.push(c);
   }
   // Also include manually added projects with 0 convos
-  for (const [root, meta] of Object.entries(projectsMeta || {})) {
+  for (const [projectPath, meta] of Object.entries(projectsMeta || {})) {
+    const root = getMainRepoRoot(projectPath);
+    if (!root) continue;
     if (meta.manual && !groups[root]) {
       groups[root] = {
         cwdRoot: root,
-        name: meta.name || root.split("/").pop(),
+        name: root.split("/").pop(),
         collapsed: meta.collapsed ?? false,
         hidden: meta.hidden ?? false,
         convos: [],

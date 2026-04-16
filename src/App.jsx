@@ -24,6 +24,29 @@ function getMainRepoRoot(dir) {
   return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
 }
 
+function normalizeProjectsMeta(projectsMeta) {
+  const normalized = {};
+  const entries = Object.entries(projectsMeta || {}).sort(([a], [b]) => {
+    const aIsRoot = a === getMainRepoRoot(a);
+    const bIsRoot = b === getMainRepoRoot(b);
+    return Number(aIsRoot) - Number(bIsRoot);
+  });
+
+  for (const [path, meta] of entries) {
+    const root = getMainRepoRoot(path);
+    if (!root) continue;
+    const prev = normalized[root] || {};
+    normalized[root] = {
+      ...prev,
+      ...meta,
+      name: path === root ? (meta.name || root.split("/").pop()) : (prev.name || root.split("/").pop()),
+      manual: Boolean(prev.manual || meta.manual),
+    };
+  }
+
+  return normalized;
+}
+
 export default function App() {
   const {
     conversations,
@@ -78,7 +101,7 @@ export default function App() {
             });
           }
         }
-        if (state.projects) setProjects(state.projects);
+        if (state.projects) setProjects(normalizeProjectsMeta(state.projects));
         if (state.draftsCollapsed != null) setDraftsCollapsed(state.draftsCollapsed);
       }
       setStateLoaded(true);
@@ -176,16 +199,18 @@ export default function App() {
   };
 
   const handleToggleProjectCollapse = (cwdRoot) => {
+    const projectRoot = getMainRepoRoot(cwdRoot);
     setProjects((prev) => ({
       ...prev,
-      [cwdRoot]: { ...prev[cwdRoot], collapsed: !prev[cwdRoot]?.collapsed },
+      [projectRoot]: { ...prev[projectRoot], collapsed: !prev[projectRoot]?.collapsed },
     }));
   };
 
   const handleHideProject = (cwdRoot) => {
+    const projectRoot = getMainRepoRoot(cwdRoot);
     setProjects((prev) => ({
       ...prev,
-      [cwdRoot]: { ...prev[cwdRoot], hidden: true },
+      [projectRoot]: { ...prev[projectRoot], hidden: true },
     }));
   };
 
@@ -429,15 +454,15 @@ export default function App() {
     setActive(id);
     setShowNewChatCard(false);
 
-    if (opts.cwd && !projects[opts.cwd]) {
+    const projectRoot = getMainRepoRoot(opts.cwd || effectiveCwd);
+    if (projectRoot && !projects[projectRoot]) {
       setProjects((prev) => ({
         ...prev,
-        [opts.cwd]: { name: opts.cwd.split("/").pop(), manual: true },
+        [projectRoot]: { name: projectRoot.split("/").pop(), manual: true },
       }));
     }
 
     // Unhide if hidden
-    const projectRoot = getMainRepoRoot(n.cwd || effectiveCwd);
     if (projectRoot && projects[projectRoot]?.hidden) {
       setProjects((prev) => ({
         ...prev,
@@ -581,7 +606,7 @@ export default function App() {
   const allCwdRoots = useMemo(() => {
     const roots = new Set();
     convoList.forEach(c => { if (c.cwd) roots.add(getMainRepoRoot(c.cwd)); });
-    Object.keys(projects).forEach(r => roots.add(r));
+    Object.keys(projects).forEach(r => roots.add(getMainRepoRoot(r)));
     return [...roots];
   }, [convoList, projects]);
 

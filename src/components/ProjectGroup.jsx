@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { ChevronRight, FolderClosed, Pencil, MoreHorizontal, Trash2 } from "lucide-react";
+import { ChevronRight, FolderClosed, Plus, MoreHorizontal, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getM } from "../data/models";
 import { relativeTime } from "../utils/time";
@@ -161,7 +161,7 @@ export default function ProjectGroup({
                 onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
               >
-                <Pencil size={11} strokeWidth={1.5} />
+                <Plus size={11} strokeWidth={1.5} />
               </button>
 
               {/* More options */}
