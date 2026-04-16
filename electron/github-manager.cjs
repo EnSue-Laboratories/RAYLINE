@@ -48,6 +48,34 @@ function ghWithStdin(args, jsonBody) {
   });
 }
 
+/**
+ * Execute a gh CLI command with a raw string piped to stdin.
+ */
+function ghWithRawStdin(args, input) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("gh", args, {
+      env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" },
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 15000,
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (d) => { stdout += d; });
+    child.stderr.on("data", (d) => { stderr += d; });
+
+    child.on("error", (err) => reject(err));
+    child.on("close", (code) => {
+      if (code !== 0) reject(new Error(stderr.trim() || `gh exited with code ${code}`));
+      else resolve(stdout.trim());
+    });
+
+    child.stdin.write(input || "");
+    child.stdin.end();
+  });
+}
+
 async function checkAuth() {
   try {
     await gh(["auth", "status"]);
@@ -182,22 +210,22 @@ async function reopenIssue(repo, number) {
 }
 
 async function createIssue(repo, title, body) {
-  const args = ["api", `/repos/${repo}/issues`, "-f", `title=${title}`];
-  if (body) args.push("-f", `body=${body}`);
-  const raw = await gh(args);
+  const raw = await ghWithStdin(
+    ["api", `/repos/${repo}/issues`, "--input", "-"],
+    { title, body: body || "" },
+  );
   return JSON.parse(raw);
 }
 
 async function createPR(repo, title, body, head, base) {
-  const args = [
+  const raw = await ghWithRawStdin([
     "pr", "create",
     "-R", repo,
     "--title", title,
     "--head", head,
     "--base", base || "main",
-    "--body", body || "",
-  ];
-  const raw = await gh(args);
+    "--body-file", "-",
+  ], body || "");
   // gh pr create outputs the PR URL, not JSON
   return { url: raw };
 }
@@ -232,9 +260,8 @@ async function getRepoDefaultBranch(repo) {
   }
 }
 
-async function uploadImage(repo, base64Data, filename) {
-  const dataUrl = `data:image/png;base64,${base64Data}`;
-  return { url: dataUrl, markdown: `![${filename}](${dataUrl})` };
+async function uploadImage(_repo, _base64Data, _filename) {
+  throw new Error("GitHub image upload is not implemented. Remove pasted images or paste a GitHub-hosted image URL instead.");
 }
 
 async function getLinkedPRs(repo, issueNumber) {

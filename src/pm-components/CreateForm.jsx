@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
 import SearchableSelect from "./SearchableSelect";
 
 const inputStyle = {
@@ -25,6 +25,9 @@ const selectStyle = {
   backgroundPosition: "right 10px center",
   paddingRight: 30,
 };
+
+const imageUploadCalloutTitle = "Images use GitHub's web uploader";
+const imageUploadCalloutBody = "Text-only drafts can be created here. To include screenshots, continue in GitHub's composer with the title and description prefilled, then paste the images there.";
 
 export default function CreateForm({ repos, type, onClose, onCreated }) {
   const [repo, setRepo] = useState(repos[0] || "");
@@ -55,6 +58,8 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
     }
   }, [repo, type]);
 
+  const canSubmit = Boolean(title.trim()) && (type !== "pr" || (head && base));
+
   const handlePaste = (e) => {
     const items = e.clipboardData?.items;
     if (!items) return;
@@ -75,17 +80,11 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
   };
 
   const handleSubmit = async () => {
-    if (!title.trim() || submitting) return;
+    if (!canSubmit || submitting || images.length > 0) return;
     setSubmitting(true);
     setError(null);
     try {
       let finalBody = body.trim();
-      // Append pasted images as markdown
-      for (const img of images) {
-        const base64 = img.dataUrl.split(",")[1];
-        const result = await window.ghApi.uploadImage(repo, base64, img.name);
-        finalBody += (finalBody ? "\n\n" : "") + result.markdown;
-      }
       if (type === "issue") {
         await window.ghApi.createIssue(repo, title.trim(), finalBody);
       } else {
@@ -97,6 +96,18 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
       setError(e.message);
     }
     setSubmitting(false);
+  };
+
+  const handleContinueInGitHub = () => {
+    if (!canSubmit) return;
+    const finalBody = body.trim();
+    const encodedTitle = encodeURIComponent(title.trim());
+    const encodedBody = encodeURIComponent(finalBody);
+    const url = type === "issue"
+      ? `https://github.com/${repo}/issues/new?title=${encodedTitle}&body=${encodedBody}`
+      : `https://github.com/${repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?expand=1&title=${encodedTitle}&body=${encodedBody}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    onClose();
   };
 
   return (
@@ -189,23 +200,58 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
         </div>
 
         {images.length > 0 && (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-            {images.map((img, i) => (
-              <div key={i} style={{ position: "relative" }}>
-                <img src={img.dataUrl} alt={img.name} style={{ height: 48, maxWidth: 80, borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)" }} />
-                <button
-                  onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
-                  style={{
-                    position: "absolute", top: -4, right: -4, width: 16, height: 16,
-                    borderRadius: "50%", background: "rgba(0,0,0,0.8)", border: "1px solid rgba(255,255,255,0.15)",
-                    color: "rgba(255,255,255,0.6)", fontSize: 10, cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                  }}
-                >
-                  x
-                </button>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+              {images.map((img, i) => (
+                <div key={i} style={{ position: "relative" }}>
+                  <img src={img.dataUrl} alt={img.name} style={{ height: 48, maxWidth: 80, borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)" }} />
+                  <button
+                    onClick={() => {
+                      setImages((prev) => prev.filter((_, j) => j !== i));
+                    }}
+                    style={{
+                      position: "absolute", top: -4, right: -4, width: 16, height: 16,
+                      borderRadius: "50%", background: "rgba(0,0,0,0.8)", border: "1px solid rgba(255,255,255,0.15)",
+                      color: "rgba(255,255,255,0.6)", fontSize: 10, cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                    }}
+                  >
+                    x
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div
+              style={{
+                borderRadius: 8,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.04)",
+                padding: "10px 12px",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.82)", fontWeight: 600, marginBottom: 4 }}>
+                {imageUploadCalloutTitle}
               </div>
-            ))}
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.52)", lineHeight: 1.45, marginBottom: 8 }}>
+                {imageUploadCalloutBody}
+              </div>
+              <button
+                onClick={() => setImages([])}
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 6,
+                  color: "rgba(255,255,255,0.72)",
+                  fontSize: 11,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  letterSpacing: ".04em",
+                  padding: "6px 10px",
+                  cursor: "pointer",
+                }}
+              >
+                Create Without Images
+              </button>
+            </div>
           </div>
         )}
 
@@ -224,18 +270,30 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
-            disabled={!title.trim() || submitting}
+            onClick={images.length > 0 ? handleContinueInGitHub : handleSubmit}
+            disabled={!canSubmit || submitting}
             style={{
-              background: title.trim() ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
+              background: canSubmit ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6,
-              padding: "6px 14px", cursor: title.trim() ? "pointer" : "default",
-              color: title.trim() ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
+              padding: "6px 14px", cursor: canSubmit ? "pointer" : "default",
+              color: canSubmit ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
               fontSize: 12, fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
               transition: "all .15s",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
-            {submitting ? "Creating..." : "Create"}
+            {submitting
+              ? "Creating..."
+              : images.length > 0
+                ? (
+                  <>
+                    Continue in GitHub
+                    <ExternalLink size={13} strokeWidth={1.75} />
+                  </>
+                )
+                : "Create"}
           </button>
         </div>
       </div>
