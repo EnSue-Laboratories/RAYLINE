@@ -232,6 +232,11 @@ async function getRepoDefaultBranch(repo) {
   }
 }
 
+async function uploadImage(repo, base64Data, filename) {
+  const dataUrl = `data:image/png;base64,${base64Data}`;
+  return { url: dataUrl, markdown: `![${filename}](${dataUrl})` };
+}
+
 async function getLinkedPRs(repo, issueNumber) {
   const raw = await gh([
     "api", `/repos/${repo}/issues/${issueNumber}/timeline`,
@@ -279,5 +284,6 @@ module.exports = {
   listBranches,
   getCurrentBranch,
   getRepoDefaultBranch,
+  uploadImage,
   getLinkedPRs,
 };

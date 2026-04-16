@@ -35,6 +35,7 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
   const [branches, setBranches] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [images, setImages] = useState([]);
 
   useEffect(() => {
     if (type === "pr" && repo) {
@@ -54,18 +55,43 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
     }
   }, [repo, type]);
 
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setImages((prev) => [...prev, {
+            name: file.name || `image-${Date.now()}.png`,
+            dataUrl: ev.target.result,
+          }]);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
   const handleSubmit = async () => {
     if (!title.trim() || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
+      let finalBody = body.trim();
+      // Append pasted images as markdown
+      for (const img of images) {
+        const base64 = img.dataUrl.split(",")[1];
+        const result = await window.ghApi.uploadImage(repo, base64, img.name);
+        finalBody += (finalBody ? "\n\n" : "") + result.markdown;
+      }
       if (type === "issue") {
-        await window.ghApi.createIssue(repo, title.trim(), body.trim());
+        await window.ghApi.createIssue(repo, title.trim(), finalBody);
       } else {
-        await window.ghApi.createPR(repo, title.trim(), body.trim(), head, base);
+        await window.ghApi.createPR(repo, title.trim(), finalBody, head, base);
       }
       onClose();
-      // Small delay so GitHub API has time to index the new item
       setTimeout(() => onCreated(), 500);
     } catch (e) {
       setError(e.message);
@@ -158,8 +184,30 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
             placeholder="Optional description..."
             rows={4}
             style={{ ...inputStyle, marginTop: 4, resize: "vertical", minHeight: 60 }}
+            onPaste={handlePaste}
           />
         </div>
+
+        {images.length > 0 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            {images.map((img, i) => (
+              <div key={i} style={{ position: "relative" }}>
+                <img src={img.dataUrl} alt={img.name} style={{ height: 48, maxWidth: 80, borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)" }} />
+                <button
+                  onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                  style={{
+                    position: "absolute", top: -4, right: -4, width: 16, height: 16,
+                    borderRadius: "50%", background: "rgba(0,0,0,0.8)", border: "1px solid rgba(255,255,255,0.15)",
+                    color: "rgba(255,255,255,0.6)", fontSize: 10, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                  }}
+                >
+                  x
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {error && (
           <div style={{ fontSize: 12, color: "rgba(248,81,73,0.8)", marginBottom: 10 }}>{error}</div>
