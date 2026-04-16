@@ -199,7 +199,7 @@ export default function ProjectGroup({
             key={c.id}
             onClick={() => onSelect(c.id)}
             style={{
-              padding: "12px 12px",
+              padding: "12px 12px 12px 28px",
               borderRadius: 8,
               cursor: "pointer",
               marginBottom: 1,

@@ -554,6 +554,16 @@ ipcMain.handle("git-worktree-remove", async (_event, cwd, worktreePath) => {
   return { success: true };
 });
 
+// IPC: get repo name from cwd via git remote
+ipcMain.handle("gh-get-repo-name", async (_e, cwd) => {
+  const { execFile } = require("child_process");
+  return new Promise((resolve) => {
+    execFile("gh", ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"], { cwd, timeout: 5000 }, (err, stdout) => {
+      resolve(err ? null : stdout.trim());
+    });
+  });
+});
+
 // IPC: GitHub Project Manager
 ipcMain.handle("gh-check-auth", () => ghManager.checkAuth());
 ipcMain.handle("gh-list-user-repos", (_e, limit) => ghManager.listUserRepos(limit));

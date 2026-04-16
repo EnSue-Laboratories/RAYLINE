@@ -77,6 +77,8 @@ contextBridge.exposeInMainWorld("api", {
 
   // GitHub operations
   ghGetIssue: (repo, number) => ipcRenderer.invoke("gh-get-issue", repo, number),
+  ghListIssues: (repo, state) => ipcRenderer.invoke("gh-list-issues", repo, state),
+  ghGetRepoName: (cwd) => ipcRenderer.invoke("gh-get-repo-name", cwd),
 
   // Project Manager
   openProjectManager: () => ipcRenderer.send("open-project-manager"),
