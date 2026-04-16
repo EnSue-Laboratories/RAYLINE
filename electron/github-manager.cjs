@@ -207,6 +207,31 @@ async function listBranches(repo) {
   return JSON.parse(raw);
 }
 
+async function getCurrentBranch() {
+  try {
+    const raw = await new Promise((resolve, reject) => {
+      execFile("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+        timeout: 5000,
+      }, (err, stdout) => {
+        if (err) reject(err);
+        else resolve(stdout.trim());
+      });
+    });
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+async function getRepoDefaultBranch(repo) {
+  try {
+    const raw = await gh(["api", `/repos/${repo}`, "--jq", ".default_branch"]);
+    return raw || "main";
+  } catch {
+    return "main";
+  }
+}
+
 async function getLinkedPRs(repo, issueNumber) {
   const raw = await gh([
     "api", `/repos/${repo}/issues/${issueNumber}/timeline`,
@@ -252,5 +277,7 @@ module.exports = {
   createIssue,
   createPR,
   listBranches,
+  getCurrentBranch,
+  getRepoDefaultBranch,
   getLinkedPRs,
 };
