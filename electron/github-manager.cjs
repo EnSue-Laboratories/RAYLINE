@@ -195,8 +195,8 @@ async function createPR(repo, title, body, head, base) {
     "--title", title,
     "--head", head,
     "--base", base || "main",
+    "--body", body || "",
   ];
-  if (body) args.push("--body", body);
   const raw = await gh(args);
   // gh pr create outputs the PR URL, not JSON
   return { url: raw };
