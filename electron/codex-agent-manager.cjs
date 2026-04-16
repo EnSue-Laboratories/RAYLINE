@@ -245,9 +245,10 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
     }
   }
 
-  // Prompt goes last as positional arg
+  // `--image` is variadic in the Codex CLI, so terminate option parsing
+  // before the prompt or the prompt may be consumed as another image path.
   const fullPrompt = buildClaudiPrompt(prompt, files, mcpServers);
-  args.push(fullPrompt);
+  args.push("--", fullPrompt);
 
   const codexBin = resolveCodexBin();
   if (!codexBin) {
