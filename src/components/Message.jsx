@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Pencil, Loader2, FileText } from "lucide-react";
+import { Pencil, Loader2, FileText, PauseCircle } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -422,6 +422,52 @@ export default function Message({ msg, onEdit, onAnswer }) {
             return <AskUserQuestionBlock key={part.id || i} tool={part} onAnswer={onAnswer} />;
           }
           return <ToolCallBlock key={part.id || i} tool={part} />;
+        }
+        if (part.type === "status") {
+          const isPaused = part.kind === "paused";
+          return (
+            <div
+              key={`status-${i}`}
+              style={{
+                margin: "10px 0 14px",
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: isPaused ? "rgba(255,214,153,0.08)" : "rgba(255,255,255,0.04)",
+                color: "rgba(255,255,255,0.72)",
+                maxWidth: "80%",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: s(11),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: ".04em",
+                  textTransform: "uppercase",
+                  color: isPaused ? "rgba(255,220,170,0.9)" : "rgba(255,255,255,0.6)",
+                }}
+              >
+                {isPaused && <PauseCircle size={14} strokeWidth={1.8} />}
+                <span>{part.title || "Status"}</span>
+              </div>
+              {part.text && (
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: s(13),
+                    lineHeight: 1.65,
+                    fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
+                    color: "rgba(255,255,255,0.66)",
+                  }}
+                >
+                  {part.text}
+                </div>
+              )}
+            </div>
+          );
         }
         return null;
       })}
