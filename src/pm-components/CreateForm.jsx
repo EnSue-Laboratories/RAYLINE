@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import SearchableSelect from "./SearchableSelect";
 
 const inputStyle = {
   width: "100%",
@@ -37,9 +38,18 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
 
   useEffect(() => {
     if (type === "pr" && repo) {
-      window.ghApi.listBranches(repo).then((b) => {
+      Promise.all([
+        window.ghApi.listBranches(repo),
+        window.ghApi.getCurrentBranch(),
+        window.ghApi.getRepoDefaultBranch(repo),
+      ]).then(([b, currentBranch, defaultBranch]) => {
+        const branchNames = b.map((br) => br.name);
         setBranches(b);
-        if (b.length > 0 && !head) setHead(b[0].name);
+        if (!head) {
+          const match = branchNames.find((n) => n === currentBranch);
+          setHead(match || branchNames[0] || "");
+        }
+        setBase(defaultBranch);
       }).catch(() => {});
     }
   }, [repo, type]);
@@ -107,23 +117,21 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>HEAD</label>
-              <select
+              <SearchableSelect
+                options={branches.map((b) => b.name)}
                 value={head}
-                onChange={(e) => setHead(e.target.value)}
-                style={selectStyle}
-              >
-                {branches.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
-              </select>
+                onChange={setHead}
+                placeholder="Search branches..."
+              />
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>BASE</label>
-              <select
+              <SearchableSelect
+                options={branches.map((b) => b.name)}
                 value={base}
-                onChange={(e) => setBase(e.target.value)}
-                style={selectStyle}
-              >
-                {branches.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
-              </select>
+                onChange={setBase}
+                placeholder="Search branches..."
+              />
             </div>
           </div>
         )}
