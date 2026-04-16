@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { ChevronRight, FolderClosed, Pencil, MoreHorizontal, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getM } from "../data/models";
+import { relativeTime } from "../utils/time";
 
 export default function ProjectGroup({
   project,
@@ -113,6 +114,21 @@ export default function ProjectGroup({
         >
           {project.name}
         </span>
+
+        {/* Relative timestamp — hidden when actions shown */}
+        {project.latestTs && !headerHovered && (
+          <span
+            style={{
+              fontSize: s(9),
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "rgba(255,255,255,0.15)",
+              letterSpacing: ".04em",
+              flexShrink: 0,
+            }}
+          >
+            {relativeTime(project.latestTs)}
+          </span>
+        )}
 
         {/* Action buttons — visible on hover */}
         <div

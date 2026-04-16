@@ -42,14 +42,29 @@ function groupConvosByProject(convos, projectsMeta) {
       };
     }
   }
-  return {
-    projectGroups: Object.values(groups).sort((a, b) => {
-      const aTs = a.convos.length ? Math.max(...a.convos.map(c => c.ts)) : 0;
-      const bTs = b.convos.length ? Math.max(...b.convos.map(c => c.ts)) : 0;
-      return bTs - aTs;
-    }),
-    drafts,
-  };
+  const sorted = Object.values(groups).sort((a, b) => {
+    const aTs = a.convos.length ? Math.max(...a.convos.map(c => c.ts)) : 0;
+    const bTs = b.convos.length ? Math.max(...b.convos.map(c => c.ts)) : 0;
+    return bTs - aTs;
+  });
+
+  // Disambiguate duplicate basenames
+  const nameCounts = {};
+  sorted.forEach(g => { nameCounts[g.name] = (nameCounts[g.name] || 0) + 1; });
+  sorted.forEach(g => {
+    if (nameCounts[g.name] > 1) {
+      const parts = g.cwdRoot.split("/");
+      const parent = parts.length >= 2 ? parts[parts.length - 2] : "";
+      if (parent) g.name = `${g.name} (${parent})`;
+    }
+  });
+
+  // Add latest timestamp for header display
+  sorted.forEach(g => {
+    g.latestTs = g.convos.length ? Math.max(...g.convos.map(c => c.ts)) : null;
+  });
+
+  return { projectGroups: sorted, drafts };
 }
 
 function GitHubIcon({ size = 12 }) {
@@ -236,7 +251,9 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           </div>
         )}
         {/* Project groups */}
-        {projectGroups.map((proj) => (
+        {projectGroups
+          .filter(proj => searchActive ? proj.convos.length > 0 : (proj.convos.length > 0 || projects?.[proj.cwdRoot]?.manual))
+          .map((proj) => (
           <ProjectGroup
             key={proj.cwdRoot}
             project={proj}
@@ -248,7 +265,8 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             onHideProject={onHideProject}
             searchActive={searchActive}
           />
-        ))}
+        ))
+        }
 
         {/* Drafts section */}
         {drafts.length > 0 && (
