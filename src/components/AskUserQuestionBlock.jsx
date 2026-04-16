@@ -5,52 +5,76 @@ import { useFontScale } from "../contexts/FontSizeContext";
 export default function AskUserQuestionBlock({ tool, onAnswer }) {
   const [selections, setSelections] = useState({});
   const s = useFontScale();
-  const [customText, setCustomText] = useState("");
+  const [customTextByQuestion, setCustomTextByQuestion] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const questions = tool.args?.questions || [];
 
   if (questions.length === 0) return null;
 
+  const getQuestionKey = (question, qIdx) => question?.id || `question-${qIdx}`;
+
   const handleSelect = (qIdx, optionLabel) => {
     if (submitted) return;
-    setCustomText("");
     const q = questions[qIdx];
+    const questionKey = getQuestionKey(q, qIdx);
+    setCustomTextByQuestion((prev) => {
+      if (!prev[questionKey]) return prev;
+      const next = { ...prev };
+      delete next[questionKey];
+      return next;
+    });
     if (q?.multiSelect) {
       setSelections((prev) => {
-        const current = prev[qIdx] || [];
+        const current = prev[questionKey] || [];
         const next = current.includes(optionLabel)
           ? current.filter((l) => l !== optionLabel)
           : [...current, optionLabel];
-        return { ...prev, [qIdx]: next };
+        return { ...prev, [questionKey]: next };
       });
     } else {
-      setSelections((prev) => ({ ...prev, [qIdx]: [optionLabel] }));
+      setSelections((prev) => ({ ...prev, [questionKey]: [optionLabel] }));
     }
   };
 
-  const isSelected = (qIdx, label) => (selections[qIdx] || []).includes(label);
+  const isSelected = (qIdx, label) => {
+    const questionKey = getQuestionKey(questions[qIdx], qIdx);
+    return (selections[questionKey] || []).includes(label);
+  };
 
-  const hasAnswer = customText.trim().length > 0 ||
+  const hasAnswer = Object.values(customTextByQuestion).some((text) => text.trim().length > 0) ||
     Object.values(selections).some((s) => s.length > 0);
 
   const handleSubmit = () => {
     if (!hasAnswer || submitted) return;
     setSubmitted(true);
-    if (customText.trim()) {
-      if (onAnswer) onAnswer(customText.trim());
-      return;
-    }
     const lines = questions.map((q, qIdx) => {
-      const selected = selections[qIdx] || [];
+      const questionKey = getQuestionKey(q, qIdx);
+      const customText = customTextByQuestion[questionKey]?.trim();
+      if (customText) return customText;
+      const selected = selections[questionKey] || [];
       if (selected.length === 0) return null;
       return selected.join(", ");
     }).filter(Boolean);
     if (onAnswer) onAnswer(lines.join("\n"));
   };
 
-  const handleCustomTextChange = (e) => {
-    setCustomText(e.target.value);
-    if (e.target.value.trim()) setSelections({});
+  const handleCustomTextChange = (qIdx, e) => {
+    const questionKey = getQuestionKey(questions[qIdx], qIdx);
+    const nextValue = e.target.value;
+    setCustomTextByQuestion((prev) => {
+      const next = { ...prev };
+      if (nextValue) next[questionKey] = nextValue;
+      else delete next[questionKey];
+      return next;
+    });
+    if (nextValue.trim()) {
+      setSelections((prev) => {
+        if (!prev[questionKey]?.length) return prev;
+        const next = { ...prev };
+        delete next[questionKey];
+        return next;
+      });
+    }
   };
 
   return (
@@ -88,8 +112,9 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
       {/* Questions */}
       <div style={{ padding: "12px 14px" }}>
         {questions.map((q, qIdx) => {
+          const questionKey = getQuestionKey(q, qIdx);
           return (
-            <div key={qIdx} style={{ marginBottom: qIdx < questions.length - 1 ? 16 : 0 }}>
+            <div key={questionKey} style={{ marginBottom: qIdx < questions.length - 1 ? 16 : 0 }}>
               {/* Header chip */}
               {q.header && (
                 <span
@@ -230,8 +255,8 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                 {!submitted && (
                   <input
                     type="text"
-                    value={customText}
-                    onChange={handleCustomTextChange}
+                    value={customTextByQuestion[questionKey] || ""}
+                    onChange={(e) => handleCustomTextChange(qIdx, e)}
                     placeholder="Or type something..."
                     style={{
                       width: "100%",
