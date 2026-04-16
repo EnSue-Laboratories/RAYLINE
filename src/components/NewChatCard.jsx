@@ -53,12 +53,10 @@ export default function NewChatCard({
 
   const handleCreate = useCallback(() => {
     if (!prompt.trim()) return;
-    let finalPrompt = prompt;
-    if (issueContext) finalPrompt = issueContext + "\n\n" + prompt;
     onCreateChat({
       cwd: selectedCwd,
       title: title.trim() || undefined,
-      prompt: finalPrompt,
+      prompt: prompt.trim(),
       model,
       branch: branch.trim() || undefined,
       worktree,

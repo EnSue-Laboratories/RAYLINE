@@ -71,6 +71,13 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeListener("terminal-output", handler);
   },
 
+  // File operations
+  openPath: (dirPath) => ipcRenderer.invoke("open-path", dirPath),
+  selectFiles: () => ipcRenderer.invoke("select-files"),
+
+  // GitHub operations
+  ghGetIssue: (repo, number) => ipcRenderer.invoke("gh-get-issue", repo, number),
+
   // Project Manager
   openProjectManager: () => ipcRenderer.send("open-project-manager"),
 });

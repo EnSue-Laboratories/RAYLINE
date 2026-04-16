@@ -4,6 +4,7 @@ import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsI
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
 import { relativeTime } from "../utils/time";
+import { getM } from "../data/models";
 
 function getMainRepoRoot(dir) {
   if (!dir) return dir;
@@ -58,7 +59,6 @@ function GitHubIcon({ size = 12 }) {
     </svg>
   );
 }
-import { getM } from "../data/models";
 
 export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed }) {
   const s = useFontScale();

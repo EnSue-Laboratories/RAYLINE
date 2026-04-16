@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { PanelLeftOpen, Plus, ArrowRight, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
+import NewChatCard from "./NewChatCard";
 import ModelPicker from "./ModelPicker";
 import BranchSelector from "./BranchSelector";
 import ImagePreview from "./ImagePreview";
@@ -9,7 +10,7 @@ import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -340,7 +341,17 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           flexDirection: "column",
         }}
       >
-        {!convo || convo.msgs.length === 0 ? (
+        {showNewChatCard ? (
+          <NewChatCard
+            defaultCwd={convo?.cwd || cwd}
+            defaultModel={convo?.model || defaultModel}
+            allCwdRoots={allCwdRoots}
+            projects={projects}
+            onPickFolder={() => window.api?.pickFolder?.().then(f => f && onCwdChange?.(f))}
+            onCreateChat={onCreateChat}
+            onCancel={onCancelNewChat}
+          />
+        ) : !convo || convo.msgs.length === 0 ? (
           <EmptyState model={convo?.model || "sonnet"} />
         ) : (
           <div style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
@@ -357,9 +368,10 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         )}
       </div>
 
-      <SelectionToolbar onQuote={handleQuote} model={convo?.model || defaultModel || "sonnet"} />
+      {!showNewChatCard && <SelectionToolbar onQuote={handleQuote} model={convo?.model || defaultModel || "sonnet"} />}
 
       {/* Input bar */}
+      {!showNewChatCard &&
       <div
         style={{ padding: "12px 28px 24px", display: "flex", justifyContent: "center" }}
       >
@@ -537,7 +549,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             ENTER TO SEND  //  SHIFT+ENTER NEWLINE  //  PASTE IMAGES
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

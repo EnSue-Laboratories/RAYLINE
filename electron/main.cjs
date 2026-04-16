@@ -201,6 +201,20 @@ ipcMain.on("open-project-manager", () => {
   createProjectManagerWindow();
 });
 
+// IPC: open path in Finder / file manager
+ipcMain.handle("open-path", async (_event, dirPath) => {
+  const { shell } = require("electron");
+  return shell.openPath(dirPath);
+});
+
+// IPC: select files (for attachments)
+ipcMain.handle("select-files", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openFile", "multiSelections"],
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
 // IPC: wallpaper image picker
 ipcMain.handle("select-wallpaper", async (_event, previousPath) => {
   const result = await dialog.showOpenDialog(mainWindow, {
