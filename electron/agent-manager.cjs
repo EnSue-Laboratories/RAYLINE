@@ -38,6 +38,36 @@ function buildSpawnPath() {
   return [...new Set([...pathParts, ...EXTRA_PATH_DIRS])].join(path.delimiter);
 }
 
+function elapsedSince(startedAt) {
+  return Date.now() - startedAt;
+}
+
+function markFirstTiming(state, key) {
+  if (state[key] == null) state[key] = elapsedSince(state.startedAt);
+}
+
+function messageHasAssistantText(message) {
+  return (message?.content || []).some((block) => block.type === "text" && typeof block.text === "string" && block.text.length > 0);
+}
+
+function summarizeResult(event) {
+  if (!event) return null;
+  return {
+    subtype: event.subtype,
+    is_error: event.is_error,
+    stop_reason: event.stop_reason,
+    terminal_reason: event.terminal_reason,
+    session_id: event.session_id,
+  };
+}
+
+function shouldEmitStderrError({ stderrBuffer, resultEvent, exitCode, signal, cancelled, stoppedForQuestion }) {
+  if (!stderrBuffer.trim()) return false;
+  if (cancelled || stoppedForQuestion) return false;
+  if (resultEvent?.is_error || resultEvent?.subtype === "error_during_execution") return true;
+  return !resultEvent && (exitCode !== 0 || Boolean(signal));
+}
+
 let cachedClaudeBin = null;
 
 function resolveClaudeBin() {
@@ -82,12 +112,9 @@ function resolveLaunchCwd({ cwd, sessionId }) {
   throw new Error(`Invalid working directory: ${cwd}`);
 }
 
-function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents) {
-  cancelAgent(conversationId);
-
+function buildClaudeArgs({ model, prompt, sessionId, resumeSessionId, forkSession }) {
   const args = ["--print", "--output-format=stream-json", "--verbose", "--include-partial-messages", "--dangerously-skip-permissions"];
 
-  // Inject Claudi-specific instructions (won't affect CLI usage)
   args.push("--append-system-prompt", `You are running inside Claudi, a desktop GUI client for Claude Code.
 The user is interacting via a chat interface, not a terminal.
 Keep responses concise and conversational.
@@ -130,7 +157,6 @@ Claudi has a built-in terminal panel (right side drawer). You have MCP tools to 
 Use these INSTEAD of the Bash tool when you need: long-running processes (dev servers, watchers), interactive prompts needing stdin, or persistent shells across turns.
 The user can see and type into these terminals in real time.`);
 
-  // Attach terminal session MCP server if available
   if (global.mcpConfigPath && fs.existsSync(global.mcpConfigPath)) {
     args.push("--mcp-config", global.mcpConfigPath);
   }
@@ -144,9 +170,12 @@ The user can see and type into these terminals in real time.`);
     args.push("--session-id", sessionId);
   }
 
-  let fullPrompt = prompt;
+  args.push(prompt);
+  return args;
+}
 
-  // Save images to temp files and reference paths in prompt
+function buildPromptWithAttachments(prompt, images, files) {
+  let fullPrompt = prompt;
   if (images && images.length > 0) {
     const imgPaths = [];
     for (let i = 0; i < images.length; i++) {
@@ -169,7 +198,11 @@ The user can see and type into these terminals in real time.`);
     fullPrompt = `[Attached files:\n${filePaths}]\n\n${fullPrompt}`;
   }
 
-  args.push(fullPrompt);
+  return fullPrompt;
+}
+
+function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents) {
+  cancelAgent(conversationId);
 
   const agentSessionId = resumeSessionId || sessionId;
   const claudeBin = resolveClaudeBin();
@@ -191,116 +224,245 @@ The user can see and type into these terminals in real time.`);
     return null;
   }
 
+  const fullPrompt = buildPromptWithAttachments(prompt, images, files);
+
+  const state = {
+    conversationId,
+    webContents,
+    claudeBin,
+    model,
+    launchCwd,
+    startedAt: Date.now(),
+    child: null,
+    cancelled: false,
+    waitingForQuestion: false,
+    stoppedForQuestion: false,
+    sawAskUserQuestion: false,
+    runCount: 0,
+    latestSessionId: agentSessionId || null,
+    firstStdoutMs: null,
+    firstEventMs: null,
+    firstAssistantTextMs: null,
+    firstToolUseMs: null,
+  };
+
   log("Starting agent:", { conversationId, model, cwd: launchCwd, sessionId, resumeSessionId, forkSession });
-  log("Full args:", args.filter(a => a !== fullPrompt).join(" "));
-  log("Prompt:", fullPrompt.slice(0, 100));
+  const spawnRun = ({ runPrompt, runSessionId, runResumeSessionId, runForkSession }) => {
+    state.runCount += 1;
+    state.waitingForQuestion = false;
+    state.stoppedForQuestion = false;
 
-  const child = spawn(claudeBin, args, {
-    cwd: launchCwd,
-    env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+    const runNumber = state.runCount;
+    const runStartedAt = Date.now();
+    const args = buildClaudeArgs({
+      model,
+      prompt: runPrompt,
+      sessionId: runSessionId,
+      resumeSessionId: runResumeSessionId,
+      forkSession: runForkSession,
+    });
 
-  log("Spawned PID:", child.pid);
+    log("Run start:", {
+      conversationId,
+      runNumber,
+      model,
+      cwd: launchCwd,
+      sessionId: runSessionId,
+      resumeSessionId: runResumeSessionId,
+      forkSession: runForkSession,
+    });
+    log("Full args:", args.filter((arg) => arg !== runPrompt).join(" "));
+    log("Prompt:", runPrompt.slice(0, 100));
 
-  activeAgents.set(conversationId, child);
+    const child = spawn(claudeBin, args, {
+      cwd: launchCwd,
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
-  let buffer = "";
-  let stderrBuffer = "";
+    state.child = child;
+    activeAgents.set(conversationId, state);
 
-  child.stdout.on("data", (chunk) => {
-    const raw = chunk.toString();
-    log("stdout chunk:", raw.slice(0, 300));
-    buffer += raw;
-    const lines = buffer.split("\n");
-    buffer = lines.pop();
+    log("Spawned PID:", child.pid, "run:", runNumber);
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
+    let buffer = "";
+    let stderrBuffer = "";
+    let runResultEvent = null;
+
+    const parseLine = (line) => {
+      if (!line.trim() || state.cancelled || activeAgents.get(conversationId) !== state) return;
+
       try {
         const event = JSON.parse(line);
-        // Reduce noise: skip logging thinking deltas
         const isThinking = event.type === "stream_event" && event.event?.delta?.type === "thinking_delta";
-        if (!isThinking) log("Parsed event type:", event.type, "subtype:", event.subtype);
+
+        markFirstTiming(state, "firstEventMs");
+        if (!isThinking) log("Parsed event type:", event.type, "subtype:", event.subtype, "run:", runNumber);
+
+        if (event.type === "assistant" && messageHasAssistantText(event.message)) {
+          markFirstTiming(state, "firstAssistantTextMs");
+        }
+
+        if (event.type === "stream_event") {
+          const inner = event.event;
+          if (
+            inner?.type === "content_block_start" &&
+            inner.content_block?.type === "tool_use"
+          ) {
+            markFirstTiming(state, "firstToolUseMs");
+            if (inner.content_block?.name === "AskUserQuestion") {
+              state.waitingForQuestion = true;
+              state.sawAskUserQuestion = true;
+            }
+          } else if (
+            inner?.type === "content_block_delta" &&
+            inner.delta?.type === "text_delta" &&
+            inner.delta?.text
+          ) {
+            markFirstTiming(state, "firstAssistantTextMs");
+          }
+
+          if (
+            state.waitingForQuestion &&
+            inner?.type === "content_block_stop"
+          ) {
+            log("AskUserQuestion fully streamed — killing process to wait for user answer");
+            state.waitingForQuestion = false;
+            state.stoppedForQuestion = true;
+            child.kill("SIGTERM");
+          }
+        }
+
         if (event.type === "result") {
+          runResultEvent = event;
+          state.latestSessionId = event.session_id || state.latestSessionId;
           log("Result keys:", Object.keys(event));
-          log("Result full:", JSON.stringify(event));
+          log("Result summary:", summarizeResult(event));
         }
+
         webContents.send("agent-stream", { conversationId, event });
-
-        // Track when AskUserQuestion tool_use starts streaming
-        if (
-          event.type === "stream_event" &&
-          event.event?.type === "content_block_start" &&
-          event.event?.content_block?.type === "tool_use" &&
-          event.event?.content_block?.name === "AskUserQuestion"
-        ) {
-          child._waitingForQuestion = true;
-        }
-
-        // Kill the process once the AskUserQuestion args are fully streamed,
-        // so Claude pauses and the renderer can show the question UI.
-        if (
-          child._waitingForQuestion &&
-          event.type === "stream_event" &&
-          event.event?.type === "content_block_stop"
-        ) {
-          log("AskUserQuestion fully streamed — killing process to wait for user answer");
-          child._waitingForQuestion = false;
-          child.kill("SIGTERM");
-        }
       } catch (e) {
         log("Failed to parse JSON line:", line.slice(0, 200), "error:", e.message);
       }
-    }
-  });
+    };
 
-  child.stderr.on("data", (chunk) => {
-    const text = chunk.toString();
-    log("stderr:", text);
-    stderrBuffer += text;
-  });
+    child.stdout.on("data", (chunk) => {
+      if (state.cancelled || activeAgents.get(conversationId) !== state) return;
 
-  child.on("close", (exitCode) => {
-    log("Process closed, exitCode:", exitCode);
-    if (stderrBuffer.trim()) {
-      log("Full stderr:", stderrBuffer);
-      webContents.send("agent-error", { conversationId, error: stderrBuffer.trim() });
-    }
-    if (buffer.trim()) {
-      log("Flushing remaining buffer:", buffer.slice(0, 200));
-      try {
-        const event = JSON.parse(buffer);
-        webContents.send("agent-stream", { conversationId, event });
-      } catch {}
-    }
-    activeAgents.delete(conversationId);
-    webContents.send("agent-done", { conversationId, exitCode });
-  });
+      if (state.firstStdoutMs == null) {
+        state.firstStdoutMs = elapsedSince(state.startedAt);
+        log("First stdout received", {
+          conversationId,
+          runNumber,
+          firstStdoutMs: state.firstStdoutMs,
+        });
+      }
 
-  child.on("error", (err) => {
-    log("Spawn error:", err.message);
-    activeAgents.delete(conversationId);
-    webContents.send("agent-error", { conversationId, error: err.message });
-  });
+      const raw = chunk.toString();
+      log("stdout chunk:", raw.slice(0, 300));
+      buffer += raw;
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
 
-  return child;
+      for (const line of lines) parseLine(line);
+    });
+
+    child.stderr.on("data", (chunk) => {
+      if (state.cancelled || activeAgents.get(conversationId) !== state) return;
+      const text = chunk.toString();
+      log("stderr:", text);
+      stderrBuffer += text;
+    });
+
+    child.on("close", (exitCode, signal) => {
+      if (activeAgents.get(conversationId) === state && buffer.trim()) {
+        log("Flushing remaining buffer:", buffer.slice(0, 200));
+        parseLine(buffer);
+      }
+
+      const isCurrentState = activeAgents.get(conversationId) === state;
+      const resultSummary = summarizeResult(runResultEvent);
+
+      log("Process closed", {
+        conversationId,
+        runNumber,
+        exitCode,
+        signal,
+        durationMs: Date.now() - runStartedAt,
+        result: resultSummary,
+        timings: {
+          firstStdoutMs: state.firstStdoutMs,
+          firstEventMs: state.firstEventMs,
+          firstAssistantTextMs: state.firstAssistantTextMs,
+          firstToolUseMs: state.firstToolUseMs,
+        },
+      });
+
+      if (state.cancelled) {
+        if (isCurrentState) {
+          activeAgents.delete(conversationId);
+          webContents.send("agent-done", { conversationId, exitCode, signal });
+        } else {
+          log("Cancelled run closed after replacement; ignoring");
+        }
+        return;
+      }
+
+      if (!isCurrentState) {
+        log("Stale run closed after replacement; ignoring");
+        return;
+      }
+
+      if (shouldEmitStderrError({
+        stderrBuffer,
+        resultEvent: runResultEvent,
+        exitCode,
+        signal,
+        cancelled: state.cancelled,
+        stoppedForQuestion: state.stoppedForQuestion,
+      })) {
+        log("Full stderr:", stderrBuffer);
+        webContents.send("agent-error", { conversationId, error: stderrBuffer.trim() });
+      }
+
+      activeAgents.delete(conversationId);
+      webContents.send("agent-done", { conversationId, exitCode, signal });
+    });
+
+    child.on("error", (err) => {
+      const isCurrentState = activeAgents.get(conversationId) === state;
+      log("Spawn error:", err.message);
+      if (isCurrentState) activeAgents.delete(conversationId);
+      webContents.send("agent-error", { conversationId, error: err.message });
+      if (isCurrentState) webContents.send("agent-done", { conversationId, exitCode: -1 });
+    });
+
+    return child;
+  };
+
+  return spawnRun({
+    runPrompt: fullPrompt,
+    runSessionId: sessionId,
+    runResumeSessionId: resumeSessionId,
+    runForkSession: forkSession,
+  });
 }
 
 function cancelAgent(conversationId) {
-  const child = activeAgents.get(conversationId);
-  if (child) {
+  const state = activeAgents.get(conversationId);
+  if (state?.child) {
     log("Cancelling agent:", conversationId);
-    child.kill("SIGTERM");
-    activeAgents.delete(conversationId);
+    state.cancelled = true;
+    state.child.kill("SIGTERM");
   }
 }
 
 function cancelAll() {
-  for (const [id, child] of activeAgents) {
-    child.kill("SIGTERM");
+  for (const [, state] of activeAgents) {
+    if (!state?.child) continue;
+    state.cancelled = true;
+    state.child.kill("SIGTERM");
   }
-  activeAgents.clear();
 }
 
 function rewindFiles({ sessionId, messageUuid, cwd }) {

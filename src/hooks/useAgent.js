@@ -38,6 +38,7 @@ function findToolPart(parts, toolId) {
 export default function useAgent() {
   const [conversations, setConversations] = useState(new Map());
   const cleanupRefs = useRef([]);
+  const pendingStartsRef = useRef(new Map());
 
   useEffect(() => {
     if (!window.api) return;
@@ -96,7 +97,7 @@ export default function useAgent() {
             if (block?.type === "thinking") {
               parts.push({ type: "thinking", text: "", blockIndex, _streamKey: streamKey });
               streamState.activeThinking[streamKey] = true;
-              updateAssistant({ parts, isThinking: true, _streamState: streamState });
+              updateAssistant({ parts, isStreaming: true, isThinking: true, _streamState: streamState });
             } else if (block?.type === "tool_use") {
               parts.push({
                 type: "tool",
@@ -109,10 +110,10 @@ export default function useAgent() {
                 blockIndex,
                 _streamKey: streamKey,
               });
-              updateAssistant({ parts, _streamState: streamState });
+              updateAssistant({ parts, isStreaming: true, _streamState: streamState });
             } else if (block?.type === "text") {
               parts.push({ type: "text", text: "", blockIndex, _streamKey: streamKey });
-              updateAssistant({ parts, _streamState: streamState });
+              updateAssistant({ parts, isStreaming: true, _streamState: streamState });
             }
           } else if (inner.type === "content_block_delta") {
             ensureAssistant();
@@ -125,7 +126,7 @@ export default function useAgent() {
               if (textIdx >= 0) {
                 parts[textIdx] = { ...parts[textIdx], text: parts[textIdx].text + (delta.text || "") };
               }
-              updateAssistant({ parts, _streamState: streamState });
+              updateAssistant({ parts, isStreaming: true, _streamState: streamState });
             } else if (delta?.type === "input_json_delta") {
               const toolIdx = findPartIndexByStreamKey(parts, streamKey, "tool");
               if (toolIdx >= 0) {
@@ -134,7 +135,7 @@ export default function useAgent() {
                 try { newArgs = JSON.parse(newJson); } catch {}
                 parts[toolIdx] = { ...parts[toolIdx], argsJson: newJson, args: newArgs };
               }
-              updateAssistant({ parts, _streamState: streamState });
+              updateAssistant({ parts, isStreaming: true, _streamState: streamState });
             } else if (delta?.type === "thinking_delta") {
               const thinkingIdx = findPartIndexByStreamKey(parts, streamKey, "thinking");
               if (thinkingIdx >= 0) {
@@ -143,7 +144,7 @@ export default function useAgent() {
                   text: parts[thinkingIdx].text + (delta.thinking || ""),
                 };
               }
-              updateAssistant({ parts, isThinking: true, _streamState: streamState });
+              updateAssistant({ parts, isStreaming: true, isThinking: true, _streamState: streamState });
             }
           } else if (inner.type === "content_block_stop") {
             ensureAssistant();
@@ -227,6 +228,18 @@ export default function useAgent() {
               const parts = cloneParts(lastMsg.parts);
               parts.push({ type: "text", text: `**Error:** ${errorText}` });
               msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };
+            } else if (event.terminal_reason === "hook_stopped") {
+              const parts = cloneParts(lastMsg.parts);
+              const hasPausedStatus = parts.some((part) => part.type === "status" && part.kind === "paused");
+              if (!hasPausedStatus) {
+                parts.push({
+                  type: "status",
+                  kind: "paused",
+                  title: "Paused by hook",
+                  text: "Claude stopped after a tool hook returned continue: false. This is expected — send another message when you want to continue.",
+                });
+              }
+              msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };
             } else {
               msgs[msgs.length - 1] = { ...lastMsg, isStreaming: false, isThinking: false };
             }
@@ -300,6 +313,7 @@ export default function useAgent() {
     });
 
     const offDone = window.api.onAgentDone(({ conversationId }) => {
+      pendingStartsRef.current.delete(conversationId);
       setConversations((prev) => {
         const next = new Map(prev);
         const convo = next.get(conversationId);
@@ -314,6 +328,7 @@ export default function useAgent() {
     });
 
     const offError = window.api.onAgentError(({ conversationId, error }) => {
+      pendingStartsRef.current.delete(conversationId);
       setConversations((prev) => {
         const next = new Map(prev);
         const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
@@ -334,7 +349,9 @@ export default function useAgent() {
     return () => cleanupRefs.current.forEach((fn) => fn?.());
   }, []);
 
-  const sendMessage = useCallback(({ conversationId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession }) => {
+  const prepareMessage = useCallback(({ conversationId, prompt, images, files }) => {
+    const pendingId = uid();
+    pendingStartsRef.current.set(conversationId, pendingId);
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
@@ -346,13 +363,39 @@ export default function useAgent() {
       next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       return next;
     });
+    return pendingId;
+  }, []);
 
+  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession }) => {
+    const expectedPendingId = pendingStartsRef.current.get(conversationId);
+    if (pendingId && expectedPendingId !== pendingId) {
+      console.log("[useAgent] Skipping stale or cancelled pending start", { conversationId, pendingId, expectedPendingId });
+      return false;
+    }
+    if (pendingId) pendingStartsRef.current.delete(conversationId);
     if (window.api) {
       window.api.agentStart({ conversationId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession });
     }
+    return true;
   }, []);
 
   const cancelMessage = useCallback((conversationId) => {
+    const pendingId = pendingStartsRef.current.get(conversationId);
+    if (pendingId) {
+      pendingStartsRef.current.delete(conversationId);
+      setConversations((prev) => {
+        const next = new Map(prev);
+        const convo = next.get(conversationId);
+        if (convo) {
+          const msgs = convo.messages.map((m) =>
+            m.role === "assistant" ? { ...m, isStreaming: false, isThinking: false } : m
+          );
+          next.set(conversationId, { ...convo, messages: msgs, isStreaming: false, error: null });
+        }
+        return next;
+      });
+    }
+
     if (window.api) {
       window.api.agentCancel({ conversationId });
     }
@@ -400,5 +443,13 @@ export default function useAgent() {
     return conversations.get(id) || { messages: [], isStreaming: false, error: null };
   }, [conversations]);
 
-  return { conversations, getConversation, sendMessage, cancelMessage, editAndResend, loadMessages };
+  return {
+    conversations,
+    getConversation,
+    prepareMessage,
+    startPreparedMessage,
+    cancelMessage,
+    editAndResend,
+    loadMessages,
+  };
 }

@@ -14,6 +14,10 @@ function logCheckpoint(...args) {
   console.log("[checkpoint-ui]", ...args);
 }
 
+function logSendFlow(...args) {
+  console.log("[send-flow]", ...args);
+}
+
 function getMainRepoRoot(dir) {
   if (!dir) return dir;
   const wtIdx = dir.indexOf("/.worktrees/");
@@ -21,7 +25,15 @@ function getMainRepoRoot(dir) {
 }
 
 export default function App() {
-  const { conversations, getConversation, sendMessage, cancelMessage, editAndResend, loadMessages } = useAgent();
+  const {
+    conversations,
+    getConversation,
+    prepareMessage,
+    startPreparedMessage,
+    cancelMessage,
+    editAndResend,
+    loadMessages,
+  } = useAgent();
   const terminal = useTerminal();
 
   // convos: array of { id, sessionId, title, model, ts }
@@ -250,33 +262,72 @@ export default function App() {
       const effectiveCwd = convoCwd || cwd || undefined;
       const thisConvoData = getConversation(convoId);
       const isFirstMessage = thisConvoData.messages.length === 0;
+      const messageIndex = thisConvoData.messages.length;
+      const images = attachments?.filter((a) => a.type === "image").map((a) => a.dataUrl);
+      const files  = attachments?.filter((a) => a.type === "file");
+      const m = getM(convo.model);
+      const sendStartedAt = Date.now();
+
+      logSendFlow("handleSend:start", {
+        conversationId: convoId,
+        effectiveCwd,
+        isFirstMessage,
+        messageIndex,
+      });
+
+      const pendingId = prepareMessage({
+        conversationId: convoId,
+        prompt: text,
+        images: images?.length ? images : undefined,
+        files: files?.length ? files : undefined,
+      });
+
+      logSendFlow("handleSend:seeded", {
+        conversationId: convoId,
+        pendingId,
+        elapsedMs: Date.now() - sendStartedAt,
+      });
 
       // Create a git checkpoint before sending (for future edit rewind)
       if (effectiveCwd && window.api) {
+        const checkpointStartedAt = Date.now();
+        logCheckpoint("checkpointCreate:start", { cwdPath: effectiveCwd, conversationId: convoId, messageIndex });
         try {
           const cp = await window.api.checkpointCreate(effectiveCwd);
+          logCheckpoint("checkpointCreate:success", {
+            cwdPath: effectiveCwd,
+            conversationId: convoId,
+            messageIndex,
+            ref: cp?.ref || null,
+            durationMs: Date.now() - checkpointStartedAt,
+            totalElapsedMs: Date.now() - sendStartedAt,
+          });
           if (cp?.ref) {
-            const msgIdx = getConversation(convoId).messages.length;
             setConvoList((p) =>
               p.map((c) => {
                 if (c.id !== convoId) return c;
                 const checkpoints = { ...(c.checkpoints || {}) };
-                checkpoints[msgIdx] = cp.ref;
+                checkpoints[messageIndex] = cp.ref;
                 return { ...c, checkpoints };
               })
             );
           }
         } catch (e) {
+          logCheckpoint("checkpointCreate:failed", {
+            cwdPath: effectiveCwd,
+            conversationId: convoId,
+            messageIndex,
+            durationMs: Date.now() - checkpointStartedAt,
+            totalElapsedMs: Date.now() - sendStartedAt,
+            error: e.message,
+          });
           console.warn("Checkpoint creation failed:", e.message);
         }
       }
 
-      const images = attachments?.filter((a) => a.type === "image").map((a) => a.dataUrl);
-      const files  = attachments?.filter((a) => a.type === "file");
-      const m = getM(convo.model);
-
-      sendMessage({
+      const started = startPreparedMessage({
         conversationId: convoId,
+        pendingId,
         sessionId: isFirstMessage ? convo.sessionId : undefined,
         resumeSessionId: isFirstMessage ? undefined : convo.sessionId,
         prompt: text,
@@ -287,8 +338,15 @@ export default function App() {
         images: images?.length ? images : undefined,
         files: files?.length ? files : undefined,
       });
+
+      logSendFlow("handleSend:agent-start", {
+        conversationId: convoId,
+        pendingId,
+        started,
+        totalElapsedMs: Date.now() - sendStartedAt,
+      });
     },
-    [activeConvo, active, activeData, cwd, sendMessage]
+    [activeConvo, active, activeData, cwd, getConversation, prepareMessage, startPreparedMessage]
   );
 
   const handleCancel = useCallback(() => {
