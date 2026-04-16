@@ -529,7 +529,7 @@ ipcMain.handle("git-worktree-list", async (_event, cwd) => {
   }
 });
 
-ipcMain.handle("git-worktree-add", async (_event, cwd, worktreePath, branchName) => {
+ipcMain.handle("git-worktree-add", async (_event, cwd, worktreePath, branchName, options = {}) => {
   // Ensure .worktrees/ directory exists and is gitignored
   const wtDir = path.dirname(worktreePath);
   if (!fs.existsSync(wtDir)) fs.mkdirSync(wtDir, { recursive: true });
@@ -540,7 +540,18 @@ ipcMain.handle("git-worktree-add", async (_event, cwd, worktreePath, branchName)
       fs.appendFileSync(gitignorePath, "\n.worktrees/\n");
     }
   } catch {}
-  await git(["worktree", "add", worktreePath, "-b", branchName], cwd);
+  const createBranch = options?.createBranch !== false;
+  const startPoint = options?.startPoint;
+  const args = ["worktree", "add", worktreePath];
+  if (createBranch) {
+    args.push("-b", branchName);
+    if (startPoint) args.push(startPoint);
+  } else if (branchName) {
+    args.push(branchName);
+  } else if (startPoint) {
+    args.push(startPoint);
+  }
+  await git(args, cwd);
   return { success: true, path: worktreePath };
 });
 

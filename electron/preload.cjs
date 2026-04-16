@@ -52,7 +52,7 @@ contextBridge.exposeInMainWorld("api", {
   gitCreateBranch: (cwd, name) => ipcRenderer.invoke("git-create-branch", cwd, name),
   gitCheckout: (cwd, name) => ipcRenderer.invoke("git-checkout", cwd, name),
   gitWorktreeList: (cwd) => ipcRenderer.invoke("git-worktree-list", cwd),
-  gitWorktreeAdd: (cwd, path, branch) => ipcRenderer.invoke("git-worktree-add", cwd, path, branch),
+  gitWorktreeAdd: (cwd, path, branch, options) => ipcRenderer.invoke("git-worktree-add", cwd, path, branch, options),
   gitDeleteBranch: (cwd, name) => ipcRenderer.invoke("git-delete-branch", cwd, name),
   gitWorktreeRemove: (cwd, path) => ipcRenderer.invoke("git-worktree-remove", cwd, path),
 

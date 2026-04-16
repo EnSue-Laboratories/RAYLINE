@@ -218,15 +218,6 @@ export default function App() {
     if (active === id) setActive(remaining[0]?.id || null);
   };
 
-  // Process queued messages when streaming ends
-  useEffect(() => {
-    if (!activeData.isStreaming && messageQueue.current.length > 0) {
-      const next = messageQueue.current.shift();
-      setQueuedMessages([...messageQueue.current]);
-      setTimeout(() => handleSend(next.text, next.attachments), 300);
-    }
-  }, [activeData.isStreaming]);
-
   // Capture Codex thread_id for session resume
   useEffect(() => {
     if (!active) return;
@@ -240,6 +231,109 @@ export default function App() {
       }
     }
   }, [active, conversations]);
+
+  const sendMessageToConversation = useCallback(
+    async ({ conversationId, conversation, text, attachments }) => {
+      if (!conversationId || !conversation) return false;
+
+      const convoCwd = conversation.cwd;
+      const effectiveCwd = convoCwd || cwd || undefined;
+      const thisConvoData = getConversation(conversationId);
+      const isFirstMessage = thisConvoData.messages.length === 0;
+      const messageIndex = thisConvoData.messages.length;
+      const images = attachments?.filter((a) => a.type === "image").map((a) => a.dataUrl);
+      const files = attachments?.filter((a) => a.type === "file");
+      const m = getM(conversation.model);
+      const sendStartedAt = Date.now();
+
+      if (isFirstMessage) {
+        setConvoList((p) =>
+          p.map((c) => c.id === conversationId ? { ...c, title: text.slice(0, 50) } : c)
+        );
+      }
+
+      logSendFlow("handleSend:start", {
+        conversationId,
+        effectiveCwd,
+        isFirstMessage,
+        messageIndex,
+      });
+
+      const pendingId = prepareMessage({
+        conversationId,
+        prompt: text,
+        images: images?.length ? images : undefined,
+        files: files?.length ? files : undefined,
+      });
+
+      logSendFlow("handleSend:seeded", {
+        conversationId,
+        pendingId,
+        elapsedMs: Date.now() - sendStartedAt,
+      });
+
+      // Create a git checkpoint before sending (for future edit rewind)
+      if (effectiveCwd && window.api) {
+        const checkpointStartedAt = Date.now();
+        logCheckpoint("checkpointCreate:start", { cwdPath: effectiveCwd, conversationId, messageIndex });
+        try {
+          const cp = await window.api.checkpointCreate(effectiveCwd);
+          logCheckpoint("checkpointCreate:success", {
+            cwdPath: effectiveCwd,
+            conversationId,
+            messageIndex,
+            ref: cp?.ref || null,
+            durationMs: Date.now() - checkpointStartedAt,
+            totalElapsedMs: Date.now() - sendStartedAt,
+          });
+          if (cp?.ref) {
+            setConvoList((p) =>
+              p.map((c) => {
+                if (c.id !== conversationId) return c;
+                const checkpoints = { ...(c.checkpoints || {}) };
+                checkpoints[messageIndex] = cp.ref;
+                return { ...c, checkpoints };
+              })
+            );
+          }
+        } catch (e) {
+          logCheckpoint("checkpointCreate:failed", {
+            cwdPath: effectiveCwd,
+            conversationId,
+            messageIndex,
+            durationMs: Date.now() - checkpointStartedAt,
+            totalElapsedMs: Date.now() - sendStartedAt,
+            error: e.message,
+          });
+          console.warn("Checkpoint creation failed:", e.message);
+        }
+      }
+
+      const started = startPreparedMessage({
+        conversationId,
+        pendingId,
+        sessionId: isFirstMessage ? conversation.sessionId : undefined,
+        resumeSessionId: isFirstMessage ? undefined : conversation.sessionId,
+        prompt: text,
+        model: m.cliFlag,
+        provider: m.provider || "claude",
+        effort: m.effort,
+        cwd: effectiveCwd,
+        images: images?.length ? images : undefined,
+        files: files?.length ? files : undefined,
+      });
+
+      logSendFlow("handleSend:agent-start", {
+        conversationId,
+        pendingId,
+        started,
+        totalElapsedMs: Date.now() - sendStartedAt,
+      });
+
+      return started;
+    },
+    [cwd, getConversation, prepareMessage, startPreparedMessage]
+  );
 
   const handleSend = useCallback(
     async (text, attachments) => {
@@ -279,105 +373,26 @@ export default function App() {
         convoId = id;
         setConvoList((p) => [convo, ...p]);
         setActive(id);
-      } else {
-        // Update title from first message
-        if (activeData.messages.length === 0) {
-          setConvoList((p) =>
-            p.map((c) => c.id === convoId ? { ...c, title: text.slice(0, 50) } : c)
-          );
-        }
       }
 
-      const convoCwd = convo.cwd;
-      const effectiveCwd = convoCwd || cwd || undefined;
-      const thisConvoData = getConversation(convoId);
-      const isFirstMessage = thisConvoData.messages.length === 0;
-      const messageIndex = thisConvoData.messages.length;
-      const images = attachments?.filter((a) => a.type === "image").map((a) => a.dataUrl);
-      const files  = attachments?.filter((a) => a.type === "file");
-      const m = getM(convo.model);
-      const sendStartedAt = Date.now();
-
-      logSendFlow("handleSend:start", {
+      await sendMessageToConversation({
         conversationId: convoId,
-        effectiveCwd,
-        isFirstMessage,
-        messageIndex,
-      });
-
-      const pendingId = prepareMessage({
-        conversationId: convoId,
-        prompt: text,
-        images: images?.length ? images : undefined,
-        files: files?.length ? files : undefined,
-      });
-
-      logSendFlow("handleSend:seeded", {
-        conversationId: convoId,
-        pendingId,
-        elapsedMs: Date.now() - sendStartedAt,
-      });
-
-      // Create a git checkpoint before sending (for future edit rewind)
-      if (effectiveCwd && window.api) {
-        const checkpointStartedAt = Date.now();
-        logCheckpoint("checkpointCreate:start", { cwdPath: effectiveCwd, conversationId: convoId, messageIndex });
-        try {
-          const cp = await window.api.checkpointCreate(effectiveCwd);
-          logCheckpoint("checkpointCreate:success", {
-            cwdPath: effectiveCwd,
-            conversationId: convoId,
-            messageIndex,
-            ref: cp?.ref || null,
-            durationMs: Date.now() - checkpointStartedAt,
-            totalElapsedMs: Date.now() - sendStartedAt,
-          });
-          if (cp?.ref) {
-            setConvoList((p) =>
-              p.map((c) => {
-                if (c.id !== convoId) return c;
-                const checkpoints = { ...(c.checkpoints || {}) };
-                checkpoints[messageIndex] = cp.ref;
-                return { ...c, checkpoints };
-              })
-            );
-          }
-        } catch (e) {
-          logCheckpoint("checkpointCreate:failed", {
-            cwdPath: effectiveCwd,
-            conversationId: convoId,
-            messageIndex,
-            durationMs: Date.now() - checkpointStartedAt,
-            totalElapsedMs: Date.now() - sendStartedAt,
-            error: e.message,
-          });
-          console.warn("Checkpoint creation failed:", e.message);
-        }
-      }
-
-      const started = startPreparedMessage({
-        conversationId: convoId,
-        pendingId,
-        sessionId: isFirstMessage ? convo.sessionId : undefined,
-        resumeSessionId: isFirstMessage ? undefined : convo.sessionId,
-        prompt: text,
-        model: m.cliFlag,
-        provider: m.provider || "claude",
-        effort: m.effort,
-        cwd: effectiveCwd,
-        images: images?.length ? images : undefined,
-        files: files?.length ? files : undefined,
-      });
-
-      logSendFlow("handleSend:agent-start", {
-        conversationId: convoId,
-        pendingId,
-        started,
-        totalElapsedMs: Date.now() - sendStartedAt,
+        conversation: convo,
+        text,
+        attachments,
       });
     },
-    [activeConvo, active, activeData, cwd, getConversation, prepareMessage, startPreparedMessage]
+    [activeConvo, active, activeData, cwd, defaultModel, sendMessageToConversation]
   );
+
+  // Process queued messages when streaming ends
+  useEffect(() => {
+    if (!activeData.isStreaming && messageQueue.current.length > 0) {
+      const next = messageQueue.current.shift();
+      setQueuedMessages([...messageQueue.current]);
+      setTimeout(() => handleSend(next.text, next.attachments), 300);
+    }
+  }, [activeData.isStreaming, handleSend]);
 
   const handleCreateChat = useCallback(async (opts) => {
     const id = "c" + Date.now();
@@ -391,11 +406,20 @@ export default function App() {
       cwd: effectiveCwd,
     };
 
+    if (opts.worktree && !opts.branch) {
+      throw new Error("A worktree requires a branch name.");
+    }
+
     if (opts.branch && effectiveCwd) {
       if (opts.worktree) {
         const wtPath = `${effectiveCwd}/.worktrees/${opts.branch}`;
-        await window.api?.gitWorktreeAdd(effectiveCwd, wtPath, opts.branch);
+        await window.api?.gitWorktreeAdd(effectiveCwd, wtPath, opts.branch, {
+          createBranch: true,
+          startPoint: opts.worktreeBaseBranch,
+        });
         n.cwd = wtPath;
+      } else if (opts.branchMode === "existing") {
+        await window.api?.gitCheckout(effectiveCwd, opts.branch);
       } else {
         await window.api?.gitCreateBranch(effectiveCwd, opts.branch);
       }
@@ -413,10 +437,11 @@ export default function App() {
     }
 
     // Unhide if hidden
-    if (effectiveCwd && projects[effectiveCwd]?.hidden) {
+    const projectRoot = getMainRepoRoot(n.cwd || effectiveCwd);
+    if (projectRoot && projects[projectRoot]?.hidden) {
       setProjects((prev) => ({
         ...prev,
-        [effectiveCwd]: { ...prev[effectiveCwd], hidden: false },
+        [projectRoot]: { ...prev[projectRoot], hidden: false },
       }));
     }
 
@@ -426,9 +451,14 @@ export default function App() {
     }
 
     if (prompt) {
-      setTimeout(() => handleSend(prompt, opts.attachments), 50);
+      await sendMessageToConversation({
+        conversationId: id,
+        conversation: n,
+        text: prompt,
+        attachments: opts.attachments,
+      });
     }
-  }, [cwd, defaultModel, projects, handleSend]);
+  }, [cwd, defaultModel, projects, sendMessageToConversation]);
 
   const handleCancel = useCallback(() => {
     if (active) cancelMessage(active);

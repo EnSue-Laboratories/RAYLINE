@@ -255,7 +255,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, WebkitAppRegion: "no-drag" }}>
 
-          {convo && (
+          {convo && !showNewChatCard && (
             <div style={{ animation: "dropIn .2s ease" }}>
               <div style={{
                 fontSize: s(13),
@@ -285,13 +285,15 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
-          <BranchSelector
-            cwd={cwd}
-            onCwdChange={onCwdChange}
-            hasMessages={convo?.msgs?.length > 0}
-            onRefocusTerminal={onRefocusTerminal}
-          />
-          <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />
+          {!showNewChatCard && (
+            <BranchSelector
+              cwd={cwd}
+              onCwdChange={onCwdChange}
+              hasMessages={convo?.msgs?.length > 0}
+              onRefocusTerminal={onRefocusTerminal}
+            />
+          )}
+          {!showNewChatCard && <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
           {onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
@@ -347,7 +349,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             defaultModel={convo?.model || defaultModel}
             allCwdRoots={allCwdRoots}
             projects={projects}
-            onPickFolder={() => window.api?.pickFolder?.().then(f => f && onCwdChange?.(f))}
+            onPickFolder={() => window.api?.pickFolder?.()}
             onCreateChat={onCreateChat}
             onCancel={onCancelNewChat}
           />

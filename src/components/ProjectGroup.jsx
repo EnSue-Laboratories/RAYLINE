@@ -115,77 +115,79 @@ export default function ProjectGroup({
           {project.name}
         </span>
 
-        {/* Relative timestamp — hidden when actions shown */}
-        {project.latestTs && !headerHovered && (
-          <span
-            style={{
-              fontSize: s(9),
-              fontFamily: "'JetBrains Mono', monospace",
-              color: "rgba(255,255,255,0.15)",
-              letterSpacing: ".04em",
-              flexShrink: 0,
-            }}
-          >
-            {relativeTime(project.latestTs)}
-          </span>
-        )}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", flexShrink: 0 }}>
+          {/* Relative timestamp */}
+          {project.latestTs && !headerHovered && (
+            <span
+              style={{
+                fontSize: s(9),
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "rgba(255,255,255,0.15)",
+                letterSpacing: ".04em",
+                flexShrink: 0,
+              }}
+            >
+              {relativeTime(project.latestTs)}
+            </span>
+          )}
 
-        {/* Action buttons — visible on hover */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            flexShrink: 0,
-            opacity: headerHovered ? 1 : 0,
-            transition: "opacity .15s",
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* New chat in project */}
-          <button
-            onClick={() => onNewInProject(project.cwdRoot)}
-            title="New chat in project"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "none",
-              border: "none",
-              color: "rgba(255,255,255,0.25)",
-              cursor: "pointer",
-              padding: 3,
-              borderRadius: 4,
-              transition: "color .15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
-          >
-            <Pencil size={11} strokeWidth={1.5} />
-          </button>
+          {/* Action buttons */}
+          {headerHovered && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 2,
+                flexShrink: 0,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* New chat in project */}
+              <button
+                onClick={() => onNewInProject(project.cwdRoot)}
+                title="New chat in project"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "none",
+                  border: "none",
+                  color: "rgba(255,255,255,0.25)",
+                  cursor: "pointer",
+                  padding: 3,
+                  borderRadius: 4,
+                  transition: "color .15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+              >
+                <Pencil size={11} strokeWidth={1.5} />
+              </button>
 
-          {/* More options */}
-          <button
-            ref={moreRef}
-            onClick={openMenu}
-            title="More options"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "none",
-              border: "none",
-              color: "rgba(255,255,255,0.25)",
-              cursor: "pointer",
-              padding: 3,
-              borderRadius: 4,
-              transition: "color .15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
-          >
-            <MoreHorizontal size={11} strokeWidth={1.5} />
-          </button>
+              {/* More options */}
+              <button
+                ref={moreRef}
+                onClick={openMenu}
+                title="More options"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "none",
+                  border: "none",
+                  color: "rgba(255,255,255,0.25)",
+                  cursor: "pointer",
+                  padding: 3,
+                  borderRadius: 4,
+                  transition: "color .15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+              >
+                <MoreHorizontal size={11} strokeWidth={1.5} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -199,7 +201,8 @@ export default function ProjectGroup({
             key={c.id}
             onClick={() => onSelect(c.id)}
             style={{
-              padding: "12px 12px 12px 28px",
+              position: "relative",
+              padding: "12px 6px 12px 28px",
               borderRadius: 8,
               cursor: "pointer",
               marginBottom: 1,
@@ -217,8 +220,8 @@ export default function ProjectGroup({
               if (actions) actions.style.opacity = "0";
             }}
           >
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+              <div style={{ flex: 1, minWidth: 0, paddingRight: 18 }}>
                 <div
                   style={{
                     fontSize: s(12.5),
@@ -246,36 +249,37 @@ export default function ProjectGroup({
                   {c.lastPreview || "Empty"}
                 </div>
               </div>
+            </div>
 
-              <div
-                className="convo-actions"
+            <div
+              className="convo-actions"
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 6,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: 0,
+                transition: "opacity .15s",
+              }}
+            >
+              <button
+                onClick={(e) => onDelete(c.id, e)}
                 style={{
+                  background: "none",
+                  border: "none",
+                  color: "rgba(255,255,255,0.25)",
+                  cursor: "pointer",
+                  padding: 1,
+                  transition: "color .15s",
                   display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-end",
-                  gap: 4,
-                  flexShrink: 0,
-                  opacity: 0,
-                  transition: "opacity .15s",
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(200,80,80,0.5)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
               >
-                <button
-                  onClick={(e) => onDelete(c.id, e)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "rgba(255,255,255,0.25)",
-                    cursor: "pointer",
-                    padding: 1,
-                    transition: "color .15s",
-                    display: "flex",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(200,80,80,0.5)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
-                >
-                  <Trash2 size={12} strokeWidth={1.5} />
-                </button>
-              </div>
+                <Trash2 size={12} strokeWidth={1.5} />
+              </button>
             </div>
 
             <div
@@ -306,6 +310,7 @@ export default function ProjectGroup({
                     alignItems: "center",
                     gap: 5,
                     flexShrink: 0,
+                    transform: "translateX(-2px)",
                     fontSize: s(8.5),
                     fontFamily: "'JetBrains Mono',monospace",
                     color: "rgba(165,255,210,0.5)",

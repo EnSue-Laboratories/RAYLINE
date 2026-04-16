@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, forwardRef } from "react";
 import { createPortal } from "react-dom";
-import { Paperclip, X } from "lucide-react";
+import { Paperclip, X, GitBranch, GitFork, Link2 } from "lucide-react";
 import ModelPicker from "./ModelPicker";
 import ProjectPicker from "./ProjectPicker";
 import { useFontScale } from "../contexts/FontSizeContext";
@@ -24,6 +24,8 @@ export default function NewChatCard({
   const [worktree, setWorktree] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [issueContext, setIssueContext] = useState(null);
+  const [error, setError] = useState(null);
+  const [creatingChat, setCreatingChat] = useState(false);
 
   // Issue search state
   const [showIssueSearch, setShowIssueSearch] = useState(false);
@@ -33,8 +35,22 @@ export default function NewChatCard({
   const issueSearchRef = useRef(null);
   const issueMenuRef = useRef(null);
 
-  // Branch input state
-  const [showBranchInput, setShowBranchInput] = useState(false);
+  // Branch picker state
+  const [showBranchSearch, setShowBranchSearch] = useState(false);
+  const [branchSearchQuery, setBranchSearchQuery] = useState("");
+  const [branchList, setBranchList] = useState([]);
+  const [branchLoading, setBranchLoading] = useState(false);
+  const [currentBranch, setCurrentBranch] = useState("");
+  const [branchMode, setBranchMode] = useState(null); // "existing" | "new" | null
+  const [worktreeBaseBranch, setWorktreeBaseBranch] = useState("");
+  const branchSearchRef = useRef(null);
+  const branchMenuRef = useRef(null);
+
+  const makeClaudiBranchName = useCallback((baseBranch) => {
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const base = (baseBranch || "claudi").trim();
+    return `${base}-claudi-${suffix}`;
+  }, []);
 
   // Auto-focus textarea on mount
   useEffect(() => {
@@ -46,13 +62,13 @@ export default function NewChatCard({
     const handler = (e) => {
       if (e.key === "Escape") {
         if (showIssueSearch) { setShowIssueSearch(false); return; }
-        if (showBranchInput) { setShowBranchInput(false); return; }
+        if (showBranchSearch) { setShowBranchSearch(false); return; }
         onCancel();
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onCancel, showIssueSearch, showBranchInput]);
+  }, [onCancel, showIssueSearch, showBranchSearch]);
 
   // Close issue search on outside click
   useEffect(() => {
@@ -82,6 +98,53 @@ export default function NewChatCard({
     return () => { cancelled = true; };
   }, [showIssueSearch, selectedCwd]);
 
+  // Close branch search on outside click
+  useEffect(() => {
+    if (!showBranchSearch) return;
+    const handler = (e) => {
+      if (branchSearchRef.current?.contains(e.target) || branchMenuRef.current?.contains(e.target)) return;
+      setShowBranchSearch(false);
+      setBranchSearchQuery("");
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showBranchSearch]);
+
+  // Load available branches for the selected project
+  useEffect(() => {
+    if (!selectedCwd || !window.api?.gitBranches) {
+      setBranchList([]);
+      setCurrentBranch("");
+      setBranchLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setBranchLoading(true);
+
+    (async () => {
+      try {
+        const info = await window.api.gitBranches(selectedCwd);
+        if (cancelled) return;
+        const current = info?.current || "";
+        setCurrentBranch(current);
+        setBranchList(info?.branches || []);
+        setWorktreeBaseBranch((prev) => prev || current);
+        setBranch((prev) => prev || current);
+        setBranchMode((prev) => prev || (current ? "existing" : null));
+      } catch {
+        if (!cancelled) {
+          setCurrentBranch("");
+          setBranchList([]);
+        }
+      } finally {
+        if (!cancelled) setBranchLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [selectedCwd]);
+
   // Auto-grow textarea
   const autoGrow = useCallback((el) => {
     if (!el) return;
@@ -89,18 +152,53 @@ export default function NewChatCard({
     el.style.height = el.scrollHeight + "px";
   }, []);
 
-  const handleCreate = useCallback(() => {
-    if (!prompt.trim()) return;
-    onCreateChat({
-      cwd: selectedCwd,
-      prompt: prompt.trim(),
-      model,
-      branch: branch.trim() || undefined,
-      worktree,
-      issueContext: issueContext || undefined,
-      attachments: attachments.length ? attachments : undefined,
-    });
-  }, [prompt, issueContext, onCreateChat, selectedCwd, model, branch, worktree, attachments]);
+  const handleCreate = useCallback(async () => {
+    const trimmedPrompt = prompt.trim();
+    let trimmedBranch = branch.trim();
+    let nextBranchMode = branchMode;
+    let nextWorktreeBaseBranch = worktreeBaseBranch || currentBranch || "";
+
+    if (!trimmedPrompt || creatingChat) return;
+
+    if ((trimmedBranch || worktree) && !selectedCwd) {
+      setError("Select a project before creating a branch or worktree.");
+      return;
+    }
+
+    if (worktree) {
+      if (nextBranchMode === "existing" && trimmedBranch) {
+        nextWorktreeBaseBranch = trimmedBranch;
+        trimmedBranch = makeClaudiBranchName(trimmedBranch);
+        nextBranchMode = "new";
+      } else if (!trimmedBranch && nextWorktreeBaseBranch) {
+        trimmedBranch = makeClaudiBranchName(nextWorktreeBaseBranch);
+        nextBranchMode = "new";
+      } else if (!trimmedBranch) {
+        setError("Pick a base branch first.");
+        return;
+      }
+    }
+
+    setError(null);
+    setCreatingChat(true);
+    try {
+      await onCreateChat({
+        cwd: selectedCwd,
+        prompt: trimmedPrompt,
+        model,
+        branch: trimmedBranch || undefined,
+        branchMode: nextBranchMode || "new",
+        worktree,
+        worktreeBaseBranch: worktree ? (nextWorktreeBaseBranch || undefined) : undefined,
+        issueContext: issueContext || undefined,
+        attachments: attachments.length ? attachments : undefined,
+      });
+    } catch (createError) {
+      setError(createError?.message || "Failed to create chat.");
+    } finally {
+      setCreatingChat(false);
+    }
+  }, [attachments, branch, branchMode, creatingChat, currentBranch, issueContext, makeClaudiBranchName, model, onCreateChat, prompt, selectedCwd, worktree, worktreeBaseBranch]);
 
   // Enter to create, Shift+Enter for newline
   const handleKeyDown = useCallback(
@@ -121,6 +219,59 @@ export default function NewChatCard({
   const removeAttachment = useCallback((idx) => {
     setAttachments((prev) => prev.filter((_, i) => i !== idx));
   }, []);
+
+  const handleProjectChange = useCallback((nextCwd) => {
+    setSelectedCwd(nextCwd);
+    setBranch("");
+    setBranchMode(null);
+    setWorktreeBaseBranch("");
+    setBranchSearchQuery("");
+    setShowBranchSearch(false);
+    setError(null);
+  }, []);
+
+  const handleBrowseProject = useCallback(async () => {
+    const folder = await onPickFolder?.();
+    if (!folder) return;
+    handleProjectChange(folder);
+  }, [handleProjectChange, onPickFolder]);
+
+  const openBranchPicker = useCallback(() => {
+    if (!selectedCwd) {
+      setError("Select a project before choosing a branch.");
+      return;
+    }
+    setError(null);
+    setBranchSearchQuery(worktree ? "" : branch);
+    setShowBranchSearch((prev) => !prev);
+  }, [branch, selectedCwd, worktree]);
+
+  const selectExistingBranch = useCallback((name) => {
+    if (worktree) {
+      setWorktreeBaseBranch(name);
+      setBranch(name);
+      setBranchMode("existing");
+    } else {
+      setBranch(name);
+      setBranchMode("existing");
+    }
+    setBranchSearchQuery("");
+    setShowBranchSearch(false);
+    setError(null);
+  }, [worktree]);
+
+  const useCustomBranch = useCallback((value) => {
+    const nextBranch = value.trim();
+    if (!nextBranch) return;
+    setBranch(nextBranch);
+    setBranchMode("new");
+    if (worktree && !worktreeBaseBranch) {
+      setWorktreeBaseBranch(currentBranch || "");
+    }
+    setBranchSearchQuery("");
+    setShowBranchSearch(false);
+    setError(null);
+  }, [currentBranch, worktree, worktreeBaseBranch]);
 
   // Paste handler for images
   const handlePaste = (e) => {
@@ -174,6 +325,12 @@ export default function NewChatCard({
       : true
   );
 
+  const filteredBranches = branchList.filter((name) =>
+    branchSearchQuery
+      ? name.toLowerCase().includes(branchSearchQuery.toLowerCase())
+      : true
+  );
+
   const inputBase = {
     background: "transparent",
     border: "none",
@@ -185,18 +342,32 @@ export default function NewChatCard({
   const toolBtnStyle = (active) => ({
     display: "flex",
     alignItems: "center",
-    gap: 4,
-    padding: "4px 10px",
-    background: active ? "rgba(180,220,255,0.08)" : "rgba(255,255,255,0.02)",
-    border: `1px solid ${active ? "rgba(180,220,255,0.15)" : "rgba(255,255,255,0.04)"}`,
-    borderRadius: 7,
-    color: active ? "rgba(180,220,255,0.85)" : "rgba(255,255,255,0.4)",
-    fontSize: s(10),
-    fontFamily: "'JetBrains Mono',monospace",
+    gap: 6,
+    padding: "5px 11px",
+    background: active ? "rgba(170,210,255,0.1)" : "rgba(255,255,255,0.025)",
+    border: `1px solid ${active ? "rgba(170,210,255,0.18)" : "rgba(255,255,255,0.05)"}`,
+    borderRadius: 999,
+    color: active ? "rgba(225,240,255,0.94)" : "rgba(255,255,255,0.5)",
+    fontSize: s(10.5),
+    fontFamily: "system-ui, sans-serif",
+    fontWeight: 600,
     cursor: "pointer",
     transition: "all .2s",
-    letterSpacing: ".04em",
+    letterSpacing: ".01em",
+    boxShadow: active ? "0 10px 24px rgba(20,30,50,0.16)" : "none",
   });
+
+  const chipIconStyle = {
+    width: 13,
+    height: 13,
+    flexShrink: 0,
+    strokeWidth: 2,
+  };
+
+  const branchLabel = worktree
+    ? (branchMode === "new" && branch ? branch : (worktreeBaseBranch || currentBranch || "Base"))
+    : (branch || currentBranch || "Branch");
+  const issueLabel = issueContext ? `#${issueContext.match(/Issue #(\d+)/)?.[1] || ""}` : "Issue";
 
   return (
     <div
@@ -304,42 +475,43 @@ export default function NewChatCard({
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
           >
-            <Paperclip size={11} strokeWidth={2} />
+            <Paperclip style={chipIconStyle} />
+            File
           </button>
 
-          {/* Branch — text toggle */}
-          {!showBranchInput ? (
-            <button onClick={() => setShowBranchInput(true)} style={toolBtnStyle(!!branch)}>
-              {branch ? `branch: ${branch}` : "branch"}
+          {/* Branch — searchable typeahead */}
+          <div ref={branchSearchRef} style={{ position: "relative" }}>
+            <button onClick={openBranchPicker} style={toolBtnStyle(!!branch)}>
+              <GitBranch style={chipIconStyle} />
+              <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {branchLabel}
+              </span>
             </button>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <input
-                autoFocus
-                type="text"
-                placeholder="branch-name"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setShowBranchInput(false); } }}
-                onBlur={() => setShowBranchInput(false)}
-                style={{
-                  ...inputBase,
-                  fontSize: s(10),
-                  fontFamily: "'JetBrains Mono', monospace",
-                  padding: "4px 8px",
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 6,
-                  width: 140,
-                  color: "rgba(255,255,255,0.6)",
-                }}
-              />
-            </div>
-          )}
 
-          {/* Worktree — text toggle */}
+            {showBranchSearch && createPortal(
+              <BranchSearchDropdown
+                ref={branchMenuRef}
+                anchorRef={branchSearchRef}
+                s={s}
+                query={branchSearchQuery}
+                onQueryChange={setBranchSearchQuery}
+                branches={filteredBranches}
+                loading={branchLoading}
+                currentBranch={currentBranch}
+                currentValue={branch}
+                baseBranch={worktreeBaseBranch || currentBranch}
+                worktree={worktree}
+                onSelectBranch={selectExistingBranch}
+                onUseCustomBranch={useCustomBranch}
+              />,
+              document.body
+            )}
+          </div>
+
+          {/* Worktree — create new worktree */}
           <button onClick={() => setWorktree(v => !v)} style={toolBtnStyle(worktree)}>
-            {worktree ? "worktree: on" : "worktree"}
+            <GitFork style={chipIconStyle} />
+            {worktree ? "Tree on" : "Tree"}
           </button>
 
           {/* Link issue — text toggle with searchable dropdown */}
@@ -351,7 +523,8 @@ export default function NewChatCard({
               }}
               style={toolBtnStyle(!!issueContext)}
             >
-              {issueContext ? issueContext.split("\n")[0].slice(0, 30) : "link issue"}
+              <Link2 style={chipIconStyle} />
+              {issueLabel}
             </button>
 
             {showIssueSearch && createPortal(
@@ -377,26 +550,34 @@ export default function NewChatCard({
         }}>
           <ProjectPicker
             value={selectedCwd}
-            onChange={setSelectedCwd}
+            onChange={handleProjectChange}
             allCwdRoots={allCwdRoots}
             projects={projects}
-            onBrowse={onPickFolder}
+            onBrowse={handleBrowseProject}
           />
           <span style={{
             fontSize: s(10), color: "rgba(255,255,255,0.2)",
             fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
           }}>
-            Enter to create
+            {creatingChat ? "Creating..." : "Enter to create"}
           </span>
         </div>
+
+        {error && (
+          <div style={{
+            fontSize: s(10),
+            color: "rgba(255,180,180,0.7)",
+            fontFamily: "'JetBrains Mono', monospace",
+          }}>
+            {error}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 /* ── Issue search dropdown ──────────────────────────────────────── */
-
-import { forwardRef } from "react";
 
 const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
   { anchorRef, s, query, onQueryChange, issues, loading, onSelect },
@@ -497,6 +678,157 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
             }}>
               {issue.title}
             </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+});
+
+const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
+  { anchorRef, s, query, onQueryChange, branches, loading, currentBranch, currentValue, baseBranch, worktree, onSelectBranch, onUseCustomBranch },
+  ref
+) {
+  const [pos, setPos] = useState(null);
+  const trimmedQuery = query.trim();
+  const exactBranchName = branches.find((branch) => branch.toLowerCase() === trimmedQuery.toLowerCase()) || null;
+
+  useEffect(() => {
+    if (!anchorRef?.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 6, left: rect.left });
+  }, [anchorRef]);
+
+  if (!pos) return null;
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "fixed",
+        top: pos.top,
+        left: pos.left,
+        zIndex: 500,
+        width: 360,
+        maxHeight: 320,
+        background: "rgba(8,8,12,0.55)",
+        backdropFilter: "blur(48px) saturate(1.2)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 10,
+        padding: 3,
+        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        animation: "dropIn .15s ease",
+        WebkitAppRegion: "no-drag",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <input
+        autoFocus
+        type="text"
+        placeholder={worktree ? "Pick a base or type a tree..." : "Find or type a branch..."}
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && trimmedQuery) {
+            e.preventDefault();
+            if (exactBranchName) onSelectBranch(exactBranchName);
+            else onUseCustomBranch(trimmedQuery);
+          }
+        }}
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          border: "none",
+          outline: "none",
+          padding: "8px 10px",
+          fontSize: s(11),
+          fontFamily: "'JetBrains Mono',monospace",
+          color: "rgba(255,255,255,0.8)",
+          borderBottom: "1px solid rgba(255,255,255,0.04)",
+          borderRadius: "7px 7px 0 0",
+        }}
+      />
+
+      {worktree && currentValue && (
+        <div
+          style={{
+            padding: "8px 10px 4px",
+            fontSize: s(9),
+            fontFamily: "'JetBrains Mono',monospace",
+            color: "rgba(255,255,255,0.3)",
+            letterSpacing: ".04em",
+          }}
+        >
+          TREE {currentValue}
+          {baseBranch ? ` · FROM ${baseBranch}` : ""}
+        </div>
+      )}
+
+      <div style={{ overflowY: "auto", maxHeight: 240 }}>
+        {trimmedQuery && !exactBranchName && (
+          <button
+            onClick={() => onUseCustomBranch(trimmedQuery)}
+            style={{
+              display: "flex",
+              width: "100%",
+              padding: "9px 10px",
+              background: "transparent",
+              border: "none",
+              borderRadius: 7,
+              color: "rgba(180,220,255,0.82)",
+              fontSize: s(11),
+              fontFamily: "'JetBrains Mono',monospace",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          >
+            {worktree ? `Use "${trimmedQuery}" as the new worktree branch` : `Use "${trimmedQuery}" as a new branch`}
+          </button>
+        )}
+
+        {loading && (
+          <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+            Loading...
+          </div>
+        )}
+        {!loading && branches.length === 0 && (
+          <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+            No branches found
+          </div>
+        )}
+
+        {branches.map((branchName) => (
+          <button
+            key={branchName}
+            onClick={() => onSelectBranch(branchName)}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: 2,
+              width: "100%",
+              padding: "8px 10px",
+              background: "transparent",
+              border: "none",
+              borderRadius: 7,
+              color: branchName === currentBranch ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.55)",
+              fontSize: s(11),
+              fontFamily: "'JetBrains Mono',monospace",
+              cursor: "pointer",
+              textAlign: "left",
+              transition: "all .12s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          >
+            <span>{branchName}</span>
+            {branchName === currentBranch && (
+              <span style={{ fontSize: s(8.5), color: "rgba(255,255,255,0.25)", letterSpacing: ".04em" }}>
+                CURRENT
+              </span>
+            )}
           </button>
         ))}
       </div>
