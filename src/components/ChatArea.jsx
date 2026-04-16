@@ -294,7 +294,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             />
           )}
           {!showNewChatCard && <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
-          {onToggleTerminal && (
+          {!showNewChatCard && onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
               title="Toggle terminal"
