@@ -401,7 +401,7 @@ export default function useAgent() {
     }
   }, []);
 
-  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, model, provider, effort, cwd }) => {
+  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, cwd }) => {
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId);
@@ -419,13 +419,15 @@ export default function useAgent() {
         conversationId,
         resumeSessionId: sessionId,
         forkSession: true,
-        prompt: newText,
+        prompt: wirePrompt ?? newText,
         model,
         provider,
         effort,
         cwd,
       });
+      return true;
     }
+    return false;
   }, []);
 
   const loadMessages = useCallback((conversationId, messages) => {

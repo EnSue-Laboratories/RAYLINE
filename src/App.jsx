@@ -533,18 +533,36 @@ export default function App() {
         }
       }
 
-      editAndResend({
+      const currentProvider = m.provider || "claude";
+      const prevProvider = activeConvo.lastProvider;
+      // For edits, treat it like a mid-chat send: if the last turn used a
+      // different provider than the current one, prime.
+      const providerSwitched = prevProvider && prevProvider !== currentProvider;
+      const priorMessages = getConversation(active).messages.slice(0, messageIndex);
+      const prime = providerSwitched
+        ? buildCrossProviderPrime(priorMessages)
+        : null;
+      const wirePrompt = prime ? decoratePromptWithPrime(newText, prime) : newText;
+
+      const started = editAndResend({
         conversationId: active,
-        sessionId: activeConvo.sessionId,
+        sessionId: providerSwitched ? undefined : activeConvo.sessionId,
         messageIndex,
         newText,
+        wirePrompt,
         model: m.cliFlag,
-        provider: m.provider || "claude",
+        provider: currentProvider,
         effort: m.effort,
         cwd: convoCwd,
       });
+
+      if (started) {
+        setConvoList((p) =>
+          p.map((c) => (c.id === active ? { ...c, lastProvider: currentProvider } : c))
+        );
+      }
     },
-    [activeConvo, active, cwd, editAndResend]
+    [activeConvo, active, cwd, getConversation, editAndResend]
   );
 
   const handleModelChange = (modelId) => {
