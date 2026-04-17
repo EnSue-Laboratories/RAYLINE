@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { GitPullRequest, GitMerge, GitPullRequestClosed, Copy, Check } from "lucide-react";
+import { GitPullRequest, GitMerge, GitPullRequestClosed, Copy, Check, GitBranch } from "lucide-react";
 
 function timeAgo(dateStr) {
   const now = Date.now();
@@ -19,7 +19,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem })
   const [prs, setPrs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [copiedId, setCopiedId] = useState(null);
+  const [copiedAction, setCopiedAction] = useState(null);
 
   async function fetchPRs() {
     setLoading(true);
@@ -113,9 +113,12 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem })
     <div style={{ display: "flex", flexDirection: "column" }}>
       {prs.map((item) => {
         const repoShort = item._repo.split("/").pop();
+        const rowId = `${item._repo}-${item.number}`;
+        const copiedSummary = copiedAction === `${rowId}:summary`;
+        const copiedCheckout = copiedAction === `${rowId}:checkout`;
         return (
           <div
-            key={`${item._repo}-${item.number}`}
+            key={rowId}
             onClick={() => onSelectItem({ repo: item._repo, number: item.number, type: "pr" })}
             style={{
               display: "flex",
@@ -124,8 +127,18 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem })
               cursor: "pointer",
               borderBottom: "1px solid rgba(255,255,255,0.03)",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; const b = e.currentTarget.querySelector(".copy-btn"); if (b) b.style.opacity = "1"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; const b = e.currentTarget.querySelector(".copy-btn"); if (b) b.style.opacity = "0"; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+              e.currentTarget.querySelectorAll(".row-action-btn").forEach((b) => {
+                b.style.opacity = "1";
+              });
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.querySelectorAll(".row-action-btn").forEach((b) => {
+                b.style.opacity = "0";
+              });
+            }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {getIcon(item)}
@@ -150,25 +163,48 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem })
                 </span>
               )}
               <button
-                className="copy-btn"
+                className="row-action-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   const url = `https://github.com/${item._repo}/pull/${item.number}`;
                   navigator.clipboard.writeText(`#${item.number} ${item.title} ${url}`);
-                  const id = `${item._repo}-${item.number}`;
-                  setCopiedId(id);
-                  setTimeout(() => setCopiedId((v) => v === id ? null : v), 1500);
+                  const actionId = `${rowId}:summary`;
+                  setCopiedAction(actionId);
+                  setTimeout(() => setCopiedAction((v) => v === actionId ? null : v), 1500);
                 }}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center",
                   background: "none", border: "none", cursor: "pointer",
-                  color: copiedId === `${item._repo}-${item.number}` ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.2)",
+                  color: copiedSummary ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.2)",
                   padding: 2, flexShrink: 0,
-                  opacity: copiedId === `${item._repo}-${item.number}` ? 1 : 0,
+                  opacity: copiedSummary ? 1 : 0,
                   transition: "opacity .15s, color .15s",
                 }}
+                title="Copy PR summary"
               >
-                {copiedId === `${item._repo}-${item.number}` ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
+                {copiedSummary ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
+              </button>
+              <button
+                className="row-action-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const cmd = `gh pr checkout ${item.number} -R ${item._repo}`;
+                  navigator.clipboard.writeText(cmd);
+                  const actionId = `${rowId}:checkout`;
+                  setCopiedAction(actionId);
+                  setTimeout(() => setCopiedAction((v) => v === actionId ? null : v), 1500);
+                }}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: "none", border: "none", cursor: "pointer",
+                  color: copiedCheckout ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.2)",
+                  padding: 2, flexShrink: 0,
+                  opacity: copiedCheckout ? 1 : 0,
+                  transition: "opacity .15s, color .15s",
+                }}
+                title="Copy checkout command"
+              >
+                {copiedCheckout ? <Check size={12} strokeWidth={2} /> : <GitBranch size={12} strokeWidth={1.5} />}
               </button>
               <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11, flexShrink: 0 }}>
                 {repoShort}
