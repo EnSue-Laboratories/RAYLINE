@@ -712,6 +712,50 @@ ipcMain.handle("git-pull", async (_event, cwd) => {
   }
 });
 
+ipcMain.handle("git-generate-commit-message", async (_event, cwd) => {
+  if (!cwd) return { message: "" };
+  const { spawn } = require("child_process");
+
+  // Pull diff ourselves (don't trust renderer to pass large blobs).
+  let diff;
+  try {
+    diff = await git(["diff", "HEAD"], cwd);
+  } catch {
+    try { diff = await git(["diff"], cwd); } catch { diff = ""; }
+  }
+  if (!diff.trim()) return { message: "" };
+  const LIMIT = 64 * 1024;
+  if (diff.length > LIMIT) diff = diff.slice(0, LIMIT);
+
+  return new Promise((resolve) => {
+    const claudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
+    if (!claudeBin) { resolve({ message: "" }); return; }
+
+    const prompt = "Write a single-line conventional-commit-style message for this diff. Under 72 chars. No quotes, no prefixes like \"here's the message:\". Output only the commit message.";
+    const args = [
+      "--print",
+      "--output-format", "text",
+      "--tools", "",
+      "--model", "haiku",
+      "--no-session-persistence",
+      "--system-prompt", prompt,
+    ];
+    const child = spawn(claudeBin, args, {
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let out = "";
+    child.stdout.on("data", (c) => { out += c.toString(); });
+    child.stderr.on("data", () => {});
+    child.on("close", () => resolve({ message: out.trim().split("\n")[0] || "" }));
+    child.on("error", () => resolve({ message: "" }));
+    const timer = setTimeout(() => { try { child.kill(); } catch {} resolve({ message: out.trim().split("\n")[0] || "" }); }, 15000);
+    child.on("close", () => clearTimeout(timer));
+    child.stdin.write(diff);
+    child.stdin.end();
+  });
+});
+
 // IPC: get repo name from cwd via git remote
 ipcMain.handle("gh-get-repo-name", async (_e, cwd) => {
   const { execFile } = require("child_process");
