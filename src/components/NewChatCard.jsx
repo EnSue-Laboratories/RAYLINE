@@ -5,6 +5,37 @@ import ModelPicker from "./ModelPicker";
 import ProjectPicker from "./ProjectPicker";
 import { useFontScale } from "../contexts/FontSizeContext";
 
+const MENU_GAP = 6;
+const VIEWPORT_PADDING = 8;
+
+function clamp(value, min, max) {
+  if (max < min) return min;
+  return Math.min(Math.max(value, min), max);
+}
+
+function getFloatingMenuLayout(rect, preferredWidth, preferredMaxHeight) {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const width = Math.min(preferredWidth, Math.max(0, viewportWidth - VIEWPORT_PADDING * 2));
+  const maxHeight = Math.min(preferredMaxHeight, viewportHeight - VIEWPORT_PADDING * 2);
+  const spaceBelow = viewportHeight - rect.bottom - MENU_GAP - VIEWPORT_PADDING;
+  const spaceAbove = rect.top - MENU_GAP - VIEWPORT_PADDING;
+  const placeAbove = spaceBelow < Math.min(maxHeight, 220) && spaceAbove > spaceBelow;
+
+  return {
+    top: placeAbove
+      ? Math.max(VIEWPORT_PADDING, rect.top - MENU_GAP - maxHeight)
+      : Math.min(rect.bottom + MENU_GAP, viewportHeight - VIEWPORT_PADDING - maxHeight),
+    left: clamp(
+      rect.left,
+      VIEWPORT_PADDING,
+      viewportWidth - width - VIEWPORT_PADDING
+    ),
+    width,
+    maxHeight,
+  };
+}
+
 export default function NewChatCard({
   onCreateChat,
   defaultCwd,
@@ -377,6 +408,7 @@ export default function NewChatCard({
         alignItems: "center",
         flex: 1,
         padding: 24,
+        minHeight: 0,
       }}
       onDrop={handleDrop}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -394,6 +426,8 @@ export default function NewChatCard({
         flexDirection: "column",
         gap: 12,
         transition: "all .2s",
+        maxHeight: "100%",
+        overflowY: "auto",
       }}>
         {/* Main textarea */}
         <textarea
@@ -584,12 +618,25 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
   ref
 ) {
   const [pos, setPos] = useState(null);
+  const updatePosition = useCallback(() => {
+    if (!anchorRef?.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    setPos(getFloatingMenuLayout(rect, 340, 300));
+  }, [anchorRef]);
 
   useEffect(() => {
     if (!anchorRef?.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
-    setPos({ top: rect.bottom + 6, left: rect.left });
-  }, [anchorRef]);
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    const ro = new ResizeObserver(updatePosition);
+    ro.observe(anchorRef.current);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      ro.disconnect();
+    };
+  }, [anchorRef, updatePosition]);
 
   if (!pos) return null;
 
@@ -601,8 +648,8 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
         top: pos.top,
         left: pos.left,
         zIndex: 500,
-        width: 340,
-        maxHeight: 300,
+        width: pos.width,
+        maxHeight: pos.maxHeight,
         background: "rgba(8,8,12,0.55)",
         backdropFilter: "blur(48px) saturate(1.2)",
         border: "1px solid rgba(255,255,255,0.06)",
@@ -633,7 +680,7 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
           borderRadius: "7px 7px 0 0",
         }}
       />
-      <div style={{ overflowY: "auto", maxHeight: 240 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {loading && (
           <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
             Loading...
@@ -692,12 +739,25 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
   const [pos, setPos] = useState(null);
   const trimmedQuery = query.trim();
   const exactBranchName = branches.find((branch) => branch.toLowerCase() === trimmedQuery.toLowerCase()) || null;
+  const updatePosition = useCallback(() => {
+    if (!anchorRef?.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    setPos(getFloatingMenuLayout(rect, 360, 320));
+  }, [anchorRef]);
 
   useEffect(() => {
     if (!anchorRef?.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
-    setPos({ top: rect.bottom + 6, left: rect.left });
-  }, [anchorRef]);
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    const ro = new ResizeObserver(updatePosition);
+    ro.observe(anchorRef.current);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      ro.disconnect();
+    };
+  }, [anchorRef, updatePosition]);
 
   if (!pos) return null;
 
@@ -709,8 +769,8 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
         top: pos.top,
         left: pos.left,
         zIndex: 500,
-        width: 360,
-        maxHeight: 320,
+        width: pos.width,
+        maxHeight: pos.maxHeight,
         background: "rgba(8,8,12,0.55)",
         backdropFilter: "blur(48px) saturate(1.2)",
         border: "1px solid rgba(255,255,255,0.06)",
@@ -764,7 +824,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
         </div>
       )}
 
-      <div style={{ overflowY: "auto", maxHeight: 240 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {trimmedQuery && !exactBranchName && (
           <button
             onClick={() => onUseCustomBranch(trimmedQuery)}
