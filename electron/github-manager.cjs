@@ -1,7 +1,23 @@
 const { execFile, spawn } = require("child_process");
+const { buildSpawnPath, isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
 
 function log(...args) {
   console.log("[github-manager]", ...args);
+}
+
+let cachedGhBin = null;
+
+function resolveGhBin() {
+  if (cachedGhBin && isExecutable(cachedGhBin)) return cachedGhBin;
+  cachedGhBin = resolveCliBin("gh", { envVarName: "GH_BIN" });
+  if (!cachedGhBin) {
+    throw new Error("GitHub CLI (gh) not found. Install it from https://cli.github.com and ensure it is on your PATH.");
+  }
+  return cachedGhBin;
+}
+
+function ghEnv() {
+  return { ...process.env, PATH: buildSpawnPath(), GH_NO_UPDATE_NOTIFIER: "1" };
 }
 
 /**
@@ -9,8 +25,10 @@ function log(...args) {
  */
 function gh(args) {
   return new Promise((resolve, reject) => {
-    execFile("gh", args, {
-      env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" },
+    let bin;
+    try { bin = resolveGhBin(); } catch (err) { reject(err); return; }
+    execFile(bin, args, {
+      env: ghEnv(),
       timeout: 15000,
       maxBuffer: 5 * 1024 * 1024,
     }, (err, stdout, stderr) => {
@@ -25,8 +43,10 @@ function gh(args) {
  */
 function ghWithStdin(args, jsonBody) {
   return new Promise((resolve, reject) => {
-    const child = spawn("gh", args, {
-      env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" },
+    let bin;
+    try { bin = resolveGhBin(); } catch (err) { reject(err); return; }
+    const child = spawn(bin, args, {
+      env: ghEnv(),
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 15000,
     });
@@ -53,8 +73,10 @@ function ghWithStdin(args, jsonBody) {
  */
 function ghWithRawStdin(args, input) {
   return new Promise((resolve, reject) => {
-    const child = spawn("gh", args, {
-      env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" },
+    let bin;
+    try { bin = resolveGhBin(); } catch (err) { reject(err); return; }
+    const child = spawn(bin, args, {
+      env: ghEnv(),
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 15000,
     });
@@ -239,6 +261,7 @@ async function getCurrentBranch() {
   try {
     const raw = await new Promise((resolve, reject) => {
       execFile("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+        env: { ...process.env, PATH: buildSpawnPath() },
         timeout: 5000,
       }, (err, stdout) => {
         if (err) reject(err);
