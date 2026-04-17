@@ -580,6 +580,47 @@ ipcMain.handle("git-worktree-remove", async (_event, cwd, worktreePath) => {
   return { success: true };
 });
 
+ipcMain.handle("git-status", async (_event, cwd) => {
+  if (!cwd) return null;
+  try {
+    const raw = await git(["status", "--porcelain=v2", "--branch"], cwd);
+    const out = {
+      branch: null,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      files: [],
+      detached: false,
+    };
+    for (const line of raw.split("\n")) {
+      if (!line) continue;
+      if (line.startsWith("# branch.head ")) {
+        const head = line.slice(14).trim();
+        if (head === "(detached)") out.detached = true;
+        else out.branch = head;
+      } else if (line.startsWith("# branch.upstream ")) {
+        out.upstream = line.slice(18).trim();
+      } else if (line.startsWith("# branch.ab ")) {
+        const m = line.slice(12).match(/^\+(\d+) -(\d+)/);
+        if (m) { out.ahead = Number(m[1]); out.behind = Number(m[2]); }
+      } else if (line.startsWith("1 ") || line.startsWith("2 ")) {
+        // tracked: "1 XY ... <path>"
+        const parts = line.split(" ");
+        const xy = parts[1];
+        const path = parts.slice(8).join(" ");
+        out.files.push({ path, index: xy[0], worktree: xy[1] });
+      } else if (line.startsWith("? ")) {
+        out.files.push({ path: line.slice(2), index: "?", worktree: "?" });
+      } else if (line.startsWith("! ")) {
+        // ignored — skip
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+});
+
 // IPC: get repo name from cwd via git remote
 ipcMain.handle("gh-get-repo-name", async (_e, cwd) => {
   const { execFile } = require("child_process");
