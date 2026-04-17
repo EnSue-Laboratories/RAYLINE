@@ -315,18 +315,19 @@ export default function GitStatusPill({ cwd }) {
           display: "flex",
           alignItems: "center",
           gap: 6,
-          height: 23,
-          padding: "0 8px",
+          padding: "4px 10px",
           borderRadius: 7,
-          background: open ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
-          border: "1px solid " + (open ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)"),
-          color: "rgba(255,255,255,0.6)",
-          fontSize: s(11),
+          background: open ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
+          border: "1px solid " + (open ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)"),
+          color: "rgba(255,255,255,0.4)",
+          fontSize: s(10),
           fontFamily: "'JetBrains Mono',monospace",
           letterSpacing: ".04em",
           cursor: "pointer",
-          transition: "all .15s",
+          transition: "all .2s",
         }}
+        onMouseEnter={(e) => { if (!open) e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+        onMouseLeave={(e) => { if (!open) e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
       >
         <GitCommitHorizontal size={13} strokeWidth={1.6} />
         {detached ? (
