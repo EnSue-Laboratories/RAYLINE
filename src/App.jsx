@@ -18,10 +18,74 @@ function logSendFlow(...args) {
   console.log("[send-flow]", ...args);
 }
 
+const SHELL_TRANSCRIPT_LIMIT = 12000;
+
 function getMainRepoRoot(dir) {
   if (!dir) return dir;
   const wtIdx = dir.indexOf("/.worktrees/");
   return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
+}
+
+function getEffectiveConversationCwd(conversation, appCwd, draftsPath) {
+  const convoCwd = conversation?.cwd;
+  if (convoCwd === null) return draftsPath || undefined;
+  if (convoCwd !== undefined) return convoCwd || undefined;
+  return appCwd || undefined;
+}
+
+function truncateShellText(text) {
+  if (!text) return "";
+  if (text.length <= SHELL_TRANSCRIPT_LIMIT) return text;
+  const remaining = text.length - SHELL_TRANSCRIPT_LIMIT;
+  return `${text.slice(0, SHELL_TRANSCRIPT_LIMIT)}\n\n[output truncated: ${remaining} more characters]`;
+}
+
+function formatShellTranscript(result) {
+  const fence = "````";
+  const sections = [`!${result.command}`];
+
+  sections.push("");
+  sections.push(`Executed locally${result.cwd ? ` in \`${result.cwd}\`` : ""}.`);
+
+  if (!result.ok) {
+    sections.push("");
+    sections.push(`Shell error: ${result.error || "Unknown error"}`);
+    return sections.join("\n");
+  }
+
+  sections.push(`Exit code: \`${result.exitCode ?? "unknown"}\`${result.timedOut ? " (timed out)" : ""}`);
+
+  if (result.timedOut) {
+    sections.push("");
+    sections.push("Command timed out. Partial output is shown below.");
+  }
+
+  if (result.truncated) {
+    sections.push("");
+    sections.push("Captured output was truncated.");
+  }
+
+  const stdout = truncateShellText(result.stdout || "");
+  const stderr = truncateShellText(result.stderr || "");
+
+  if (stdout) {
+    sections.push("");
+    sections.push("Stdout:");
+    sections.push(`${fence}text\n${stdout}\n${fence}`);
+  }
+
+  if (stderr) {
+    sections.push("");
+    sections.push("Stderr:");
+    sections.push(`${fence}text\n${stderr}\n${fence}`);
+  }
+
+  if (!stdout && !stderr) {
+    sections.push("");
+    sections.push("No output.");
+  }
+
+  return sections.join("\n");
 }
 
 function normalizeProjectsMeta(projectsMeta) {
@@ -260,14 +324,10 @@ export default function App() {
   }, [active, conversations]);
 
   const sendMessageToConversation = useCallback(
-    async ({ conversationId, conversation, text, attachments }) => {
+    async ({ conversationId, conversation, text, attachments, titleText }) => {
       if (!conversationId || !conversation) return false;
 
-      const convoCwd = conversation.cwd;
-      // null = explicit draft → use the shared drafts dir; undefined = legacy convo → fall back to app cwd
-      const effectiveCwd = convoCwd === null
-        ? (draftsPath || undefined)
-        : (convoCwd !== undefined ? (convoCwd || undefined) : (cwd || undefined));
+      const effectiveCwd = getEffectiveConversationCwd(conversation, cwd, draftsPath);
       const thisConvoData = getConversation(conversationId);
       const isFirstMessage = thisConvoData.messages.length === 0;
       const messageIndex = thisConvoData.messages.length;
@@ -278,7 +338,7 @@ export default function App() {
 
       if (isFirstMessage) {
         setConvoList((p) =>
-          p.map((c) => c.id === conversationId ? { ...c, title: text.slice(0, 50) } : c)
+          p.map((c) => c.id === conversationId ? { ...c, title: (titleText || text).slice(0, 50) } : c)
         );
       }
 
@@ -369,6 +429,7 @@ export default function App() {
     async (text, attachments) => {
       // Handle slash commands client-side
       const trimmed = text.trim();
+      const isShellCommand = trimmed.startsWith("!") && trimmed.length > 1;
       if (trimmed.startsWith("/") && !trimmed.includes(" ")) {
         const cmd = trimmed.toLowerCase();
         if (cmd === "/clear" || cmd === "/new") {
@@ -405,14 +466,33 @@ export default function App() {
         setActive(id);
       }
 
+      let messageText = text;
+      let titleText = text;
+
+      if (isShellCommand) {
+        const command = trimmed.slice(1).trim();
+        const effectiveCwd = getEffectiveConversationCwd(convo, cwd, draftsPath);
+        const result = window.api?.shellRun
+          ? await window.api.shellRun({ command, cwd: effectiveCwd })
+          : {
+              ok: false,
+              command,
+              cwd: effectiveCwd,
+              error: "Shell mode is not available in this environment.",
+            };
+        messageText = formatShellTranscript(result);
+        titleText = trimmed;
+      }
+
       await sendMessageToConversation({
         conversationId: convoId,
         conversation: convo,
-        text,
+        text: messageText,
         attachments,
+        titleText,
       });
     },
-    [activeConvo, active, activeData, cwd, defaultModel, sendMessageToConversation]
+    [activeConvo, active, activeData, cwd, defaultModel, draftsPath, sendMessageToConversation]
   );
 
   // Process queued messages when streaming ends
