@@ -2,7 +2,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { buildSpawnPath, resolveCliBin } = require("./cli-bin-resolver.cjs");
+const { buildSpawnPath, isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
 const { findSessionCwd } = require("./session-reader.cjs");
 
 const activeAgents = new Map();
@@ -52,7 +52,7 @@ function shouldEmitStderrError({ stderrBuffer, resultEvent, exitCode, signal, ca
 let cachedClaudeBin = null;
 
 function resolveClaudeBin() {
-  if (cachedClaudeBin && fs.existsSync(cachedClaudeBin)) return cachedClaudeBin;
+  if (cachedClaudeBin && isExecutable(cachedClaudeBin)) return cachedClaudeBin;
   cachedClaudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
   return cachedClaudeBin;
 }

@@ -2,7 +2,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { buildSpawnPath, resolveCliBin } = require("./cli-bin-resolver.cjs");
+const { isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
@@ -29,7 +29,7 @@ function shouldEmitStderrError({ stderrBuffer, exitCode, signal, cancelled, sawT
 let cachedCodexBin = null;
 
 function resolveCodexBin() {
-  if (cachedCodexBin && fs.existsSync(cachedCodexBin)) return cachedCodexBin;
+  if (cachedCodexBin && isExecutable(cachedCodexBin)) return cachedCodexBin;
   cachedCodexBin = resolveCliBin("codex", { envVarName: "CODEX_BIN" });
   return cachedCodexBin;
 }

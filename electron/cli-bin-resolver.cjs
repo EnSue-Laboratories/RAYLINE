@@ -147,5 +147,6 @@ function resolveCliBin(commandName, { envVarName, extraDirs = [] } = {}) {
 module.exports = {
   COMMON_EXTRA_PATH_DIRS,
   buildSpawnPath,
+  isExecutable,
   resolveCliBin,
 };
