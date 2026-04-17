@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
+import SearchableSelect from "./SearchableSelect";
 
 const inputStyle = {
   width: "100%",
@@ -25,6 +26,9 @@ const selectStyle = {
   paddingRight: 30,
 };
 
+const imageUploadCalloutTitle = "Images use GitHub's web uploader";
+const imageUploadCalloutBody = "Text-only drafts can be created here. To include screenshots, continue in GitHub's composer with the title and description prefilled, then paste the images there.";
+
 export default function CreateForm({ repos, type, onClose, onCreated }) {
   const [repo, setRepo] = useState(repos[0] || "");
   const [title, setTitle] = useState("");
@@ -34,33 +38,76 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
   const [branches, setBranches] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [images, setImages] = useState([]);
 
   useEffect(() => {
     if (type === "pr" && repo) {
-      window.ghApi.listBranches(repo).then((b) => {
+      Promise.all([
+        window.ghApi.listBranches(repo),
+        window.ghApi.getCurrentBranch(),
+        window.ghApi.getRepoDefaultBranch(repo),
+      ]).then(([b, currentBranch, defaultBranch]) => {
+        const branchNames = b.map((br) => br.name);
         setBranches(b);
-        if (b.length > 0 && !head) setHead(b[0].name);
+        if (!head) {
+          const match = branchNames.find((n) => n === currentBranch);
+          setHead(match || branchNames[0] || "");
+        }
+        setBase(defaultBranch);
       }).catch(() => {});
     }
   }, [repo, type]);
 
+  const canSubmit = Boolean(title.trim()) && (type !== "pr" || (head && base));
+
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setImages((prev) => [...prev, {
+            name: file.name || `image-${Date.now()}.png`,
+            dataUrl: ev.target.result,
+          }]);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!title.trim() || submitting) return;
+    if (!canSubmit || submitting || images.length > 0) return;
     setSubmitting(true);
     setError(null);
     try {
+      let finalBody = body.trim();
       if (type === "issue") {
-        await window.ghApi.createIssue(repo, title.trim(), body.trim());
+        await window.ghApi.createIssue(repo, title.trim(), finalBody);
       } else {
-        await window.ghApi.createPR(repo, title.trim(), body.trim(), head, base);
+        await window.ghApi.createPR(repo, title.trim(), finalBody, head, base);
       }
       onClose();
-      // Small delay so GitHub API has time to index the new item
       setTimeout(() => onCreated(), 500);
     } catch (e) {
       setError(e.message);
     }
     setSubmitting(false);
+  };
+
+  const handleContinueInGitHub = () => {
+    if (!canSubmit) return;
+    const finalBody = body.trim();
+    const encodedTitle = encodeURIComponent(title.trim());
+    const encodedBody = encodeURIComponent(finalBody);
+    const url = type === "issue"
+      ? `https://github.com/${repo}/issues/new?title=${encodedTitle}&body=${encodedBody}`
+      : `https://github.com/${repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}?expand=1&title=${encodedTitle}&body=${encodedBody}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    onClose();
   };
 
   return (
@@ -107,23 +154,21 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>HEAD</label>
-              <select
+              <SearchableSelect
+                options={branches.map((b) => b.name)}
                 value={head}
-                onChange={(e) => setHead(e.target.value)}
-                style={selectStyle}
-              >
-                {branches.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
-              </select>
+                onChange={setHead}
+                placeholder="Search branches..."
+              />
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>BASE</label>
-              <select
+              <SearchableSelect
+                options={branches.map((b) => b.name)}
                 value={base}
-                onChange={(e) => setBase(e.target.value)}
-                style={selectStyle}
-              >
-                {branches.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
-              </select>
+                onChange={setBase}
+                placeholder="Search branches..."
+              />
             </div>
           </div>
         )}
@@ -150,8 +195,65 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
             placeholder="Optional description..."
             rows={4}
             style={{ ...inputStyle, marginTop: 4, resize: "vertical", minHeight: 60 }}
+            onPaste={handlePaste}
           />
         </div>
+
+        {images.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+              {images.map((img, i) => (
+                <div key={i} style={{ position: "relative" }}>
+                  <img src={img.dataUrl} alt={img.name} style={{ height: 48, maxWidth: 80, borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)" }} />
+                  <button
+                    onClick={() => {
+                      setImages((prev) => prev.filter((_, j) => j !== i));
+                    }}
+                    style={{
+                      position: "absolute", top: -4, right: -4, width: 16, height: 16,
+                      borderRadius: "50%", background: "rgba(0,0,0,0.8)", border: "1px solid rgba(255,255,255,0.15)",
+                      color: "rgba(255,255,255,0.6)", fontSize: 10, cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                    }}
+                  >
+                    x
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div
+              style={{
+                borderRadius: 8,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.04)",
+                padding: "10px 12px",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.82)", fontWeight: 600, marginBottom: 4 }}>
+                {imageUploadCalloutTitle}
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.52)", lineHeight: 1.45, marginBottom: 8 }}>
+                {imageUploadCalloutBody}
+              </div>
+              <button
+                onClick={() => setImages([])}
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 6,
+                  color: "rgba(255,255,255,0.72)",
+                  fontSize: 11,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  letterSpacing: ".04em",
+                  padding: "6px 10px",
+                  cursor: "pointer",
+                }}
+              >
+                Create Without Images
+              </button>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div style={{ fontSize: 12, color: "rgba(248,81,73,0.8)", marginBottom: 10 }}>{error}</div>
@@ -168,18 +270,30 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
             Cancel
           </button>
           <button
-            onClick={handleSubmit}
-            disabled={!title.trim() || submitting}
+            onClick={images.length > 0 ? handleContinueInGitHub : handleSubmit}
+            disabled={!canSubmit || submitting}
             style={{
-              background: title.trim() ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
+              background: canSubmit ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
               border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6,
-              padding: "6px 14px", cursor: title.trim() ? "pointer" : "default",
-              color: title.trim() ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
+              padding: "6px 14px", cursor: canSubmit ? "pointer" : "default",
+              color: canSubmit ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
               fontSize: 12, fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
               transition: "all .15s",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
-            {submitting ? "Creating..." : "Create"}
+            {submitting
+              ? "Creating..."
+              : images.length > 0
+                ? (
+                  <>
+                    Continue in GitHub
+                    <ExternalLink size={13} strokeWidth={1.75} />
+                  </>
+                )
+                : "Create"}
           </button>
         </div>
       </div>

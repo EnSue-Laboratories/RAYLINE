@@ -48,6 +48,34 @@ function ghWithStdin(args, jsonBody) {
   });
 }
 
+/**
+ * Execute a gh CLI command with a raw string piped to stdin.
+ */
+function ghWithRawStdin(args, input) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("gh", args, {
+      env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" },
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 15000,
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (d) => { stdout += d; });
+    child.stderr.on("data", (d) => { stderr += d; });
+
+    child.on("error", (err) => reject(err));
+    child.on("close", (code) => {
+      if (code !== 0) reject(new Error(stderr.trim() || `gh exited with code ${code}`));
+      else resolve(stdout.trim());
+    });
+
+    child.stdin.write(input || "");
+    child.stdin.end();
+  });
+}
+
 async function checkAuth() {
   try {
     await gh(["auth", "status"]);
@@ -182,22 +210,22 @@ async function reopenIssue(repo, number) {
 }
 
 async function createIssue(repo, title, body) {
-  const args = ["api", `/repos/${repo}/issues`, "-f", `title=${title}`];
-  if (body) args.push("-f", `body=${body}`);
-  const raw = await gh(args);
+  const raw = await ghWithStdin(
+    ["api", `/repos/${repo}/issues`, "--input", "-"],
+    { title, body: body || "" },
+  );
   return JSON.parse(raw);
 }
 
 async function createPR(repo, title, body, head, base) {
-  const args = [
+  const raw = await ghWithRawStdin([
     "pr", "create",
     "-R", repo,
     "--title", title,
     "--head", head,
     "--base", base || "main",
-  ];
-  if (body) args.push("--body", body);
-  const raw = await gh(args);
+    "--body-file", "-",
+  ], body || "");
   // gh pr create outputs the PR URL, not JSON
   return { url: raw };
 }
@@ -205,6 +233,35 @@ async function createPR(repo, title, body, head, base) {
 async function listBranches(repo) {
   const raw = await gh(["api", `/repos/${repo}/branches?per_page=100`]);
   return JSON.parse(raw);
+}
+
+async function getCurrentBranch() {
+  try {
+    const raw = await new Promise((resolve, reject) => {
+      execFile("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+        timeout: 5000,
+      }, (err, stdout) => {
+        if (err) reject(err);
+        else resolve(stdout.trim());
+      });
+    });
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+async function getRepoDefaultBranch(repo) {
+  try {
+    const raw = await gh(["api", `/repos/${repo}`, "--jq", ".default_branch"]);
+    return raw || "main";
+  } catch {
+    return "main";
+  }
+}
+
+async function uploadImage(_repo, _base64Data, _filename) {
+  throw new Error("GitHub image upload is not implemented. Remove pasted images or paste a GitHub-hosted image URL instead.");
 }
 
 async function getLinkedPRs(repo, issueNumber) {
@@ -252,5 +309,8 @@ module.exports = {
   createIssue,
   createPR,
   listBranches,
+  getCurrentBranch,
+  getRepoDefaultBranch,
+  uploadImage,
   getLinkedPRs,
 };

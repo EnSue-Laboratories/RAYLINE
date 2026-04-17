@@ -595,6 +595,9 @@ ipcMain.handle("gh-create-issue", (_e, repo, title, body) => ghManager.createIss
 ipcMain.handle("gh-create-pr", (_e, repo, title, body, head, base) => ghManager.createPR(repo, title, body, head, base));
 ipcMain.handle("gh-list-branches", (_e, repo) => ghManager.listBranches(repo));
 ipcMain.handle("gh-linked-prs", (_e, repo, number) => ghManager.getLinkedPRs(repo, number));
+ipcMain.handle("gh-current-branch", () => ghManager.getCurrentBranch());
+ipcMain.handle("gh-repo-default-branch", (_e, repo) => ghManager.getRepoDefaultBranch(repo));
+ipcMain.handle("gh-upload-image", (_e, repo, base64Data, filename) => ghManager.uploadImage(repo, base64Data, filename));
 
 ipcMain.handle("gh-load-pm-state", async () => {
   try {
