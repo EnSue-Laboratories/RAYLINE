@@ -35,6 +35,11 @@ export default function GitStatusPill({ cwd }) {
   }, []);
 
   useEffect(() => {
+    setMessage("");
+    setError(null);
+  }, [cwd]);
+
+  useEffect(() => {
     if (!open) return;
     setError(null);
     refresh();
@@ -53,14 +58,32 @@ export default function GitStatusPill({ cwd }) {
   }, [open, close]);
 
   useEffect(() => {
-    if (!open || !triggerRef.current) return;
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, close]);
+
+  const updateMenuPosition = useCallback(() => {
+    if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
     const alignRight = rect.left + MENU_WIDTH > window.innerWidth - VIEWPORT_PADDING;
     const left = alignRight
       ? Math.max(VIEWPORT_PADDING, rect.right - MENU_WIDTH)
       : Math.min(rect.left, window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING);
     setMenuStyle({ top: rect.bottom + MENU_GAP, left, width: MENU_WIDTH });
-  }, [open]);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   if (!status) return null;
 
@@ -93,7 +116,7 @@ export default function GitStatusPill({ cwd }) {
       setMessage("");
       if (canPush) {
         const p = await window.api.gitPush(cwd);
-        if (!p.ok) { setError(p.stderr || "Push failed"); return; }
+        if (!p.ok) { setError(p.stderr || "Push failed"); await refresh(); return; }
       }
       await refresh();
     } finally {
@@ -108,7 +131,7 @@ export default function GitStatusPill({ cwd }) {
     try {
       const p = await window.api.gitPull(cwd);
       if (!p.ok) setError(p.stderr || "Pull failed");
-      else await refresh();
+      await refresh();
     } finally {
       setBusy(false);
     }
