@@ -490,6 +490,15 @@ function git(args, cwd) {
   });
 }
 
+function gitLong(args, cwd) {
+  return new Promise((resolve, reject) => {
+    execFile("git", args, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }, timeout: 60000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) reject(new Error(stderr.trim() || err.message));
+      else resolve(stdout.trim());
+    });
+  });
+}
+
 ipcMain.handle("git-branches", async (_event, cwd) => {
   if (!cwd) return { current: null, branches: [] };
   try {
@@ -631,6 +640,74 @@ ipcMain.handle("git-status", async (_event, cwd) => {
     return out;
   } catch {
     return null;
+  }
+});
+
+ipcMain.handle("git-fetch", async (_event, cwd) => {
+  if (!cwd) return { ok: false, error: "no cwd" };
+  try {
+    await gitLong(["fetch", "--no-tags", "--quiet"], cwd);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle("git-diff", async (_event, cwd) => {
+  if (!cwd) return { diff: "", truncated: false };
+  try {
+    const raw = await git(["diff", "HEAD"], cwd);
+    const LIMIT = 64 * 1024;
+    if (raw.length > LIMIT) {
+      return { diff: raw.slice(0, LIMIT), truncated: true };
+    }
+    return { diff: raw, truncated: false };
+  } catch {
+    try {
+      const raw = await git(["diff"], cwd);
+      return { diff: raw.slice(0, 64 * 1024), truncated: raw.length > 64 * 1024 };
+    } catch {
+      return { diff: "", truncated: false };
+    }
+  }
+});
+
+ipcMain.handle("git-commit", async (_event, cwd, message) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  if (!message || !message.trim()) return { ok: false, stderr: "empty message" };
+  try {
+    await git(["add", "-A"], cwd);
+    const stdout = await git(["commit", "-m", message], cwd);
+    return { ok: true, stdout };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-push", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    let args = ["push"];
+    try {
+      await git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd);
+    } catch {
+      const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+      args = ["push", "-u", "origin", branch];
+    }
+    const stdout = await gitLong(args, cwd);
+    return { ok: true, stdout };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-pull", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const stdout = await gitLong(["pull", "--ff-only"], cwd);
+    return { ok: true, stdout };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
   }
 });
 
