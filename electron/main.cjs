@@ -603,11 +603,24 @@ ipcMain.handle("git-status", async (_event, cwd) => {
       } else if (line.startsWith("# branch.ab ")) {
         const m = line.slice(12).match(/^\+(\d+) -(\d+)/);
         if (m) { out.ahead = Number(m[1]); out.behind = Number(m[2]); }
-      } else if (line.startsWith("1 ") || line.startsWith("2 ")) {
-        // tracked: "1 XY ... <path>"
+      } else if (line.startsWith("1 ")) {
+        // tracked: "1 XY ... <path>" — 8 header fields before path
         const parts = line.split(" ");
         const xy = parts[1];
         const path = parts.slice(8).join(" ");
+        out.files.push({ path, index: xy[0], worktree: xy[1] });
+      } else if (line.startsWith("2 ")) {
+        // renamed/copied: "2 XY ... <score> <newPath>\t<origPath>" — 9 header fields, tab-separated paths
+        const parts = line.split(" ");
+        const xy = parts[1];
+        const rest = parts.slice(9).join(" ");
+        const [newPath] = rest.split("\t");
+        out.files.push({ path: newPath, index: xy[0], worktree: xy[1] });
+      } else if (line.startsWith("u ")) {
+        // unmerged: "u XY ... <path>" — 10 header fields before path
+        const parts = line.split(" ");
+        const xy = parts[1];
+        const path = parts.slice(10).join(" ");
         out.files.push({ path, index: xy[0], worktree: xy[1] });
       } else if (line.startsWith("? ")) {
         out.files.push({ path: line.slice(2), index: "?", worktree: "?" });
