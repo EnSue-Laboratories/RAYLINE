@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
 const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
+const { buildSpawnPath, resolveCliBin } = require("./cli-bin-resolver.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
@@ -399,6 +400,12 @@ ipcMain.handle("system-info", () => ({
 ipcMain.handle("quick-explain", async (_event, { text, model }) => {
   const { spawn } = require("child_process");
   return new Promise((resolve) => {
+    const claudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
+    if (!claudeBin) {
+      resolve("Error: Unable to locate the Claude CLI binary");
+      return;
+    }
+
     const args = [
       "--print",
       "--output-format", "text",
@@ -408,8 +415,8 @@ ipcMain.handle("quick-explain", async (_event, { text, model }) => {
       "--system-prompt", "You are a concise explainer. Give 1-3 sentence explanations. Use markdown for formatting.",
       `Explain this briefly:\n\n${text}`,
     ];
-    const child = spawn("claude", args, {
-      env: { ...process.env, FORCE_COLOR: "0", PATH: process.env.PATH + ":/opt/homebrew/bin:/usr/local/bin" },
+    const child = spawn(claudeBin, args, {
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
       stdio: ["ignore", "pipe", "pipe"],
     });
     let out = "";

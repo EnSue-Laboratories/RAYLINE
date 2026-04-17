@@ -2,15 +2,10 @@ const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const { buildSpawnPath, resolveCliBin } = require("./cli-bin-resolver.cjs");
 const { findSessionCwd } = require("./session-reader.cjs");
 
 const activeAgents = new Map();
-const EXTRA_PATH_DIRS = [
-  "/opt/homebrew/bin",
-  "/usr/local/bin",
-  "/usr/bin",
-  "/bin",
-];
 
 function log(...args) {
   console.log("[agent-manager]", ...args);
@@ -22,20 +17,6 @@ function isDirectory(dirPath) {
   } catch {
     return false;
   }
-}
-
-function isExecutable(filePath) {
-  try {
-    fs.accessSync(filePath, fs.constants.X_OK);
-    return fs.statSync(filePath).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function buildSpawnPath() {
-  const pathParts = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
-  return [...new Set([...pathParts, ...EXTRA_PATH_DIRS])].join(path.delimiter);
 }
 
 function elapsedSince(startedAt) {
@@ -71,26 +52,9 @@ function shouldEmitStderrError({ stderrBuffer, resultEvent, exitCode, signal, ca
 let cachedClaudeBin = null;
 
 function resolveClaudeBin() {
-  if (cachedClaudeBin && isExecutable(cachedClaudeBin)) return cachedClaudeBin;
-
-  const searchPath = buildSpawnPath();
-  const candidates = [process.env.CLAUDE_BIN, "claude"].filter(Boolean);
-
-  for (const candidate of candidates) {
-    if (path.isAbsolute(candidate) && isExecutable(candidate)) {
-      cachedClaudeBin = candidate;
-      return candidate;
-    }
-    for (const dir of searchPath.split(path.delimiter).filter(Boolean)) {
-      const fullPath = path.join(dir, candidate);
-      if (isExecutable(fullPath)) {
-        cachedClaudeBin = fullPath;
-        return fullPath;
-      }
-    }
-  }
-
-  return null;
+  if (cachedClaudeBin && fs.existsSync(cachedClaudeBin)) return cachedClaudeBin;
+  cachedClaudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
+  return cachedClaudeBin;
 }
 
 function resolveLaunchCwd({ cwd, sessionId }) {
