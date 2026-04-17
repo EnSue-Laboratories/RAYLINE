@@ -38,6 +38,13 @@ function buildSpawnPath() {
   return [...new Set([...pathParts, ...EXTRA_PATH_DIRS])].join(path.delimiter);
 }
 
+function shouldEmitStderrError({ stderrBuffer, exitCode, signal, cancelled, sawTurnCompleted }) {
+  if (!stderrBuffer.trim()) return false;
+  if (cancelled) return false;
+  if (sawTurnCompleted && exitCode === 0 && !signal) return false;
+  return exitCode !== 0 || Boolean(signal) || !sawTurnCompleted;
+}
+
 let cachedCodexBin = null;
 
 function resolveCodexBin() {
@@ -238,9 +245,10 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
     }
   }
 
-  // Prompt goes last as positional arg
+  // `--image` is variadic in the Codex CLI, so terminate option parsing
+  // before the prompt or the prompt may be consumed as another image path.
   const fullPrompt = buildClaudiPrompt(prompt, files, mcpServers);
-  args.push(fullPrompt);
+  args.push("--", fullPrompt);
 
   const codexBin = resolveCodexBin();
   if (!codexBin) {
@@ -270,77 +278,114 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
 
   log("Spawned PID:", child.pid);
 
-  activeAgents.set(conversationId, child);
+  const state = {
+    child,
+    cancelled: false,
+    sawTurnCompleted: false,
+  };
+
+  activeAgents.set(conversationId, state);
 
   let buffer = "";
   let stderrBuffer = "";
 
+  const parseLine = (line) => {
+    if (!line.trim()) return;
+    try {
+      const event = JSON.parse(line);
+      if (event.type === "turn.completed") {
+        state.sawTurnCompleted = true;
+      }
+      log("Parsed event type:", event.type);
+      webContents.send("agent-stream", { conversationId, event });
+    } catch (e) {
+      log("Failed to parse JSON line:", line.slice(0, 200), "error:", e.message);
+    }
+  };
+
   child.stdout.on("data", (chunk) => {
+    if (activeAgents.get(conversationId) !== state) return;
     const raw = chunk.toString();
     log("stdout chunk:", raw.slice(0, 300));
     buffer += raw;
     const lines = buffer.split("\n");
     buffer = lines.pop();
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const event = JSON.parse(line);
-        log("Parsed event type:", event.type);
-        webContents.send("agent-stream", { conversationId, event });
-      } catch (e) {
-        log("Failed to parse JSON line:", line.slice(0, 200), "error:", e.message);
-      }
-    }
+    for (const line of lines) parseLine(line);
   });
 
   child.stderr.on("data", (chunk) => {
+    if (activeAgents.get(conversationId) !== state && !state.cancelled) return;
     const text = chunk.toString();
     log("stderr:", text);
     stderrBuffer += text;
   });
 
-  child.on("close", (exitCode) => {
-    log("Process closed, exitCode:", exitCode);
-    if (stderrBuffer.trim()) {
+  child.on("close", (exitCode, signal) => {
+    const isCurrentState = activeAgents.get(conversationId) === state;
+
+    log("Process closed, exitCode:", exitCode, "signal:", signal, "cancelled:", state.cancelled, "current:", isCurrentState);
+
+    if (isCurrentState && buffer.trim()) {
+      log("Flushing remaining buffer:", buffer.slice(0, 200));
+      parseLine(buffer);
+    }
+
+    if (state.cancelled) {
+      if (isCurrentState) {
+        activeAgents.delete(conversationId);
+        webContents.send("agent-done", { conversationId, exitCode, signal });
+      }
+      return;
+    }
+
+    if (!isCurrentState) {
+      log("Stale codex run closed after replacement; ignoring");
+      return;
+    }
+
+    if (shouldEmitStderrError({
+      stderrBuffer,
+      exitCode,
+      signal,
+      cancelled: state.cancelled,
+      sawTurnCompleted: state.sawTurnCompleted,
+    })) {
       log("Full stderr:", stderrBuffer);
       webContents.send("agent-error", { conversationId, error: stderrBuffer.trim() });
     }
-    // Flush remaining buffer
-    if (buffer.trim()) {
-      log("Flushing remaining buffer:", buffer.slice(0, 200));
-      try {
-        const event = JSON.parse(buffer);
-        webContents.send("agent-stream", { conversationId, event });
-      } catch {}
-    }
+
     activeAgents.delete(conversationId);
-    webContents.send("agent-done", { conversationId, exitCode });
+    webContents.send("agent-done", { conversationId, exitCode, signal });
   });
 
   child.on("error", (err) => {
+    const isCurrentState = activeAgents.get(conversationId) === state;
     log("Spawn error:", err.message);
-    activeAgents.delete(conversationId);
+    if (isCurrentState) activeAgents.delete(conversationId);
     webContents.send("agent-error", { conversationId, error: err.message });
+    if (isCurrentState) {
+      webContents.send("agent-done", { conversationId, exitCode: -1 });
+    }
   });
 
   return child;
 }
 
 function cancelCodexAgent(conversationId) {
-  const child = activeAgents.get(conversationId);
-  if (child) {
+  const state = activeAgents.get(conversationId);
+  if (state?.child) {
     log("Cancelling codex agent:", conversationId);
-    child.kill("SIGTERM");
-    activeAgents.delete(conversationId);
+    state.cancelled = true;
+    state.child.kill("SIGTERM");
   }
 }
 
 function cancelAllCodex() {
-  for (const [id, child] of activeAgents) {
-    child.kill("SIGTERM");
+  for (const [, state] of activeAgents) {
+    state.cancelled = true;
+    state.child.kill("SIGTERM");
   }
-  activeAgents.clear();
 }
 
 module.exports = { startCodexAgent, cancelCodexAgent, cancelAllCodex, resolveCodexBin };

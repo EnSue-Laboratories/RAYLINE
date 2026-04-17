@@ -1,7 +1,72 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight } from "lucide-react";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
+import ProjectGroup from "./ProjectGroup";
+import { getM } from "../data/models";
+
+function getMainRepoRoot(dir) {
+  if (!dir) return dir;
+  const wtIdx = dir.indexOf("/.worktrees/");
+  return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
+}
+
+function groupConvosByProject(convos, projectsMeta) {
+  const groups = {};
+  const drafts = [];
+  for (const c of convos) {
+    const root = c.cwd ? getMainRepoRoot(c.cwd) : null;
+    if (!root) { drafts.push(c); continue; }
+    if (!groups[root]) {
+      const meta = projectsMeta?.[root] || {};
+      groups[root] = {
+        cwdRoot: root,
+        name: meta.name || root.split("/").pop(),
+        collapsed: meta.collapsed ?? false,
+        hidden: meta.hidden ?? false,
+        convos: [],
+      };
+    }
+    groups[root].convos.push(c);
+  }
+  // Also include manually added projects with 0 convos
+  for (const [projectPath, meta] of Object.entries(projectsMeta || {})) {
+    const root = getMainRepoRoot(projectPath);
+    if (!root) continue;
+    if (meta.manual && !groups[root]) {
+      groups[root] = {
+        cwdRoot: root,
+        name: root.split("/").pop(),
+        collapsed: meta.collapsed ?? false,
+        hidden: meta.hidden ?? false,
+        convos: [],
+      };
+    }
+  }
+  const sorted = Object.values(groups).sort((a, b) => {
+    const aTs = a.convos.length ? Math.max(...a.convos.map(c => c.ts)) : 0;
+    const bTs = b.convos.length ? Math.max(...b.convos.map(c => c.ts)) : 0;
+    return bTs - aTs;
+  });
+
+  // Disambiguate duplicate basenames
+  const nameCounts = {};
+  sorted.forEach(g => { nameCounts[g.name] = (nameCounts[g.name] || 0) + 1; });
+  sorted.forEach(g => {
+    if (nameCounts[g.name] > 1) {
+      const parts = g.cwdRoot.split("/");
+      const parent = parts.length >= 2 ? parts[parts.length - 2] : "";
+      if (parent) g.name = `${g.name} (${parent})`;
+    }
+  });
+
+  // Add latest timestamp for header display
+  sorted.forEach(g => {
+    g.latestTs = g.convos.length ? Math.max(...g.convos.map(c => c.ts)) : null;
+  });
+
+  return { projectGroups: sorted, drafts };
+}
 
 function GitHubIcon({ size = 12 }) {
   return (
@@ -10,9 +75,8 @@ function GitHubIcon({ size = 12 }) {
     </svg>
   );
 }
-import { getM } from "../data/models";
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
@@ -21,6 +85,12 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
   const filtered = convos.filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase())
   );
+
+  const { projectGroups, drafts } = useMemo(
+    () => groupConvosByProject(filtered, projects),
+    [filtered, projects]
+  );
+  const searchActive = search.length > 0;
 
   const cwdShort = cwd ? (() => {
     const parts = cwd.split("/");
@@ -181,126 +251,190 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             </div>
           </div>
         )}
-        {filtered.map((c, i) => {
-          const isActive = c.id === active;
-          const cm = getM(c.model);
+        {/* Project groups */}
+        {projectGroups
+          .filter(proj => searchActive ? proj.convos.length > 0 : (proj.convos.length > 0 || projects?.[proj.cwdRoot]?.manual))
+          .map((proj) => (
+          <ProjectGroup
+            key={proj.cwdRoot}
+            project={proj}
+            active={active}
+            onSelect={onSelect}
+            onDelete={onDelete}
+            onNewInProject={onNewInProject}
+            onToggleCollapse={onToggleProjectCollapse}
+            onHideProject={onHideProject}
+            searchActive={searchActive}
+          />
+        ))
+        }
 
-          return (
+        {/* Drafts section */}
+        {drafts.length > 0 && (
+          <div style={{ marginBottom: 2 }}>
+            {/* Drafts header */}
             <div
-              key={c.id}
-              onClick={() => onSelect(c.id)}
               style={{
-                padding: "12px 12px",
-                borderRadius: 8,
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "5px 6px",
+                borderRadius: 6,
                 cursor: "pointer",
-                marginBottom: 1,
-                background: isActive ? "rgba(255,255,255,0.035)" : "transparent",
-                transition: "all .12s",
-                animation: `fadeSlide .2s ease ${i * 0.03}s both`,
+                transition: "background .15s",
+                userSelect: "none",
               }}
-              onMouseEnter={(e) => {
-                if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.018)";
-                const actions = e.currentTarget.querySelector(".convo-actions");
-                if (actions) actions.style.opacity = "1";
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) e.currentTarget.style.background = "transparent";
-                const actions = e.currentTarget.querySelector(".convo-actions");
-                if (actions) actions.style.opacity = "0";
-              }}
+              onClick={onToggleDraftsCollapsed}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
             >
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: s(12.5),
-                      color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      fontFamily: "system-ui,sans-serif",
-                      marginBottom: 4,
-                    }}
-                  >
-                    {c.title}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: s(11),
-                      color: "rgba(255,255,255,0.3)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      fontFamily: "'Lato',system-ui,sans-serif",
-                      fontWeight: 300,
-                    }}
-                  >
-                    {c.lastPreview || "Empty"}
-                  </div>
-                </div>
-
-                <div className="convo-actions" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, opacity: 0, transition: "opacity .15s" }}>
-                  <button
-                    onClick={(e) => onDelete(c.id, e)}
-                    style={{ background: "none", border: "none", color: "rgba(255,255,255,0.25)", cursor: "pointer", padding: 1, transition: "color .15s", display: "flex" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(200,80,80,0.5)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
-                  >
-                    <Trash2 size={12} strokeWidth={1.5} />
-                  </button>
-                </div>
-              </div>
-
-              <div
+              <span
                 style={{
-                  marginTop: 6,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
+                  color: "rgba(255,255,255,0.25)",
+                  transform: `rotate(${(searchActive || !draftsCollapsed) ? 90 : 0}deg)`,
+                  transition: "transform .15s",
+                  flexShrink: 0,
                 }}
               >
+                <ChevronRight size={12} strokeWidth={1.5} />
+              </span>
+              <span
+                style={{
+                  fontSize: s(11),
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: "rgba(255,255,255,0.4)",
+                  letterSpacing: ".04em",
+                }}
+              >
+                DRAFTS
+              </span>
+            </div>
+
+            {/* Draft conversation rows */}
+            {(searchActive || !draftsCollapsed) && drafts.map((c, i) => {
+              const isActive = c.id === active;
+              const cm = getM(c.model);
+
+              return (
                 <div
+                  key={c.id}
+                  onClick={() => onSelect(c.id)}
                   style={{
-                    fontSize: s(9),
-                    fontFamily: "'JetBrains Mono',monospace",
-                    color: "rgba(255,255,255,0.35)",
-                    letterSpacing: ".08em",
-                    minWidth: 0,
+                    padding: "12px 12px 12px 28px",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    marginBottom: 1,
+                    background: isActive ? "rgba(255,255,255,0.035)" : "transparent",
+                    transition: "all .12s",
+                    animation: `fadeSlide .2s ease ${i * 0.03}s both`,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.018)";
+                    const actions = e.currentTarget.querySelector(".convo-actions");
+                    if (actions) actions.style.opacity = "1";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) e.currentTarget.style.background = "transparent";
+                    const actions = e.currentTarget.querySelector(".convo-actions");
+                    if (actions) actions.style.opacity = "0";
                   }}
                 >
-                  {cm.tag}
-                </div>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: s(12.5),
+                          color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          fontFamily: "system-ui,sans-serif",
+                          marginBottom: 4,
+                        }}
+                      >
+                        {c.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: s(11),
+                          color: "rgba(255,255,255,0.3)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          fontFamily: "'Lato',system-ui,sans-serif",
+                          fontWeight: 300,
+                        }}
+                      >
+                        {c.lastPreview || "Empty"}
+                      </div>
+                    </div>
 
-                {c.isStreaming && (
+                    <div className="convo-actions" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, opacity: 0, transition: "opacity .15s" }}>
+                      <button
+                        onClick={(e) => onDelete(c.id, e)}
+                        style={{ background: "none", border: "none", color: "rgba(255,255,255,0.25)", cursor: "pointer", padding: 1, transition: "color .15s", display: "flex" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(200,80,80,0.5)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+                      >
+                        <Trash2 size={12} strokeWidth={1.5} />
+                      </button>
+                    </div>
+                  </div>
+
                   <div
                     style={{
+                      marginTop: 6,
                       display: "flex",
                       alignItems: "center",
-                      gap: 5,
-                      flexShrink: 0,
-                      fontSize: s(8.5),
-                      fontFamily: "'JetBrains Mono',monospace",
-                      color: "rgba(165,255,210,0.5)",
-                      letterSpacing: ".08em",
+                      justifyContent: "space-between",
+                      gap: 10,
                     }}
                   >
-                    <span
+                    <div
                       style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background: "rgba(165,255,210,0.5)",
-                        animation: "dotPulse 1.2s ease-in-out infinite",
+                        fontSize: s(9),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        color: "rgba(255,255,255,0.35)",
+                        letterSpacing: ".08em",
+                        minWidth: 0,
                       }}
-                    />
-                    RUNNING
+                    >
+                      {cm.tag}
+                    </div>
+
+                    {c.isStreaming && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          flexShrink: 0,
+                          fontSize: s(8.5),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          color: "rgba(165,255,210,0.5)",
+                          letterSpacing: ".08em",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            background: "rgba(165,255,210,0.5)",
+                            animation: "dotPulse 1.2s ease-in-out infinite",
+                          }}
+                        />
+                        RUNNING
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Footer */}

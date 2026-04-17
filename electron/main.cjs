@@ -201,6 +201,20 @@ ipcMain.on("open-project-manager", () => {
   createProjectManagerWindow();
 });
 
+// IPC: open path in Finder / file manager
+ipcMain.handle("open-path", async (_event, dirPath) => {
+  const { shell } = require("electron");
+  return shell.openPath(dirPath);
+});
+
+// IPC: select files (for attachments)
+ipcMain.handle("select-files", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openFile", "multiSelections"],
+  });
+  return result.canceled ? [] : result.filePaths;
+});
+
 // IPC: wallpaper image picker
 ipcMain.handle("select-wallpaper", async (_event, previousPath) => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -515,7 +529,7 @@ ipcMain.handle("git-worktree-list", async (_event, cwd) => {
   }
 });
 
-ipcMain.handle("git-worktree-add", async (_event, cwd, worktreePath, branchName) => {
+ipcMain.handle("git-worktree-add", async (_event, cwd, worktreePath, branchName, options = {}) => {
   // Ensure .worktrees/ directory exists and is gitignored
   const wtDir = path.dirname(worktreePath);
   if (!fs.existsSync(wtDir)) fs.mkdirSync(wtDir, { recursive: true });
@@ -526,7 +540,18 @@ ipcMain.handle("git-worktree-add", async (_event, cwd, worktreePath, branchName)
       fs.appendFileSync(gitignorePath, "\n.worktrees/\n");
     }
   } catch {}
-  await git(["worktree", "add", worktreePath, "-b", branchName], cwd);
+  const createBranch = options?.createBranch !== false;
+  const startPoint = options?.startPoint;
+  const args = ["worktree", "add", worktreePath];
+  if (createBranch) {
+    args.push("-b", branchName);
+    if (startPoint) args.push(startPoint);
+  } else if (branchName) {
+    args.push(branchName);
+  } else if (startPoint) {
+    args.push(startPoint);
+  }
+  await git(args, cwd);
   return { success: true, path: worktreePath };
 });
 
@@ -538,6 +563,16 @@ ipcMain.handle("git-delete-branch", async (_event, cwd, branchName) => {
 ipcMain.handle("git-worktree-remove", async (_event, cwd, worktreePath) => {
   await git(["worktree", "remove", worktreePath], cwd);
   return { success: true };
+});
+
+// IPC: get repo name from cwd via git remote
+ipcMain.handle("gh-get-repo-name", async (_e, cwd) => {
+  const { execFile } = require("child_process");
+  return new Promise((resolve) => {
+    execFile("gh", ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"], { cwd, timeout: 5000 }, (err, stdout) => {
+      resolve(err ? null : stdout.trim());
+    });
+  });
 });
 
 // IPC: GitHub Project Manager

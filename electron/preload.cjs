@@ -52,7 +52,7 @@ contextBridge.exposeInMainWorld("api", {
   gitCreateBranch: (cwd, name) => ipcRenderer.invoke("git-create-branch", cwd, name),
   gitCheckout: (cwd, name) => ipcRenderer.invoke("git-checkout", cwd, name),
   gitWorktreeList: (cwd) => ipcRenderer.invoke("git-worktree-list", cwd),
-  gitWorktreeAdd: (cwd, path, branch) => ipcRenderer.invoke("git-worktree-add", cwd, path, branch),
+  gitWorktreeAdd: (cwd, path, branch, options) => ipcRenderer.invoke("git-worktree-add", cwd, path, branch, options),
   gitDeleteBranch: (cwd, name) => ipcRenderer.invoke("git-delete-branch", cwd, name),
   gitWorktreeRemove: (cwd, path) => ipcRenderer.invoke("git-worktree-remove", cwd, path),
 
@@ -70,6 +70,15 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("terminal-output", handler);
     return () => ipcRenderer.removeListener("terminal-output", handler);
   },
+
+  // File operations
+  openPath: (dirPath) => ipcRenderer.invoke("open-path", dirPath),
+  selectFiles: () => ipcRenderer.invoke("select-files"),
+
+  // GitHub operations
+  ghGetIssue: (repo, number) => ipcRenderer.invoke("gh-get-issue", repo, number),
+  ghListIssues: (repo, state) => ipcRenderer.invoke("gh-list-issues", repo, state),
+  ghGetRepoName: (cwd) => ipcRenderer.invoke("gh-get-repo-name", cwd),
 
   // Project Manager
   openProjectManager: () => ipcRenderer.send("open-project-manager"),
