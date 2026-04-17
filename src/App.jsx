@@ -8,6 +8,7 @@ import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
 import { DEFAULT_MODEL_ID, getM, normalizeModelId } from "./data/models";
+import { buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { FontSizeContext } from "./contexts/FontSizeContext";
 
 function logCheckpoint(...args) {
@@ -274,6 +275,14 @@ export default function App() {
       const images = attachments?.filter((a) => a.type === "image").map((a) => a.dataUrl);
       const files = attachments?.filter((a) => a.type === "file");
       const m = getM(conversation.model);
+      const currentProvider = m.provider || "claude";
+      const prevProvider = conversation.lastProvider;
+      const providerSwitched =
+        !isFirstMessage && prevProvider && prevProvider !== currentProvider;
+      const prime = providerSwitched
+        ? buildCrossProviderPrime(thisConvoData.messages)
+        : null;
+      const wirePrompt = prime ? decoratePromptWithPrime(text, prime) : text;
       const sendStartedAt = Date.now();
 
       if (isFirstMessage) {
@@ -343,8 +352,9 @@ export default function App() {
         conversationId,
         pendingId,
         sessionId: isFirstMessage ? conversation.sessionId : undefined,
-        resumeSessionId: isFirstMessage ? undefined : conversation.sessionId,
-        prompt: text,
+        resumeSessionId:
+          isFirstMessage || providerSwitched ? undefined : conversation.sessionId,
+        prompt: wirePrompt,
         model: m.cliFlag,
         provider: m.provider || "claude",
         effort: m.effort,
