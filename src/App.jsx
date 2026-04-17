@@ -353,6 +353,13 @@ export default function App() {
         files: files?.length ? files : undefined,
       });
 
+      if (started) {
+        const providerUsed = m.provider || "claude";
+        setConvoList((p) =>
+          p.map((c) => (c.id === conversationId ? { ...c, lastProvider: providerUsed } : c))
+        );
+      }
+
       logSendFlow("handleSend:agent-start", {
         conversationId,
         pendingId,
