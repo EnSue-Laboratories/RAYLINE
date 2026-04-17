@@ -42,6 +42,12 @@ function getWallpaperStorageDir() {
   return dir;
 }
 
+function getDraftsStorageDir() {
+  const dir = path.join(app.getPath("userData"), "drafts");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 function isManagedWallpaperPath(filePath) {
   if (!filePath) return false;
   const relative = path.relative(getWallpaperStorageDir(), path.resolve(filePath));
@@ -383,6 +389,8 @@ ipcMain.handle("load-state", async () => {
 });
 
 // IPC: system info
+ipcMain.handle("get-drafts-path", () => getDraftsStorageDir());
+
 ipcMain.handle("system-info", () => ({
   user: os.userInfo().username,
   hostname: os.hostname(),

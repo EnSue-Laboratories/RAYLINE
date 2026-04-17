@@ -71,6 +71,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [projects, setProjects] = useState({});
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
+  const [draftsPath, setDraftsPath] = useState(null);
   const [showNewChatCard, setShowNewChatCard] = useState(false);
   const messageQueue = useRef([]);
   const [queuedMessages, setQueuedMessages] = useState([]);
@@ -106,6 +107,7 @@ export default function App() {
       }
       setStateLoaded(true);
     });
+    window.api.getDraftsPath?.().then((p) => { if (p) setDraftsPath(p); });
   }, []);
 
   // Persist state to file on changes (skip until initial load is done)
@@ -262,7 +264,10 @@ export default function App() {
       if (!conversationId || !conversation) return false;
 
       const convoCwd = conversation.cwd;
-      const effectiveCwd = convoCwd || cwd || undefined;
+      // null = explicit draft → use the shared drafts dir; undefined = legacy convo → fall back to app cwd
+      const effectiveCwd = convoCwd === null
+        ? (draftsPath || undefined)
+        : (convoCwd !== undefined ? (convoCwd || undefined) : (cwd || undefined));
       const thisConvoData = getConversation(conversationId);
       const isFirstMessage = thisConvoData.messages.length === 0;
       const messageIndex = thisConvoData.messages.length;
@@ -357,7 +362,7 @@ export default function App() {
 
       return started;
     },
-    [cwd, getConversation, prepareMessage, startPreparedMessage]
+    [cwd, draftsPath, getConversation, prepareMessage, startPreparedMessage]
   );
 
   const handleSend = useCallback(
@@ -669,7 +674,7 @@ export default function App() {
           onNew={handleNew}
           onDelete={handleDelete}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
-          cwd={activeConvo?.cwd || cwd}
+          cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
           onPickFolder={handlePickFolder}
           onOpenSettings={() => setShowSettings(true)}
           onOpenProjectManager={() => window.api?.openProjectManager()}
@@ -707,7 +712,7 @@ export default function App() {
           terminalOpen={terminal.drawerOpen}
           terminalCount={terminal.sessions.length}
           wallpaper={wallpaper}
-          cwd={activeConvo?.cwd || cwd}
+          cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
           onRefocusTerminal={terminal.focusActiveSession}
           onCwdChange={(newCwd) => {
             setCwd(newCwd);
@@ -733,7 +738,7 @@ export default function App() {
         activeSession={terminal.activeSession}
         onSelectSession={terminal.setActiveSession}
         onCreateSession={terminal.createSession}
-        cwd={activeConvo?.cwd || cwd}
+        cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
         onKillSession={terminal.killSession}
         onSendInput={terminal.sendInput}
         onResizeSession={terminal.resizeSession}

@@ -4,7 +4,7 @@
   "description": "A desktop client for Claude Code",
   "author": "Ensue Laboratories",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
