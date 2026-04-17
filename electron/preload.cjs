@@ -56,6 +56,13 @@ contextBridge.exposeInMainWorld("api", {
   gitWorktreeAdd: (cwd, path, branch, options) => ipcRenderer.invoke("git-worktree-add", cwd, path, branch, options),
   gitDeleteBranch: (cwd, name) => ipcRenderer.invoke("git-delete-branch", cwd, name),
   gitWorktreeRemove: (cwd, path) => ipcRenderer.invoke("git-worktree-remove", cwd, path),
+  gitStatus: (cwd) => ipcRenderer.invoke("git-status", cwd),
+  gitFetch: (cwd) => ipcRenderer.invoke("git-fetch", cwd),
+  gitDiff: (cwd) => ipcRenderer.invoke("git-diff", cwd),
+  gitCommit: (cwd, message) => ipcRenderer.invoke("git-commit", cwd, message),
+  gitPush: (cwd) => ipcRenderer.invoke("git-push", cwd),
+  gitPull: (cwd) => ipcRenderer.invoke("git-pull", cwd),
+  gitGenerateCommitMessage: (cwd) => ipcRenderer.invoke("git-generate-commit-message", cwd),
 
   // Terminal sessions
   terminalCreate: (opts) => ipcRenderer.invoke("terminal-create", opts),
