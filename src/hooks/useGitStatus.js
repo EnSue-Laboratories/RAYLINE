@@ -9,22 +9,26 @@ export default function useGitStatus(cwd) {
   const [busy, setBusy] = useState(false);    // true during push/pull/commit
   const pollTimer = useRef(null);
   const fetchTimer = useRef(null);
-  const cancelled = useRef(false);
+  const runId = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!cwd || !window.api?.gitStatus) return;
+    const token = runId.current;
     const s = await window.api.gitStatus(cwd);
-    if (!cancelled.current) setStatus(s);
+    if (token !== runId.current) return;
+    setStatus(s);
   }, [cwd]);
 
   const refetch = useCallback(async () => {
     if (!cwd || !window.api?.gitFetch) return;
+    const token = runId.current;
     await window.api.gitFetch(cwd);
+    if (token !== runId.current) return;
     await refresh();
   }, [cwd, refresh]);
 
   useEffect(() => {
-    cancelled.current = false;
+    runId.current += 1;
     setStatus(null); // eslint-disable-line react-hooks/set-state-in-effect
     if (!cwd) return () => {};
 
@@ -44,7 +48,7 @@ export default function useGitStatus(cwd) {
     window.addEventListener("focus", onFocus);
 
     return () => {
-      cancelled.current = true;
+      runId.current += 1;
       clearInterval(pollTimer.current);
       clearInterval(fetchTimer.current);
       clearTimeout(fetchKickoff);
