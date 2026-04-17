@@ -644,12 +644,12 @@ ipcMain.handle("git-status", async (_event, cwd) => {
 });
 
 ipcMain.handle("git-fetch", async (_event, cwd) => {
-  if (!cwd) return { ok: false, error: "no cwd" };
+  if (!cwd) return { ok: false, stderr: "no cwd" };
   try {
     await gitLong(["fetch", "--no-tags", "--quiet"], cwd);
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: err.message };
+    return { ok: false, stderr: err.message };
   }
 });
 
@@ -692,6 +692,7 @@ ipcMain.handle("git-push", async (_event, cwd) => {
       await git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd);
     } catch {
       const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+      if (branch === "HEAD") return { ok: false, stderr: "detached HEAD; cannot push without a branch" };
       args = ["push", "-u", "origin", branch];
     }
     const stdout = await gitLong(args, cwd);
