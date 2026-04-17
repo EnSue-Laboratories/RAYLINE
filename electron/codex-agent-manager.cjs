@@ -2,27 +2,13 @@ const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const { isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
 
 const activeAgents = new Map();
-const EXTRA_PATH_DIRS = [
-  "/opt/homebrew/bin",
-  "/usr/local/bin",
-  "/usr/bin",
-  "/bin",
-];
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
 
 function log(...args) {
   console.log("[codex-agent-manager]", ...args);
-}
-
-function isExecutable(filePath) {
-  try {
-    fs.accessSync(filePath, fs.constants.X_OK);
-    return fs.statSync(filePath).isFile();
-  } catch {
-    return false;
-  }
 }
 
 function isDirectory(dirPath) {
@@ -31,11 +17,6 @@ function isDirectory(dirPath) {
   } catch {
     return false;
   }
-}
-
-function buildSpawnPath() {
-  const pathParts = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
-  return [...new Set([...pathParts, ...EXTRA_PATH_DIRS])].join(path.delimiter);
 }
 
 function shouldEmitStderrError({ stderrBuffer, exitCode, signal, cancelled, sawTurnCompleted }) {
@@ -49,25 +30,8 @@ let cachedCodexBin = null;
 
 function resolveCodexBin() {
   if (cachedCodexBin && isExecutable(cachedCodexBin)) return cachedCodexBin;
-
-  const searchPath = buildSpawnPath();
-  const candidates = [process.env.CODEX_BIN, "codex"].filter(Boolean);
-
-  for (const candidate of candidates) {
-    if (path.isAbsolute(candidate) && isExecutable(candidate)) {
-      cachedCodexBin = candidate;
-      return candidate;
-    }
-    for (const dir of searchPath.split(path.delimiter).filter(Boolean)) {
-      const fullPath = path.join(dir, candidate);
-      if (isExecutable(fullPath)) {
-        cachedCodexBin = fullPath;
-        return fullPath;
-      }
-    }
-  }
-
-  return null;
+  cachedCodexBin = resolveCliBin("codex", { envVarName: "CODEX_BIN" });
+  return cachedCodexBin;
 }
 
 function getExecutionFlags() {
