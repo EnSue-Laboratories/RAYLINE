@@ -5,6 +5,7 @@ import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
 import ModelPicker from "./ModelPicker";
 import BranchSelector from "./BranchSelector";
+import GitStatusPill from "./GitStatusPill";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
@@ -285,6 +286,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
+          {!showNewChatCard && <GitStatusPill cwd={cwd} />}
           {!showNewChatCard && (
             <BranchSelector
               cwd={cwd}
