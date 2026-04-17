@@ -745,14 +745,15 @@ ipcMain.handle("git-generate-commit-message", async (_event, cwd) => {
       stdio: ["pipe", "pipe", "pipe"],
     });
     let out = "";
+    let done = false;
+    let timer;
+    const finish = (msg) => { if (done) return; done = true; clearTimeout(timer); resolve({ message: msg }); };
     child.stdout.on("data", (c) => { out += c.toString(); });
     child.stderr.on("data", () => {});
-    child.on("close", () => resolve({ message: out.trim().split("\n")[0] || "" }));
-    child.on("error", () => resolve({ message: "" }));
-    const timer = setTimeout(() => { try { child.kill(); } catch {} resolve({ message: out.trim().split("\n")[0] || "" }); }, 15000);
-    child.on("close", () => clearTimeout(timer));
-    child.stdin.write(diff);
-    child.stdin.end();
+    child.on("close", () => finish(out.trim().split("\n")[0] || ""));
+    child.on("error", () => finish(out.trim().split("\n")[0] || ""));
+    timer = setTimeout(() => { try { child.kill(); } catch {} finish(out.trim().split("\n")[0] || ""); }, 15000);
+    try { child.stdin.write(diff); child.stdin.end(); } catch {}
   });
 });
 
