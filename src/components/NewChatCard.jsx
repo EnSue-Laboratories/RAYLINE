@@ -930,6 +930,23 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
   );
 });
 
+function getNeutralDropdownItemStyle(s) {
+  return {
+    display: "flex",
+    width: "100%",
+    padding: "8px 10px",
+    background: "transparent",
+    border: "none",
+    borderRadius: 7,
+    color: "rgba(255,255,255,0.55)",
+    fontSize: s(11),
+    fontFamily: "'JetBrains Mono',monospace",
+    cursor: "pointer",
+    textAlign: "left",
+    transition: "all .12s",
+  };
+}
+
 /* ── Worktree name input ────────────────────────────────────────── */
 
 const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
@@ -1021,19 +1038,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
 
       <button
         onClick={() => onConfirm(value)}
-        style={{
-          display: "flex",
-          width: "100%",
-          padding: "8px 10px",
-          background: "transparent",
-          border: "none",
-          borderRadius: 7,
-          color: "rgba(180,220,255,0.82)",
-          fontSize: s(11),
-          fontFamily: "'JetBrains Mono',monospace",
-          cursor: "pointer",
-          textAlign: "left",
-        }}
+        style={getNeutralDropdownItemStyle(s)}
         onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
       >
@@ -1043,19 +1048,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
       {active && (
         <button
           onClick={onDisable}
-          style={{
-            display: "flex",
-            width: "100%",
-            padding: "8px 10px",
-            background: "transparent",
-            border: "none",
-            borderRadius: 7,
-            color: "rgba(255,180,180,0.7)",
-            fontSize: s(11),
-            fontFamily: "'JetBrains Mono',monospace",
-            cursor: "pointer",
-            textAlign: "left",
-          }}
+          style={getNeutralDropdownItemStyle(s)}
           onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
         >
