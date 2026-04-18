@@ -2,7 +2,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
+const { buildSpawnPath, isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");

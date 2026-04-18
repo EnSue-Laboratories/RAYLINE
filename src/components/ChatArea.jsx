@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { PanelLeftOpen, Plus, ArrowRight, Square, Terminal as TerminalIcon } from "lucide-react";
+import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
@@ -44,6 +44,24 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       endRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [msgCount, convo?.isStreaming, lastPartText]);
+
+  // Track whether the user is near the bottom to toggle the scroll-to-bottom button
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      setShowScrollToBottom(distanceFromBottom > 120);
+    };
+    handleScroll();
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, [convo?.id, msgCount]);
+
+  const scrollToBottom = useCallback(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
   const isStreaming = convo?.isStreaming;
 
@@ -373,6 +391,50 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       </div>
 
       {!showNewChatCard && <SelectionToolbar onQuote={handleQuote} model={convo?.model || defaultModel || "sonnet"} />}
+
+      {/* Scroll to bottom button */}
+      {!showNewChatCard && convo && convo.msgs.length > 0 && (
+        <button
+          onClick={scrollToBottom}
+          aria-label="Scroll to bottom"
+          title="Scroll to bottom"
+          style={{
+            position: "absolute",
+            bottom: 108,
+            left: "50%",
+            transform: `translateX(-50%) scale(${showScrollToBottom ? 1 : 0.8})`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.02)",
+            border: "1px solid rgba(255,255,255,0.04)",
+            color: "rgba(255,255,255,0.72)",
+            cursor: "pointer",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
+            opacity: showScrollToBottom ? 1 : 0,
+            pointerEvents: showScrollToBottom ? "auto" : "none",
+            transition: "opacity .2s ease, transform .2s cubic-bezier(.16,1,.3,1), background .2s ease, border-color .2s ease",
+            zIndex: 20,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)";
+            e.currentTarget.style.color = "rgba(255,255,255,0.92)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)";
+            e.currentTarget.style.color = "rgba(255,255,255,0.72)";
+          }}
+        >
+          <ArrowDown size={16} strokeWidth={1.75} />
+        </button>
+      )}
 
       {/* Input bar */}
       {!showNewChatCard &&
