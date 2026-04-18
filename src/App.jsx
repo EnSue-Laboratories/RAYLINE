@@ -913,10 +913,17 @@ export default function App() {
         : (convoCwd !== undefined ? (convoCwd || undefined) : (cwd || undefined));
       const thisConvoData = getConversation(conversationId);
       const normalizedConversation = normalizeConversationState(conversation);
+      const persistedMessages = Array.isArray(normalizedConversation.archivedMessages)
+        ? normalizedConversation.archivedMessages
+        : [];
+      const availableMessages =
+        thisConvoData.messages.length > 0
+          ? thisConvoData.messages
+          : persistedMessages;
       const activeSession = getActiveConversationSession(normalizedConversation);
-      const isFirstMessage = thisConvoData.messages.length === 0;
-      const messageIndex = thisConvoData.messages.length;
-      const syncedMessageCount = thisConvoData.messages.length;
+      const isFirstMessage = availableMessages.length === 0;
+      const messageIndex = availableMessages.length;
+      const syncedMessageCount = availableMessages.length;
       const images = attachments?.filter((a) => a.type === "image").map((a) => a.dataUrl);
       const files = attachments?.filter((a) => a.type === "file");
       const m = getM(normalizedConversation.model);
@@ -965,9 +972,9 @@ export default function App() {
           ? seededSession?.nativeSessionId || undefined
           : undefined;
       const prime = providerSwitched
-        ? buildCrossProviderPrime(thisConvoData.messages)
+        ? buildCrossProviderPrime(availableMessages)
         : needsHistoryPrimeFallback
-          ? buildConversationPrime(thisConvoData.messages)
+          ? buildConversationPrime(availableMessages)
           : null;
       const wirePrompt = prime ? decoratePromptWithPrime(text, prime) : text;
       const sendStartedAt = Date.now();
@@ -1000,6 +1007,7 @@ export default function App() {
       const pendingId = prepareMessage({
         conversationId,
         prompt: text,
+        existingMessages: availableMessages,
         images: images?.length ? images : undefined,
         files: files?.length ? files : undefined,
       });

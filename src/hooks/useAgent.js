@@ -363,14 +363,18 @@ export default function useAgent() {
     return () => cleanupRefs.current.forEach((fn) => fn?.());
   }, []);
 
-  const prepareMessage = useCallback(({ conversationId, prompt, images, files }) => {
+  const prepareMessage = useCallback(({ conversationId, prompt, images, files, existingMessages }) => {
     const pendingId = uid();
     pendingStartsRef.current.set(conversationId, pendingId);
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
+      const baseMessages =
+        convo.messages.length > 0
+          ? convo.messages
+          : (Array.isArray(existingMessages) ? existingMessages : []);
       const msgs = [
-        ...convo.messages,
+        ...baseMessages,
         { id: uid(), role: "user", text: prompt, images, files },
         { id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false },
       ];
