@@ -380,6 +380,27 @@ export default function useAgent() {
     return pendingId;
   }, []);
 
+  const appendLocalMessages = useCallback((conversationId, messages) => {
+    if (!conversationId || !Array.isArray(messages) || messages.length === 0) return;
+
+    setConversations((prev) => {
+      const next = new Map(prev);
+      const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
+      const appended = messages.map((message) => ({
+        id: message.id || uid(),
+        ...message,
+      }));
+
+      next.set(conversationId, {
+        ...convo,
+        messages: [...convo.messages, ...appended],
+        isStreaming: false,
+        error: null,
+      });
+      return next;
+    });
+  }, []);
+
   const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession }) => {
     const expectedPendingId = pendingStartsRef.current.get(conversationId);
     if (pendingId && expectedPendingId !== pendingId) {
@@ -463,6 +484,7 @@ export default function useAgent() {
     conversations,
     getConversation,
     prepareMessage,
+    appendLocalMessages,
     startPreparedMessage,
     cancelMessage,
     editAndResend,

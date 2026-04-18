@@ -11,6 +11,8 @@ const terminalManager = require("./terminal-manager.cjs");
 const ghManager = require("./github-manager.cjs");
 
 const isDev = !app.isPackaged;
+const SHELL_COMMAND_TIMEOUT_MS = 15000;
+const SHELL_OUTPUT_LIMIT = 128 * 1024;
 const WALLPAPER_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
 const WALLPAPER_MIME_TYPES = {
   png: "image/png",
@@ -433,6 +435,132 @@ ipcMain.handle("quick-explain", async (_event, { text, model }) => {
     child.on("close", () => resolve(out.trim()));
     child.on("error", (err) => resolve(`Error: ${err.message}`));
     setTimeout(() => { child.kill(); resolve(out.trim() || "Timed out"); }, 30000);
+  });
+});
+
+ipcMain.handle("shell-run", async (_event, { command, cwd }) => {
+  const { spawn } = require("child_process");
+
+  return new Promise((resolve) => {
+    const shellCommand = String(command || "").trim();
+    const workDir = cwd || os.homedir();
+
+    if (!shellCommand) {
+      resolve({
+        ok: false,
+        command: shellCommand,
+        cwd: workDir,
+        stdout: "",
+        stderr: "",
+        exitCode: null,
+        timedOut: false,
+        truncated: false,
+        error: "Command is required.",
+      });
+      return;
+    }
+
+    const isWindows = process.platform === "win32";
+    const shellBin = isWindows ? (process.env.ComSpec || "cmd.exe") : "/bin/sh";
+    const shellArgs = isWindows
+      ? ["/d", "/s", "/c", shellCommand]
+      : ["-c", shellCommand];
+    const env = { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() };
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let truncated = false;
+    let settled = false;
+
+    const appendChunk = (current, chunk) => {
+      if (current.length >= SHELL_OUTPUT_LIMIT) {
+        truncated = true;
+        return current;
+      }
+
+      const text = chunk.toString();
+      const remaining = SHELL_OUTPUT_LIMIT - current.length;
+      if (text.length > remaining) {
+        truncated = true;
+        return current + text.slice(0, remaining);
+      }
+
+      return current + text;
+    };
+
+    let child;
+    try {
+      child = spawn(shellBin, shellArgs, {
+        cwd: workDir,
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+      });
+    } catch (error) {
+      resolve({
+        ok: false,
+        command: shellCommand,
+        cwd: workDir,
+        stdout: "",
+        stderr: "",
+        exitCode: null,
+        timedOut: false,
+        truncated: false,
+        error: error.message || String(error),
+      });
+      return;
+    }
+
+    const finish = (payload) => {
+      if (settled) return;
+      settled = true;
+      resolve(payload);
+    };
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        child.kill();
+      } catch {}
+    }, SHELL_COMMAND_TIMEOUT_MS);
+
+    child.stdout.on("data", (chunk) => {
+      stdout = appendChunk(stdout, chunk);
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr = appendChunk(stderr, chunk);
+    });
+
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      finish({
+        ok: false,
+        command: shellCommand,
+        cwd: workDir,
+        stdout,
+        stderr,
+        exitCode: null,
+        timedOut,
+        truncated,
+        error: error.message || String(error),
+      });
+    });
+
+    child.on("close", (exitCode) => {
+      clearTimeout(timer);
+      finish({
+        ok: true,
+        command: shellCommand,
+        cwd: workDir,
+        stdout,
+        stderr,
+        exitCode,
+        timedOut,
+        truncated,
+      });
+    });
   });
 });
 

@@ -19,6 +19,28 @@ function extractText(message) {
     .trim();
 }
 
+function formatPrimeLine(message) {
+  const text = extractText(message);
+  if (!text) return null;
+
+  if (message.mode === "shell-command") {
+    return `Local shell command: ${text}`;
+  }
+  if (message.mode === "shell-result") {
+    return `Local shell output: ${text}`;
+  }
+  if (message.role === "system") {
+    return `System: ${text}`;
+  }
+  if (message.role === "user") {
+    return `User: ${text}`;
+  }
+  if (message.role === "assistant") {
+    return `Assistant: ${text}`;
+  }
+  return null;
+}
+
 export function buildConversationPrime(
   messages,
   { charBudget = DEFAULT_CHAR_BUDGET, header = DEFAULT_HEADER, footer = DEFAULT_FOOTER } = {}
@@ -31,10 +53,8 @@ export function buildConversationPrime(
   let used = 0;
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (m.role !== "user" && m.role !== "assistant") continue;
-    const text = extractText(m);
-    if (!text) continue;
-    const line = `${m.role === "user" ? "User" : "Assistant"}: ${text}`;
+    const line = formatPrimeLine(m);
+    if (!line) continue;
     if (used + line.length > charBudget && kept.length > 0) break;
     kept.push(line);
     used += line.length;
