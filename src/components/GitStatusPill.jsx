@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { GitCommitHorizontal, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
+import { GitCommitHorizontal, GitPullRequestArrow, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import useGitStatus from "../hooks/useGitStatus";
 
@@ -39,7 +39,7 @@ const rowIconBtnStyle = {
   transition: "color .15s",
 };
 
-export default function GitStatusPill({ cwd }) {
+export default function GitStatusPill({ cwd, defaultPrBranch }) {
   const s = useFontScale();
   const { status, refresh, refetch } = useGitStatus(cwd);
   const [open, setOpen] = useState(false);
@@ -118,6 +118,8 @@ export default function GitStatusPill({ cwd }) {
   const canPush = !detached && upstream;
   const canPull = !detached && upstream && behind > 0;
   const canCommit = !detached && dirty > 0 && message.trim().length > 0 && !busy;
+  const prBase = (defaultPrBranch || "main").trim();
+  const canPr = !detached && !!branch && branch !== prBase && !busy;
 
   const handleCommitAndPush = async () => {
     if (!canCommit) return;
@@ -149,6 +151,22 @@ export default function GitStatusPill({ cwd }) {
     await refresh();
   };
 
+  const handleStageAll = async () => {
+    if (!window.api?.gitStage) return;
+    const paths = unstaged.map((f) => f.path);
+    if (!paths.length) return;
+    await window.api.gitStage(cwd, paths);
+    await refresh();
+  };
+
+  const handleUnstageAll = async () => {
+    if (!window.api?.gitUnstage) return;
+    const paths = staged.map((f) => f.path);
+    if (!paths.length) return;
+    await window.api.gitUnstage(cwd, paths);
+    await refresh();
+  };
+
   const handleRevert = (path, untracked) => {
     if (!window.api?.gitRevert) return;
     setConfirm({
@@ -171,6 +189,19 @@ export default function GitStatusPill({ cwd }) {
     const r = await window.api.gitIgnore(cwd, path);
     if (!r.ok) setError(r.stderr || "Failed to update .gitignore");
     await refresh();
+  };
+
+  const handleCreatePr = async () => {
+    if (!canPr || !window.api?.gitCreatePr) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await window.api.gitCreatePr(cwd, prBase);
+      if (!r.ok) { setError(r.stderr || "Failed to create PR"); return; }
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handlePull = async () => {
@@ -247,6 +278,8 @@ export default function GitStatusPill({ cwd }) {
             action="unstage"
             onAction={handleUnstage}
             onRevert={handleRevert}
+            onBulkAction={handleUnstageAll}
+            bulkActionTitle="Unstage all"
           />
         )}
         {unstaged.length > 0 && (
@@ -259,6 +292,8 @@ export default function GitStatusPill({ cwd }) {
             onAction={handleStage}
             onRevert={handleRevert}
             onIgnore={handleIgnore}
+            onBulkAction={handleStageAll}
+            bulkActionTitle="Stage all"
             style={{ marginTop: staged.length > 0 ? 10 : 0 }}
           />
         )}
@@ -309,6 +344,26 @@ export default function GitStatusPill({ cwd }) {
           }}
         >
           {busy ? "…" : "Commit & Push"}
+        </button>
+        <button
+          onClick={handleCreatePr}
+          disabled={!canPr}
+          title={canPr ? `Create PR → ${prBase}` : (branch === prBase ? `On base branch "${prBase}"` : "Cannot create PR")}
+          style={{
+            height: 30,
+            padding: "0 10px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: canPr ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+            border: "1px solid " + (canPr ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)"),
+            borderRadius: 6,
+            color: canPr ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
+            fontFamily: "system-ui,sans-serif",
+            cursor: canPr ? "pointer" : "default",
+          }}
+        >
+          <GitPullRequestArrow size={14} strokeWidth={1.6} />
         </button>
         <button
           onClick={handlePull}
@@ -513,11 +568,25 @@ function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, on
   );
 }
 
-function FileSection({ title, files, s, pickCode, action, onAction, onRevert, onIgnore, style }) {
+function FileSection({ title, files, s, pickCode, action, onAction, onRevert, onIgnore, onBulkAction, bulkActionTitle, style }) {
+  const BulkIcon = action === "stage" ? Plus : Minus;
   return (
     <div style={style}>
-      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: s(10), fontFamily: "'JetBrains Mono',monospace", letterSpacing: ".08em", marginBottom: 6 }}>
-        {title}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        color: "rgba(255,255,255,0.4)",
+        fontSize: s(10),
+        fontFamily: "'JetBrains Mono',monospace",
+        letterSpacing: ".08em",
+        marginBottom: 6,
+      }}>
+        <span style={{ flex: 1 }}>{title}</span>
+        {onBulkAction && (
+          <RowIconBtn onClick={onBulkAction} title={bulkActionTitle}>
+            <BulkIcon size={12} strokeWidth={1.8} />
+          </RowIconBtn>
+        )}
       </div>
       {files.map((f) => (
         <FileRow

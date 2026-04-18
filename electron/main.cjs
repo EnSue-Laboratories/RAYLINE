@@ -770,6 +770,48 @@ ipcMain.handle("git-pull", async (_event, cwd) => {
   }
 });
 
+ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+    if (branch === "HEAD") return { ok: false, stderr: "detached HEAD" };
+    if (base && branch === base) return { ok: false, stderr: `already on base branch "${base}"` };
+    // Ensure upstream exists and is current.
+    let pushArgs;
+    try {
+      await git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd);
+      pushArgs = ["push"];
+    } catch {
+      pushArgs = ["push", "-u", "origin", branch];
+    }
+    await gitLong(pushArgs, cwd);
+    const ghArgs = ["pr", "create", "--fill"];
+    if (base) ghArgs.push("--base", base);
+    const stdout = await new Promise((resolve, reject) => {
+      execFile("gh", ghArgs, {
+        cwd,
+        env: { ...process.env, PATH: buildSpawnPath() },
+        timeout: 60000,
+      }, (err, out, stderr) => {
+        if (err) reject(new Error((stderr || "").trim() || err.message));
+        else resolve(out.trim());
+      });
+    });
+    const urlMatch = stdout.match(/https?:\/\/\S+/);
+    const url = urlMatch ? urlMatch[0] : null;
+    if (url) shell.openExternal(url);
+    return { ok: true, url, stdout };
+  } catch (err) {
+    const msg = err.message || String(err);
+    const existing = msg.match(/https?:\/\/github\.com\/\S+\/pull\/\d+/);
+    if (existing) {
+      shell.openExternal(existing[0]);
+      return { ok: true, url: existing[0], stdout: msg };
+    }
+    return { ok: false, stderr: msg };
+  }
+});
+
 // IPC: get repo name from cwd via git remote
 ipcMain.handle("gh-get-repo-name", async (_e, cwd) => {
   const { execFile } = require("child_process");

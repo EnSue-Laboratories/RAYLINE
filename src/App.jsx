@@ -68,6 +68,7 @@ export default function App() {
   const [stateLoaded, setStateLoaded] = useState(false);
   const [wallpaper, setWallpaper] = useState(null); // { path, opacity, blur }
   const [fontSize, setFontSize] = useState(15);
+  const [defaultPrBranch, setDefaultPrBranch] = useState("main");
   const [showSettings, setShowSettings] = useState(false);
   const [projects, setProjects] = useState({});
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
@@ -93,6 +94,7 @@ export default function App() {
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
         if (state.fontSize) setFontSize(state.fontSize);
+        if (state.defaultPrBranch) setDefaultPrBranch(state.defaultPrBranch);
         if (state.wallpaper) {
           setWallpaper(state.wallpaper);
           // Reload data URL from disk (not persisted — too large for JSON)
@@ -119,9 +121,9 @@ export default function App() {
     saveTimer.current = setTimeout(() => {
       // Strip dataUrl before persisting (too large for JSON, reloaded on startup)
       const wpSave = wallpaper ? { path: wallpaper.path, opacity: wallpaper.opacity, blur: wallpaper.blur, imgBlur: wallpaper.imgBlur, imgDarken: wallpaper.imgDarken } : null;
-      window.api.saveState({ convos: convoList, active, cwd, defaultModel, fontSize, wallpaper: wpSave, projects, draftsCollapsed });
+      window.api.saveState({ convos: convoList, active, cwd, defaultModel, fontSize, wallpaper: wpSave, projects, draftsCollapsed, defaultPrBranch });
     }, 300);
-  }, [convoList, active, cwd, defaultModel, fontSize, wallpaper, projects, draftsCollapsed, stateLoaded]);
+  }, [convoList, active, cwd, defaultModel, fontSize, wallpaper, projects, draftsCollapsed, defaultPrBranch, stateLoaded]);
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
@@ -694,6 +696,8 @@ export default function App() {
           onWallpaperChange={setWallpaper}
           fontSize={fontSize}
           onFontSizeChange={setFontSize}
+          defaultPrBranch={defaultPrBranch}
+          onDefaultPrBranchChange={setDefaultPrBranch}
           onClose={() => setShowSettings(false)}
         />
       ) : (
@@ -729,6 +733,7 @@ export default function App() {
           onCancelNewChat={() => setShowNewChatCard(false)}
           allCwdRoots={allCwdRoots}
           projects={projects}
+          defaultPrBranch={defaultPrBranch}
         />
       )}
 
