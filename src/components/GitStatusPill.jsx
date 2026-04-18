@@ -185,19 +185,24 @@ export default function GitStatusPill({ cwd }) {
       {/* header */}
       <div style={{
         padding: "10px 12px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
         borderBottom: "1px solid rgba(255,255,255,0.05)",
         fontFamily: "'JetBrains Mono',monospace",
         fontSize: s(11),
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
       }}>
         <span style={{ color: "rgba(255,255,255,0.7)" }}>
           {branch || (detached ? "(detached)" : "?")}
           {upstream && <span style={{ color: "rgba(255,255,255,0.3)" }}> → {upstream}</span>}
         </span>
-        <span style={{ color: "rgba(255,255,255,0.4)" }}>
-          ↑{ahead} ↓{behind}
+        <span style={{ display: "flex", gap: 10 }}>
+          <span style={{ color: ahead > 0 ? "rgba(130,210,140,0.9)" : "rgba(255,255,255,0.3)" }}>
+            ↑{ahead}
+          </span>
+          <span style={{ color: behind > 0 ? "rgba(150,190,255,0.9)" : "rgba(255,255,255,0.3)" }}>
+            ↓{behind}
+          </span>
         </span>
       </div>
 
@@ -238,7 +243,7 @@ export default function GitStatusPill({ cwd }) {
             placeholder="Commit message"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            rows={2}
+            rows={1}
             style={{
               width: "100%",
               boxSizing: "border-box",
@@ -347,18 +352,22 @@ export default function GitStatusPill({ cwd }) {
         onMouseEnter={(e) => { if (!open) e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
         onMouseLeave={(e) => { if (!open) e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
       >
-        <GitCommitHorizontal size={13} strokeWidth={1.6} />
         {detached ? (
-          <span style={{ color: "rgba(200,160,100,0.8)" }}>detached</span>
+          <>
+            <GitCommitHorizontal size={13} strokeWidth={1.6} />
+            <span style={{ color: "rgba(200,160,100,0.8)" }}>detached</span>
+          </>
         ) : !upstream ? (
-          <span style={{ color: "rgba(255,255,255,0.4)" }}>local</span>
+          <>
+            <GitCommitHorizontal size={13} strokeWidth={1.6} />
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>local</span>
+          </>
         ) : clean ? (
-          <span style={{ color: "rgba(255,255,255,0.35)" }}>GIT</span>
+          <GitCommitHorizontal size={13} strokeWidth={1.6} />
         ) : (
           <>
-            {dirty > 0 && <span style={{ color: "rgba(240,180,90,0.9)" }}>●{dirty}</span>}
-            {ahead > 0 && <span style={{ color: "rgba(255,255,255,0.85)" }}>↑{ahead}</span>}
-            {behind > 0 && <span style={{ color: "rgba(150,190,255,0.9)" }}>↓{behind}</span>}
+            {(dirty > 0 || ahead > 0) && <span>↑{dirty > 0 ? dirty : ahead}</span>}
+            {behind > 0 && <span>↓{behind}</span>}
           </>
         )}
       </button>
@@ -373,30 +382,45 @@ function FileSection({ title, files, s, pickCode, action, onAction, style }) {
       <div style={{ color: "rgba(255,255,255,0.4)", fontSize: s(10), fontFamily: "'JetBrains Mono',monospace", letterSpacing: ".08em", marginBottom: 6 }}>
         {title}
       </div>
-      {files.map((f) => {
-        const letter = letterFor(pickCode(f));
-        const Icon = action === "stage" ? Plus : Minus;
-        const actionTitle = action === "stage" ? "Stage" : "Unstage";
-        return (
-          <div key={f.path + ":" + action} style={{
-            display: "flex", gap: 8, alignItems: "center",
-            fontFamily: "'JetBrains Mono',monospace", fontSize: s(11),
-            padding: "2px 0", color: "rgba(255,255,255,0.7)",
-          }}>
-            <span style={{ width: 14, color: STATUS_COLORS[letter] || "rgba(255,255,255,0.6)" }}>{letter}</span>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{f.path}</span>
-            <button
-              onClick={() => onAction(f.path)}
-              title={actionTitle}
-              style={rowIconBtnStyle}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.9)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-            >
-              <Icon size={12} strokeWidth={1.8} />
-            </button>
-          </div>
-        );
-      })}
+      {files.map((f) => (
+        <FileRow
+          key={f.path + ":" + action}
+          file={f}
+          s={s}
+          letter={letterFor(pickCode(f))}
+          action={action}
+          onAction={onAction}
+        />
+      ))}
+    </div>
+  );
+}
+
+function FileRow({ file, s, letter, action, onAction }) {
+  const [hover, setHover] = useState(false);
+  const Icon = action === "stage" ? Plus : Minus;
+  const actionTitle = action === "stage" ? "Stage" : "Unstage";
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex", gap: 8, alignItems: "center",
+        fontFamily: "'JetBrains Mono',monospace", fontSize: s(11),
+        padding: "2px 0", color: "rgba(255,255,255,0.7)",
+      }}
+    >
+      <span style={{ width: 14, color: STATUS_COLORS[letter] || "rgba(255,255,255,0.6)" }}>{letter}</span>
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{file.path}</span>
+      <button
+        onClick={() => onAction(file.path)}
+        title={actionTitle}
+        style={{ ...rowIconBtnStyle, visibility: hover ? "visible" : "hidden" }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.9)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+      >
+        <Icon size={12} strokeWidth={1.8} />
+      </button>
     </div>
   );
 }
