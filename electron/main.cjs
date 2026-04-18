@@ -799,13 +799,11 @@ ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
     });
     const urlMatch = stdout.match(/https?:\/\/\S+/);
     const url = urlMatch ? urlMatch[0] : null;
-    if (url) shell.openExternal(url);
     return { ok: true, url, stdout };
   } catch (err) {
     const msg = err.message || String(err);
     const existing = msg.match(/https?:\/\/github\.com\/\S+\/pull\/\d+/);
     if (existing) {
-      shell.openExternal(existing[0]);
       return { ok: true, url: existing[0], stdout: msg };
     }
     return { ok: false, stderr: msg };
