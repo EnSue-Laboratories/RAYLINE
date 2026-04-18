@@ -47,10 +47,9 @@ export function getPaneSurfaceStyle(hasWallpaper, opacity) {
   }
 
   const alpha = clamp((Number(opacity) || 0) / 100, 0, 1);
-  const hoverFillAlpha = clamp(alpha * 0.07, 0.03, 0.08);
-  const activeFillAlpha = clamp(alpha * 0.11, 0.05, 0.13);
-  const hoverRingAlpha = clamp(alpha * 0.09, 0.04, 0.11);
-  const activeRingAlpha = clamp(alpha * 0.14, 0.06, 0.16);
+  const hoverFillAlpha = clamp(alpha * 0.06, 0.025, 0.07);
+  const activeFillAlpha = clamp(alpha * 0.07, 0.035, 0.085);
+  const hoverRingAlpha = clamp(alpha * 0.07, 0.03, 0.09);
   const elevatedAlpha = clamp(alpha * 0.55, 0.28, 0.55);
   const borderAlpha = clamp(alpha * 0.12, 0.06, 0.14);
 
@@ -71,6 +70,6 @@ export function getPaneSurfaceStyle(hasWallpaper, opacity) {
     "--pane-interaction-hover-filter": "none",
     "--pane-interaction-active-filter": "none",
     "--pane-interaction-hover-shadow": `inset 0 0 0 1px rgba(255,255,255,${hoverRingAlpha.toFixed(3)})`,
-    "--pane-interaction-active-shadow": `inset 0 0 0 1px rgba(255,255,255,${activeRingAlpha.toFixed(3)})`,
+    "--pane-interaction-active-shadow": "none",
   };
 }
