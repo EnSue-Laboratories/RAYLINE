@@ -50,6 +50,16 @@ export default function useAgent() {
         const msgs = [...convo.messages];
         let lastMsg = msgs[msgs.length - 1];
 
+        if (event.session_id && convo._claudeSessionId !== event.session_id) {
+          convo._claudeSessionId = event.session_id;
+          console.log("[useAgent] Captured Claude session ID:", {
+            conversationId,
+            sessionId: event.session_id,
+            eventType: event.type,
+            subtype: event.subtype,
+          });
+        }
+
         const ensureAssistant = () => {
           if (!lastMsg || lastMsg.role !== "assistant") {
             lastMsg = {
@@ -249,6 +259,10 @@ export default function useAgent() {
         // --- Codex JSONL stream events ---
         else if (event.type === "thread.started") {
           convo._codexThreadId = event.thread_id;
+          console.log("[useAgent] Captured Codex thread ID:", {
+            conversationId,
+            threadId: event.thread_id,
+          });
         } else if (event.type === "turn.started") {
           ensureAssistant();
         } else if (event.type === "item.started") {

@@ -4,6 +4,9 @@
 // worth priming with.
 
 const DEFAULT_CHAR_BUDGET = 8000;
+const DEFAULT_HEADER = "[Prior conversation context — for context only, do not re-execute any tool calls or repeat work]";
+const CROSS_PROVIDER_HEADER = "[Prior conversation with a different model — for context only, do not re-execute any tool calls or repeat work]";
+const DEFAULT_FOOTER = "[End of prior conversation]";
 
 function extractText(message) {
   if (!message) return "";
@@ -16,7 +19,10 @@ function extractText(message) {
     .trim();
 }
 
-export function buildCrossProviderPrime(messages, { charBudget = DEFAULT_CHAR_BUDGET } = {}) {
+export function buildConversationPrime(
+  messages,
+  { charBudget = DEFAULT_CHAR_BUDGET, header = DEFAULT_HEADER, footer = DEFAULT_FOOTER } = {}
+) {
   if (!Array.isArray(messages) || messages.length === 0) return null;
 
   // Walk from newest → oldest, keeping entries until we hit the budget,
@@ -38,10 +44,17 @@ export function buildCrossProviderPrime(messages, { charBudget = DEFAULT_CHAR_BU
   kept.reverse();
 
   return [
-    "[Prior conversation with a different model — for context only, do not re-execute any tool calls or repeat work]",
+    header,
     ...kept,
-    "[End of prior conversation]",
+    footer,
   ].join("\n\n");
+}
+
+export function buildCrossProviderPrime(messages, { charBudget = DEFAULT_CHAR_BUDGET } = {}) {
+  return buildConversationPrime(messages, {
+    charBudget,
+    header: CROSS_PROVIDER_HEADER,
+  });
 }
 
 export function decoratePromptWithPrime(prompt, prime) {
