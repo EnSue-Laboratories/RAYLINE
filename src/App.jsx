@@ -19,6 +19,7 @@ function logSendFlow(...args) {
 }
 
 const SHELL_TRANSCRIPT_LIMIT = 12000;
+const SHELL_TERMINAL_TIMEOUT_MS = 15000;
 
 function getMainRepoRoot(dir) {
   if (!dir) return dir;
@@ -40,49 +41,169 @@ function truncateShellText(text) {
   return `${text.slice(0, SHELL_TRANSCRIPT_LIMIT)}\n\n[output truncated: ${remaining} more characters]`;
 }
 
-function formatShellTranscript(result) {
-  const fence = "````";
-  const sections = [`!${result.command}`];
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  sections.push("");
-  sections.push(`Executed locally${result.cwd ? ` in \`${result.cwd}\`` : ""}.`);
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripAnsi(text) {
+  const esc = String.fromCharCode(27);
+  return text.replace(new RegExp(`${esc}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`, "g"), "");
+}
+
+function cleanTerminalShellOutput(text, marker) {
+  if (!text) return "";
+
+  const markerPattern = new RegExp(`^${escapeRegExp(marker)}:\\d+$`);
+  const helperPatterns = [
+    /^__claudi_exit_code=\$\?$/,
+    /^printf ['"].*__CLAUDI_SHELL_EXIT__.*$/,
+  ];
+
+  return stripAnsi(text)
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return true;
+      if (markerPattern.test(trimmed)) return false;
+      return !helperPatterns.some((pattern) => pattern.test(trimmed));
+    })
+    .join("\n")
+    .trim();
+}
+
+async function runShellViaTerminalApi({ command, cwd }) {
+  if (!window.api?.terminalCreate || !window.api?.terminalSend || !window.api?.terminalRead || !window.api?.terminalKill) {
+    return {
+      ok: false,
+      command,
+      cwd,
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      timedOut: false,
+      truncated: false,
+      error: "Terminal session APIs are not available.",
+    };
+  }
+
+  const sessionName = `shell-run-${Date.now()}`;
+  const marker = `__CLAUDI_SHELL_EXIT__${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const deadline = Date.now() + SHELL_TERMINAL_TIMEOUT_MS;
+
+  const createResult = await window.api.terminalCreate({ name: sessionName, cwd });
+  if (createResult?.error) {
+    return {
+      ok: false,
+      command,
+      cwd,
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      timedOut: false,
+      truncated: false,
+      error: createResult.error,
+    };
+  }
+
+  const sendInput = async (text) => {
+    const result = await window.api.terminalSend({ name: sessionName, text });
+    if (result?.error) throw new Error(result.error);
+  };
+
+  try {
+    await sendInput(`${command}\n`);
+    await sendInput("__claudi_exit_code=$?\n");
+    await sendInput(`printf '${marker}:%s\\n' "$__claudi_exit_code"\n`);
+
+    let rawOutput = "";
+    let exitCode = null;
+
+    while (Date.now() < deadline) {
+      const readResult = await window.api.terminalRead({ name: sessionName, lines: 400 });
+      if (readResult?.error) throw new Error(readResult.error);
+
+      rawOutput = (readResult?.lines || []).join("\n");
+      const match = rawOutput.match(new RegExp(`${escapeRegExp(marker)}:(\\d+)`));
+      if (match) {
+        exitCode = Number(match[1]);
+        break;
+      }
+
+      await sleep(120);
+    }
+
+    const output = cleanTerminalShellOutput(rawOutput, marker);
+
+    if (exitCode == null) {
+      return {
+        ok: true,
+        command,
+        cwd,
+        stdout: output,
+        stderr: "",
+        exitCode: null,
+        timedOut: true,
+        truncated: false,
+      };
+    }
+
+    return {
+      ok: true,
+      command,
+      cwd,
+      stdout: output,
+      stderr: "",
+      exitCode,
+      timedOut: false,
+      truncated: false,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      command,
+      cwd,
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      timedOut: false,
+      truncated: false,
+      error: error.message || String(error),
+    };
+  } finally {
+    try {
+      await window.api.terminalKill({ name: sessionName });
+    } catch (error) {
+      console.warn("[shell-fallback] terminal kill failed:", error);
+    }
+  }
+}
+
+function formatShellResult(result) {
+  const fence = "````";
 
   if (!result.ok) {
-    sections.push("");
-    sections.push(`Shell error: ${result.error || "Unknown error"}`);
-    return sections.join("\n");
-  }
-
-  sections.push(`Exit code: \`${result.exitCode ?? "unknown"}\`${result.timedOut ? " (timed out)" : ""}`);
-
-  if (result.timedOut) {
-    sections.push("");
-    sections.push("Command timed out. Partial output is shown below.");
-  }
-
-  if (result.truncated) {
-    sections.push("");
-    sections.push("Captured output was truncated.");
+    return `${fence}text\n${result.error || "Unknown error"}\n${fence}`;
   }
 
   const stdout = truncateShellText(result.stdout || "");
   const stderr = truncateShellText(result.stderr || "");
+  const sections = [];
 
   if (stdout) {
-    sections.push("");
-    sections.push("Stdout:");
     sections.push(`${fence}text\n${stdout}\n${fence}`);
   }
 
   if (stderr) {
-    sections.push("");
-    sections.push("Stderr:");
+    if (stdout) sections.push("");
     sections.push(`${fence}text\n${stderr}\n${fence}`);
   }
 
   if (!stdout && !stderr) {
-    sections.push("");
-    sections.push("No output.");
+    sections.push(`${fence}text\n(no output)\n${fence}`);
   }
 
   return sections.join("\n");
@@ -116,6 +237,7 @@ export default function App() {
     conversations,
     getConversation,
     prepareMessage,
+    appendLocalMessages,
     startPreparedMessage,
     cancelMessage,
     editAndResend,
@@ -427,9 +549,11 @@ export default function App() {
 
   const handleSend = useCallback(
     async (text, attachments) => {
-      // Handle slash commands client-side
       const trimmed = text.trim();
       const isShellCommand = trimmed.startsWith("!") && trimmed.length > 1;
+      if (trimmed === "!") return;
+
+      // Handle slash commands client-side
       if (trimmed.startsWith("/") && !trimmed.includes(" ")) {
         const cmd = trimmed.toLowerCase();
         if (cmd === "/clear" || cmd === "/new") {
@@ -466,33 +590,57 @@ export default function App() {
         setActive(id);
       }
 
-      let messageText = text;
-      let titleText = text;
-
       if (isShellCommand) {
         const command = trimmed.slice(1).trim();
         const effectiveCwd = getEffectiveConversationCwd(convo, cwd, draftsPath);
-        const result = window.api?.shellRun
-          ? await window.api.shellRun({ command, cwd: effectiveCwd })
-          : {
-              ok: false,
-              command,
-              cwd: effectiveCwd,
-              error: "Shell mode is not available in this environment.",
-            };
-        messageText = formatShellTranscript(result);
-        titleText = trimmed;
+        const isFirstMessage = getConversation(convoId).messages.length === 0;
+        let result;
+
+        if (window.api?.shellRun) {
+          result = await window.api.shellRun({ command, cwd: effectiveCwd });
+        } else if (window.api?.terminalCreate && window.api?.terminalSend && window.api?.terminalRead && window.api?.terminalKill) {
+          result = await runShellViaTerminalApi({ command, cwd: effectiveCwd });
+        } else {
+          result = {
+            ok: false,
+            command,
+            cwd: effectiveCwd,
+            error: "Shell mode is not available in this environment.",
+          };
+        }
+
+        if (isFirstMessage) {
+          setConvoList((p) =>
+            p.map((c) => c.id === convoId ? { ...c, title: trimmed.slice(0, 50) } : c)
+          );
+        }
+
+        appendLocalMessages(convoId, [
+          {
+            role: "user",
+            text: command,
+            mode: "shell-command",
+          },
+          {
+            role: "system",
+            text: formatShellResult(result),
+            mode: "shell-result",
+            command,
+            exitCode: result.exitCode,
+          },
+        ]);
+        return;
       }
 
       await sendMessageToConversation({
         conversationId: convoId,
         conversation: convo,
-        text: messageText,
+        text,
         attachments,
-        titleText,
+        titleText: text,
       });
     },
-    [activeConvo, active, activeData, cwd, defaultModel, draftsPath, sendMessageToConversation]
+    [activeConvo, active, activeData, appendLocalMessages, cwd, defaultModel, draftsPath, getConversation, sendMessageToConversation]
   );
 
   // Process queued messages when streaming ends

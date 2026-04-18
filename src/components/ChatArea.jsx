@@ -57,14 +57,26 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     ? COMMANDS.filter(c => c.cmd.startsWith(input.toLowerCase()))
     : [];
   const [selectedCmd, setSelectedCmd] = useState(0);
+  const trimmedInput = input.trim();
+  const shellMode = trimmedInput.startsWith("!");
+  const canRunShell = shellMode && trimmedInput.length > 1;
+  const canSend = shellMode ? canRunShell : Boolean(trimmedInput) || attachments.length > 0;
+  const shellLocation = cwd ? (() => {
+    const parts = cwd.split("/");
+    const wtIdx = parts.indexOf(".worktrees");
+    if (wtIdx >= 0 && wtIdx + 1 < parts.length) {
+      return `${parts[wtIdx - 1]} / ${parts[wtIdx + 1]}`;
+    }
+    return parts.slice(-2).join("/") || parts[parts.length - 1] || cwd;
+  })() : "current workspace";
 
   const send = useCallback(() => {
-    if (!input.trim() && attachments.length === 0) return;
-    onSend(input.trim(), attachments.length > 0 ? attachments : undefined);
+    if (!canSend) return;
+    onSend(trimmedInput, shellMode ? undefined : (attachments.length > 0 ? attachments : undefined));
     setInput("");
     setAttachments([]);
     if (inRef.current) inRef.current.style.height = "20px";
-  }, [input, attachments, convo, onSend, isStreaming]);
+  }, [attachments, canSend, onSend, shellMode, trimmedInput]);
 
   const handleInput = (e) => {
     setInput(e.target.value);
@@ -193,6 +205,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       style={{
         flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10,
         background: wallpaper?.dataUrl ? `rgba(0,0,0,${wallpaper.opacity / 100})` : "transparent",
+        boxShadow: dragOver ? "inset 0 0 0 1px rgba(153,214,255,0.18)" : "none",
+        transition: "box-shadow .2s ease",
       }}
       onDrop={(e) => { e.stopPropagation(); handleDrop(e); setDragOver(false); }}
       onDragOver={handleDragOver}
@@ -361,7 +375,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               <Message
                 key={m.id}
                 msg={m}
-                onEdit={m.role === "user" ? (newText) => onEdit(i, newText) : undefined}
+                onEdit={m.role === "user" && m.mode !== "shell-command" ? (newText) => onEdit(i, newText) : undefined}
                 onAnswer={m.role === "assistant" ? (text) => onSend(text) : undefined}
               />
             ))}
@@ -452,6 +466,21 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             </div>
           )}
           <ImagePreview items={attachments} onRemove={removeAttachment} />
+          {shellMode && (
+            <div
+              style={{
+                marginBottom: 6,
+                fontSize: s(10),
+                fontFamily: "'JetBrains Mono',monospace",
+                letterSpacing: ".1em",
+                color: "rgba(255,255,255,0.35)",
+              }}
+            >
+              {canRunShell
+                ? `SHELL MODE  //  RUNS IN ${shellLocation.toUpperCase()}`
+                : "SHELL MODE  //  TYPE A COMMAND AFTER !"}
+            </div>
+          )}
 
           <div
             style={{
@@ -463,7 +492,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               borderRadius: 12,
               padding: "9px 14px",
               backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 20}px)`,
-              transition: "border-color .25s",
+              transition: "border-color .25s, background .25s",
             }}
           >
             <textarea
@@ -474,7 +503,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               onPaste={handlePaste}
               onFocus={() => setInputFocused(true)}
               onBlur={() => setInputFocused(false)}
-              placeholder="Write something..."
+              placeholder={shellMode ? "Run a shell command locally..." : "Write something..."}
               rows={1}
               style={{
                 flex: 1,
@@ -516,24 +545,41 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             ) : (
               <button
                 onClick={send}
-                disabled={!input.trim() && attachments.length === 0}
+                disabled={!canSend}
                 style={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 30,
+                  gap: shellMode ? 6 : 0,
+                  width: shellMode ? "auto" : 30,
                   height: 30,
+                  padding: shellMode ? "0 12px" : 0,
                   borderRadius: 8,
                   flexShrink: 0,
-                  background: (input.trim() || attachments.length > 0) ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.02)",
+                  background: canSend ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.02)",
                   border: "none",
-                  color: (input.trim() || attachments.length > 0) ? "#000000" : "rgba(255,255,255,0.06)",
-                  cursor: (input.trim() || attachments.length > 0) ? "pointer" : "default",
+                  color: canSend ? "#000000" : "rgba(255,255,255,0.06)",
+                  cursor: canSend ? "pointer" : "default",
                   transition: "all .3s cubic-bezier(.16,1,.3,1)",
-                  transform: (input.trim() || attachments.length > 0) ? "scale(1)" : "scale(0.88)",
+                  transform: canSend ? "scale(1)" : "scale(0.88)",
                 }}
               >
-                <ArrowRight size={16} strokeWidth={1.5} />
+                {shellMode ? (
+                  <>
+                    <TerminalIcon size={14} strokeWidth={1.6} />
+                    <span
+                      style={{
+                        fontSize: s(10),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        letterSpacing: ".1em",
+                      }}
+                    >
+                      RUN
+                    </span>
+                  </>
+                ) : (
+                  <ArrowRight size={16} strokeWidth={1.5} />
+                )}
               </button>
             )}
           </div>
@@ -548,7 +594,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               letterSpacing: ".1em",
             }}
           >
-            ENTER TO SEND  //  SHIFT+ENTER NEWLINE  //  PASTE IMAGES
+            {shellMode
+              ? (canRunShell
+                  ? "ENTER TO RUN  //  OUTPUT APPENDS BELOW  //  LOCAL SHELL"
+                  : "TYPE A COMMAND AFTER !  //  ENTER TO RUN")
+              : "ENTER TO SEND  //  SHIFT+ENTER NEWLINE  //  PASTE IMAGES"}
           </div>
         </div>
       </div>}

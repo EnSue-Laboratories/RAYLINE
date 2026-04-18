@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Pencil, Loader2, FileText, PauseCircle } from "lucide-react";
+import { Pencil, Loader2, FileText, PauseCircle, Terminal } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -48,6 +48,33 @@ const sanitizeSchema = {
     foreignObject: ["x", "y", "width", "height"],
   },
 };
+
+function PreBlock({ rawText, s = (x) => x, children }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <pre
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: "rgba(0,0,0,0.4)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 8,
+        padding: "12px 14px",
+        overflow: "auto",
+        fontSize: s(12),
+        fontFamily: "'JetBrains Mono',monospace",
+        margin: "8px 0 12px",
+        lineHeight: 1.6,
+        position: "relative",
+      }}
+    >
+      <div style={{ position: "absolute", top: 6, right: 6, opacity: hovered ? 1 : 0, transition: "opacity .15s" }}>
+        <CopyBtn text={rawText} />
+      </div>
+      {children}
+    </pre>
+  );
+}
 
 const makeMdComponents = (isStreaming = false, s = (x) => x) => ({
   p: ({ children }) => <p style={{ margin: "0 0 12px" }}>{children}</p>,
@@ -110,25 +137,7 @@ const makeMdComponents = (isStreaming = false, s = (x) => x) => ({
       return <InteractiveBlock code={text.replace(/\n$/, "")} isStreaming={isStreaming} />;
     }
     const rawText = codeNode?.children?.map(c => c.value || "").join("") || "";
-    return (
-      <pre style={{
-        background: "rgba(0,0,0,0.4)",
-        border: "1px solid rgba(255,255,255,0.06)",
-        borderRadius: 8,
-        padding: "12px 14px",
-        overflow: "auto",
-        fontSize: s(12),
-        fontFamily: "'JetBrains Mono',monospace",
-        margin: "8px 0 12px",
-        lineHeight: 1.6,
-        position: "relative",
-      }}>
-        <div style={{ position: "absolute", top: 6, right: 6 }}>
-          <CopyBtn text={rawText} />
-        </div>
-        {children}
-      </pre>
-    );
+    return <PreBlock rawText={rawText} s={s}>{children}</PreBlock>;
   },
   ul: ({ children }) => <ul style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ol>,
@@ -182,13 +191,14 @@ function sanitizeText(text) {
 // Cache both variants to avoid recreating components on every render
 // Default (unscaled) components for module-level fallback
 const mdComponentsStatic = makeMdComponents(false);
-const scaledMdStreaming = makeMdComponents(true);
 
 export default function Message({ msg, onEdit, onAnswer }) {
   const s = useFontScale();
   const scaledMdStatic = useMemo(() => makeMdComponents(false, s), [s]);
   const scaledMdStreaming = useMemo(() => makeMdComponents(true, s), [s]);
   const isUser = msg.role === "user";
+  const isSystem = msg.role === "system";
+  const isShellCommand = msg.mode === "shell-command";
   const hasThinkingPart = Boolean(msg.parts?.some((part) => part.type === "thinking"));
   const activeThinkingByStreamKey = msg._streamState?.activeThinking || {};
 
@@ -250,7 +260,7 @@ export default function Message({ msg, onEdit, onAnswer }) {
           letterSpacing: ".14em",
           marginBottom: 10,
         }}>
-          YOU
+          {isShellCommand ? "SHELL" : "YOU"}
         </div>
 
         {editing ? (
@@ -336,19 +346,49 @@ export default function Message({ msg, onEdit, onAnswer }) {
           </div>
         )}
 
-            <div style={{
-              color: "rgba(255,255,255,0.92)",
-              fontSize: s(15),
-              lineHeight: 1.7,
-              fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
-              fontWeight: 400,
-              textAlign: "left",
-              maxWidth: "85%",
-            }}>
-              <Markdown remarkPlugins={[remarkGfm]} components={scaledMdStatic}>
-                {displayText}
-              </Markdown>
-            </div>
+            {isShellCommand ? (
+              <div
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: "85%",
+                    padding: "10px 12px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    background: "linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))",
+                    color: "rgba(255,255,255,0.85)",
+                    fontSize: s(12),
+                    lineHeight: 1.6,
+                    fontFamily: "'JetBrains Mono',monospace",
+                    whiteSpace: "pre-wrap",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  <span style={{ color: "rgba(255,255,255,0.5)" }}>$ </span>
+                  {displayText}
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                color: "rgba(255,255,255,0.92)",
+                fontSize: s(15),
+                lineHeight: 1.7,
+                fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
+                fontWeight: 400,
+                textAlign: "left",
+                maxWidth: "85%",
+              }}>
+                <Markdown remarkPlugins={[remarkGfm]} components={scaledMdStatic}>
+                  {displayText}
+                </Markdown>
+              </div>
+            )}
           </>
         )}
 
@@ -360,6 +400,61 @@ export default function Message({ msg, onEdit, onAnswer }) {
             )}
           </div>
         )}
+      </div>
+    );
+  }
+
+  if (isSystem) {
+    return (
+      <div
+        style={{
+          marginBottom: 28,
+          animation: "msgIn .4s cubic-bezier(.16,1,.3,1)",
+          textAlign: "left",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "88%",
+            padding: "14px 16px 12px",
+            borderRadius: 14,
+            border: "1px solid rgba(255,255,255,0.08)",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.18)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 10,
+              fontSize: s(9),
+              fontFamily: "'JetBrains Mono',monospace",
+              color: "rgba(255,255,255,0.4)",
+              letterSpacing: ".14em",
+            }}
+          >
+            <Terminal size={12} strokeWidth={1.7} />
+            OUTPUT
+          </div>
+          <div
+            style={{
+              color: "rgba(255,255,255,0.82)",
+              fontSize: s(14),
+              lineHeight: 1.75,
+              fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
+              letterSpacing: "0.006em",
+            }}
+          >
+            <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]} components={scaledMdStatic}>
+              {sanitizeText(displayText)}
+            </Markdown>
+          </div>
+        </div>
+        <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
+          <CopyBtn text={displayText} />
+        </div>
       </div>
     );
   }
