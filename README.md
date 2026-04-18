@@ -1,8 +1,8 @@
-# Claudi
+# RayLine
 
-Claudi is an Electron desktop client for Claude Code built with React and Vite.
+RayLine is an Electron desktop client for Claude Code built with React and Vite.
 This repository is published as `Ensue-Chat`, while the packaged app and product
-name in the codebase are `Claudi`.
+name are `RayLine`.
 
 The app wraps the Claude CLI in a desktop chat interface and adds a few workflow
 features that are hard to get from a plain terminal session:
@@ -70,7 +70,7 @@ against that renderer.
 
 ## How It Works
 
-Claudi uses the Electron main process to spawn Claude Code as a child process
+RayLine uses the Electron main process to spawn Claude Code as a child process
 with streaming JSON output:
 
 ```text
@@ -111,4 +111,4 @@ Some files worth reading first:
 - The repository currently contains both the active UI in `src/` and a backup UI
   snapshot in `src-ui-backup/`.
 - External links are opened in the system browser from the Electron shell.
-- App state is persisted to the Electron user data directory as `claudi-state.json`.
+- App state is persisted to the Electron user data directory as `rayline-state.json`.

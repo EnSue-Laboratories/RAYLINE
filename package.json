@@ -1,7 +1,7 @@
 {
   "name": "ensue",
-  "productName": "Claudi",
-  "description": "A desktop client for Claude Code",
+  "productName": "RayLine",
+  "description": "RayLine — a desktop client for Claude Code",
   "author": "Ensue Laboratories",
   "private": true,
   "version": "0.1.1",
@@ -37,8 +37,8 @@
     "ws": "^8.20.0"
   },
   "build": {
-    "appId": "com.ensue.claudi",
-    "productName": "Claudi",
+    "appId": "com.ensue.rayline",
+    "productName": "RayLine",
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "public/icon.png",
@@ -51,7 +51,7 @@
       "notarize": true
     },
     "dmg": {
-      "title": "Claudi",
+      "title": "RayLine",
       "iconSize": 80,
       "contents": [
         {

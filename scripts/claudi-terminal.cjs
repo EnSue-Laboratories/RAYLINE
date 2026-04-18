@@ -5,18 +5,18 @@ const fs = require("fs");
 const WebSocket = require("ws");
 
 function usage() {
-  process.stderr.write(`Claudi terminal CLI
+  process.stderr.write(`RayLine terminal CLI
 
 Usage:
-  claudi-terminal list [--json]
-  claudi-terminal create <name> [--cwd <path>] [--command <executable>] [--json]
-  claudi-terminal send <name> <text> [--json]
-  claudi-terminal read <name> [--lines <n>] [--json]
-  claudi-terminal kill <name> [--json]
-  claudi-terminal resize <name> <cols> <rows> [--json]
+  rayline-terminal list [--json]
+  rayline-terminal create <name> [--cwd <path>] [--command <executable>] [--json]
+  rayline-terminal send <name> <text> [--json]
+  rayline-terminal read <name> [--lines <n>] [--json]
+  rayline-terminal kill <name> [--json]
+  rayline-terminal resize <name> <cols> <rows> [--json]
 
 Environment:
-  CLAUDI_TERMINAL_PORT         WebSocket port of Claudi terminal manager
+  CLAUDI_TERMINAL_PORT         WebSocket port of RayLine terminal manager
   CLAUDI_TERMINAL_MCP_CONFIG   Optional path to mcp-terminal.json for port discovery
 `);
 }
@@ -162,7 +162,7 @@ async function main() {
 
   const port = resolvePort();
   if (!port) {
-    fail("Claudi terminal server is not available. Missing CLAUDI_TERMINAL_PORT / CLAUDI_TERMINAL_MCP_CONFIG.");
+    fail("RayLine terminal server is not available. Missing CLAUDI_TERMINAL_PORT / CLAUDI_TERMINAL_MCP_CONFIG.");
   }
 
   let action;

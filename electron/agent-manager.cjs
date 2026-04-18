@@ -79,7 +79,7 @@ function resolveLaunchCwd({ cwd, sessionId }) {
 function buildClaudeArgs({ model, prompt, sessionId, resumeSessionId, forkSession }) {
   const args = ["--print", "--output-format=stream-json", "--verbose", "--include-partial-messages", "--dangerously-skip-permissions"];
 
-  args.push("--append-system-prompt", `You are running inside Claudi, a desktop GUI client for Claude Code.
+  args.push("--append-system-prompt", `You are running inside RayLine, a desktop GUI client for Claude Code.
 The user is interacting via a chat interface, not a terminal.
 Keep responses concise and conversational.
 Use markdown formatting — the client renders headings, code blocks, tables, lists, and mermaid diagrams.
@@ -112,7 +112,7 @@ THEME for render blocks and SVGs — dark palette:
 - Avoid saturated blue/violet/default chart colors.
 
 INTERACTIVE TERMINAL SESSIONS:
-Claudi has a built-in terminal panel (right side drawer). You have MCP tools to control it:
+RayLine has a built-in terminal panel (right side drawer). You have MCP tools to control it:
 - create_session(name, command?, cwd?) — spawn a persistent shell session visible to the user
 - send_input(name, text) — send keystrokes (use \\n for Enter, \\x03 for Ctrl+C)
 - read_output(name, lines?) — read recent terminal output

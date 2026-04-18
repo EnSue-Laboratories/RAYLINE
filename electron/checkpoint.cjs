@@ -260,13 +260,13 @@ async function resolveRepoRoot(cwdPath) {
     // Create initial commit so HEAD exists
     await execGit(["add", "-A", "--", "."], cwdPath);
     await execGit(
-      ["commit", "--allow-empty", "-m", "claudi: initial checkpoint"],
+      ["commit", "--allow-empty", "-m", "rayline: initial checkpoint"],
       cwdPath,
       {
-        GIT_AUTHOR_NAME: "Claudi",
-        GIT_AUTHOR_EMAIL: "claudi@noreply",
-        GIT_COMMITTER_NAME: "Claudi",
-        GIT_COMMITTER_EMAIL: "claudi@noreply",
+        GIT_AUTHOR_NAME: "RayLine",
+        GIT_AUTHOR_EMAIL: "rayline@noreply",
+        GIT_COMMITTER_NAME: "RayLine",
+        GIT_COMMITTER_EMAIL: "rayline@noreply",
       }
     );
     log("Git repo initialized:", cwdPath);
@@ -530,10 +530,10 @@ async function createCheckpoint(cwdPath) {
 
   // 7. Create the commit object (Inspector-style author env vars)
   const authorEnv = {
-    GIT_AUTHOR_NAME: "Claudi Checkpoint",
-    GIT_AUTHOR_EMAIL: "checkpoint@claudi.local",
-    GIT_COMMITTER_NAME: "Claudi Checkpoint",
-    GIT_COMMITTER_EMAIL: "checkpoint@claudi.local",
+    GIT_AUTHOR_NAME: "RayLine Checkpoint",
+    GIT_AUTHOR_EMAIL: "checkpoint@rayline.local",
+    GIT_COMMITTER_NAME: "RayLine Checkpoint",
+    GIT_COMMITTER_EMAIL: "checkpoint@rayline.local",
   };
 
   const commitTreeArgs = ["commit-tree", worktreeTree, "-m", commitMessage.join("\n")];

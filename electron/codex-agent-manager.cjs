@@ -35,7 +35,7 @@ function resolveCodexBin() {
 }
 
 function getExecutionFlags() {
-  // Claudi is expected to run Codex without internal CLI sandboxing so it can
+  // RayLine is expected to run Codex without internal CLI sandboxing so it can
   // use the full local environment. Set CLAUDI_CODEX_BYPASS_SANDBOX=0 to fall
   // back to Codex's workspace-write sandboxed mode.
   if (process.env.CLAUDI_CODEX_BYPASS_SANDBOX === "0") {
@@ -79,9 +79,9 @@ function buildClaudiPrompt(prompt, files, mcpServers) {
 
   const terminalInstructions = hasTerminalSessions
     ? `Terminal sessions:
-Claudi's terminal means the visible sidebar terminal drawer inside the app. Sessions created there are user-visible and remain available across turns.
-Use Claudi's terminal when you want the user to see or interact with a shell, when a process should keep running, or when stdin needs to be sent over time.
-Prefer Claudi's terminal over one-off shell commands for dev servers, watchers, REPLs, or any command the user may want to monitor.
+RayLine's terminal means the visible sidebar terminal drawer inside the app. Sessions created there are user-visible and remain available across turns.
+Use RayLine's terminal when you want the user to see or interact with a shell, when a process should keep running, or when stdin needs to be sent over time.
+Prefer RayLine's terminal over one-off shell commands for dev servers, watchers, REPLs, or any command the user may want to monitor.
 If MCP terminal tools are unavailable, use the local terminal CLI exposed via $CLAUDI_TERMINAL_CLI.
 CLI examples:
 - node "$CLAUDI_TERMINAL_CLI" list
@@ -90,8 +90,8 @@ CLI examples:
 - node "$CLAUDI_TERMINAL_CLI" read <name> --lines 80
 - node "$CLAUDI_TERMINAL_CLI" kill <name>`
     : `Terminal sessions:
-Claudi's terminal means the visible sidebar terminal drawer inside the app. Do not describe it generically; use it when you want a user-visible, long-lived shell inside Claudi itself.
-If terminal-session MCP tools are not exposed, use the local terminal CLI exposed via $CLAUDI_TERMINAL_CLI to control Claudi's sidebar terminal directly.
+RayLine's terminal means the visible sidebar terminal drawer inside the app. Do not describe it generically; use it when you want a user-visible, long-lived shell inside RayLine itself.
+If terminal-session MCP tools are not exposed, use the local terminal CLI exposed via $CLAUDI_TERMINAL_CLI to control RayLine's sidebar terminal directly.
 CLI examples:
 - node "$CLAUDI_TERMINAL_CLI" list
 - node "$CLAUDI_TERMINAL_CLI" create <name> --cwd <path>
@@ -100,7 +100,7 @@ CLI examples:
 - node "$CLAUDI_TERMINAL_CLI" kill <name>`;
 
   const claudiInstructions = `System context for this run:
-You are running inside Claudi, a desktop GUI client for coding agents.
+You are running inside RayLine, a desktop GUI client for coding agents.
 The user is interacting via a chat interface, not a terminal.
 Keep responses concise and conversational.
 Use markdown formatting; the client renders headings, code blocks, tables, lists, and mermaid diagrams.

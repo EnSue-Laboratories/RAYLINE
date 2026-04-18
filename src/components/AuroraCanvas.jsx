@@ -25,7 +25,7 @@ export default function AuroraCanvas() {
     const draw = () => {
       t += 0.003;
 
-      ctx.fillStyle = "#000";
+      ctx.fillStyle = "#0D0D0F";
       ctx.fillRect(0, 0, w, h);
 
       // Compute orb positions
@@ -65,7 +65,7 @@ export default function AuroraCanvas() {
   return (
     <canvas
       ref={ref}
-      style={{ position: "fixed", inset: 0, zIndex: 0, background: "#000" }}
+      style={{ position: "fixed", inset: 0, zIndex: 0, background: "#0D0D0F" }}
     />
   );
 }

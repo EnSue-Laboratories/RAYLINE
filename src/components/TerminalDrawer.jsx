@@ -139,7 +139,7 @@ function TerminalViewport({
           cursor:              "rgba(255,255,255,0.5)",
           cursorAccent:        XTERM_TRANSPARENT,
           selectionBackground: "rgba(255,255,255,0.12)",
-          // ANSI colors — muted palette matching Claudi's dark theme
+          // ANSI colors — muted palette matching RayLine's dark theme
           black:               "#1a1a1a",
           red:                 "#e06c75",
           green:               "#98c379",

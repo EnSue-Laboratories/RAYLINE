@@ -184,7 +184,7 @@ export default function ProjectManager() {
           alignItems: "center",
           justifyContent: "center",
           height: "100vh",
-          background: "#000",
+          background: "#0D0D0F",
           color: "rgba(255,255,255,0.3)",
           fontFamily: "system-ui, sans-serif",
           fontSize: 14,
@@ -206,7 +206,7 @@ export default function ProjectManager() {
           justifyContent: "center",
           height: "100vh",
           gap: 16,
-          background: "#000",
+          background: "#0D0D0F",
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -238,7 +238,7 @@ export default function ProjectManager() {
         height: "100vh",
         width: "100vw",
         overflow: "hidden",
-        background: "#000",
+        background: "#0D0D0F",
         color: "rgba(255,255,255,0.85)",
         fontFamily: "system-ui, sans-serif",
         position: "relative",

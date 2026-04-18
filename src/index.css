@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 *, *::before, *::after {
   margin: 0;
@@ -9,7 +9,7 @@
 html, body, #root {
   height: 100%;
   width: 100%;
-  background: #000;
+  background: #0D0D0F;
 }
 
 /* ── Scrollbar ── */
