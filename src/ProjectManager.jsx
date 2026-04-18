@@ -15,19 +15,23 @@ import RepoManager from "./pm-components/RepoManager";
 import IssueList from "./pm-components/IssueList";
 import PRList from "./pm-components/PRList";
 import ItemDetail from "./pm-components/ItemDetail";
+import { getPaneInteractionStyle, getPaneSurfaceStyle } from "./utils/paneSurface";
+import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
 const iconBtnStyle = {
   width: 28,
   height: 28,
   borderRadius: 7,
-  border: "1px solid rgba(255,255,255,0.06)",
-  background: "rgba(255,255,255,0.04)",
+  border: "1px solid var(--pane-border)",
+  background: "var(--pane-interaction-hover-fill, var(--pane-hover))",
+  backdropFilter: "var(--pane-interaction-hover-filter, none)",
+  boxShadow: "var(--pane-interaction-hover-shadow, none)",
   color: "rgba(255,255,255,0.5)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   cursor: "pointer",
-  transition: "background .15s, color .15s",
+  transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
   padding: 0,
 };
 
@@ -52,14 +56,14 @@ function RepoFilterItem({ label, active, onClick, removeMode }) {
         color: active
           ? "rgba(255,255,255,0.9)"
           : "rgba(255,255,255,0.45)",
-        background: active
-          ? "rgba(255,255,255,0.07)"
-          : hovered
-            ? "rgba(255,255,255,0.04)"
-            : "transparent",
-        transition: "background .15s, color .15s",
+        transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
         textAlign: "left",
         marginBottom: 1,
+        ...(active
+          ? getPaneInteractionStyle("active")
+          : hovered
+            ? getPaneInteractionStyle("hover")
+            : getPaneInteractionStyle("idle")),
       }}
     >
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -104,8 +108,7 @@ function StateToggle({ value, onChange }) {
       <button
         onClick={() => onChange(val)}
         style={{
-          background: active ? "rgba(255,255,255,0.08)" : "transparent",
-          border: "1px solid " + (active ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)"),
+          border: "1px solid " + (active ? "rgba(255,255,255,0.1)" : "var(--pane-border)"),
           borderRadius: 6,
           color: active ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.35)",
           fontSize: 11,
@@ -113,7 +116,8 @@ function StateToggle({ value, onChange }) {
           letterSpacing: ".04em",
           padding: "4px 10px",
           cursor: "pointer",
-          transition: "all .15s",
+          transition: "background .15s, color .15s, border-color .15s, box-shadow .15s, backdrop-filter .15s",
+          ...(active ? getPaneInteractionStyle("active") : getPaneInteractionStyle("idle")),
         }}
       >
         {label}
@@ -149,9 +153,9 @@ export default function ProjectManager() {
     window.ghApi.loadPmState().then(({ repos, wallpaper: wp }) => {
       setRepos(repos);
       if (wp?.path) {
-        setWallpaper(wp);
+        setWallpaper(normalizeWallpaper(wp));
         window.ghApi.readImage(wp.path).then((dataUrl) => {
-          if (dataUrl) setWallpaper((prev) => prev ? { ...prev, dataUrl } : prev);
+          if (dataUrl) setWallpaper((prev) => (prev ? normalizeWallpaper({ ...prev, dataUrl }) : prev));
         });
       }
       setStateLoaded(true);
@@ -184,7 +188,7 @@ export default function ProjectManager() {
           alignItems: "center",
           justifyContent: "center",
           height: "100vh",
-          background: "#000",
+          background: "var(--pane-background)",
           color: "rgba(255,255,255,0.3)",
           fontFamily: "system-ui, sans-serif",
           fontSize: 14,
@@ -206,7 +210,7 @@ export default function ProjectManager() {
           justifyContent: "center",
           height: "100vh",
           gap: 16,
-          background: "#000",
+          background: "var(--pane-background)",
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -218,7 +222,9 @@ export default function ProjectManager() {
           Run{" "}
           <code
             style={{
-              background: "rgba(255,255,255,0.06)",
+              background: "var(--pane-interaction-hover-fill, var(--pane-hover))",
+              backdropFilter: "var(--pane-interaction-hover-filter, none)",
+              boxShadow: "var(--pane-interaction-hover-shadow, none)",
               padding: "2px 6px",
               borderRadius: 4,
             }}
@@ -238,7 +244,7 @@ export default function ProjectManager() {
         height: "100vh",
         width: "100vw",
         overflow: "hidden",
-        background: "#000",
+        background: "var(--pane-background)",
         color: "rgba(255,255,255,0.85)",
         fontFamily: "system-ui, sans-serif",
         position: "relative",
@@ -251,12 +257,10 @@ export default function ProjectManager() {
             position: "absolute", inset: 0,
             backgroundImage: `url(${wallpaper.dataUrl})`,
             backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
-            filter: wallpaper.imgBlur ? `blur(${wallpaper.imgBlur}px)` : "none",
+            filter: getWallpaperImageFilter(wallpaper),
+            opacity: ((wallpaper.imgOpacity ?? 100) / 100).toFixed(3),
             transform: wallpaper.imgBlur ? "scale(1.05)" : "none",
           }} />
-          {(wallpaper.imgDarken > 0) && (
-            <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${wallpaper.imgDarken / 100})` }} />
-          )}
         </div>
       ) : (
         <>
@@ -288,7 +292,7 @@ export default function ProjectManager() {
           borderRight: "1px solid rgba(255,255,255,0.025)",
           position: "relative",
           zIndex: 10,
-          background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
+          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
           backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
         }}
       >
@@ -376,7 +380,7 @@ export default function ProjectManager() {
           overflow: "hidden",
           position: "relative",
           zIndex: 10,
-          background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
+          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
           backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
         }}
       >
@@ -415,13 +419,15 @@ export default function ProjectManager() {
             {repos.length > 0 && (
               <button
                 onClick={() => setShowCreate(activeTab === "issues" ? "issue" : "pr")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 4,
-                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 6, padding: "4px 10px", cursor: "pointer",
-                  color: "rgba(255,255,255,0.5)", fontSize: 11,
-                  fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
-                  marginRight: 8, transition: "all .15s",
+            style={{
+              display: "flex", alignItems: "center", gap: 4,
+              background: "var(--pane-interaction-hover-fill, var(--pane-hover))", border: "1px solid var(--pane-border)",
+              backdropFilter: "var(--pane-interaction-hover-filter, none)",
+              boxShadow: "var(--pane-interaction-hover-shadow, none)",
+              borderRadius: 6, padding: "4px 10px", cursor: "pointer",
+              color: "rgba(255,255,255,0.5)", fontSize: 11,
+              fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
+                  marginRight: 8, transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
                 }}
               >
                 <Plus size={11} strokeWidth={2} /> NEW

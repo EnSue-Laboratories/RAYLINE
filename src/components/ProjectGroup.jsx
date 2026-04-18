@@ -4,6 +4,7 @@ import { ChevronRight, FolderClosed, Plus, MoreHorizontal, Trash2 } from "lucide
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getM } from "../data/models";
 import { relativeTime } from "../utils/time";
+import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 
 export default function ProjectGroup({
   project,
@@ -63,10 +64,11 @@ export default function ProjectGroup({
           gap: 5,
           padding: "5px 6px",
           borderRadius: 6,
+          minHeight: 26,
           cursor: "pointer",
-          background: headerHovered ? "rgba(255,255,255,0.02)" : "transparent",
           transition: "background .15s",
           userSelect: "none",
+          ...(headerHovered ? getPaneInteractionStyle("hover") : getPaneInteractionStyle("idle")),
         }}
         onMouseEnter={() => setHeaderHovered(true)}
         onMouseLeave={() => setHeaderHovered(false)}
@@ -115,79 +117,85 @@ export default function ProjectGroup({
           {project.name}
         </span>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", flexShrink: 0 }}>
-          {/* Relative timestamp */}
-          {project.latestTs && !headerHovered && (
+        <div style={{ marginLeft: "auto", width: 42, height: 18, position: "relative", flexShrink: 0 }}>
+          {project.latestTs && (
             <span
               style={{
+                position: "absolute",
+                right: 0,
+                top: "50%",
+                transform: "translateY(-50%)",
                 fontSize: s(9),
                 fontFamily: "'JetBrains Mono', monospace",
                 color: "rgba(255,255,255,0.15)",
                 letterSpacing: ".04em",
-                flexShrink: 0,
+                opacity: headerHovered ? 0 : 1,
+                pointerEvents: "none",
+                transition: "opacity .15s",
               }}
             >
               {relativeTime(project.latestTs)}
             </span>
           )}
 
-          {/* Action buttons */}
-          {headerHovered && (
-            <div
+          <div
+            style={{
+              position: "absolute",
+              right: 0,
+              top: "50%",
+              transform: "translateY(-50%)",
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              opacity: headerHovered ? 1 : 0,
+              pointerEvents: headerHovered ? "auto" : "none",
+              transition: "opacity .15s",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => onNewInProject(project.cwdRoot)}
+              title="New chat in project"
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 2,
-                flexShrink: 0,
+                justifyContent: "center",
+                background: "none",
+                border: "none",
+                color: "rgba(255,255,255,0.25)",
+                cursor: "pointer",
+                padding: 3,
+                borderRadius: 4,
+                transition: "color .15s",
               }}
-              onClick={(e) => e.stopPropagation()}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
             >
-              {/* New chat in project */}
-              <button
-                onClick={() => onNewInProject(project.cwdRoot)}
-                title="New chat in project"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "none",
-                  border: "none",
-                  color: "rgba(255,255,255,0.25)",
-                  cursor: "pointer",
-                  padding: 3,
-                  borderRadius: 4,
-                  transition: "color .15s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
-              >
-                <Plus size={11} strokeWidth={1.5} />
-              </button>
+              <Plus size={11} strokeWidth={1.5} />
+            </button>
 
-              {/* More options */}
-              <button
-                ref={moreRef}
-                onClick={openMenu}
-                title="More options"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "none",
-                  border: "none",
-                  color: "rgba(255,255,255,0.25)",
-                  cursor: "pointer",
-                  padding: 3,
-                  borderRadius: 4,
-                  transition: "color .15s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
-              >
-                <MoreHorizontal size={11} strokeWidth={1.5} />
-              </button>
-            </div>
-          )}
+            <button
+              ref={moreRef}
+              onClick={openMenu}
+              title="More options"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "none",
+                border: "none",
+                color: "rgba(255,255,255,0.25)",
+                cursor: "pointer",
+                padding: 3,
+                borderRadius: 4,
+                transition: "color .15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+            >
+              <MoreHorizontal size={11} strokeWidth={1.5} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -206,16 +214,16 @@ export default function ProjectGroup({
               borderRadius: 8,
               cursor: "pointer",
               marginBottom: 1,
-              background: isActive ? "rgba(255,255,255,0.035)" : "transparent",
               transition: "all .12s",
+              ...(isActive ? getPaneInteractionStyle("active") : getPaneInteractionStyle("idle")),
             }}
             onMouseEnter={(e) => {
-              if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.018)";
+              if (!isActive) applyPaneInteractionStyle(e.currentTarget, "hover");
               const actions = e.currentTarget.querySelector(".convo-actions");
               if (actions) actions.style.opacity = "1";
             }}
             onMouseLeave={(e) => {
-              if (!isActive) e.currentTarget.style.background = "transparent";
+              if (!isActive) applyPaneInteractionStyle(e.currentTarget, "idle");
               const actions = e.currentTarget.querySelector(".convo-actions");
               if (actions) actions.style.opacity = "0";
             }}

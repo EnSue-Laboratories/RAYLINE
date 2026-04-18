@@ -10,8 +10,9 @@ import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
+import { getPaneSurfaceStyle } from "../utils/paneSurface";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, onControlChange, canControlTarget }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -223,7 +224,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     <div
       style={{
         flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10,
-        background: wallpaper?.dataUrl ? `rgba(0,0,0,${wallpaper.opacity / 100})` : "transparent",
+        ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
         boxShadow: dragOver ? "inset 0 0 0 1px rgba(153,214,255,0.18)" : "none",
         transition: "box-shadow .2s ease",
       }}
@@ -397,6 +398,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 msg={m}
                 onEdit={m.role === "user" && m.mode !== "shell-command" ? (newText) => onEdit(i, newText) : undefined}
                 onAnswer={m.role === "assistant" ? (text) => onSend(text) : undefined}
+                onControlChange={m.role === "assistant" ? onControlChange : undefined}
+                canControlTarget={m.role === "assistant" ? canControlTarget : undefined}
               />
             ))}
             <div ref={endRef} />
@@ -492,11 +495,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           {filteredCommands.length > 0 && (
             <div style={{
               marginBottom: 6,
-              background: wallpaper?.dataUrl ? `rgba(0,0,0,${(wallpaper.opacity / 100) * 0.95})` : "rgba(24,24,24,0.95)",
+              background: wallpaper?.dataUrl ? "var(--pane-elevated)" : "rgba(24,24,24,0.95)",
               border: "1px solid rgba(255,255,255,0.08)",
               borderRadius: 10,
               padding: "4px",
-              backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 20}px)`,
+              backdropFilter: "blur(20px)",
               boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
             }}>
               {filteredCommands.map((c, i) => (
@@ -551,11 +554,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               display: "flex",
               alignItems: "center",
               gap: 10,
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid " + (inputFocused ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)"),
+              background: inputFocused ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
+              border: "1px solid " + (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)"),
               borderRadius: 12,
               padding: "9px 14px",
-              backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 20}px)`,
+              backdropFilter: "blur(20px)",
               transition: "border-color .25s, background .25s",
             }}
           >
@@ -567,7 +570,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               onPaste={handlePaste}
               onFocus={() => setInputFocused(true)}
               onBlur={() => setInputFocused(false)}
-              placeholder={shellMode ? "Run a shell command locally..." : "Write something..."}
+              placeholder={shellMode ? "Run a shell command locally..." : "Ask anything..."}
               rows={1}
               style={{
                 flex: 1,
@@ -654,7 +657,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               marginTop: 8,
               fontSize: s(8),
               fontFamily: "'JetBrains Mono',monospace",
-              color: "rgba(255,255,255,0.15)",
+              color: "rgba(255,255,255,0.30)",
               letterSpacing: ".1em",
             }}
           >

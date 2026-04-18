@@ -10,6 +10,8 @@ import Settings     from "./components/Settings";
 import { DEFAULT_MODEL_ID, getM, normalizeModelId } from "./data/models";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { FontSizeContext } from "./contexts/FontSizeContext";
+import { getPaneSurfaceStyle } from "./utils/paneSurface";
+import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
 function logCheckpoint(...args) {
   console.log("[checkpoint-ui]", ...args);
@@ -21,6 +23,9 @@ function logSendFlow(...args) {
 
 const SHELL_TRANSCRIPT_LIMIT = 12000;
 const SHELL_TERMINAL_TIMEOUT_MS = 15000;
+const LAB_CONTROL_ENDPOINT = "http://127.0.0.1:4001/control";
+const LAB_CONTROL_COMMIT_DELAY_MS = 1000;
+const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
 
 function logSessionState(...args) {
   console.log("[session-state]", ...args);
@@ -54,6 +59,12 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function clampNumber(value, min, max, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+}
+
 function stripAnsi(text) {
   const esc = String.fromCharCode(27);
   return text.replace(new RegExp(`${esc}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`, "g"), "");
@@ -78,6 +89,16 @@ function cleanTerminalShellOutput(text, marker) {
     })
     .join("\n")
     .trim();
+}
+
+function postLabControlUpdate(target, value) {
+  return fetch(LAB_CONTROL_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ target, value }),
+  });
 }
 
 async function runShellViaTerminalApi({ command, cwd }) {
@@ -588,9 +609,12 @@ export default function App() {
   const [defaultModel, setDefaultModel] = useState(DEFAULT_MODEL_ID);
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
-  const [wallpaper, setWallpaper] = useState(null); // { path, opacity, blur }
+  const [wallpaper, setWallpaper] = useState(null);
   const [fontSize, setFontSize] = useState(15);
+  const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
+  const [appBlur, setAppBlur] = useState(0);
+  const [appOpacity, setAppOpacity] = useState(100);
   const [showSettings, setShowSettings] = useState(false);
   const [projects, setProjects] = useState({});
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
@@ -598,6 +622,83 @@ export default function App() {
   const [showNewChatCard, setShowNewChatCard] = useState(false);
   const messageQueue = useRef([]);
   const [queuedMessages, setQueuedMessages] = useState([]);
+  const labControlTimersRef = useRef(new Map());
+
+  const canControlTarget = useCallback((target) => (
+    target === "wallpaper.imgBlur"
+    || target === "wallpaper.imgOpacity"
+    || target === "app.blur"
+    || target === "app.opacity"
+    || target === "fontSize"
+    || target === "app.fontSize"
+    || target === "sidebar.activeOpacity"
+    || target === "lab.imageOpacity"
+    || target === "lab.imageBlur"
+    || target === "lab.panelOpacity"
+  ), []);
+
+  useEffect(() => () => {
+    for (const timer of labControlTimersRef.current.values()) {
+      clearTimeout(timer);
+    }
+    labControlTimersRef.current.clear();
+  }, []);
+
+  const queueLabControlUpdate = useCallback((target, value) => {
+    const timers = labControlTimersRef.current;
+    const existingTimer = timers.get(target);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    const timer = setTimeout(() => {
+      void postLabControlUpdate(target, value).catch((error) => {
+        console.warn("[control-bridge] failed to update lab target:", target, error);
+      });
+      timers.delete(target);
+    }, LAB_CONTROL_COMMIT_DELAY_MS);
+
+    timers.set(target, timer);
+  }, []);
+
+  const handleControlChange = useCallback(({ target, value }) => {
+    if (!target) return;
+
+    switch (target) {
+      case "wallpaper.imgBlur":
+        setWallpaper((prev) => normalizeWallpaper({
+          ...(prev ?? DEFAULT_WALLPAPER),
+          imgBlur: clampNumber(value, 0, 32, DEFAULT_WALLPAPER.imgBlur),
+        }));
+        return;
+      case "wallpaper.imgOpacity":
+        setWallpaper((prev) => normalizeWallpaper({
+          ...(prev ?? DEFAULT_WALLPAPER),
+          imgOpacity: clampNumber(value, 0, 100, DEFAULT_WALLPAPER.imgOpacity),
+        }));
+        return;
+      case "app.blur":
+        setAppBlur(clampNumber(value, 0, 20, 0));
+        return;
+      case "app.opacity":
+        setAppOpacity(clampNumber(value, 30, 100, 100));
+        return;
+      case "fontSize":
+      case "app.fontSize":
+        setFontSize(clampNumber(value, 12, 22, 15));
+        return;
+      case "sidebar.activeOpacity":
+        setSidebarActiveOpacity(clampNumber(value, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
+        return;
+      case "lab.imageOpacity":
+      case "lab.imageBlur":
+      case "lab.panelOpacity":
+        queueLabControlUpdate(target, value);
+        return;
+      default:
+        return;
+    }
+  }, [queueLabControlUpdate]);
 
   // Load state from file on mount
   useEffect(() => {
@@ -621,13 +722,18 @@ export default function App() {
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
         if (state.fontSize) setFontSize(state.fontSize);
+        if (state.sidebarActiveOpacity != null) {
+          setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
+        }
         if (state.defaultPrBranch) setDefaultPrBranch(state.defaultPrBranch);
+        if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
+        if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.wallpaper) {
-          setWallpaper(state.wallpaper);
+          setWallpaper(normalizeWallpaper(state.wallpaper));
           // Reload data URL from disk (not persisted — too large for JSON)
           if (state.wallpaper.path && window.api.readImage) {
             window.api.readImage(state.wallpaper.path).then((dataUrl) => {
-              if (dataUrl) setWallpaper((prev) => prev ? { ...prev, dataUrl } : prev);
+              if (dataUrl) setWallpaper((prev) => (prev ? normalizeWallpaper({ ...prev, dataUrl }) : prev));
             });
           }
         }
@@ -647,20 +753,29 @@ export default function App() {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       // Strip dataUrl before persisting (too large for JSON, reloaded on startup)
-      const wpSave = wallpaper ? { path: wallpaper.path, opacity: wallpaper.opacity, blur: wallpaper.blur, imgBlur: wallpaper.imgBlur, imgDarken: wallpaper.imgDarken } : null;
+      const wpSave = getPersistedWallpaper(wallpaper);
       window.api.saveState({
         convos: convoList.map((conversation) => normalizeConversationState(conversation)),
         active,
         cwd,
         defaultModel,
         fontSize,
+        sidebarActiveOpacity,
         wallpaper: wpSave,
         projects,
         draftsCollapsed,
         defaultPrBranch,
+        appBlur,
+        appOpacity,
       });
     }, 300);
-  }, [convoList, active, cwd, defaultModel, fontSize, wallpaper, projects, draftsCollapsed, defaultPrBranch, stateLoaded]);
+  }, [convoList, active, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, appBlur, appOpacity, stateLoaded]);
+
+  // Push window opacity to Electron
+  useEffect(() => {
+    if (!stateLoaded || !window.api?.setWindowOpacity) return;
+    window.api.setWindowOpacity(Math.max(0.3, Math.min(1, appOpacity / 100)));
+  }, [appOpacity, stateLoaded]);
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
@@ -1781,6 +1896,8 @@ export default function App() {
           position: "fixed",
           inset: 0,
           zIndex: 0,
+          filter: appBlur > 0 ? `blur(${appBlur}px)` : "none",
+          transition: "filter .2s",
         }}>
           <div style={{
             position: "absolute",
@@ -1789,24 +1906,33 @@ export default function App() {
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
-            filter: wallpaper.imgBlur ? `blur(${wallpaper.imgBlur}px)` : "none",
-            transform: wallpaper.imgBlur ? "scale(1.05)" : "none", // prevent blur edge artifacts
+            filter: getWallpaperImageFilter(wallpaper),
+            opacity: ((wallpaper.imgOpacity ?? 100) / 100).toFixed(3),
+            transform: (wallpaper.imgBlur || appBlur) ? "scale(1.05)" : "none", // prevent blur edge artifacts
           }} />
-          {(wallpaper.imgDarken > 0) && (
-            <div style={{
-              position: "absolute",
-              inset: 0,
-              background: `rgba(0,0,0,${wallpaper.imgDarken / 100})`,
-            }} />
-          )}
         </div>
       ) : (
-        <>
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+          filter: appBlur > 0 ? `blur(${appBlur}px)` : "none",
+          transform: appBlur > 0 ? "scale(1.05)" : "none",
+          transition: "filter .2s",
+        }}>
           <AuroraCanvas />
           <Grain />
-        </>
+        </div>
       )}
 
+      <div
+        style={{
+          display: "flex",
+          flex: 1,
+          minWidth: 0,
+          height: "100%",
+        }}
+      >
       {/* Sidebar */}
       <div
         style={{
@@ -1817,7 +1943,10 @@ export default function App() {
           flexDirection: "column",
           position: "relative",
           zIndex: 10,
-          background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
+          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), {
+            hoverOpacity: clampNumber(sidebarActiveOpacity * 0.6, 0.8, sidebarActiveOpacity),
+            activeOpacity: sidebarActiveOpacity,
+          }),
           backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
           transition: "all .35s cubic-bezier(.16,1,.3,1)",
           overflow: "hidden",
@@ -1852,6 +1981,10 @@ export default function App() {
           onFontSizeChange={setFontSize}
           defaultPrBranch={defaultPrBranch}
           onDefaultPrBranchChange={setDefaultPrBranch}
+          appBlur={appBlur}
+          onAppBlurChange={setAppBlur}
+          appOpacity={appOpacity}
+          onAppOpacityChange={setAppOpacity}
           onClose={() => setShowSettings(false)}
         />
       ) : (
@@ -1888,6 +2021,8 @@ export default function App() {
           allCwdRoots={allCwdRoots}
           projects={projects}
           defaultPrBranch={defaultPrBranch}
+          onControlChange={handleControlChange}
+          canControlTarget={canControlTarget}
         />
       )}
 
@@ -1907,6 +2042,7 @@ export default function App() {
         unregisterTerminal={terminal.unregisterTerminal}
         wallpaper={wallpaper}
       />
+      </div>
     </div>
     </FontSizeContext.Provider>
   );

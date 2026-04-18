@@ -15,6 +15,7 @@ import AskUserQuestionBlock from "./AskUserQuestionBlock";
 import MermaidBlock from "./MermaidBlock";
 import InteractiveBlock from "./InteractiveBlock";
 import ThinkingBlock from "./ThinkingBlock";
+import ValueControlBlock from "./ValueControlBlock";
 import { useFontScale } from "../contexts/FontSizeContext";
 
 // Allow SVG tags in markdown (rehype-sanitize schema)
@@ -76,7 +77,7 @@ function PreBlock({ rawText, s = (x) => x, children }) {
   );
 }
 
-const makeMdComponents = (isStreaming = false, s = (x) => x) => ({
+const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControlChange, canControlTarget) => ({
   p: ({ children }) => <p style={{ margin: "0 0 12px" }}>{children}</p>,
   code: ({ node, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || "");
@@ -97,6 +98,9 @@ const makeMdComponents = (isStreaming = false, s = (x) => x) => ({
     // Render interactive HTML blocks inline
     if (match && match[1] === "render") {
       return <InteractiveBlock code={codeString} isStreaming={isStreaming} />;
+    }
+    if (match && match[1] === "control") {
+      return <ValueControlBlock json={codeString} isStreaming={isStreaming} onAnswer={onAnswer} onControlChange={onControlChange} canControlTarget={canControlTarget} />;
     }
     if (match) {
       return (
@@ -135,6 +139,10 @@ const makeMdComponents = (isStreaming = false, s = (x) => x) => ({
     if (classes.includes("language-render")) {
       const text = codeNode?.children?.map(c => c.value || "").join("") || "";
       return <InteractiveBlock code={text.replace(/\n$/, "")} isStreaming={isStreaming} />;
+    }
+    if (classes.includes("language-control")) {
+      const text = codeNode?.children?.map(c => c.value || "").join("") || "";
+      return <ValueControlBlock json={text.replace(/\n$/, "")} isStreaming={isStreaming} onAnswer={onAnswer} onControlChange={onControlChange} canControlTarget={canControlTarget} />;
     }
     const rawText = codeNode?.children?.map(c => c.value || "").join("") || "";
     return <PreBlock rawText={rawText} s={s}>{children}</PreBlock>;
@@ -188,14 +196,83 @@ function sanitizeText(text) {
   return text.replace(/<\/?(?:thinking|antThinking)[^>]*>/gi, (match) => `\`${match}\``);
 }
 
-// Cache both variants to avoid recreating components on every render
-// Default (unscaled) components for module-level fallback
-const mdComponentsStatic = makeMdComponents(false);
+const CONTROL_BLOCK_RE = /```control\s*\n([\s\S]*?)```/g;
 
-export default function Message({ msg, onEdit, onAnswer }) {
+function splitControlBlocks(text) {
+  if (!text) return [{ type: "markdown", text: "" }];
+
+  const segments = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = CONTROL_BLOCK_RE.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({
+        type: "markdown",
+        text: text.slice(lastIndex, match.index),
+      });
+    }
+
+    segments.push({
+      type: "control",
+      json: match[1].replace(/\n$/, ""),
+    });
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({
+      type: "markdown",
+      text: text.slice(lastIndex),
+    });
+  }
+
+  return segments.length > 0 ? segments : [{ type: "markdown", text }];
+}
+
+function renderControlAwareMarkdown({
+  text,
+  blockKey,
+  markdownProps,
+  components,
+  isStreaming = false,
+  onAnswer,
+  onControlChange,
+  canControlTarget,
+}) {
+  return splitControlBlocks(text).map((segment, index) => {
+    const key = `${blockKey}-${index}`;
+
+    if (segment.type === "control") {
+      return (
+        <ValueControlBlock
+          key={key}
+          json={segment.json}
+          isStreaming={isStreaming}
+          onAnswer={onAnswer}
+          onControlChange={onControlChange}
+          canControlTarget={canControlTarget}
+        />
+      );
+    }
+
+    if (!segment.text) {
+      return null;
+    }
+
+    return (
+      <Markdown key={key} {...markdownProps} components={components}>
+        {sanitizeText(segment.text)}
+      </Markdown>
+    );
+  });
+}
+
+export default function Message({ msg, onEdit, onAnswer, onControlChange, canControlTarget }) {
   const s = useFontScale();
-  const scaledMdStatic = useMemo(() => makeMdComponents(false, s), [s]);
-  const scaledMdStreaming = useMemo(() => makeMdComponents(true, s), [s]);
+  const scaledMdStatic = useMemo(() => makeMdComponents(false, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
+  const scaledMdStreaming = useMemo(() => makeMdComponents(true, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
   const isUser = msg.role === "user";
   const isSystem = msg.role === "system";
   const isShellCommand = msg.mode === "shell-command";
@@ -256,11 +333,11 @@ export default function Message({ msg, onEdit, onAnswer }) {
         <div style={{
           fontSize: s(9),
           fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.2)",
+          color: "rgba(255,255,255,0.38)",
           letterSpacing: ".14em",
           marginBottom: 10,
         }}>
-          {isShellCommand ? "SHELL" : "YOU"}
+          {isShellCommand ? "SHELL" : "USER"}
         </div>
 
         {editing ? (
@@ -384,9 +461,15 @@ export default function Message({ msg, onEdit, onAnswer }) {
                 textAlign: "left",
                 maxWidth: "85%",
               }}>
-                <Markdown remarkPlugins={[remarkGfm]} components={scaledMdStatic}>
-                  {displayText}
-                </Markdown>
+                {renderControlAwareMarkdown({
+                  text: displayText,
+                  blockKey: `user-${msg.id}`,
+                  markdownProps: { remarkPlugins: [remarkGfm] },
+                  components: scaledMdStatic,
+                  onAnswer,
+                  onControlChange,
+                  canControlTarget,
+                })}
               </div>
             )}
           </>
@@ -472,14 +555,14 @@ export default function Message({ msg, onEdit, onAnswer }) {
       <div style={{
         fontSize: s(9),
         fontFamily: "'JetBrains Mono',monospace",
-        color: "rgba(255,255,255,0.2)",
+        color: "rgba(255,255,255,0.38)",
         letterSpacing: ".14em",
         marginBottom: 12,
         display: "flex",
         alignItems: "center",
         gap: 8,
       }}>
-        RESPONSE
+        ASSISTANT
       </div>
 
       {/* Render parts in order — text and tool calls interleaved */}
@@ -495,9 +578,19 @@ export default function Message({ msg, onEdit, onAnswer }) {
               letterSpacing: "0.008em",
               marginBottom: 4,
             }}>
-              <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]} components={(msg.isStreaming && isLastPart) ? scaledMdStreaming : mdComponentsStatic}>
-                {sanitizeText(part.text)}
-              </Markdown>
+              {renderControlAwareMarkdown({
+                text: part.text,
+                blockKey: `part-${part.id || i}`,
+                markdownProps: {
+                  remarkPlugins: [remarkGfm, remarkMath],
+                  rehypePlugins: [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex],
+                },
+                components: (msg.isStreaming && isLastPart) ? scaledMdStreaming : scaledMdStatic,
+                isStreaming: msg.isStreaming && isLastPart,
+                onAnswer,
+                onControlChange,
+                canControlTarget,
+              })}
               {msg.isStreaming && isLastPart && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.2)", marginLeft: 4, verticalAlign: "middle" }}>
                   <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
@@ -594,9 +687,18 @@ export default function Message({ msg, onEdit, onAnswer }) {
           fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
           letterSpacing: "0.008em",
         }}>
-          <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]} components={scaledMdStatic}>
-            {sanitizeText(msg.text)}
-          </Markdown>
+          {renderControlAwareMarkdown({
+            text: msg.text,
+            blockKey: `legacy-${msg.id}`,
+            markdownProps: {
+              remarkPlugins: [remarkGfm, remarkMath],
+              rehypePlugins: [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex],
+            },
+            components: scaledMdStatic,
+            onAnswer,
+            onControlChange,
+            canControlTarget,
+          })}
         </div>
       )}
       {!msg.parts && msg.toolCalls && msg.toolCalls.map((tc) => (

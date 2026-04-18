@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Circle, CheckCircle2, Copy, Check, GitPullRequest } from "lucide-react";
+import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 
 function timeAgo(dateStr) {
   const now = Date.now();
@@ -149,9 +150,11 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               padding: "10px 16px",
               cursor: "pointer",
               borderBottom: "1px solid rgba(255,255,255,0.03)",
+              transition: "background .15s, box-shadow .15s, backdrop-filter .15s",
+              ...getPaneInteractionStyle("idle"),
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; const b = e.currentTarget.querySelector(".copy-btn"); if (b) b.style.opacity = "1"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; const b = e.currentTarget.querySelector(".copy-btn"); if (b) b.style.opacity = "0"; }}
+            onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); const b = e.currentTarget.querySelector(".copy-btn"); if (b) b.style.opacity = "1"; }}
+            onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); const b = e.currentTarget.querySelector(".copy-btn"); if (b) b.style.opacity = "0"; }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {isOpen ? (

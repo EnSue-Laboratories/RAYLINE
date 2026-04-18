@@ -95,4 +95,7 @@ contextBridge.exposeInMainWorld("api", {
 
   // Project Manager
   openProjectManager: () => ipcRenderer.send("open-project-manager"),
+
+  // Window appearance
+  setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
 });

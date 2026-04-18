@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { getPaneSurfaceStyle } from "../utils/paneSurface";
 
 // ── Shared style helpers ──────────────────────────────────────────────────────
 
@@ -139,7 +140,7 @@ function TerminalViewport({
           cursor:              "rgba(255,255,255,0.5)",
           cursorAccent:        XTERM_TRANSPARENT,
           selectionBackground: "rgba(255,255,255,0.12)",
-          // ANSI colors — muted palette matching Claudi's dark theme
+          // ANSI colors — muted palette matching RayLine's dark theme
           black:               "#1a1a1a",
           red:                 "#e06c75",
           green:               "#98c379",
@@ -437,7 +438,7 @@ export default function TerminalDrawer({
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
+        ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
         backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
         borderLeft: "1px solid rgba(255,255,255,0.025)",
         position: "relative",

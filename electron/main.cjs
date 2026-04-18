@@ -25,7 +25,7 @@ const WALLPAPER_MIME_TYPES = {
 };
 
 // Override app name (in dev, Electron uses its own binary name)
-app.setName("Claudi");
+app.setName("RayLine");
 if (isDev && process.platform === "darwin") {
   // Patch the dock name in dev mode
   const { execSync } = require("child_process");
@@ -80,14 +80,14 @@ function importWallpaperToStorage(sourcePath, previousPath) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    title: "Claudi",
+    title: "RayLine",
     width: 1200,
     height: 800,
     minWidth: 800,
     minHeight: 600,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: "#000000",
+    backgroundColor: "#0D0D10",
     icon: path.join(__dirname, "../public/icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -130,7 +130,7 @@ function createProjectManagerWindow() {
     minHeight: 500,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: "#000000",
+    backgroundColor: "#0D0D10",
     icon: path.join(__dirname, "../public/icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload-pm.cjs"),
@@ -154,7 +154,7 @@ function createProjectManagerWindow() {
   pmWindow.on("closed", () => { pmWindow = null; });
 }
 
-app.setName("Claudi");
+app.setName("RayLine");
 
 app.whenReady().then(() => {
   // Set dock icon on macOS
@@ -208,6 +208,15 @@ ipcMain.handle("folder-pick", async () => {
 
 ipcMain.on("open-project-manager", () => {
   createProjectManagerWindow();
+});
+
+ipcMain.handle("set-window-opacity", (event, opacity) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  if (!win) return false;
+  const v = Number(opacity);
+  if (!Number.isFinite(v)) return false;
+  win.setOpacity(Math.max(0.2, Math.min(1, v)));
+  return true;
 });
 
 // IPC: open path in Finder / file manager

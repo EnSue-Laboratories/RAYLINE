@@ -4,8 +4,8 @@ import SearchableSelect from "./SearchableSelect";
 
 const inputStyle = {
   width: "100%",
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  background: "var(--pane-hover)",
+  border: "1px solid var(--pane-border)",
   borderRadius: 6,
   padding: "8px 10px",
   color: "rgba(255,255,255,0.8)",
@@ -142,8 +142,8 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
     >
       <div
         style={{
-          width: 440, background: "rgba(20,20,20,0.95)",
-          border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12,
+          width: 440, background: "var(--pane-elevated)",
+          border: "1px solid var(--pane-border)", borderRadius: 12,
           padding: "20px", fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -244,8 +244,8 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
             <div
               style={{
                 borderRadius: 8,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: "rgba(255,255,255,0.04)",
+                border: "1px solid var(--pane-border)",
+                background: "var(--pane-hover)",
                 padding: "10px 12px",
               }}
             >
@@ -258,8 +258,8 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
               <button
                 onClick={() => setImages([])}
                 style={{
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "var(--pane-active)",
+                  border: "1px solid rgba(255,255,255,0.1)",
                   borderRadius: 6,
                   color: "rgba(255,255,255,0.72)",
                   fontSize: 11,
@@ -282,7 +282,7 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
         {/* Submit */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button onClick={onClose} style={{
-            background: "none", border: "1px solid rgba(255,255,255,0.08)",
+            background: "none", border: "1px solid var(--pane-border)",
             borderRadius: 6, padding: "6px 14px", cursor: "pointer",
             color: "rgba(255,255,255,0.4)", fontSize: 12,
             fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
@@ -293,7 +293,7 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
             onClick={images.length > 0 ? handleContinueInGitHub : handleSubmit}
             disabled={!canSubmit || submitting}
             style={{
-              background: canSubmit ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
+              background: canSubmit ? "var(--pane-active)" : "var(--pane-hover)",
               border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6,
               padding: "6px 14px", cursor: canSubmit ? "pointer" : "default",
               color: canSubmit ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",

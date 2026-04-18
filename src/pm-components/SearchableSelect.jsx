@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from "react";
 
 const inputStyle = {
   width: "100%",
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  background: "var(--pane-hover)",
+  border: "1px solid var(--pane-border)",
   borderRadius: 6,
   padding: "8px 10px",
   color: "rgba(255,255,255,0.8)",
@@ -95,8 +95,8 @@ export default function SearchableSelect({ options, value, onChange, placeholder
             marginTop: 2,
             maxHeight: 180,
             overflowY: "auto",
-            background: "rgba(30,30,30,0.98)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--pane-elevated)",
+            border: "1px solid var(--pane-border)",
             borderRadius: 6,
             zIndex: 50,
           }}
@@ -111,7 +111,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
                 fontSize: 13,
                 fontFamily: "system-ui, sans-serif",
                 color: opt === value ? "rgba(180,220,255,0.9)" : "rgba(255,255,255,0.7)",
-                background: i === highlightIdx ? "rgba(255,255,255,0.06)" : "transparent",
+                background: i === highlightIdx ? "var(--pane-hover)" : "transparent",
                 cursor: "pointer",
               }}
             >
