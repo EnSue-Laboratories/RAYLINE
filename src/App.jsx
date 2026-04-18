@@ -1493,6 +1493,22 @@ export default function App() {
     return [...roots];
   }, [convoList, projects]);
 
+  const terminalCwd = activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd);
+
+  const handleToggleTerminal = async () => {
+    if (terminal.drawerOpen) {
+      terminal.setDrawerOpen(false);
+      return;
+    }
+
+    if (terminal.sessions.length === 0) {
+      await terminal.createSession({ name: `shell-${Date.now()}`, cwd: terminalCwd });
+      return;
+    }
+
+    terminal.setDrawerOpen(true);
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -1588,11 +1604,11 @@ export default function App() {
           onModelChange={handleModelChange}
           defaultModel={defaultModel}
           queuedMessages={queuedMessages}
-          onToggleTerminal={() => terminal.setDrawerOpen((o) => !o)}
+          onToggleTerminal={handleToggleTerminal}
           terminalOpen={terminal.drawerOpen}
           terminalCount={terminal.sessions.length}
           wallpaper={wallpaper}
-          cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
+          cwd={terminalCwd}
           onRefocusTerminal={terminal.focusActiveSession}
           onCwdChange={(newCwd) => {
             setCwd(newCwd);
@@ -1619,7 +1635,7 @@ export default function App() {
         activeSession={terminal.activeSession}
         onSelectSession={terminal.setActiveSession}
         onCreateSession={terminal.createSession}
-        cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
+        cwd={terminalCwd}
         onKillSession={terminal.killSession}
         onSendInput={terminal.sendInput}
         onResizeSession={terminal.resizeSession}
