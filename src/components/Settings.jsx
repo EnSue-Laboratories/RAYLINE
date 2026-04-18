@@ -165,12 +165,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         style={{
           flex: 1,
           overflowY: "auto",
-          display: "flex",
-          justifyContent: "center",
-          padding: "0 24px 40px",
+          padding: "0 24px max(96px, calc(96px + env(safe-area-inset-bottom)))",
+          boxSizing: "border-box",
         }}
       >
-        <div style={{ width: "100%", maxWidth: 520 }}>
+        <div style={{ width: "100%", maxWidth: 520, margin: "0 auto" }}>
           {/* APPEARANCE section label */}
           <div
             style={{
