@@ -698,6 +698,37 @@ ipcMain.handle("git-unstage", async (_event, cwd, paths) => {
   }
 });
 
+ipcMain.handle("git-revert", async (_event, cwd, path, untracked) => {
+  if (!cwd || !path) return { ok: false, stderr: "bad args" };
+  try {
+    if (untracked) {
+      await git(["clean", "-fd", "--", path], cwd);
+    } else {
+      await git(["restore", "--staged", "--worktree", "--source=HEAD", "--", path], cwd);
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-ignore", async (_event, cwd, path) => {
+  if (!cwd || !path) return { ok: false, stderr: "bad args" };
+  try {
+    const giPath = require("path").join(cwd, ".gitignore");
+    let existing = "";
+    if (fs.existsSync(giPath)) existing = fs.readFileSync(giPath, "utf8");
+    const entry = path.replace(/\/+$/, "");
+    const present = existing.split("\n").some((l) => l.trim() === entry || l.trim() === entry + "/");
+    if (present) return { ok: true, alreadyIgnored: true };
+    const sep = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
+    fs.writeFileSync(giPath, existing + sep + entry + "\n");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
 ipcMain.handle("git-commit", async (_event, cwd, message) => {
   if (!cwd) return { ok: false, stderr: "no cwd" };
   if (!message || !message.trim()) return { ok: false, stderr: "empty message" };

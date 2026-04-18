@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { GitCommitHorizontal, X, Plus, Minus } from "lucide-react";
+import { GitCommitHorizontal, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import useGitStatus from "../hooks/useGitStatus";
 
@@ -46,6 +46,7 @@ export default function GitStatusPill({ cwd }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [confirm, setConfirm] = useState(null); // { title, body, confirmLabel, destructive, onConfirm }
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
@@ -148,6 +149,30 @@ export default function GitStatusPill({ cwd }) {
     await refresh();
   };
 
+  const handleRevert = (path, untracked) => {
+    if (!window.api?.gitRevert) return;
+    setConfirm({
+      title: untracked ? "Delete untracked file" : "Discard changes",
+      body: untracked
+        ? `"${path}" isn't tracked by git and cannot be recovered once deleted.`
+        : `All uncommitted changes to "${path}" will be lost. This cannot be undone.`,
+      confirmLabel: untracked ? "Delete" : "Discard",
+      destructive: true,
+      onConfirm: async () => {
+        const r = await window.api.gitRevert(cwd, path, !!untracked);
+        if (!r.ok) setError(r.stderr || "Revert failed");
+        await refresh();
+      },
+    });
+  };
+
+  const handleIgnore = async (path) => {
+    if (!window.api?.gitIgnore) return;
+    const r = await window.api.gitIgnore(cwd, path);
+    if (!r.ok) setError(r.stderr || "Failed to update .gitignore");
+    await refresh();
+  };
+
   const handlePull = async () => {
     if (!canPull) return;
     setBusy(true);
@@ -197,10 +222,10 @@ export default function GitStatusPill({ cwd }) {
           {upstream && <span style={{ color: "rgba(255,255,255,0.3)" }}> → {upstream}</span>}
         </span>
         <span style={{ display: "flex", gap: 10 }}>
-          <span style={{ color: ahead > 0 ? "rgba(130,210,140,0.9)" : "rgba(255,255,255,0.3)" }}>
+          <span style={{ color: ahead > 0 ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)" }}>
             ↑{ahead}
           </span>
-          <span style={{ color: behind > 0 ? "rgba(150,190,255,0.9)" : "rgba(255,255,255,0.3)" }}>
+          <span style={{ color: behind > 0 ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)" }}>
             ↓{behind}
           </span>
         </span>
@@ -221,6 +246,7 @@ export default function GitStatusPill({ cwd }) {
             pickCode={(f) => f.index}
             action="unstage"
             onAction={handleUnstage}
+            onRevert={handleRevert}
           />
         )}
         {unstaged.length > 0 && (
@@ -231,6 +257,8 @@ export default function GitStatusPill({ cwd }) {
             pickCode={(f) => (f.index === "?" ? "?" : f.worktree)}
             action="stage"
             onAction={handleStage}
+            onRevert={handleRevert}
+            onIgnore={handleIgnore}
             style={{ marginTop: staged.length > 0 ? 10 : 0 }}
           />
         )}
@@ -263,7 +291,7 @@ export default function GitStatusPill({ cwd }) {
       )}
 
       {/* action buttons */}
-      <div style={{ padding: "8px 12px", display: "flex", gap: 8, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ padding: "0 12px 8px", display: "flex", gap: 8 }}>
         <button
           onClick={handleCommitAndPush}
           disabled={!canCommit}
@@ -372,11 +400,120 @@ export default function GitStatusPill({ cwd }) {
         )}
       </button>
       {popover}
+      {confirm && (
+        <ConfirmDialog
+          s={s}
+          title={confirm.title}
+          body={confirm.body}
+          confirmLabel={confirm.confirmLabel}
+          destructive={confirm.destructive}
+          onCancel={() => setConfirm(null)}
+          onConfirm={async () => {
+            const fn = confirm.onConfirm;
+            setConfirm(null);
+            if (fn) await fn();
+          }}
+        />
+      )}
     </>
   );
 }
 
-function FileSection({ title, files, s, pickCode, action, onAction, style }) {
+function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, onConfirm }) {
+  const confirmBtnRef = useRef(null);
+  useEffect(() => {
+    confirmBtnRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.stopPropagation(); onCancel(); }
+      else if (e.key === "Enter") { e.stopPropagation(); onConfirm(); }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [onCancel, onConfirm]);
+
+  const accent = destructive ? "rgba(230,120,120,0.95)" : "rgba(150,190,255,0.95)";
+  const accentBg = destructive ? "rgba(230,120,120,0.14)" : "rgba(150,190,255,0.14)";
+  const accentBorder = destructive ? "rgba(230,120,120,0.35)" : "rgba(150,190,255,0.35)";
+
+  return createPortal(
+    <div
+      onMouseDown={onCancel}
+      style={{
+        position: "fixed", inset: 0, zIndex: 10000,
+        background: "rgba(0,0,0,0.25)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24,
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        style={{
+          width: "min(420px, 100%)",
+          background: "rgba(14,14,16,0.55)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: 14,
+          boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
+          backdropFilter: "blur(72px) saturate(1.15)",
+          WebkitBackdropFilter: "blur(72px) saturate(1.15)",
+          color: "rgba(255,255,255,0.9)",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ padding: "16px 18px 4px", fontSize: s(14), fontWeight: 600, letterSpacing: "-0.005em" }}>
+          {title}
+        </div>
+        <div style={{ padding: "4px 18px 16px", fontSize: s(12), lineHeight: 1.5, color: "rgba(255,255,255,0.65)" }}>
+          {body}
+        </div>
+        <div style={{
+          display: "flex", gap: 8, justifyContent: "flex-end",
+          padding: "4px 12px 12px",
+        }}>
+          <button
+            onClick={onCancel}
+            style={{
+              height: 30, padding: "0 14px",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 7,
+              color: "rgba(255,255,255,0.8)",
+              fontSize: s(12),
+              fontFamily: "system-ui,sans-serif",
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            ref={confirmBtnRef}
+            onClick={onConfirm}
+            style={{
+              height: 30, padding: "0 14px",
+              background: accentBg,
+              border: "1px solid " + accentBorder,
+              borderRadius: 7,
+              color: accent,
+              fontSize: s(12),
+              fontFamily: "system-ui,sans-serif",
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            {confirmLabel || "Confirm"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function FileSection({ title, files, s, pickCode, action, onAction, onRevert, onIgnore, style }) {
   return (
     <div style={style}>
       <div style={{ color: "rgba(255,255,255,0.4)", fontSize: s(10), fontFamily: "'JetBrains Mono',monospace", letterSpacing: ".08em", marginBottom: 6 }}>
@@ -390,37 +527,60 @@ function FileSection({ title, files, s, pickCode, action, onAction, style }) {
           letter={letterFor(pickCode(f))}
           action={action}
           onAction={onAction}
+          onRevert={onRevert}
+          onIgnore={onIgnore}
         />
       ))}
     </div>
   );
 }
 
-function FileRow({ file, s, letter, action, onAction }) {
+function RowIconBtn({ onClick, title, children }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={rowIconBtnStyle}
+      onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.95)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function FileRow({ file, s, letter, action, onAction, onRevert, onIgnore }) {
   const [hover, setHover] = useState(false);
-  const Icon = action === "stage" ? Plus : Minus;
-  const actionTitle = action === "stage" ? "Stage" : "Unstage";
+  const StageIcon = action === "stage" ? Plus : Minus;
+  const stageTitle = action === "stage" ? "Stage" : "Unstage";
+  const untracked = file.index === "?";
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        display: "flex", gap: 8, alignItems: "center",
+        display: "flex", gap: 6, alignItems: "center",
         fontFamily: "'JetBrains Mono',monospace", fontSize: s(11),
         padding: "2px 0", color: "rgba(255,255,255,0.7)",
       }}
     >
       <span style={{ width: 14, color: STATUS_COLORS[letter] || "rgba(255,255,255,0.6)" }}>{letter}</span>
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{file.path}</span>
-      <button
-        onClick={() => onAction(file.path)}
-        title={actionTitle}
-        style={{ ...rowIconBtnStyle, visibility: hover ? "visible" : "hidden" }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.9)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-      >
-        <Icon size={12} strokeWidth={1.8} />
-      </button>
+      <div style={{ display: "flex", gap: 2, visibility: hover ? "visible" : "hidden" }}>
+        {onRevert && (
+          <RowIconBtn onClick={() => onRevert(file.path, untracked)} title={untracked ? "Delete (untracked)" : "Discard changes"}>
+            <Undo2 size={12} strokeWidth={1.8} />
+          </RowIconBtn>
+        )}
+        {onIgnore && untracked && (
+          <RowIconBtn onClick={() => onIgnore(file.path)} title="Add to .gitignore">
+            <RefreshCwOff size={12} strokeWidth={1.8} />
+          </RowIconBtn>
+        )}
+        <RowIconBtn onClick={() => onAction(file.path)} title={stageTitle}>
+          <StageIcon size={12} strokeWidth={1.8} />
+        </RowIconBtn>
+      </div>
     </div>
   );
 }
