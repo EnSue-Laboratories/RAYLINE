@@ -58,6 +58,14 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
     }
   }, [repo, type]);
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const canSubmit = Boolean(title.trim()) && (type !== "pr" || (head && base));
 
   const handlePaste = (e) => {
@@ -84,18 +92,32 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
     setSubmitting(true);
     setError(null);
     try {
-      let finalBody = body.trim();
+      const finalBody = body.trim();
+      let created;
       if (type === "issue") {
-        await window.ghApi.createIssue(repo, title.trim(), finalBody);
+        const issue = await window.ghApi.createIssue(repo, title.trim(), finalBody);
+        created = { ...issue, _repo: repo };
       } else {
-        await window.ghApi.createPR(repo, title.trim(), finalBody, head, base);
+        const res = await window.ghApi.createPR(repo, title.trim(), finalBody, head, base);
+        const match = (res?.url || "").match(/\/pull\/(\d+)/);
+        const number = match ? parseInt(match[1], 10) : null;
+        created = {
+          number,
+          title: title.trim(),
+          state: "open",
+          draft: false,
+          merged_at: null,
+          updated_at: new Date().toISOString(),
+          user: { login: "" },
+          _repo: repo,
+        };
       }
+      onCreated(created);
       onClose();
-      setTimeout(() => onCreated(), 500);
     } catch (e) {
       setError(e.message);
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const handleContinueInGitHub = () => {
@@ -112,7 +134,6 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
 
   return (
     <div
-      onClick={onClose}
       style={{
         position: "fixed", inset: 0, zIndex: 200,
         background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
@@ -120,7 +141,6 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: 440, background: "rgba(20,20,20,0.95)",
           border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12,
