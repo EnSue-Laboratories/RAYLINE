@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 const POLL_MS = 10_000;
 const FETCH_MS = 60_000;
-const FETCH_INITIAL_DELAY = 3_000;
 
 export default function useGitStatus(cwd) {
   const [status, setStatus] = useState(null); // null = not loaded / not a repo
@@ -33,16 +32,13 @@ export default function useGitStatus(cwd) {
     if (!cwd) return () => {};
 
     refresh();
+    refetch();
     pollTimer.current = setInterval(() => {
       if (!document.hidden) refresh();
     }, POLL_MS);
-
-    const fetchKickoff = setTimeout(() => {
+    fetchTimer.current = setInterval(() => {
       if (!document.hidden) refetch();
-      fetchTimer.current = setInterval(() => {
-        if (!document.hidden) refetch();
-      }, FETCH_MS);
-    }, FETCH_INITIAL_DELAY);
+    }, FETCH_MS);
 
     const onFocus = () => refresh();
     window.addEventListener("focus", onFocus);
@@ -51,7 +47,6 @@ export default function useGitStatus(cwd) {
       runId.current += 1;
       clearInterval(pollTimer.current);
       clearInterval(fetchTimer.current);
-      clearTimeout(fetchKickoff);
       window.removeEventListener("focus", onFocus);
     };
   }, [cwd, refresh, refetch]);
