@@ -7,6 +7,10 @@ import { useFontScale } from "../contexts/FontSizeContext";
 
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
+const SHEET_BG = "var(--pane-elevated)";
+const SHEET_HOVER = "var(--pane-interaction-hover-fill, var(--pane-hover))";
+const SHEET_ACTIVE = "var(--pane-interaction-active-fill, var(--pane-active))";
+const SHEET_BORDER = "var(--pane-border)";
 
 function clamp(value, min, max) {
   if (max < min) return min;
@@ -409,17 +413,18 @@ export default function NewChatCard({
     alignItems: "center",
     gap: 6,
     padding: "5px 11px",
-    background: active ? "rgba(170,210,255,0.1)" : "rgba(255,255,255,0.025)",
-    border: `1px solid ${active ? "rgba(170,210,255,0.18)" : "rgba(255,255,255,0.05)"}`,
+    background: active ? SHEET_ACTIVE : SHEET_HOVER,
+    backdropFilter: active ? "var(--pane-interaction-active-filter, none)" : "var(--pane-interaction-hover-filter, none)",
+    border: `1px solid ${active ? "rgba(255,255,255,0.12)" : SHEET_BORDER}`,
     borderRadius: 999,
-    color: active ? "rgba(225,240,255,0.94)" : "rgba(255,255,255,0.5)",
+    color: active ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.5)",
     fontSize: s(10.5),
     fontFamily: "system-ui, sans-serif",
     fontWeight: 600,
     cursor: "pointer",
     transition: "all .2s",
     letterSpacing: ".01em",
-    boxShadow: active ? "0 10px 24px rgba(20,30,50,0.16)" : "none",
+    boxShadow: active ? "var(--pane-interaction-active-shadow, inset 0 0 0 1px rgba(255,255,255,0.08))" : "var(--pane-interaction-hover-shadow, none)",
   });
 
   const chipIconStyle = {
@@ -450,9 +455,9 @@ export default function NewChatCard({
       <div style={{
         maxWidth: 600,
         width: "100%",
-        background: dragOver ? "rgba(180,220,255,0.04)" : "rgba(8,8,12,0.55)",
+        background: dragOver ? "rgba(180,220,255,0.05)" : SHEET_BG,
         backdropFilter: "blur(48px) saturate(1.2)",
-        border: `1px solid ${dragOver ? "rgba(180,220,255,0.12)" : "rgba(255,255,255,0.06)"}`,
+        border: `1px solid ${dragOver ? "rgba(180,220,255,0.12)" : SHEET_BORDER}`,
         borderRadius: 14,
         padding: 20,
         display: "flex",
@@ -629,7 +634,7 @@ export default function NewChatCard({
         {/* Bottom bar */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          paddingTop: 4, borderTop: "1px solid rgba(255,255,255,0.04)",
+          paddingTop: 4, borderTop: "1px solid var(--pane-border)",
         }}>
           <ProjectPicker
             value={selectedCwd}
@@ -699,9 +704,9 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
         zIndex: 500,
         width: pos.width,
         maxHeight: pos.maxHeight,
-        background: "rgba(8,8,12,0.55)",
+        background: SHEET_BG,
         backdropFilter: "blur(48px) saturate(1.2)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        border: "1px solid var(--pane-border)",
         borderRadius: 10,
         padding: 3,
         boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
@@ -718,14 +723,14 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         style={{
-          background: "rgba(255,255,255,0.03)",
+          background: SHEET_HOVER,
           border: "none",
           outline: "none",
           padding: "8px 10px",
           fontSize: s(11),
           fontFamily: "'JetBrains Mono',monospace",
           color: "rgba(255,255,255,0.8)",
-          borderBottom: "1px solid rgba(255,255,255,0.04)",
+          borderBottom: "1px solid var(--pane-border)",
           borderRadius: "7px 7px 0 0",
         }}
       />
@@ -760,7 +765,7 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
               textAlign: "left",
               transition: "all .12s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
             <span style={{
@@ -820,9 +825,9 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
         zIndex: 500,
         width: pos.width,
         maxHeight: pos.maxHeight,
-        background: "rgba(8,8,12,0.55)",
+        background: SHEET_BG,
         backdropFilter: "blur(48px) saturate(1.2)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        border: "1px solid var(--pane-border)",
         borderRadius: 10,
         padding: 3,
         boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
@@ -846,14 +851,14 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
           }
         }}
         style={{
-          background: "rgba(255,255,255,0.03)",
+          background: SHEET_HOVER,
           border: "none",
           outline: "none",
           padding: "8px 10px",
           fontSize: s(11),
           fontFamily: "'JetBrains Mono',monospace",
           color: "rgba(255,255,255,0.8)",
-          borderBottom: "1px solid rgba(255,255,255,0.04)",
+          borderBottom: "1px solid var(--pane-border)",
           borderRadius: "7px 7px 0 0",
         }}
       />
@@ -875,7 +880,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
               cursor: "pointer",
               textAlign: "left",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
             Use "{trimmedQuery}" as a new branch
@@ -914,7 +919,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
               textAlign: "left",
               transition: "all .12s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
             <span>{branchName}</span>
@@ -987,9 +992,9 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
         left: pos.left,
         zIndex: 500,
         width: pos.width,
-        background: "rgba(8,8,12,0.55)",
+        background: SHEET_BG,
         backdropFilter: "blur(48px) saturate(1.2)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        border: "1px solid var(--pane-border)",
         borderRadius: 10,
         padding: 3,
         boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
@@ -1012,14 +1017,14 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
           }
         }}
         style={{
-          background: "rgba(255,255,255,0.03)",
+          background: SHEET_HOVER,
           border: "none",
           outline: "none",
           padding: "8px 10px",
           fontSize: s(11),
           fontFamily: "'JetBrains Mono',monospace",
           color: "rgba(255,255,255,0.8)",
-          borderBottom: "1px solid rgba(255,255,255,0.04)",
+          borderBottom: "1px solid var(--pane-border)",
           borderRadius: "7px 7px 0 0",
         }}
       />
@@ -1039,7 +1044,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
       <button
         onClick={() => onConfirm(value)}
         style={getNeutralDropdownItemStyle(s)}
-        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
       >
         {value.trim() ? `Use "${value.trim()}"` : "Use random name"}
@@ -1049,7 +1054,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
         <button
           onClick={onDisable}
           style={getNeutralDropdownItemStyle(s)}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
         >
           Turn off worktree

@@ -10,6 +10,7 @@ import Settings     from "./components/Settings";
 import { DEFAULT_MODEL_ID, getM, normalizeModelId } from "./data/models";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { FontSizeContext } from "./contexts/FontSizeContext";
+import { getPaneSurfaceStyle } from "./utils/paneSurface";
 
 function logCheckpoint(...args) {
   console.log("[checkpoint-ui]", ...args);
@@ -1817,7 +1818,7 @@ export default function App() {
           flexDirection: "column",
           position: "relative",
           zIndex: 10,
-          background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
+          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), wallpaper?.opacity),
           backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
           transition: "all .35s cubic-bezier(.16,1,.3,1)",
           overflow: "hidden",

@@ -4,6 +4,7 @@ import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsI
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
 import { getM } from "../data/models";
+import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 
 function getMainRepoRoot(dir) {
   if (!dir) return dir;
@@ -147,8 +148,8 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             fontFamily: "system-ui, sans-serif", transition: "all .15s",
             textAlign: "left",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <Plus size={15} strokeWidth={1.5} />
           New Chat
@@ -163,8 +164,8 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             fontFamily: "system-ui, sans-serif", transition: "all .15s",
             textAlign: "left",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <GitHubIcon size={15} />
           GitHub Projects
@@ -179,8 +180,8 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             fontFamily: "system-ui, sans-serif", transition: "all .15s",
             textAlign: "left",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <Search size={15} strokeWidth={1.5} />
           Search
@@ -192,10 +193,14 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             gap: 7,
             marginTop: 6,
             padding: "6px 10px",
-            background: searchFocused ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.045)",
-            border: "1px solid " + (searchFocused ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.08)"),
+            border: "1px solid " + (searchFocused ? "rgba(255,255,255,0.12)" : "var(--pane-border)"),
             borderRadius: 8,
-            transition: "all .2s",
+            transition: "background .2s, color .2s, border-color .2s, box-shadow .2s, backdrop-filter .2s",
+            ...(searchFocused ? getPaneInteractionStyle("active") : {
+              background: "var(--pane-elevated)",
+              backdropFilter: "none",
+              boxShadow: "none",
+            }),
           }}
         >
           <span style={{ color: "rgba(255,255,255,0.45)", flexShrink: 0, display: "flex" }}>
@@ -285,8 +290,8 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                 userSelect: "none",
               }}
               onClick={onToggleDraftsCollapsed}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); }}
+              onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); }}
             >
               <span
                 style={{
@@ -326,17 +331,17 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                     borderRadius: 8,
                     cursor: "pointer",
                     marginBottom: 1,
-                    background: isActive ? "rgba(255,255,255,0.035)" : "transparent",
                     transition: "all .12s",
                     animation: `fadeSlide .2s ease ${i * 0.03}s both`,
+                    ...(isActive ? getPaneInteractionStyle("active") : getPaneInteractionStyle("idle")),
                   }}
                   onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.018)";
+                    if (!isActive) applyPaneInteractionStyle(e.currentTarget, "hover");
                     const actions = e.currentTarget.querySelector(".convo-actions");
                     if (actions) actions.style.opacity = "1";
                   }}
                   onMouseLeave={(e) => {
-                    if (!isActive) e.currentTarget.style.background = "transparent";
+                    if (!isActive) applyPaneInteractionStyle(e.currentTarget, "idle");
                     const actions = e.currentTarget.querySelector(".convo-actions");
                     if (actions) actions.style.opacity = "0";
                   }}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { getPaneSurfaceStyle } from "../utils/paneSurface";
 
 // ── Shared style helpers ──────────────────────────────────────────────────────
 
@@ -437,7 +438,7 @@ export default function TerminalDrawer({
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        background: `rgba(0,0,0,${wallpaper?.dataUrl ? (wallpaper.opacity / 100) : 0.65})`,
+        ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), wallpaper?.opacity),
         backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
         borderLeft: "1px solid rgba(255,255,255,0.025)",
         position: "relative",

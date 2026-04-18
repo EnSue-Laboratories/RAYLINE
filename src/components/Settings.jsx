@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ArrowLeft, Image } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { getPaneSurfaceStyle } from "../utils/paneSurface";
 
 const DEFAULTS = { path: null, dataUrl: null, opacity: 50, blur: 32, imgBlur: 0, imgDarken: 0 };
 
@@ -105,7 +106,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         minWidth: 0,
         position: "relative",
         zIndex: 10,
-        background: local.dataUrl ? `rgba(0,0,0,${local.opacity / 100})` : "transparent",
+        ...getPaneSurfaceStyle(Boolean(local.dataUrl), local.opacity),
         color: "rgba(255,255,255,0.85)",
         fontFamily: "system-ui, sans-serif",
       }}

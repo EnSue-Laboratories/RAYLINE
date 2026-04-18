@@ -87,7 +87,7 @@ function createWindow() {
     minHeight: 600,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: "#0D0D0F",
+    backgroundColor: "#0D0D10",
     icon: path.join(__dirname, "../public/icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -130,7 +130,7 @@ function createProjectManagerWindow() {
     minHeight: 500,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: "#0D0D0F",
+    backgroundColor: "#0D0D10",
     icon: path.join(__dirname, "../public/icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload-pm.cjs"),

@@ -10,6 +10,7 @@ import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
+import { getPaneSurfaceStyle } from "../utils/paneSurface";
 
 export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch }) {
   const s = useFontScale();
@@ -223,7 +224,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     <div
       style={{
         flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10,
-        background: wallpaper?.dataUrl ? `rgba(0,0,0,${wallpaper.opacity / 100})` : "transparent",
+        ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), wallpaper?.opacity),
         boxShadow: dragOver ? "inset 0 0 0 1px rgba(153,214,255,0.18)" : "none",
         transition: "box-shadow .2s ease",
       }}

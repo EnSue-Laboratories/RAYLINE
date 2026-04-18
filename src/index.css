@@ -1,5 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
+:root {
+  --pane-background: #0D0D10;
+  --pane-background-rgb: 13, 13, 16;
+  --pane-overlay-alpha: 0.82;
+  --pane-background-overlay: rgba(var(--pane-background-rgb), var(--pane-overlay-alpha));
+  --pane-hover-overlay: rgba(11, 11, 13, var(--pane-overlay-alpha));
+  --pane-active-overlay: rgba(9, 9, 11, var(--pane-overlay-alpha));
+  --pane-elevated: #101012;
+  --pane-hover: #121214;
+  --pane-active: #141416;
+  --pane-interaction-hover-fill: var(--pane-hover);
+  --pane-interaction-active-fill: var(--pane-active);
+  --pane-interaction-hover-filter: none;
+  --pane-interaction-active-filter: none;
+  --pane-interaction-hover-shadow: none;
+  --pane-interaction-active-shadow: none;
+  --pane-border: rgba(255,255,255,0.06);
+}
+
 *, *::before, *::after {
   margin: 0;
   padding: 0;
@@ -9,7 +28,7 @@
 html, body, #root {
   height: 100%;
   width: 100%;
-  background: #0D0D0F;
+  background: var(--pane-background);
 }
 
 /* ── Scrollbar ── */

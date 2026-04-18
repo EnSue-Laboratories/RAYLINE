@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { GitPullRequest, GitMerge, GitPullRequestClosed, Copy, Check, GitBranch } from "lucide-react";
+import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 
 function timeAgo(dateStr) {
   const now = Date.now();
@@ -135,15 +136,17 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
               padding: "10px 16px",
               cursor: "pointer",
               borderBottom: "1px solid rgba(255,255,255,0.03)",
+              transition: "background .15s, box-shadow .15s, backdrop-filter .15s",
+              ...getPaneInteractionStyle("idle"),
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+              applyPaneInteractionStyle(e.currentTarget, "hover");
               e.currentTarget.querySelectorAll(".row-action-btn").forEach((b) => {
                 b.style.opacity = "1";
               });
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
+              applyPaneInteractionStyle(e.currentTarget, "idle");
               e.currentTarget.querySelectorAll(".row-action-btn").forEach((b) => {
                 b.style.opacity = "0";
               });

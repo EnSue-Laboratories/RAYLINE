@@ -65,7 +65,7 @@ export default function AuroraCanvas() {
   return (
     <canvas
       ref={ref}
-      style={{ position: "fixed", inset: 0, zIndex: 0, background: "#0D0D0F" }}
+      style={{ position: "fixed", inset: 0, zIndex: 0, background: "var(--pane-background, #0D0D10)" }}
     />
   );
 }
