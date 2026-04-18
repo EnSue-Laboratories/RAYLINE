@@ -4,7 +4,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, onClose }) {
   const s = useFontScale();
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
 
@@ -453,7 +453,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             />
           </div>
 
-          {/* GIT section label */}
+          {/* ADVANCED section label */}
           <div
             style={{
               fontFamily: "'JetBrains Mono', monospace",
@@ -466,54 +466,137 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginTop: 12,
             }}
           >
-            GIT
+            ADVANCED
           </div>
 
-          {/* Default PR branch */}
+          {/* Developer mode toggle */}
           <div style={{ marginBottom: 24 }}>
             <div
               style={{
-                fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
-                marginBottom: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
               }}
             >
-              Default PR branch
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: s(13),
+                    color: "rgba(255,255,255,0.8)",
+                    marginBottom: 2,
+                  }}
+                >
+                  Developer mode
+                </div>
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: "rgba(255,255,255,0.3)",
+                  }}
+                >
+                  Show developer-related settings such as Git
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={developerMode}
+                onClick={() => onDeveloperModeChange?.(!developerMode)}
+                style={{
+                  flexShrink: 0,
+                  width: 38,
+                  height: 22,
+                  borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: developerMode ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                  position: "relative",
+                  cursor: "pointer",
+                  padding: 0,
+                  transition: "background 120ms ease",
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    left: developerMode ? 18 : 2,
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    background: "rgba(255,255,255,0.9)",
+                    transition: "left 120ms ease",
+                  }}
+                />
+              </button>
             </div>
-            <div
-              style={{
-                fontSize: s(11),
-                color: "rgba(255,255,255,0.3)",
-                marginBottom: 10,
-              }}
-            >
-              Target branch used when creating a pull request
-            </div>
-            <input
-              type="text"
-              value={defaultPrBranch ?? ""}
-              placeholder="main"
-              onChange={(e) => onDefaultPrBranchChange?.(e.target.value)}
-              onBlur={(e) => {
-                const v = e.target.value.trim();
-                if (!v) onDefaultPrBranchChange?.("main");
-              }}
-              spellCheck={false}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                height: 32,
-                padding: "0 10px",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 7,
-                color: "rgba(255,255,255,0.9)",
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: s(12),
-                outline: "none",
-              }}
-            />
           </div>
+
+          {developerMode && (
+            <>
+              {/* GIT section label */}
+              <div
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: s(10),
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.25)",
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                  marginBottom: 20,
+                  marginTop: 12,
+                }}
+              >
+                GIT
+              </div>
+
+              {/* Default PR branch */}
+              <div style={{ marginBottom: 24 }}>
+                <div
+                  style={{
+                    fontSize: s(13),
+                    color: "rgba(255,255,255,0.8)",
+                    marginBottom: 2,
+                  }}
+                >
+                  Default PR branch
+                </div>
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: "rgba(255,255,255,0.3)",
+                    marginBottom: 10,
+                  }}
+                >
+                  Target branch used when creating a pull request
+                </div>
+                <input
+                  type="text"
+                  value={defaultPrBranch ?? ""}
+                  placeholder="main"
+                  onChange={(e) => onDefaultPrBranchChange?.(e.target.value)}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (!v) onDefaultPrBranchChange?.("main");
+                  }}
+                  spellCheck={false}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    height: 32,
+                    padding: "0 10px",
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 7,
+                    color: "rgba(255,255,255,0.9)",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: s(12),
+                    outline: "none",
+                  }}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

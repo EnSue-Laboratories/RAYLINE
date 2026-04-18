@@ -77,7 +77,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
@@ -154,22 +154,24 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           <Plus size={15} strokeWidth={1.5} />
           New Chat
         </button>
-        <button
-          onClick={onOpenProjectManager}
-          style={{
-            display: "flex", alignItems: "center", gap: 10,
-            padding: "8px 10px", borderRadius: 7,
-            background: "none", border: "none", cursor: "pointer",
-            color: "rgba(255,255,255,0.55)", fontSize: s(12),
-            fontFamily: "system-ui, sans-serif", transition: "all .15s",
-            textAlign: "left",
-          }}
-          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
-        >
-          <GitHubIcon size={15} />
-          GitHub Projects
-        </button>
+        {developerMode && (
+          <button
+            onClick={onOpenProjectManager}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "8px 10px", borderRadius: 7,
+              background: "none", border: "none", cursor: "pointer",
+              color: "rgba(255,255,255,0.55)", fontSize: s(12),
+              fontFamily: "system-ui, sans-serif", transition: "all .15s",
+              textAlign: "left",
+            }}
+            onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+            onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+          >
+            <GitHubIcon size={15} />
+            GitHub Projects
+          </button>
+        )}
         {convos.length > 0 && !searchOpen && <button
           onClick={() => setSearchOpen(true)}
           style={{

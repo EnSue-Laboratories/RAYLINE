@@ -48,6 +48,7 @@ export default function NewChatCard({
   projects,
   onPickFolder,
   onCancel,
+  developerMode = true,
 }) {
   const s = useFontScale();
   const textareaRef = useRef(null);
@@ -552,7 +553,7 @@ export default function NewChatCard({
           </button>
 
           {/* Branch — searchable typeahead */}
-          <div ref={branchSearchRef} style={{ position: "relative" }}>
+          {developerMode && <div ref={branchSearchRef} style={{ position: "relative" }}>
             <button onClick={openBranchPicker} style={toolBtnStyle(!!branch)}>
               <GitBranch style={chipIconStyle} />
               <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -576,10 +577,10 @@ export default function NewChatCard({
               />,
               document.body
             )}
-          </div>
+          </div>}
 
           {/* Worktree — inline name input */}
-          <div ref={treeBtnRef} style={{ position: "relative" }}>
+          {developerMode && <div ref={treeBtnRef} style={{ position: "relative" }}>
             <button onClick={openTreeInput} style={toolBtnStyle(worktree)}>
               <GitFork style={chipIconStyle} />
               <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -600,10 +601,10 @@ export default function NewChatCard({
               />,
               document.body
             )}
-          </div>
+          </div>}
 
           {/* Link issue — text toggle with searchable dropdown */}
-          <div ref={issueSearchRef} style={{ position: "relative" }}>
+          {developerMode && <div ref={issueSearchRef} style={{ position: "relative" }}>
             <button
               onClick={() => {
                 if (issueContext) { setIssueContext(null); return; }
@@ -628,7 +629,7 @@ export default function NewChatCard({
               />,
               document.body
             )}
-          </div>
+          </div>}
         </div>
 
         {/* Bottom bar */}

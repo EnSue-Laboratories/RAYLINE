@@ -12,7 +12,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, onControlChange, canControlTarget }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, onControlChange, canControlTarget, developerMode = true }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -319,8 +319,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
-          {!showNewChatCard && <GitStatusPill cwd={cwd} defaultPrBranch={defaultPrBranch} />}
-          {!showNewChatCard && (
+          {!showNewChatCard && developerMode && <GitStatusPill cwd={cwd} defaultPrBranch={defaultPrBranch} />}
+          {!showNewChatCard && developerMode && (
             <BranchSelector
               cwd={cwd}
               onCwdChange={onCwdChange}
@@ -329,7 +329,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             />
           )}
           {!showNewChatCard && <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
-          {!showNewChatCard && onToggleTerminal && (
+          {!showNewChatCard && developerMode && onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
               title="Toggle terminal"
@@ -387,6 +387,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             onPickFolder={() => window.api?.pickFolder?.()}
             onCreateChat={onCreateChat}
             onCancel={onCancelNewChat}
+            developerMode={developerMode}
           />
         ) : !convo || convo.msgs.length === 0 ? (
           <EmptyState model={convo?.model || "sonnet"} />
