@@ -551,8 +551,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               display: "flex",
               alignItems: "center",
               gap: 10,
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid " + (inputFocused ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)"),
+              background: inputFocused ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
+              border: "1px solid " + (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)"),
               borderRadius: 12,
               padding: "9px 14px",
               backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 20}px)`,
@@ -567,7 +567,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               onPaste={handlePaste}
               onFocus={() => setInputFocused(true)}
               onBlur={() => setInputFocused(false)}
-              placeholder={shellMode ? "Run a shell command locally..." : "Write something..."}
+              placeholder={shellMode ? "Run a shell command locally..." : "Ask anything..."}
               rows={1}
               style={{
                 flex: 1,
@@ -654,7 +654,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               marginTop: 8,
               fontSize: s(8),
               fontFamily: "'JetBrains Mono',monospace",
-              color: "rgba(255,255,255,0.15)",
+              color: "rgba(255,255,255,0.30)",
               letterSpacing: ".1em",
             }}
           >

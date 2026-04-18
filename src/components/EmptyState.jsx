@@ -88,21 +88,6 @@ export default function EmptyState() {
         </g>
       </svg>
 
-      <div
-        className="rl-tagline"
-        style={{
-          marginTop: 22,
-          fontFamily: "'Inter Tight', 'Inter', system-ui, sans-serif",
-          fontWeight: 500,
-          fontSize: s(11),
-          letterSpacing: "0.62em",
-          color: "rgba(255,255,255,0.45)",
-          textIndent: "0.62em",
-        }}
-      >
-        R&nbsp;/&nbsp;Y&nbsp;L&nbsp;I&nbsp;N&nbsp;E&nbsp;.
-      </div>
-
       {info && (
         <div style={{
           display: "flex",

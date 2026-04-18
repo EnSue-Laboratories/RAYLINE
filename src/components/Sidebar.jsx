@@ -458,13 +458,13 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             cursor: "pointer",
             fontSize: s(8),
             fontFamily: "'JetBrains Mono',monospace",
-            color: "rgba(255,255,255,0.28)",
+            color: "rgba(255,255,255,0.45)",
             letterSpacing: ".08em",
             padding: 0,
             transition: "color .2s",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.28)"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.72)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
         >
           <FolderOpen size={10} strokeWidth={1.5} />
           {cwdShort || "SELECT FOLDER"}
@@ -481,16 +481,16 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             background: "none",
             border: "none",
             cursor: "pointer",
-            color: "rgba(255,255,255,0.28)",
+            color: "rgba(255,255,255,0.45)",
             transition: "color .2s",
             padding: 0,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.28)"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.72)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
         >
           <SettingsIcon size={12} strokeWidth={1.5} />
         </button>
-        <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.2)", letterSpacing: ".06em" }}>
+        <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.38)", letterSpacing: ".06em" }}>
           {convos.length} CHATS
         </span>
       </div>

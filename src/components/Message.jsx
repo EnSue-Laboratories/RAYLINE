@@ -256,11 +256,11 @@ export default function Message({ msg, onEdit, onAnswer }) {
         <div style={{
           fontSize: s(9),
           fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.2)",
+          color: "rgba(255,255,255,0.38)",
           letterSpacing: ".14em",
           marginBottom: 10,
         }}>
-          {isShellCommand ? "SHELL" : "YOU"}
+          {isShellCommand ? "SHELL" : "USER"}
         </div>
 
         {editing ? (
@@ -472,14 +472,14 @@ export default function Message({ msg, onEdit, onAnswer }) {
       <div style={{
         fontSize: s(9),
         fontFamily: "'JetBrains Mono',monospace",
-        color: "rgba(255,255,255,0.2)",
+        color: "rgba(255,255,255,0.38)",
         letterSpacing: ".14em",
         marginBottom: 12,
         display: "flex",
         alignItems: "center",
         gap: 8,
       }}>
-        RESPONSE
+        ASSISTANT
       </div>
 
       {/* Render parts in order — text and tool calls interleaved */}
