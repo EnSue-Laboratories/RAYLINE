@@ -59,10 +59,11 @@ contextBridge.exposeInMainWorld("api", {
   gitStatus: (cwd) => ipcRenderer.invoke("git-status", cwd),
   gitFetch: (cwd) => ipcRenderer.invoke("git-fetch", cwd),
   gitDiff: (cwd) => ipcRenderer.invoke("git-diff", cwd),
+  gitStage: (cwd, paths) => ipcRenderer.invoke("git-stage", cwd, paths),
+  gitUnstage: (cwd, paths) => ipcRenderer.invoke("git-unstage", cwd, paths),
   gitCommit: (cwd, message) => ipcRenderer.invoke("git-commit", cwd, message),
   gitPush: (cwd) => ipcRenderer.invoke("git-push", cwd),
   gitPull: (cwd) => ipcRenderer.invoke("git-pull", cwd),
-  gitGenerateCommitMessage: (cwd) => ipcRenderer.invoke("git-generate-commit-message", cwd),
 
   // Terminal sessions
   terminalCreate: (opts) => ipcRenderer.invoke("terminal-create", opts),

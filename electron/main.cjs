@@ -672,11 +672,38 @@ ipcMain.handle("git-diff", async (_event, cwd) => {
   }
 });
 
+ipcMain.handle("git-stage", async (_event, cwd, paths) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const args = Array.isArray(paths) && paths.length
+      ? ["add", "--", ...paths]
+      : ["add", "-A"];
+    await git(args, cwd);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-unstage", async (_event, cwd, paths) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const args = Array.isArray(paths) && paths.length
+      ? ["reset", "HEAD", "--", ...paths]
+      : ["reset", "HEAD"];
+    await git(args, cwd);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
 ipcMain.handle("git-commit", async (_event, cwd, message) => {
   if (!cwd) return { ok: false, stderr: "no cwd" };
   if (!message || !message.trim()) return { ok: false, stderr: "empty message" };
   try {
-    await git(["add", "-A"], cwd);
+    const staged = await git(["diff", "--cached", "--name-only"], cwd);
+    if (!staged.trim()) await git(["add", "-A"], cwd);
     const stdout = await git(["commit", "-m", message], cwd);
     return { ok: true, stdout };
   } catch (err) {
@@ -710,51 +737,6 @@ ipcMain.handle("git-pull", async (_event, cwd) => {
   } catch (err) {
     return { ok: false, stderr: err.message };
   }
-});
-
-ipcMain.handle("git-generate-commit-message", async (_event, cwd) => {
-  if (!cwd) return { message: "" };
-  const { spawn } = require("child_process");
-
-  // Pull diff ourselves (don't trust renderer to pass large blobs).
-  let diff;
-  try {
-    diff = await git(["diff", "HEAD"], cwd);
-  } catch {
-    try { diff = await git(["diff"], cwd); } catch { diff = ""; }
-  }
-  if (!diff.trim()) return { message: "" };
-  const LIMIT = 64 * 1024;
-  if (diff.length > LIMIT) diff = diff.slice(0, LIMIT);
-
-  return new Promise((resolve) => {
-    const claudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
-    if (!claudeBin) { resolve({ message: "" }); return; }
-
-    const prompt = "Write a single-line conventional-commit-style message for this diff. Under 72 chars. No quotes, no prefixes like \"here's the message:\". Output only the commit message.";
-    const args = [
-      "--print",
-      "--output-format", "text",
-      "--tools", "",
-      "--model", "haiku",
-      "--no-session-persistence",
-      "--system-prompt", prompt,
-    ];
-    const child = spawn(claudeBin, args, {
-      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    let out = "";
-    let done = false;
-    let timer;
-    const finish = (msg) => { if (done) return; done = true; clearTimeout(timer); resolve({ message: msg }); };
-    child.stdout.on("data", (c) => { out += c.toString(); });
-    child.stderr.on("data", () => {});
-    child.on("close", () => finish(out.trim().split("\n")[0] || ""));
-    child.on("error", () => finish(out.trim().split("\n")[0] || ""));
-    timer = setTimeout(() => { try { child.kill(); } catch {} finish(out.trim().split("\n")[0] || ""); }, 15000);
-    try { child.stdin.write(diff); child.stdin.end(); } catch {}
-  });
 });
 
 // IPC: get repo name from cwd via git remote

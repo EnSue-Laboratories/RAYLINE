@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { GitCommitHorizontal, Sparkles, X } from "lucide-react";
+import { GitCommitHorizontal, X, Plus, Minus } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import useGitStatus from "../hooks/useGitStatus";
 
@@ -8,20 +8,42 @@ const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 const MENU_WIDTH = 360;
 
-function statusLetter(idx, wt) {
-  if (idx === "?" ) return "?" ;
-  if (idx === "A" || wt === "A") return "A";
-  if (idx === "D" || wt === "D") return "D";
-  if (idx === "R" || wt === "R") return "R";
+function letterFor(code) {
+  if (code === "?") return "U";
+  if (code === "A") return "A";
+  if (code === "D") return "D";
+  if (code === "R") return "R";
   return "M";
 }
+
+const STATUS_COLORS = {
+  U: "rgba(130,210,140,0.85)",
+  A: "rgba(130,210,140,0.85)",
+  M: "rgba(240,180,90,0.85)",
+  D: "rgba(230,120,120,0.9)",
+  R: "rgba(150,190,255,0.85)",
+};
+
+const rowIconBtnStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 18,
+  height: 18,
+  padding: 0,
+  background: "transparent",
+  border: "none",
+  borderRadius: 4,
+  color: "rgba(255,255,255,0.5)",
+  cursor: "pointer",
+  transition: "color .15s",
+};
 
 export default function GitStatusPill({ cwd }) {
   const s = useFontScale();
   const { status, refresh, refetch } = useGitStatus(cwd);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
-  const [generating, setGenerating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const triggerRef = useRef(null);
@@ -90,21 +112,11 @@ export default function GitStatusPill({ cwd }) {
   const dirty = status.files.length;
   const { ahead, behind, detached, upstream, branch } = status;
   const clean = dirty === 0 && ahead === 0 && behind === 0;
+  const staged = status.files.filter((f) => f.index !== "." && f.index !== "?");
+  const unstaged = status.files.filter((f) => f.worktree !== "." || f.index === "?");
   const canPush = !detached && upstream;
   const canPull = !detached && upstream && behind > 0;
   const canCommit = !detached && dirty > 0 && message.trim().length > 0 && !busy;
-
-  const handleGenerate = async () => {
-    if (generating || !window.api?.gitGenerateCommitMessage) return;
-    setGenerating(true);
-    try {
-      const { message: msg } = await window.api.gitGenerateCommitMessage(cwd);
-      if (msg) setMessage(msg);
-      else setError("Couldn't generate a message.");
-    } finally {
-      setGenerating(false);
-    }
-  };
 
   const handleCommitAndPush = async () => {
     if (!canCommit) return;
@@ -122,6 +134,18 @@ export default function GitStatusPill({ cwd }) {
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleStage = async (path) => {
+    if (!window.api?.gitStage) return;
+    await window.api.gitStage(cwd, [path]);
+    await refresh();
+  };
+
+  const handleUnstage = async (path) => {
+    if (!window.api?.gitUnstage) return;
+    await window.api.gitUnstage(cwd, [path]);
+    await refresh();
   };
 
   const handlePull = async () => {
@@ -145,11 +169,12 @@ export default function GitStatusPill({ cwd }) {
         top: menuStyle.top,
         left: menuStyle.left,
         width: menuStyle.width,
-        background: "rgba(14,14,14,0.98)",
+        background: "rgba(10,10,12,0.55)",
         border: "1px solid rgba(255,255,255,0.08)",
         borderRadius: 10,
-        boxShadow: "0 12px 36px rgba(0,0,0,0.6)",
-        backdropFilter: "blur(24px) saturate(1.1)",
+        boxShadow: "0 12px 36px rgba(0,0,0,0.5)",
+        backdropFilter: "blur(56px) saturate(1.1)",
+        WebkitBackdropFilter: "blur(56px) saturate(1.1)",
         color: "rgba(255,255,255,0.85)",
         fontFamily: "system-ui, sans-serif",
         fontSize: s(12),
@@ -177,65 +202,58 @@ export default function GitStatusPill({ cwd }) {
       </div>
 
       {/* file list */}
-      <div style={{ padding: "8px 12px", maxHeight: 200, overflowY: "auto" }}>
-        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: s(10), fontFamily: "'JetBrains Mono',monospace", letterSpacing: ".08em", marginBottom: 6 }}>
-          {clean ? "NO CHANGES" : `CHANGED FILES (${dirty})`}
-        </div>
-        {status.files.map((f) => (
-          <div key={f.path} style={{
-            display: "flex", gap: 8, alignItems: "center",
-            fontFamily: "'JetBrains Mono',monospace", fontSize: s(11),
-            padding: "2px 0", color: "rgba(255,255,255,0.7)",
-          }}>
-            <span style={{ width: 14, color: "rgba(240,180,90,0.8)" }}>{statusLetter(f.index, f.worktree)}</span>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{f.path}</span>
+      <div style={{ padding: "8px 12px", maxHeight: 260, overflowY: "auto" }}>
+        {clean && (
+          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: s(10), fontFamily: "'JetBrains Mono',monospace", letterSpacing: ".08em" }}>
+            NO CHANGES
           </div>
-        ))}
+        )}
+        {staged.length > 0 && (
+          <FileSection
+            title={`STAGED CHANGES (${staged.length})`}
+            files={staged}
+            s={s}
+            pickCode={(f) => f.index}
+            action="unstage"
+            onAction={handleUnstage}
+          />
+        )}
+        {unstaged.length > 0 && (
+          <FileSection
+            title={`CHANGES (${unstaged.length})`}
+            files={unstaged}
+            s={s}
+            pickCode={(f) => (f.index === "?" ? "?" : f.worktree)}
+            action="stage"
+            onAction={handleStage}
+            style={{ marginTop: staged.length > 0 ? 10 : 0 }}
+          />
+        )}
       </div>
 
       {/* commit message */}
       {!detached && (
         <div style={{ padding: "8px 12px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
-            <textarea
-              placeholder="Commit message"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={2}
-              style={{
-                flex: 1,
-                resize: "none",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 6,
-                color: "rgba(255,255,255,0.9)",
-                fontFamily: "system-ui,sans-serif",
-                fontSize: s(12),
-                padding: "6px 8px",
-                outline: "none",
-              }}
-            />
-            <button
-              onClick={handleGenerate}
-              disabled={generating || dirty === 0}
-              title="Generate commit message with Claude"
-              style={{
-                display: "flex", alignItems: "center", gap: 4,
-                height: 28, padding: "0 8px",
-                borderRadius: 6,
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                color: generating ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.7)",
-                fontSize: s(11),
-                fontFamily: "'JetBrains Mono',monospace",
-                cursor: generating || dirty === 0 ? "default" : "pointer",
-                opacity: dirty === 0 ? 0.4 : 1,
-              }}
-            >
-              <Sparkles size={12} strokeWidth={1.6} />
-              {generating ? "…" : "GEN"}
-            </button>
-          </div>
+          <textarea
+            placeholder="Commit message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={2}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              resize: "none",
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 6,
+              color: "rgba(255,255,255,0.9)",
+              fontFamily: "system-ui,sans-serif",
+              fontSize: s(12),
+              lineHeight: 1.4,
+              padding: "6px 8px",
+              outline: "none",
+            }}
+          />
         </div>
       )}
 
@@ -346,5 +364,39 @@ export default function GitStatusPill({ cwd }) {
       </button>
       {popover}
     </>
+  );
+}
+
+function FileSection({ title, files, s, pickCode, action, onAction, style }) {
+  return (
+    <div style={style}>
+      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: s(10), fontFamily: "'JetBrains Mono',monospace", letterSpacing: ".08em", marginBottom: 6 }}>
+        {title}
+      </div>
+      {files.map((f) => {
+        const letter = letterFor(pickCode(f));
+        const Icon = action === "stage" ? Plus : Minus;
+        const actionTitle = action === "stage" ? "Stage" : "Unstage";
+        return (
+          <div key={f.path + ":" + action} style={{
+            display: "flex", gap: 8, alignItems: "center",
+            fontFamily: "'JetBrains Mono',monospace", fontSize: s(11),
+            padding: "2px 0", color: "rgba(255,255,255,0.7)",
+          }}>
+            <span style={{ width: 14, color: STATUS_COLORS[letter] || "rgba(255,255,255,0.6)" }}>{letter}</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{f.path}</span>
+            <button
+              onClick={() => onAction(f.path)}
+              title={actionTitle}
+              style={rowIconBtnStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.9)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+            >
+              <Icon size={12} strokeWidth={1.8} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
