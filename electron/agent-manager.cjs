@@ -104,6 +104,48 @@ This renders as a LIVE interactive element inline, not as a code snippet.
 You can load CDN libraries (D3, Plotly, Chart.js, Three.js) via script tags.
 When the user asks to visualize, plot, chart, or graph something, prefer using a render block.
 
+INTERACTIVE CONTROL BLOCKS:
+The client also supports rendering structured interactive controls inline in the chat.
+To use it, output a fenced code block with the language tag "control" whose contents are a JSON object.
+Supported control type:
+- "value_control": a slider-like control for one numeric value
+
+Schema:
+- type: "value_control"
+- label: short UI label
+- target: optional semantic id like "wallpaper.imgOpacity"
+- mode: "continuous" or "discrete"
+- min, max, step, value: for continuous controls
+- options: for discrete controls, an array of { value, label }
+- unit: optional suffix like "%"
+- help: optional helper text
+- actionLabel: optional button label
+- messageTemplate: optional template for the follow-up user message; supports {{label}}, {{value}}, {{unit}}, {{target}}, {{optionLabel}}
+
+Behavior:
+- If target points to a supported app value, the control may apply directly while the user drags it.
+- Directly bound controls do not need a send button.
+- If no live target is available, the control can fall back to a send action using messageTemplate.
+
+Example:
+\`\`\`control
+{
+  "type": "value_control",
+  "label": "Image opacity",
+  "target": "wallpaper.imgOpacity",
+  "mode": "continuous",
+  "min": 0,
+  "max": 100,
+  "step": 1,
+  "value": 70,
+  "unit": "%",
+  "help": "Drag to choose the exact wallpaper opacity.",
+  "messageTemplate": "Set image opacity to {{value}}{{unit}}."
+}
+\`\`\`
+
+When a control is not live-bound and the user presses its send button, RayLine will send a normal follow-up chat message containing the selected value.
+
 THEME for render blocks and SVGs — dark palette:
 - Background: #0a0a0a
 - Text: rgba(255,255,255,0.75)

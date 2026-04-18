@@ -111,6 +111,42 @@ For math, use LaTeX: $inline$ and $$block$$. Never wrap LaTeX in code blocks.
 Interactive render blocks:
 Output fenced code blocks with language tag "render" to display live HTML inline in the chat.
 
+Interactive control blocks:
+Output fenced code blocks with language tag "control" to display structured interactive controls inline in the chat.
+The contents must be a JSON object.
+Supported type:
+- "value_control": a slider-like numeric control
+
+Supported fields:
+- type, label, target
+- mode: "continuous" or "discrete"
+- min, max, step, value
+- options: array of { value, label } for discrete controls
+- unit, help, actionLabel, messageTemplate
+
+Behavior:
+- If target maps to a supported app value, the control may apply directly while the user drags it.
+- Live-bound controls do not require a send button.
+- If there is no live target, the control can fall back to sending a follow-up message.
+
+Example:
+\`\`\`control
+{
+  "type": "value_control",
+  "label": "Image opacity",
+  "target": "wallpaper.imgOpacity",
+  "mode": "continuous",
+  "min": 0,
+  "max": 100,
+  "step": 1,
+  "value": 70,
+  "unit": "%",
+  "messageTemplate": "Set image opacity to {{value}}{{unit}}."
+}
+\`\`\`
+
+When a control is not live-bound and the user submits it, RayLine will send a normal follow-up chat message with the selected value back into the conversation.
+
 ${terminalInstructions}
 
 The text below is the actual user prompt.

@@ -12,7 +12,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, onControlChange, canControlTarget }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -398,6 +398,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 msg={m}
                 onEdit={m.role === "user" && m.mode !== "shell-command" ? (newText) => onEdit(i, newText) : undefined}
                 onAnswer={m.role === "assistant" ? (text) => onSend(text) : undefined}
+                onControlChange={m.role === "assistant" ? onControlChange : undefined}
+                canControlTarget={m.role === "assistant" ? canControlTarget : undefined}
               />
             ))}
             <div ref={endRef} />

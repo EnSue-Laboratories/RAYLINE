@@ -1,0 +1,46 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]: ENSUE OPACITY LAB
+    - heading "Slider drag test" [level=1] [ref=e6]
+    - paragraph [ref=e7]: Isolated dev page for testing wallpaper controls without the full app in the way. The slider hit area is intentionally larger than the visible track.
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e10]: Image Opacity
+        - strong [ref=e11]: 41%
+      - slider "Image Opacity 41%" [ref=e12]: "41"
+      - paragraph [ref=e13]: Controls the wallpaper image alpha directly.
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]: Image Blur
+        - strong [ref=e17]: 3px
+      - slider "Image Blur 3px" [ref=e18]: "3"
+      - paragraph [ref=e19]: Optional secondary control so the preview feels closer to the app.
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: Panel Surface
+        - strong [ref=e23]: 78%
+      - slider "Panel Surface 78%" [ref=e24]: "78"
+      - paragraph [ref=e25]: Helps separate wallpaper opacity from pane darkness.
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - text: "Port:"
+        - code [ref=e28]: "4000"
+      - generic [ref=e29]:
+        - text: "Mode:"
+        - code [ref=e30]: vite dev
+      - generic [ref=e31]:
+        - text: "Bridge:"
+        - strong [ref=e32]: connected
+        - text: "on"
+        - code [ref=e33]: "4001"
+      - generic [ref=e34]: "Goal: test drag fidelity first, app integration second"
+  - generic [ref=e35]:
+    - complementary [ref=e38]:
+      - generic [ref=e39]: Conversations
+      - generic [ref=e40]: Opacity tuning
+      - generic [ref=e41]: Wallpaper blur
+      - generic [ref=e42]: Hover transparency
+    - generic [ref=e43]:
+      - generic [ref=e44]: Preview
+      - generic [ref=e45]: Drag the sliders and watch the wallpaper and glass panels respond independently.
+      - generic [ref=e46]: If the slider still feels bad here, the issue is the control itself. If it feels good here, the problem is in app layout or event handling.

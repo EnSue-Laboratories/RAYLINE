@@ -11,7 +11,7 @@ import { DEFAULT_MODEL_ID, getM, normalizeModelId } from "./data/models";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
-import { getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
+import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
 function logCheckpoint(...args) {
   console.log("[checkpoint-ui]", ...args);
@@ -23,6 +23,9 @@ function logSendFlow(...args) {
 
 const SHELL_TRANSCRIPT_LIMIT = 12000;
 const SHELL_TERMINAL_TIMEOUT_MS = 15000;
+const LAB_CONTROL_ENDPOINT = "http://127.0.0.1:4001/control";
+const LAB_CONTROL_COMMIT_DELAY_MS = 1000;
+const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
 
 function logSessionState(...args) {
   console.log("[session-state]", ...args);
@@ -56,6 +59,12 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function clampNumber(value, min, max, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+}
+
 function stripAnsi(text) {
   const esc = String.fromCharCode(27);
   return text.replace(new RegExp(`${esc}(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])`, "g"), "");
@@ -80,6 +89,16 @@ function cleanTerminalShellOutput(text, marker) {
     })
     .join("\n")
     .trim();
+}
+
+function postLabControlUpdate(target, value) {
+  return fetch(LAB_CONTROL_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ target, value }),
+  });
 }
 
 async function runShellViaTerminalApi({ command, cwd }) {
@@ -592,6 +611,7 @@ export default function App() {
   const [stateLoaded, setStateLoaded] = useState(false);
   const [wallpaper, setWallpaper] = useState(null);
   const [fontSize, setFontSize] = useState(15);
+  const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
   const [showSettings, setShowSettings] = useState(false);
   const [projects, setProjects] = useState({});
@@ -600,6 +620,75 @@ export default function App() {
   const [showNewChatCard, setShowNewChatCard] = useState(false);
   const messageQueue = useRef([]);
   const [queuedMessages, setQueuedMessages] = useState([]);
+  const labControlTimersRef = useRef(new Map());
+
+  const canControlTarget = useCallback((target) => (
+    target === "wallpaper.imgBlur"
+    || target === "wallpaper.imgOpacity"
+    || target === "fontSize"
+    || target === "app.fontSize"
+    || target === "sidebar.activeOpacity"
+    || target === "lab.imageOpacity"
+    || target === "lab.imageBlur"
+    || target === "lab.panelOpacity"
+  ), []);
+
+  useEffect(() => () => {
+    for (const timer of labControlTimersRef.current.values()) {
+      clearTimeout(timer);
+    }
+    labControlTimersRef.current.clear();
+  }, []);
+
+  const queueLabControlUpdate = useCallback((target, value) => {
+    const timers = labControlTimersRef.current;
+    const existingTimer = timers.get(target);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+
+    const timer = setTimeout(() => {
+      void postLabControlUpdate(target, value).catch((error) => {
+        console.warn("[control-bridge] failed to update lab target:", target, error);
+      });
+      timers.delete(target);
+    }, LAB_CONTROL_COMMIT_DELAY_MS);
+
+    timers.set(target, timer);
+  }, []);
+
+  const handleControlChange = useCallback(({ target, value }) => {
+    if (!target) return;
+
+    switch (target) {
+      case "wallpaper.imgBlur":
+        setWallpaper((prev) => normalizeWallpaper({
+          ...(prev ?? DEFAULT_WALLPAPER),
+          imgBlur: clampNumber(value, 0, 32, DEFAULT_WALLPAPER.imgBlur),
+        }));
+        return;
+      case "wallpaper.imgOpacity":
+        setWallpaper((prev) => normalizeWallpaper({
+          ...(prev ?? DEFAULT_WALLPAPER),
+          imgOpacity: clampNumber(value, 0, 100, DEFAULT_WALLPAPER.imgOpacity),
+        }));
+        return;
+      case "fontSize":
+      case "app.fontSize":
+        setFontSize(clampNumber(value, 12, 22, 15));
+        return;
+      case "sidebar.activeOpacity":
+        setSidebarActiveOpacity(clampNumber(value, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
+        return;
+      case "lab.imageOpacity":
+      case "lab.imageBlur":
+      case "lab.panelOpacity":
+        queueLabControlUpdate(target, value);
+        return;
+      default:
+        return;
+    }
+  }, [queueLabControlUpdate]);
 
   // Load state from file on mount
   useEffect(() => {
@@ -623,6 +712,9 @@ export default function App() {
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
         if (state.fontSize) setFontSize(state.fontSize);
+        if (state.sidebarActiveOpacity != null) {
+          setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
+        }
         if (state.defaultPrBranch) setDefaultPrBranch(state.defaultPrBranch);
         if (state.wallpaper) {
           setWallpaper(normalizeWallpaper(state.wallpaper));
@@ -656,13 +748,14 @@ export default function App() {
         cwd,
         defaultModel,
         fontSize,
+        sidebarActiveOpacity,
         wallpaper: wpSave,
         projects,
         draftsCollapsed,
         defaultPrBranch,
       });
     }, 300);
-  }, [convoList, active, cwd, defaultModel, fontSize, wallpaper, projects, draftsCollapsed, defaultPrBranch, stateLoaded]);
+  }, [convoList, active, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, stateLoaded]);
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
@@ -1813,7 +1906,10 @@ export default function App() {
           flexDirection: "column",
           position: "relative",
           zIndex: 10,
-          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
+          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), {
+            hoverOpacity: clampNumber(sidebarActiveOpacity * 0.6, 0.8, sidebarActiveOpacity),
+            activeOpacity: sidebarActiveOpacity,
+          }),
           backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
           transition: "all .35s cubic-bezier(.16,1,.3,1)",
           overflow: "hidden",
@@ -1884,6 +1980,8 @@ export default function App() {
           allCwdRoots={allCwdRoots}
           projects={projects}
           defaultPrBranch={defaultPrBranch}
+          onControlChange={handleControlChange}
+          canControlTarget={canControlTarget}
         />
       )}
 
