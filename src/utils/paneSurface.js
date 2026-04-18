@@ -45,16 +45,16 @@ export function getPaneSurfaceStyle(hasWallpaper) {
   return {
     background: "var(--pane-background-overlay)",
     "--pane-elevated": "var(--pane-elevated)",
-    "--pane-hover": "rgba(255, 255, 255, 0.03)",
-    "--pane-active": "rgba(255, 255, 255, 0.045)",
+    "--pane-hover": "rgba(255, 255, 255, 0.02)",
+    "--pane-active": "rgba(255, 255, 255, 0.035)",
     "--pane-border": "rgba(255, 255, 255, 0.06)",
-    "--pane-interaction-hover": "rgba(255, 255, 255, 0.03)",
-    "--pane-interaction-active": "rgba(255, 255, 255, 0.045)",
-    "--pane-interaction-hover-fill": "rgba(255, 255, 255, 0.03)",
-    "--pane-interaction-active-fill": "rgba(255, 255, 255, 0.045)",
+    "--pane-interaction-hover": "rgba(255, 255, 255, 0.02)",
+    "--pane-interaction-active": "rgba(255, 255, 255, 0.035)",
+    "--pane-interaction-hover-fill": "rgba(255, 255, 255, 0.02)",
+    "--pane-interaction-active-fill": "rgba(255, 255, 255, 0.035)",
     "--pane-interaction-hover-filter": "none",
     "--pane-interaction-active-filter": "none",
-    "--pane-interaction-hover-shadow": "inset 0 0 0 1px rgba(255,255,255,0.045)",
+    "--pane-interaction-hover-shadow": "inset 0 0 0 1px rgba(255,255,255,0.035)",
     "--pane-interaction-active-shadow": "none",
   };
 }
