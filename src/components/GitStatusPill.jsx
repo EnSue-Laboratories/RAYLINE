@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { GitCommitHorizontal, GitPullRequestArrow, CloudUpload, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
+import { GitCommitHorizontal, GitPullRequestArrow, CloudUpload, Sparkles, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import useGitStatus from "../hooks/useGitStatus";
 
@@ -45,6 +45,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [confirm, setConfirm] = useState(null); // { title, body, confirmLabel, destructive, onConfirm }
   const triggerRef = useRef(null);
@@ -205,6 +206,22 @@ export default function GitStatusPill({ cwd, defaultPrBranch }) {
     }
   };
 
+  const handleGenerateMessage = async () => {
+    if (generating || !window.api?.gitGenCommitMessage) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const r = await window.api.gitGenCommitMessage(cwd);
+      if (!r.ok) {
+        setError(r.stderr || "Failed to generate commit message");
+        return;
+      }
+      setMessage(r.message || "");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const handlePublish = async () => {
     if (!canPublish) return;
     setBusy(true);
@@ -316,26 +333,64 @@ export default function GitStatusPill({ cwd, defaultPrBranch }) {
       {/* commit message */}
       {!detached && (
         <div style={{ padding: "8px 12px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <textarea
-            placeholder="Commit message"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={1}
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              resize: "none",
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 6,
-              color: "rgba(255,255,255,0.9)",
-              fontFamily: "system-ui,sans-serif",
-              fontSize: s(12),
-              lineHeight: 1.4,
-              padding: "6px 8px",
-              outline: "none",
-            }}
-          />
+          <div style={{ position: "relative" }}>
+            <textarea
+              placeholder={generating ? "Generating with Sonnet…" : "Commit message  (⇥ to generate)"}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Tab" && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
+                  if (message.trim().length > 0) return; // don't clobber user text
+                  e.preventDefault();
+                  handleGenerateMessage();
+                }
+              }}
+              disabled={generating}
+              rows={1}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                resize: "none",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 6,
+                color: "rgba(255,255,255,0.9)",
+                fontFamily: "system-ui,sans-serif",
+                fontSize: s(12),
+                lineHeight: 1.4,
+                padding: "6px 28px 6px 8px",
+                outline: "none",
+                opacity: generating ? 0.6 : 1,
+              }}
+            />
+            <button
+              onClick={handleGenerateMessage}
+              disabled={generating}
+              title={generating ? "Generating…" : "Generate commit message (Tab)"}
+              style={{
+                position: "absolute",
+                right: 4,
+                top: "50%",
+                transform: "translateY(-50%)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 22,
+                height: 22,
+                padding: 0,
+                background: "transparent",
+                border: "none",
+                borderRadius: 4,
+                color: generating ? "rgba(180,220,255,0.95)" : "rgba(255,255,255,0.45)",
+                cursor: generating ? "default" : "pointer",
+                transition: "color .15s",
+              }}
+              onMouseEnter={(e) => { if (!generating) e.currentTarget.style.color = "rgba(255,255,255,0.9)"; }}
+              onMouseLeave={(e) => { if (!generating) e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
+            >
+              <Sparkles size={13} strokeWidth={1.6} style={generating ? { opacity: 0.9 } : undefined} />
+            </button>
+          </div>
         </div>
       )}
 

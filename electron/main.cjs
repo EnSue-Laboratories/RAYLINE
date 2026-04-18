@@ -947,6 +947,74 @@ ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
   }
 });
 
+// IPC: generate commit message from staged diff via Claude (sonnet)
+ipcMain.handle("git-gen-commit-message", async (_e, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    // Prefer staged diff; fall back to full working diff if nothing staged.
+    let diff = "";
+    try { diff = await git(["diff", "--cached"], cwd); } catch {}
+    if (!diff.trim()) {
+      try { diff = await git(["diff", "HEAD"], cwd); } catch {}
+    }
+    if (!diff.trim()) {
+      try {
+        const untracked = await git(["ls-files", "--others", "--exclude-standard"], cwd);
+        if (untracked.trim()) diff = `# Untracked files:\n${untracked}`;
+      } catch {}
+    }
+    if (!diff.trim()) return { ok: false, stderr: "No changes to summarize" };
+
+    const LIMIT = 48 * 1024;
+    if (diff.length > LIMIT) diff = diff.slice(0, LIMIT);
+
+    const claudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
+    if (!claudeBin) return { ok: false, stderr: "Unable to locate the Claude CLI binary" };
+
+    const systemPrompt = "You write concise conventional git commit messages. Output ONLY the commit message — no quotes, no code fences, no preamble, no trailing commentary. Prefer a single subject line under 72 chars in the form 'type: summary' (type ∈ feat, fix, refactor, chore, docs, test, style, perf). Only include a body if genuinely useful, separated by one blank line.";
+    const userPrompt = `Write a commit message for the following diff:\n\n${diff}`;
+
+    const args = [
+      "--print",
+      "--output-format", "text",
+      "--tools", "",
+      "--model", "sonnet",
+      "--no-session-persistence",
+      "--system-prompt", systemPrompt,
+      userPrompt,
+    ];
+
+    return await new Promise((resolve) => {
+      const { spawn } = require("child_process");
+      const child = spawn(claudeBin, args, {
+        cwd,
+        env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (c) => { out += c.toString(); });
+      child.stderr.on("data", (c) => { err += c.toString(); });
+      const timer = setTimeout(() => {
+        try { child.kill(); } catch {}
+        resolve({ ok: false, stderr: "Timed out generating commit message" });
+      }, 45000);
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        const msg = out.trim().replace(/^["'`]+|["'`]+$/g, "").trim();
+        if (!msg) return resolve({ ok: false, stderr: err.trim() || `exit ${code}` });
+        resolve({ ok: true, message: msg });
+      });
+      child.on("error", (e) => {
+        clearTimeout(timer);
+        resolve({ ok: false, stderr: e.message });
+      });
+    });
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
 // IPC: get repo name from cwd via git remote
 ipcMain.handle("gh-get-repo-name", async (_e, cwd) => {
   const { execFile } = require("child_process");

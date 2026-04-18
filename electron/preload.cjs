@@ -68,6 +68,7 @@ contextBridge.exposeInMainWorld("api", {
   gitPush: (cwd) => ipcRenderer.invoke("git-push", cwd),
   gitPull: (cwd) => ipcRenderer.invoke("git-pull", cwd),
   gitCreatePr: (cwd, base) => ipcRenderer.invoke("git-create-pr", cwd, base),
+  gitGenCommitMessage: (cwd) => ipcRenderer.invoke("git-gen-commit-message", cwd),
 
   // Terminal sessions
   terminalCreate: (opts) => ipcRenderer.invoke("terminal-create", opts),
