@@ -4,7 +4,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, onClose }) {
   const s = useFontScale();
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
 
@@ -73,6 +73,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const sliderPct = (value, min, max) => ((value - min) / (max - min)) * 100;
   const imgBlurPct = sliderPct(local.imgBlur || 0, 0, 32);
   const imgOpacityPct = sliderPct(local.imgOpacity || 0, 0, 100);
+  const appBlurPct = sliderPct(appBlur || 0, 0, 20);
+  const appOpacityPct = sliderPct(appOpacity || 100, 30, 100);
 
   // Slider track style helper
   const sliderTrack = (pct) =>
@@ -351,6 +353,66 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               }}
             >
               Controls wallpaper transparency.
+            </div>
+          </div>
+
+          {/* Application Blur */}
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 10,
+              }}
+            >
+              Application Blur: {appBlur || 0}
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={20}
+              value={appBlur || 0}
+              onChange={(e) => onAppBlurChange?.(Number(e.target.value))}
+              style={sliderStyle(appBlurPct)}
+            />
+            <div
+              style={{
+                fontSize: s(10),
+                color: "rgba(255,255,255,0.3)",
+                marginTop: 8,
+              }}
+            >
+              Blurs the window background only.
+            </div>
+          </div>
+
+          {/* Application Opacity */}
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 10,
+              }}
+            >
+              Application Opacity: {appOpacity ?? 100}
+            </div>
+            <input
+              type="range"
+              min={30}
+              max={100}
+              value={appOpacity ?? 100}
+              onChange={(e) => onAppOpacityChange?.(Number(e.target.value))}
+              style={sliderStyle(appOpacityPct)}
+            />
+            <div
+              style={{
+                fontSize: s(10),
+                color: "rgba(255,255,255,0.3)",
+                marginTop: 8,
+              }}
+            >
+              Makes the entire window transparent.
             </div>
           </div>
 

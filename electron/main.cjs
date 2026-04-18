@@ -210,6 +210,15 @@ ipcMain.on("open-project-manager", () => {
   createProjectManagerWindow();
 });
 
+ipcMain.handle("set-window-opacity", (event, opacity) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  if (!win) return false;
+  const v = Number(opacity);
+  if (!Number.isFinite(v)) return false;
+  win.setOpacity(Math.max(0.2, Math.min(1, v)));
+  return true;
+});
+
 // IPC: open path in Finder / file manager
 ipcMain.handle("open-path", async (_event, dirPath) => {
   const { shell } = require("electron");

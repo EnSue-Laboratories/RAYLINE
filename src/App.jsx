@@ -613,6 +613,8 @@ export default function App() {
   const [fontSize, setFontSize] = useState(15);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
+  const [appBlur, setAppBlur] = useState(0);
+  const [appOpacity, setAppOpacity] = useState(100);
   const [showSettings, setShowSettings] = useState(false);
   const [projects, setProjects] = useState({});
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
@@ -625,6 +627,8 @@ export default function App() {
   const canControlTarget = useCallback((target) => (
     target === "wallpaper.imgBlur"
     || target === "wallpaper.imgOpacity"
+    || target === "app.blur"
+    || target === "app.opacity"
     || target === "fontSize"
     || target === "app.fontSize"
     || target === "sidebar.activeOpacity"
@@ -673,6 +677,12 @@ export default function App() {
           imgOpacity: clampNumber(value, 0, 100, DEFAULT_WALLPAPER.imgOpacity),
         }));
         return;
+      case "app.blur":
+        setAppBlur(clampNumber(value, 0, 20, 0));
+        return;
+      case "app.opacity":
+        setAppOpacity(clampNumber(value, 30, 100, 100));
+        return;
       case "fontSize":
       case "app.fontSize":
         setFontSize(clampNumber(value, 12, 22, 15));
@@ -716,6 +726,8 @@ export default function App() {
           setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
         }
         if (state.defaultPrBranch) setDefaultPrBranch(state.defaultPrBranch);
+        if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
+        if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.wallpaper) {
           setWallpaper(normalizeWallpaper(state.wallpaper));
           // Reload data URL from disk (not persisted — too large for JSON)
@@ -753,9 +765,17 @@ export default function App() {
         projects,
         draftsCollapsed,
         defaultPrBranch,
+        appBlur,
+        appOpacity,
       });
     }, 300);
-  }, [convoList, active, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, stateLoaded]);
+  }, [convoList, active, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, appBlur, appOpacity, stateLoaded]);
+
+  // Push window opacity to Electron
+  useEffect(() => {
+    if (!stateLoaded || !window.api?.setWindowOpacity) return;
+    window.api.setWindowOpacity(Math.max(0.3, Math.min(1, appOpacity / 100)));
+  }, [appOpacity, stateLoaded]);
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
@@ -1876,6 +1896,8 @@ export default function App() {
           position: "fixed",
           inset: 0,
           zIndex: 0,
+          filter: appBlur > 0 ? `blur(${appBlur}px)` : "none",
+          transition: "filter .2s",
         }}>
           <div style={{
             position: "absolute",
@@ -1886,16 +1908,31 @@ export default function App() {
             backgroundRepeat: "no-repeat",
             filter: getWallpaperImageFilter(wallpaper),
             opacity: ((wallpaper.imgOpacity ?? 100) / 100).toFixed(3),
-            transform: wallpaper.imgBlur ? "scale(1.05)" : "none", // prevent blur edge artifacts
+            transform: (wallpaper.imgBlur || appBlur) ? "scale(1.05)" : "none", // prevent blur edge artifacts
           }} />
         </div>
       ) : (
-        <>
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+          filter: appBlur > 0 ? `blur(${appBlur}px)` : "none",
+          transform: appBlur > 0 ? "scale(1.05)" : "none",
+          transition: "filter .2s",
+        }}>
           <AuroraCanvas />
           <Grain />
-        </>
+        </div>
       )}
 
+      <div
+        style={{
+          display: "flex",
+          flex: 1,
+          minWidth: 0,
+          height: "100%",
+        }}
+      >
       {/* Sidebar */}
       <div
         style={{
@@ -1944,6 +1981,10 @@ export default function App() {
           onFontSizeChange={setFontSize}
           defaultPrBranch={defaultPrBranch}
           onDefaultPrBranchChange={setDefaultPrBranch}
+          appBlur={appBlur}
+          onAppBlurChange={setAppBlur}
+          appOpacity={appOpacity}
+          onAppOpacityChange={setAppOpacity}
           onClose={() => setShowSettings(false)}
         />
       ) : (
@@ -2001,6 +2042,7 @@ export default function App() {
         unregisterTerminal={terminal.unregisterTerminal}
         wallpaper={wallpaper}
       />
+      </div>
     </div>
     </FontSizeContext.Provider>
   );
