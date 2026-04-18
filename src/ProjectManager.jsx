@@ -16,6 +16,7 @@ import IssueList from "./pm-components/IssueList";
 import PRList from "./pm-components/PRList";
 import ItemDetail from "./pm-components/ItemDetail";
 import { getPaneInteractionStyle, getPaneSurfaceStyle } from "./utils/paneSurface";
+import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
 const iconBtnStyle = {
   width: 28,
@@ -152,9 +153,9 @@ export default function ProjectManager() {
     window.ghApi.loadPmState().then(({ repos, wallpaper: wp }) => {
       setRepos(repos);
       if (wp?.path) {
-        setWallpaper(wp);
+        setWallpaper(normalizeWallpaper(wp));
         window.ghApi.readImage(wp.path).then((dataUrl) => {
-          if (dataUrl) setWallpaper((prev) => prev ? { ...prev, dataUrl } : prev);
+          if (dataUrl) setWallpaper((prev) => (prev ? normalizeWallpaper({ ...prev, dataUrl }) : prev));
         });
       }
       setStateLoaded(true);
@@ -256,12 +257,10 @@ export default function ProjectManager() {
             position: "absolute", inset: 0,
             backgroundImage: `url(${wallpaper.dataUrl})`,
             backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat",
-            filter: wallpaper.imgBlur ? `blur(${wallpaper.imgBlur}px)` : "none",
+            filter: getWallpaperImageFilter(wallpaper),
+            opacity: ((wallpaper.imgOpacity ?? 100) / 100).toFixed(3),
             transform: wallpaper.imgBlur ? "scale(1.05)" : "none",
           }} />
-          {(wallpaper.imgDarken > 0) && (
-            <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${wallpaper.imgDarken / 100})` }} />
-          )}
         </div>
       ) : (
         <>
@@ -293,7 +292,7 @@ export default function ProjectManager() {
           borderRight: "1px solid rgba(255,255,255,0.025)",
           position: "relative",
           zIndex: 10,
-          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), wallpaper?.opacity),
+          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
           backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
         }}
       >
@@ -381,7 +380,7 @@ export default function ProjectManager() {
           overflow: "hidden",
           position: "relative",
           zIndex: 10,
-          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), wallpaper?.opacity),
+          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
           backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
         }}
       >

@@ -224,7 +224,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     <div
       style={{
         flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10,
-        ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), wallpaper?.opacity),
+        ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
         boxShadow: dragOver ? "inset 0 0 0 1px rgba(153,214,255,0.18)" : "none",
         transition: "box-shadow .2s ease",
       }}
@@ -493,11 +493,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           {filteredCommands.length > 0 && (
             <div style={{
               marginBottom: 6,
-              background: wallpaper?.dataUrl ? `rgba(0,0,0,${(wallpaper.opacity / 100) * 0.95})` : "rgba(24,24,24,0.95)",
+              background: wallpaper?.dataUrl ? "var(--pane-elevated)" : "rgba(24,24,24,0.95)",
               border: "1px solid rgba(255,255,255,0.08)",
               borderRadius: 10,
               padding: "4px",
-              backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 20}px)`,
+              backdropFilter: "blur(20px)",
               boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
             }}>
               {filteredCommands.map((c, i) => (
@@ -556,7 +556,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               border: "1px solid " + (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)"),
               borderRadius: 12,
               padding: "9px 14px",
-              backdropFilter: `blur(${wallpaper?.dataUrl ? wallpaper.blur : 20}px)`,
+              backdropFilter: "blur(20px)",
               transition: "border-color .25s, background .25s",
             }}
           >

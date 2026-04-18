@@ -1,18 +1,18 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ArrowLeft, Image } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
-
-const DEFAULTS = { path: null, dataUrl: null, opacity: 50, blur: 32, imgBlur: 0, imgDarken: 0 };
+import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 
 export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, onClose }) {
   const s = useFontScale();
-  const [local, setLocal] = useState(() => wallpaper ?? { ...DEFAULTS });
-  const debounceRef = useRef(null);
+  const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
 
   // Sync from parent when wallpaper prop changes externally
   useEffect(() => {
-    setLocal(wallpaper ?? { ...DEFAULTS });
+    // Local edits should reset when the persisted wallpaper changes outside this panel.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocal(normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
   }, [wallpaper]);
 
   // Load data URL when path is set but dataUrl is missing (e.g. after app restart)
@@ -20,8 +20,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     if (local.path && !local.dataUrl && window.api?.readImage) {
       window.api.readImage(local.path).then((dataUrl) => {
         if (dataUrl) {
-          setLocal((prev) => ({ ...prev, dataUrl }));
-          onWallpaperChange({ ...local, dataUrl });
+          setLocal((prev) => {
+            const next = normalizeWallpaper({ ...prev, dataUrl });
+            onWallpaperChange(next.path ? next : null);
+            return next;
+          });
         }
       });
     }
@@ -29,10 +32,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
 
   const propagate = useCallback(
     (next) => {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => {
-        onWallpaperChange(next.path ? next : null);
-      }, 150);
+      onWallpaperChange(next.path ? next : null);
     },
     [onWallpaperChange]
   );
@@ -40,7 +40,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const update = useCallback(
     (patch) => {
       setLocal((prev) => {
-        const next = { ...prev, ...patch };
+        const next = normalizeWallpaper({ ...prev, ...patch });
         propagate(next);
         return next;
       });
@@ -57,9 +57,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
 
   const handleRemove = async () => {
     const previousPath = local.path;
-    const next = { ...DEFAULTS };
+    const next = { ...DEFAULT_WALLPAPER };
     setLocal(next);
-    clearTimeout(debounceRef.current);
     onWallpaperChange(null);
     if (previousPath && window.api?.deleteWallpaper) {
       await window.api.deleteWallpaper(previousPath);
@@ -71,10 +70,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
       ? local.path.split(/[/\\]/).slice(-2).join("/")
       : null;
 
-  const opacityPct = local.opacity;
-  const blurPct = (local.blur / 64) * 100;
-  const imgBlurPct = ((local.imgBlur || 0) / 32) * 100;
-  const imgDarkenPct = local.imgDarken || 0;
+  const sliderPct = (value, min, max) => ((value - min) / (max - min)) * 100;
+  const imgBlurPct = sliderPct(local.imgBlur || 0, 0, 32);
+  const imgOpacityPct = sliderPct(local.imgOpacity || 0, 0, 100);
 
   // Slider track style helper
   const sliderTrack = (pct) =>
@@ -106,7 +104,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         minWidth: 0,
         position: "relative",
         zIndex: 10,
-        ...getPaneSurfaceStyle(Boolean(local.dataUrl), local.opacity),
+        ...getPaneSurfaceStyle(Boolean(local.dataUrl)),
         color: "rgba(255,255,255,0.85)",
         fontFamily: "system-ui, sans-serif",
       }}
@@ -326,7 +324,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             />
           </div>
 
-          {/* Image Darken */}
+          {/* Image Opacity */}
           <div style={{ marginBottom: 24 }}>
             <div
               style={{
@@ -335,58 +333,25 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              Image Darken: {local.imgDarken || 0}
+              Image Opacity: {local.imgOpacity || 0}
             </div>
             <input
               type="range"
               min={0}
               max={100}
-              value={local.imgDarken || 0}
-              onChange={(e) => update({ imgDarken: Number(e.target.value) })}
-              style={sliderStyle(imgDarkenPct)}
+              value={local.imgOpacity || 0}
+              onChange={(e) => update({ imgOpacity: Number(e.target.value) })}
+              style={sliderStyle(imgOpacityPct)}
             />
-          </div>
-
-          {/* Window Opacity */}
-          <div style={{ marginBottom: 24 }}>
             <div
               style={{
-                fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
-                marginBottom: 10,
+                fontSize: s(10),
+                color: "rgba(255,255,255,0.3)",
+                marginTop: 8,
               }}
             >
-              Window Opacity: {local.opacity}
+              Controls wallpaper transparency.
             </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={local.opacity}
-              onChange={(e) => update({ opacity: Number(e.target.value) })}
-              style={sliderStyle(opacityPct)}
-            />
-          </div>
-
-          {/* Window Blur Radius */}
-          <div style={{ marginBottom: 24 }}>
-            <div
-              style={{
-                fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
-                marginBottom: 10,
-              }}
-            >
-              Window Blur Radius: {local.blur}
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={64}
-              value={local.blur}
-              onChange={(e) => update({ blur: Number(e.target.value) })}
-              style={sliderStyle(blurPct)}
-            />
           </div>
 
           {/* TYPOGRAPHY section label */}

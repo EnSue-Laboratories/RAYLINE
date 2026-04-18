@@ -11,6 +11,7 @@ import { DEFAULT_MODEL_ID, getM, normalizeModelId } from "./data/models";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
+import { getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
 function logCheckpoint(...args) {
   console.log("[checkpoint-ui]", ...args);
@@ -589,7 +590,7 @@ export default function App() {
   const [defaultModel, setDefaultModel] = useState(DEFAULT_MODEL_ID);
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
-  const [wallpaper, setWallpaper] = useState(null); // { path, opacity, blur }
+  const [wallpaper, setWallpaper] = useState(null);
   const [fontSize, setFontSize] = useState(15);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
   const [showSettings, setShowSettings] = useState(false);
@@ -624,11 +625,11 @@ export default function App() {
         if (state.fontSize) setFontSize(state.fontSize);
         if (state.defaultPrBranch) setDefaultPrBranch(state.defaultPrBranch);
         if (state.wallpaper) {
-          setWallpaper(state.wallpaper);
+          setWallpaper(normalizeWallpaper(state.wallpaper));
           // Reload data URL from disk (not persisted — too large for JSON)
           if (state.wallpaper.path && window.api.readImage) {
             window.api.readImage(state.wallpaper.path).then((dataUrl) => {
-              if (dataUrl) setWallpaper((prev) => prev ? { ...prev, dataUrl } : prev);
+              if (dataUrl) setWallpaper((prev) => (prev ? normalizeWallpaper({ ...prev, dataUrl }) : prev));
             });
           }
         }
@@ -648,7 +649,7 @@ export default function App() {
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       // Strip dataUrl before persisting (too large for JSON, reloaded on startup)
-      const wpSave = wallpaper ? { path: wallpaper.path, opacity: wallpaper.opacity, blur: wallpaper.blur, imgBlur: wallpaper.imgBlur, imgDarken: wallpaper.imgDarken } : null;
+      const wpSave = getPersistedWallpaper(wallpaper);
       window.api.saveState({
         convos: convoList.map((conversation) => normalizeConversationState(conversation)),
         active,
@@ -1790,16 +1791,10 @@ export default function App() {
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
-            filter: wallpaper.imgBlur ? `blur(${wallpaper.imgBlur}px)` : "none",
+            filter: getWallpaperImageFilter(wallpaper),
+            opacity: ((wallpaper.imgOpacity ?? 100) / 100).toFixed(3),
             transform: wallpaper.imgBlur ? "scale(1.05)" : "none", // prevent blur edge artifacts
           }} />
-          {(wallpaper.imgDarken > 0) && (
-            <div style={{
-              position: "absolute",
-              inset: 0,
-              background: `rgba(0,0,0,${wallpaper.imgDarken / 100})`,
-            }} />
-          )}
         </div>
       ) : (
         <>
@@ -1818,7 +1813,7 @@ export default function App() {
           flexDirection: "column",
           position: "relative",
           zIndex: 10,
-          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), wallpaper?.opacity),
+          ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
           backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
           transition: "all .35s cubic-bezier(.16,1,.3,1)",
           overflow: "hidden",

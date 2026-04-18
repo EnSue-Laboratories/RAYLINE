@@ -438,7 +438,7 @@ export default function TerminalDrawer({
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), wallpaper?.opacity),
+        ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
         backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
         borderLeft: "1px solid rgba(255,255,255,0.025)",
         position: "relative",
