@@ -615,6 +615,7 @@ export default function App() {
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
   const [appBlur, setAppBlur] = useState(0);
   const [appOpacity, setAppOpacity] = useState(100);
+  const [developerMode, setDeveloperMode] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [projects, setProjects] = useState({});
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
@@ -728,6 +729,7 @@ export default function App() {
         if (state.defaultPrBranch) setDefaultPrBranch(state.defaultPrBranch);
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
+        if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
         if (state.wallpaper) {
           setWallpaper(normalizeWallpaper(state.wallpaper));
           // Reload data URL from disk (not persisted — too large for JSON)
@@ -767,9 +769,10 @@ export default function App() {
         defaultPrBranch,
         appBlur,
         appOpacity,
+        developerMode,
       });
     }, 300);
-  }, [convoList, active, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, appBlur, appOpacity, stateLoaded]);
+  }, [convoList, active, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, appBlur, appOpacity, developerMode, stateLoaded]);
 
   // Push window opacity to Electron
   useEffect(() => {
@@ -1969,6 +1972,7 @@ export default function App() {
           onNewInProject={handleNewInProject}
           draftsCollapsed={draftsCollapsed}
           onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
+          developerMode={developerMode}
         />
       </div>
 
@@ -1985,6 +1989,8 @@ export default function App() {
           onAppBlurChange={setAppBlur}
           appOpacity={appOpacity}
           onAppOpacityChange={setAppOpacity}
+          developerMode={developerMode}
+          onDeveloperModeChange={setDeveloperMode}
           onClose={() => setShowSettings(false)}
         />
       ) : (
@@ -2023,6 +2029,7 @@ export default function App() {
           defaultPrBranch={defaultPrBranch}
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
+          developerMode={developerMode}
         />
       )}
 
