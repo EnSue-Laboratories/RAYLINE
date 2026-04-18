@@ -490,6 +490,15 @@ function git(args, cwd) {
   });
 }
 
+function gitLong(args, cwd) {
+  return new Promise((resolve, reject) => {
+    execFile("git", args, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }, timeout: 60000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) reject(new Error(stderr.trim() || err.message));
+      else resolve(stdout.trim());
+    });
+  });
+}
+
 ipcMain.handle("git-branches", async (_event, cwd) => {
   if (!cwd) return { current: null, branches: [] };
   try {
@@ -578,6 +587,227 @@ ipcMain.handle("git-delete-branch", async (_event, cwd, branchName) => {
 ipcMain.handle("git-worktree-remove", async (_event, cwd, worktreePath) => {
   await git(["worktree", "remove", worktreePath], cwd);
   return { success: true };
+});
+
+ipcMain.handle("git-status", async (_event, cwd) => {
+  if (!cwd) return null;
+  try {
+    const raw = await git(["status", "--porcelain=v2", "--branch"], cwd);
+    const out = {
+      branch: null,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      files: [],
+      detached: false,
+    };
+    for (const line of raw.split("\n")) {
+      if (!line) continue;
+      if (line.startsWith("# branch.head ")) {
+        const head = line.slice(14).trim();
+        if (head === "(detached)") out.detached = true;
+        else out.branch = head;
+      } else if (line.startsWith("# branch.upstream ")) {
+        out.upstream = line.slice(18).trim();
+      } else if (line.startsWith("# branch.ab ")) {
+        const m = line.slice(12).match(/^\+(\d+) -(\d+)/);
+        if (m) { out.ahead = Number(m[1]); out.behind = Number(m[2]); }
+      } else if (line.startsWith("1 ")) {
+        // tracked: "1 XY ... <path>" — 8 header fields before path
+        const parts = line.split(" ");
+        const xy = parts[1];
+        const path = parts.slice(8).join(" ");
+        out.files.push({ path, index: xy[0], worktree: xy[1] });
+      } else if (line.startsWith("2 ")) {
+        // renamed/copied: "2 XY ... <score> <newPath>\t<origPath>" — 9 header fields, tab-separated paths
+        const parts = line.split(" ");
+        const xy = parts[1];
+        const rest = parts.slice(9).join(" ");
+        const [newPath] = rest.split("\t");
+        out.files.push({ path: newPath, index: xy[0], worktree: xy[1] });
+      } else if (line.startsWith("u ")) {
+        // unmerged: "u XY ... <path>" — 10 header fields before path
+        const parts = line.split(" ");
+        const xy = parts[1];
+        const path = parts.slice(10).join(" ");
+        out.files.push({ path, index: xy[0], worktree: xy[1] });
+      } else if (line.startsWith("? ")) {
+        out.files.push({ path: line.slice(2), index: "?", worktree: "?" });
+      } else if (line.startsWith("! ")) {
+        // ignored — skip
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle("git-fetch", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    await gitLong(["fetch", "--no-tags", "--quiet"], cwd);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-diff", async (_event, cwd) => {
+  if (!cwd) return { diff: "", truncated: false };
+  try {
+    const raw = await git(["diff", "HEAD"], cwd);
+    const LIMIT = 64 * 1024;
+    if (raw.length > LIMIT) {
+      return { diff: raw.slice(0, LIMIT), truncated: true };
+    }
+    return { diff: raw, truncated: false };
+  } catch {
+    try {
+      const raw = await git(["diff"], cwd);
+      return { diff: raw.slice(0, 64 * 1024), truncated: raw.length > 64 * 1024 };
+    } catch {
+      return { diff: "", truncated: false };
+    }
+  }
+});
+
+ipcMain.handle("git-stage", async (_event, cwd, paths) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const args = Array.isArray(paths) && paths.length
+      ? ["add", "--", ...paths]
+      : ["add", "-A"];
+    await git(args, cwd);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-unstage", async (_event, cwd, paths) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const args = Array.isArray(paths) && paths.length
+      ? ["reset", "HEAD", "--", ...paths]
+      : ["reset", "HEAD"];
+    await git(args, cwd);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-revert", async (_event, cwd, path, untracked) => {
+  if (!cwd || !path) return { ok: false, stderr: "bad args" };
+  try {
+    if (untracked) {
+      await git(["clean", "-fd", "--", path], cwd);
+    } else {
+      await git(["restore", "--staged", "--worktree", "--source=HEAD", "--", path], cwd);
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-ignore", async (_event, cwd, path) => {
+  if (!cwd || !path) return { ok: false, stderr: "bad args" };
+  try {
+    const giPath = require("path").join(cwd, ".gitignore");
+    let existing = "";
+    if (fs.existsSync(giPath)) existing = fs.readFileSync(giPath, "utf8");
+    const entry = path.replace(/\/+$/, "");
+    const present = existing.split("\n").some((l) => l.trim() === entry || l.trim() === entry + "/");
+    if (present) return { ok: true, alreadyIgnored: true };
+    const sep = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
+    fs.writeFileSync(giPath, existing + sep + entry + "\n");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-commit", async (_event, cwd, message) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  if (!message || !message.trim()) return { ok: false, stderr: "empty message" };
+  try {
+    const staged = await git(["diff", "--cached", "--name-only"], cwd);
+    if (!staged.trim()) await git(["add", "-A"], cwd);
+    const stdout = await git(["commit", "-m", message], cwd);
+    return { ok: true, stdout };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-push", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    let args = ["push"];
+    try {
+      await git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd);
+    } catch {
+      const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+      if (branch === "HEAD") return { ok: false, stderr: "detached HEAD; cannot push without a branch" };
+      args = ["push", "-u", "origin", branch];
+    }
+    const stdout = await gitLong(args, cwd);
+    return { ok: true, stdout };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-pull", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const stdout = await gitLong(["pull", "--ff-only"], cwd);
+    return { ok: true, stdout };
+  } catch (err) {
+    return { ok: false, stderr: err.message };
+  }
+});
+
+ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+    if (branch === "HEAD") return { ok: false, stderr: "detached HEAD" };
+    if (base && branch === base) return { ok: false, stderr: `already on base branch "${base}"` };
+    // Ensure upstream exists and is current.
+    let pushArgs;
+    try {
+      await git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd);
+      pushArgs = ["push"];
+    } catch {
+      pushArgs = ["push", "-u", "origin", branch];
+    }
+    await gitLong(pushArgs, cwd);
+    const ghArgs = ["pr", "create", "--fill"];
+    if (base) ghArgs.push("--base", base);
+    const stdout = await new Promise((resolve, reject) => {
+      execFile("gh", ghArgs, {
+        cwd,
+        env: { ...process.env, PATH: buildSpawnPath() },
+        timeout: 60000,
+      }, (err, out, stderr) => {
+        if (err) reject(new Error((stderr || "").trim() || err.message));
+        else resolve(out.trim());
+      });
+    });
+    const urlMatch = stdout.match(/https?:\/\/\S+/);
+    const url = urlMatch ? urlMatch[0] : null;
+    return { ok: true, url, stdout };
+  } catch (err) {
+    const msg = err.message || String(err);
+    const existing = msg.match(/https?:\/\/github\.com\/\S+\/pull\/\d+/);
+    if (existing) {
+      return { ok: true, url: existing[0], stdout: msg };
+    }
+    return { ok: false, stderr: msg };
+  }
 });
 
 // IPC: get repo name from cwd via git remote
