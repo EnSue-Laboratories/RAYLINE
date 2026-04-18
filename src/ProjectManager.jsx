@@ -140,7 +140,9 @@ export default function ProjectManager() {
   const [wallpaper, setWallpaper] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [showCreate, setShowCreate] = useState(null); // null | "issue" | "pr"
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshSignal, setRefreshSignal] = useState(0);
+  const [freshIssue, setFreshIssue] = useState(null);
+  const [freshPR, setFreshPR] = useState(null);
 
   useEffect(() => {
     window.ghApi.checkAuth().then(({ ok }) => setAuthOk(ok));
@@ -446,19 +448,21 @@ export default function ProjectManager() {
             />
           ) : activeTab === "issues" ? (
             <IssueList
-              key={`issues-${refreshKey}`}
               repos={repos}
               stateFilter={stateFilter}
               repoFilter={repoFilter}
               onSelectItem={setSelectedItem}
+              refreshSignal={refreshSignal}
+              freshItem={freshIssue}
             />
           ) : (
             <PRList
-              key={`prs-${refreshKey}`}
               repos={repos}
               stateFilter={stateFilter}
               repoFilter={repoFilter}
               onSelectItem={setSelectedItem}
+              refreshSignal={refreshSignal}
+              freshItem={freshPR}
             />
           )}
         </div>
@@ -470,7 +474,11 @@ export default function ProjectManager() {
           repos={repos}
           type={showCreate}
           onClose={() => setShowCreate(null)}
-          onCreated={() => setRefreshKey((k) => k + 1)}
+          onCreated={(item) => {
+            if (showCreate === "issue") setFreshIssue(item);
+            else setFreshPR(item);
+            setRefreshSignal((k) => k + 1);
+          }}
         />
       )}
 

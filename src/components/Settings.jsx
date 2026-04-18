@@ -4,7 +4,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 
 const DEFAULTS = { path: null, dataUrl: null, opacity: 50, blur: 32, imgBlur: 0, imgDarken: 0 };
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, onClose }) {
   const s = useFontScale();
   const [local, setLocal] = useState(() => wallpaper ?? { ...DEFAULTS });
   const debounceRef = useRef(null);
@@ -422,6 +422,68 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               value={fontSize}
               onChange={(e) => onFontSizeChange(Number(e.target.value))}
               style={sliderStyle(((fontSize - 12) / 10) * 100)}
+            />
+          </div>
+
+          {/* GIT section label */}
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: s(10),
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.25)",
+              letterSpacing: ".12em",
+              textTransform: "uppercase",
+              marginBottom: 20,
+              marginTop: 12,
+            }}
+          >
+            GIT
+          </div>
+
+          {/* Default PR branch */}
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 2,
+              }}
+            >
+              Default PR branch
+            </div>
+            <div
+              style={{
+                fontSize: s(11),
+                color: "rgba(255,255,255,0.3)",
+                marginBottom: 10,
+              }}
+            >
+              Target branch used when creating a pull request
+            </div>
+            <input
+              type="text"
+              value={defaultPrBranch ?? ""}
+              placeholder="main"
+              onChange={(e) => onDefaultPrBranchChange?.(e.target.value)}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (!v) onDefaultPrBranchChange?.("main");
+              }}
+              spellCheck={false}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                height: 32,
+                padding: "0 10px",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 7,
+                color: "rgba(255,255,255,0.9)",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: s(12),
+                outline: "none",
+              }}
             />
           </div>
         </div>

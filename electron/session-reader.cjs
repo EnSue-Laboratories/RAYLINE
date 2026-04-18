@@ -204,7 +204,7 @@ function loadCodexSessionMessages(filePath) {
   }
 
   const result = messages.length > MAX_MESSAGES ? messages.slice(-MAX_MESSAGES) : messages;
-  return { messages: result, cwd: sessionCwd };
+  return { messages: result, cwd: sessionCwd, provider: "codex" };
 }
 
 async function listSessions(cwd) {
@@ -249,7 +249,7 @@ async function listSessions(cwd) {
       }
     } catch {}
 
-    sessions.push({ id: sessionId, title, model, ts: stat.mtimeMs, cwd });
+    sessions.push({ id: sessionId, title, model, ts: stat.mtimeMs, cwd, provider: "claude" });
   }
 
   // Scan Codex sessions
@@ -306,7 +306,7 @@ async function loadSessionMessages(sessionId) {
     if (codexFile) {
       return loadCodexSessionMessages(codexFile);
     }
-    return { messages: [], cwd: null };
+    return { messages: [], cwd: null, provider: null };
   }
 
   const { filePath, projectDir } = found;
@@ -411,7 +411,7 @@ async function loadSessionMessages(sessionId) {
 
   // Keep only the last MAX_MESSAGES messages to avoid slowdowns
   const result = messages.length > MAX_MESSAGES ? messages.slice(-MAX_MESSAGES) : messages;
-  return { messages: result, cwd: sessionCwd };
+  return { messages: result, cwd: sessionCwd, provider: "claude" };
 }
 
 function moveSession(sessionId, newCwd) {

@@ -15,14 +15,14 @@ function timeAgo(dateStr) {
   return `${months}mo ago`;
 }
 
-export default function PRList({ repos, stateFilter, repoFilter, onSelectItem }) {
+export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, refreshSignal, freshItem }) {
   const [prs, setPrs] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [error, setError] = useState(null);
   const [copiedAction, setCopiedAction] = useState(null);
 
-  async function fetchPRs() {
-    setLoading(true);
+  async function fetchPRs({ silent = false } = {}) {
+    if (!silent) setInitialLoad(true);
     setError(null);
     try {
       const targetRepos = repoFilter ? [repoFilter] : repos;
@@ -35,41 +35,50 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem })
       const merged = results.flat().sort(
         (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       );
-      setPrs(merged);
+      setPrs((prev) => {
+        const mergedKeys = new Set(merged.map((i) => `${i._repo}-${i.number}`));
+        const stillPending = prev.filter(
+          (i) => i.__optimistic && !mergedKeys.has(`${i._repo}-${i.number}`)
+        );
+        return [...stillPending, ...merged].sort(
+          (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        );
+      });
     } catch (err) {
       setError(err.message || "Failed to load pull requests");
     } finally {
-      setLoading(false);
+      setInitialLoad(false);
     }
   }
 
   useEffect(() => {
-    if (repos.length > 0) fetchPRs();
-    else {
+    if (repos.length === 0) {
       setPrs([]);
-      setLoading(false);
+      setInitialLoad(false);
+      return;
     }
-    if (repos.length > 0) {
-      const interval = setInterval(async () => {
-        try {
-          const targetRepos = repoFilter ? [repoFilter] : repos;
-          const results = await Promise.all(
-            targetRepos.map(async (repo) => {
-              const items = await window.ghApi.listPRs(repo, stateFilter);
-              return items.map((item) => ({ ...item, _repo: repo }));
-            })
-          );
-          const merged = results.flat().sort(
-            (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-          );
-          setPrs(merged);
-        } catch {}
-      }, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [repos, stateFilter, repoFilter]);
+    fetchPRs({ silent: !initialLoad });
+    const interval = setInterval(() => {
+      fetchPRs({ silent: true }).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repos, stateFilter, repoFilter, refreshSignal]);
 
-  if (loading) {
+  useEffect(() => {
+    if (!freshItem || freshItem.number == null) return;
+    const itemState = freshItem.state || "open";
+    if (itemState !== stateFilter) return;
+    if (repoFilter && freshItem._repo !== repoFilter) return;
+    if (!repos.includes(freshItem._repo)) return;
+    setPrs((prev) => {
+      const key = `${freshItem._repo}-${freshItem.number}`;
+      if (prev.some((i) => `${i._repo}-${i.number}` === key)) return prev;
+      return [{ ...freshItem, __optimistic: true }, ...prev];
+    });
+  }, [freshItem, stateFilter, repoFilter, repos]);
+
+  if (initialLoad && prs.length === 0) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui", fontSize: 13 }}>
         Loading pull requests...
@@ -77,12 +86,12 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem })
     );
   }
 
-  if (error) {
+  if (error && prs.length === 0) {
     return (
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: 40, gap: 12 }}>
         <span style={{ color: "rgba(255,100,100,0.7)", fontFamily: "system-ui", fontSize: 13 }}>{error}</span>
         <button
-          onClick={fetchPRs}
+          onClick={() => fetchPRs()}
           style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "rgba(255,255,255,0.5)", padding: "6px 16px", cursor: "pointer", fontFamily: "system-ui", fontSize: 12 }}
         >
           Retry
