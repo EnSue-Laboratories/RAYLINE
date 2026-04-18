@@ -53,6 +53,7 @@ export default function NewChatCard({
   const [selectedCwd, setSelectedCwd] = useState(defaultCwd);
   const [branch, setBranch] = useState("");
   const [worktree, setWorktree] = useState(false);
+  const [worktreeName, setWorktreeName] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [issueContext, setIssueContext] = useState(null);
   const [error, setError] = useState(null);
@@ -73,9 +74,13 @@ export default function NewChatCard({
   const [branchLoading, setBranchLoading] = useState(false);
   const [currentBranch, setCurrentBranch] = useState("");
   const [branchMode, setBranchMode] = useState(null); // "existing" | "new" | null
-  const [worktreeBaseBranch, setWorktreeBaseBranch] = useState("");
   const branchSearchRef = useRef(null);
   const branchMenuRef = useRef(null);
+
+  // Worktree name input state
+  const [showTreeInput, setShowTreeInput] = useState(false);
+  const treeBtnRef = useRef(null);
+  const treeMenuRef = useRef(null);
 
   const makeClaudiBranchName = useCallback((baseBranch) => {
     const suffix = Math.random().toString(36).slice(2, 8);
@@ -94,12 +99,13 @@ export default function NewChatCard({
       if (e.key === "Escape") {
         if (showIssueSearch) { setShowIssueSearch(false); return; }
         if (showBranchSearch) { setShowBranchSearch(false); return; }
+        if (showTreeInput) { setShowTreeInput(false); return; }
         onCancel();
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onCancel, showIssueSearch, showBranchSearch]);
+  }, [onCancel, showIssueSearch, showBranchSearch, showTreeInput]);
 
   // Close issue search on outside click
   useEffect(() => {
@@ -141,6 +147,17 @@ export default function NewChatCard({
     return () => document.removeEventListener("mousedown", handler);
   }, [showBranchSearch]);
 
+  // Close tree input on outside click
+  useEffect(() => {
+    if (!showTreeInput) return;
+    const handler = (e) => {
+      if (treeBtnRef.current?.contains(e.target) || treeMenuRef.current?.contains(e.target)) return;
+      setShowTreeInput(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showTreeInput]);
+
   // Load available branches for the selected project
   useEffect(() => {
     if (!selectedCwd || !window.api?.gitBranches) {
@@ -160,7 +177,6 @@ export default function NewChatCard({
         const current = info?.current || "";
         setCurrentBranch(current);
         setBranchList(info?.branches || []);
-        setWorktreeBaseBranch((prev) => prev || current);
         setBranch((prev) => prev || current);
         setBranchMode((prev) => prev || (current ? "existing" : null));
       } catch {
@@ -187,7 +203,7 @@ export default function NewChatCard({
     const trimmedPrompt = prompt.trim();
     let trimmedBranch = branch.trim();
     let nextBranchMode = branchMode;
-    let nextWorktreeBaseBranch = worktreeBaseBranch || currentBranch || "";
+    let nextWorktreeBaseBranch;
 
     if (!trimmedPrompt || creatingChat) return;
 
@@ -197,17 +213,14 @@ export default function NewChatCard({
     }
 
     if (worktree) {
-      if (nextBranchMode === "existing" && trimmedBranch) {
-        nextWorktreeBaseBranch = trimmedBranch;
-        trimmedBranch = makeClaudiBranchName(trimmedBranch);
-        nextBranchMode = "new";
-      } else if (!trimmedBranch && nextWorktreeBaseBranch) {
-        trimmedBranch = makeClaudiBranchName(nextWorktreeBaseBranch);
-        nextBranchMode = "new";
-      } else if (!trimmedBranch) {
+      const base = trimmedBranch || currentBranch;
+      if (!base) {
         setError("Pick a base branch first.");
         return;
       }
+      nextWorktreeBaseBranch = base;
+      trimmedBranch = worktreeName.trim() || makeClaudiBranchName(base);
+      nextBranchMode = "new";
     }
 
     setError(null);
@@ -220,7 +233,7 @@ export default function NewChatCard({
         branch: trimmedBranch || undefined,
         branchMode: nextBranchMode || "new",
         worktree,
-        worktreeBaseBranch: worktree ? (nextWorktreeBaseBranch || undefined) : undefined,
+        worktreeBaseBranch: worktree ? nextWorktreeBaseBranch : undefined,
         issueContext: issueContext || undefined,
         attachments: attachments.length ? attachments : undefined,
       });
@@ -229,7 +242,7 @@ export default function NewChatCard({
     } finally {
       setCreatingChat(false);
     }
-  }, [attachments, branch, branchMode, creatingChat, currentBranch, issueContext, makeClaudiBranchName, model, onCreateChat, prompt, selectedCwd, worktree, worktreeBaseBranch]);
+  }, [attachments, branch, branchMode, creatingChat, currentBranch, issueContext, makeClaudiBranchName, model, onCreateChat, prompt, selectedCwd, worktree, worktreeName]);
 
   // Enter to create, Shift+Enter for newline
   const handleKeyDown = useCallback(
@@ -255,9 +268,11 @@ export default function NewChatCard({
     setSelectedCwd(nextCwd);
     setBranch("");
     setBranchMode(null);
-    setWorktreeBaseBranch("");
     setBranchSearchQuery("");
     setShowBranchSearch(false);
+    setWorktree(false);
+    setWorktreeName("");
+    setShowTreeInput(false);
     setError(null);
   }, []);
 
@@ -273,36 +288,55 @@ export default function NewChatCard({
       return;
     }
     setError(null);
-    setBranchSearchQuery(worktree ? "" : branch);
+    setBranchSearchQuery(branch);
     setShowBranchSearch((prev) => !prev);
-  }, [branch, selectedCwd, worktree]);
+  }, [branch, selectedCwd]);
 
   const selectExistingBranch = useCallback((name) => {
-    if (worktree) {
-      setWorktreeBaseBranch(name);
-      setBranch(name);
-      setBranchMode("existing");
-    } else {
-      setBranch(name);
-      setBranchMode("existing");
-    }
+    setBranch(name);
+    setBranchMode("existing");
     setBranchSearchQuery("");
     setShowBranchSearch(false);
     setError(null);
-  }, [worktree]);
+  }, []);
 
   const useCustomBranch = useCallback((value) => {
     const nextBranch = value.trim();
     if (!nextBranch) return;
     setBranch(nextBranch);
-    setBranchMode("new");
-    if (worktree && !worktreeBaseBranch) {
-      setWorktreeBaseBranch(currentBranch || "");
-    }
+    setBranchMode(worktree ? "existing" : "new");
     setBranchSearchQuery("");
     setShowBranchSearch(false);
     setError(null);
-  }, [currentBranch, worktree, worktreeBaseBranch]);
+  }, [worktree]);
+
+  const openTreeInput = useCallback(() => {
+    if (!selectedCwd) {
+      setError("Select a project before creating a worktree.");
+      return;
+    }
+    setError(null);
+    setShowTreeInput((prev) => !prev);
+  }, [selectedCwd]);
+
+  const confirmTreeName = useCallback((value) => {
+    setWorktreeName(value.trim());
+    setWorktree(true);
+    // A worktree's base must be an existing branch; if the user had typed a
+    // new branch in the branch picker, fall back to the current branch.
+    if (branchMode === "new") {
+      setBranch(currentBranch || "");
+      setBranchMode(currentBranch ? "existing" : null);
+    }
+    setShowTreeInput(false);
+    setError(null);
+  }, [branchMode, currentBranch]);
+
+  const disableWorktree = useCallback(() => {
+    setWorktree(false);
+    setWorktreeName("");
+    setShowTreeInput(false);
+  }, []);
 
   // Paste handler for images
   const handlePaste = (e) => {
@@ -395,9 +429,8 @@ export default function NewChatCard({
     strokeWidth: 2,
   };
 
-  const branchLabel = worktree
-    ? (branchMode === "new" && branch ? branch : (worktreeBaseBranch || currentBranch || "Base"))
-    : (branch || currentBranch || "Branch");
+  const branchLabel = branch || currentBranch || (worktree ? "Base" : "Branch");
+  const treeLabel = worktreeName || "Tree";
   const issueLabel = issueContext ? `#${issueContext.match(/Issue #(\d+)/)?.[1] || ""}` : "Issue";
 
   return (
@@ -532,8 +565,6 @@ export default function NewChatCard({
                 branches={filteredBranches}
                 loading={branchLoading}
                 currentBranch={currentBranch}
-                currentValue={branch}
-                baseBranch={worktreeBaseBranch || currentBranch}
                 worktree={worktree}
                 onSelectBranch={selectExistingBranch}
                 onUseCustomBranch={useCustomBranch}
@@ -542,11 +573,29 @@ export default function NewChatCard({
             )}
           </div>
 
-          {/* Worktree — create new worktree */}
-          <button onClick={() => setWorktree(v => !v)} style={toolBtnStyle(worktree)}>
-            <GitFork style={chipIconStyle} />
-            {worktree ? "Tree on" : "Tree"}
-          </button>
+          {/* Worktree — inline name input */}
+          <div ref={treeBtnRef} style={{ position: "relative" }}>
+            <button onClick={openTreeInput} style={toolBtnStyle(worktree)}>
+              <GitFork style={chipIconStyle} />
+              <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {treeLabel}
+              </span>
+            </button>
+
+            {showTreeInput && createPortal(
+              <WorktreeInputDropdown
+                ref={treeMenuRef}
+                anchorRef={treeBtnRef}
+                s={s}
+                initialValue={worktreeName}
+                active={worktree}
+                baseBranch={branch || currentBranch}
+                onConfirm={confirmTreeName}
+                onDisable={disableWorktree}
+              />,
+              document.body
+            )}
+          </div>
 
           {/* Link issue — text toggle with searchable dropdown */}
           <div ref={issueSearchRef} style={{ position: "relative" }}>
@@ -733,7 +782,7 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
 });
 
 const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
-  { anchorRef, s, query, onQueryChange, branches, loading, currentBranch, currentValue, baseBranch, worktree, onSelectBranch, onUseCustomBranch },
+  { anchorRef, s, query, onQueryChange, branches, loading, currentBranch, worktree, onSelectBranch, onUseCustomBranch },
   ref
 ) {
   const [pos, setPos] = useState(null);
@@ -786,14 +835,14 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
       <input
         autoFocus
         type="text"
-        placeholder={worktree ? "Pick a base or type a tree..." : "Find or type a branch..."}
+        placeholder={worktree ? "Pick a base branch..." : "Find or type a branch..."}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && trimmedQuery) {
             e.preventDefault();
             if (exactBranchName) onSelectBranch(exactBranchName);
-            else onUseCustomBranch(trimmedQuery);
+            else if (!worktree) onUseCustomBranch(trimmedQuery);
           }
         }}
         style={{
@@ -809,23 +858,8 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
         }}
       />
 
-      {worktree && currentValue && (
-        <div
-          style={{
-            padding: "8px 10px 4px",
-            fontSize: s(9),
-            fontFamily: "'JetBrains Mono',monospace",
-            color: "rgba(255,255,255,0.3)",
-            letterSpacing: ".04em",
-          }}
-        >
-          TREE {currentValue}
-          {baseBranch ? ` · FROM ${baseBranch}` : ""}
-        </div>
-      )}
-
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-        {trimmedQuery && !exactBranchName && (
+        {trimmedQuery && !exactBranchName && !worktree && (
           <button
             onClick={() => onUseCustomBranch(trimmedQuery)}
             style={{
@@ -844,7 +878,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
-            {worktree ? `Use "${trimmedQuery}" as the new worktree branch` : `Use "${trimmedQuery}" as a new branch`}
+            Use "{trimmedQuery}" as a new branch
           </button>
         )}
 
@@ -892,6 +926,142 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
           </button>
         ))}
       </div>
+    </div>
+  );
+});
+
+/* ── Worktree name input ────────────────────────────────────────── */
+
+const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
+  { anchorRef, s, initialValue, active, baseBranch, onConfirm, onDisable },
+  ref
+) {
+  const [pos, setPos] = useState(null);
+  const [value, setValue] = useState(initialValue || "");
+
+  const updatePosition = useCallback(() => {
+    if (!anchorRef?.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    setPos(getFloatingMenuLayout(rect, 300, 180));
+  }, [anchorRef]);
+
+  useEffect(() => {
+    if (!anchorRef?.current) return;
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    const ro = new ResizeObserver(updatePosition);
+    ro.observe(anchorRef.current);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      ro.disconnect();
+    };
+  }, [anchorRef, updatePosition]);
+
+  if (!pos) return null;
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "fixed",
+        top: pos.top,
+        left: pos.left,
+        zIndex: 500,
+        width: pos.width,
+        background: "rgba(8,8,12,0.55)",
+        backdropFilter: "blur(48px) saturate(1.2)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 10,
+        padding: 3,
+        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        animation: "dropIn .15s ease",
+        WebkitAppRegion: "no-drag",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <input
+        autoFocus
+        type="text"
+        placeholder="Name (empty = random)"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onConfirm(value);
+          }
+        }}
+        style={{
+          background: "rgba(255,255,255,0.03)",
+          border: "none",
+          outline: "none",
+          padding: "8px 10px",
+          fontSize: s(11),
+          fontFamily: "'JetBrains Mono',monospace",
+          color: "rgba(255,255,255,0.8)",
+          borderBottom: "1px solid rgba(255,255,255,0.04)",
+          borderRadius: "7px 7px 0 0",
+        }}
+      />
+
+      {baseBranch && (
+        <div style={{
+          padding: "6px 10px 2px",
+          fontSize: s(9),
+          fontFamily: "'JetBrains Mono',monospace",
+          color: "rgba(255,255,255,0.3)",
+          letterSpacing: ".04em",
+        }}>
+          FROM {baseBranch}
+        </div>
+      )}
+
+      <button
+        onClick={() => onConfirm(value)}
+        style={{
+          display: "flex",
+          width: "100%",
+          padding: "8px 10px",
+          background: "transparent",
+          border: "none",
+          borderRadius: 7,
+          color: "rgba(180,220,255,0.82)",
+          fontSize: s(11),
+          fontFamily: "'JetBrains Mono',monospace",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+      >
+        {value.trim() ? `Use "${value.trim()}"` : "Use random name"}
+      </button>
+
+      {active && (
+        <button
+          onClick={onDisable}
+          style={{
+            display: "flex",
+            width: "100%",
+            padding: "8px 10px",
+            background: "transparent",
+            border: "none",
+            borderRadius: 7,
+            color: "rgba(255,180,180,0.7)",
+            fontSize: s(11),
+            fontFamily: "'JetBrains Mono',monospace",
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+        >
+          Turn off worktree
+        </button>
+      )}
     </div>
   );
 });
