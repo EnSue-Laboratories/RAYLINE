@@ -18,6 +18,102 @@ function cloneStreamState(streamState) {
   };
 }
 
+// Freeze the final elapsed duration onto the assistant message when the
+// stream ends. Once persisted, the loading indicator uses this value so it
+// survives reloads (`Date.now() - _startedAt` would drift across sessions).
+function freezeElapsed(msg) {
+  if (!msg || msg.role !== "assistant") return msg;
+  // Compaction is a transient mid-turn signal — never persist it past stream end.
+  const { _compacting, ...rest } = msg;
+  if (rest._elapsedMs != null) return rest;
+  if (!rest._startedAt) return rest;
+  return { ...rest, _elapsedMs: Date.now() - rest._startedAt };
+}
+
+function mergeUsage(prev, incoming) {
+  if (!incoming) return prev || null;
+  const base = prev || {};
+  return {
+    input_tokens: incoming.input_tokens ?? base.input_tokens ?? 0,
+    output_tokens: incoming.output_tokens ?? base.output_tokens ?? 0,
+    cache_creation_input_tokens:
+      incoming.cache_creation_input_tokens ?? base.cache_creation_input_tokens ?? 0,
+    cache_read_input_tokens:
+      incoming.cache_read_input_tokens ?? base.cache_read_input_tokens ?? 0,
+    ...(Number.isFinite(incoming.total_tokens)
+      ? { total_tokens: incoming.total_tokens }
+      : Number.isFinite(base.total_tokens)
+        ? { total_tokens: base.total_tokens }
+        : {}),
+    ...(Number.isFinite(incoming.context_window)
+      ? { context_window: incoming.context_window }
+      : Number.isFinite(base.context_window)
+        ? { context_window: base.context_window }
+        : {}),
+  };
+}
+
+function normalizeCodexUsage(usage, contextWindow) {
+  if (!usage) return null;
+  return {
+    input_tokens: usage.input_tokens ?? 0,
+    output_tokens: usage.output_tokens ?? 0,
+    total_tokens: usage.total_tokens ?? null,
+    cache_read_input_tokens: usage.cached_input_tokens ?? usage.cache_read_input_tokens ?? 0,
+    cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+    ...(Number.isFinite(contextWindow) ? { context_window: contextWindow } : {}),
+  };
+}
+
+// Codex emits plan-quota snapshots inside the same `token_count` event as token
+// usage — `payload.rate_limits` is a sibling of `payload.info`. The shape uses
+// `primary` (5h rolling window, window_minutes=300) and `secondary` (7d, =10080).
+// Normalize to a provider-agnostic shape so Claude Code's statusline JSON
+// (`five_hour`/`seven_day`) can later reuse the same renderer.
+function normalizeCodexRateLimits(rl) {
+  if (!rl || typeof rl !== "object") return null;
+  const pickWindow = (w) => {
+    if (!w || typeof w !== "object") return null;
+    if (!Number.isFinite(w.used_percent)) return null;
+    return {
+      used_percent: w.used_percent,
+      resets_at: Number.isFinite(w.resets_at) ? w.resets_at : null,
+      window_minutes: Number.isFinite(w.window_minutes) ? w.window_minutes : null,
+    };
+  };
+  const five = pickWindow(rl.primary);
+  const seven = pickWindow(rl.secondary);
+  if (!five && !seven) return null;
+  return {
+    ...(five ? { five_hour: five } : {}),
+    ...(seven ? { seven_day: seven } : {}),
+    ...(rl.plan_type ? { plan_type: rl.plan_type } : {}),
+  };
+}
+
+function extractSessionStatsFromResult(result) {
+  const fallbackAssistantIdx = findLatestAssistantIndex(result?.messages || []);
+  return {
+    usage:
+      result?.usageSnapshot ||
+      (fallbackAssistantIdx >= 0 ? result.messages[fallbackAssistantIdx]?._usage : null) ||
+      null,
+    rateLimits:
+      result?.rateLimitsSnapshot ||
+      (fallbackAssistantIdx >= 0 ? result.messages[fallbackAssistantIdx]?._rateLimits : null) ||
+      null,
+  };
+}
+
+function findLatestAssistantIndex(messages) {
+  for (let i = (messages?.length || 0) - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === "assistant") return i;
+  }
+  return -1;
+}
+
+const CODEX_USAGE_HYDRATION_RETRY_DELAYS_MS = [0, 150, 500, 1200, 2500];
+
 function buildBlockKey(turn, blockIndex) {
   return `${turn}:${blockIndex}`;
 }
@@ -35,13 +131,106 @@ function findToolPart(parts, toolId) {
   return null;
 }
 
+function extractCodexResponseText(content) {
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((item) => item?.type === "output_text" && typeof item.text === "string")
+    .map((item) => item.text)
+    .join("");
+}
+
+function normalizeCodexToolArgs(payload) {
+  const raw = payload?.arguments ?? payload?.input;
+  if (raw == null) return {};
+  if (typeof raw === "object") {
+    return raw.cmd && !raw.command ? { ...raw, command: raw.cmd } : raw;
+  }
+  if (typeof raw !== "string") return { value: raw };
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      return parsed.cmd && !parsed.command ? { ...parsed, command: parsed.cmd } : parsed;
+    }
+  } catch {}
+
+  return payload?.type === "custom_tool_call" ? { input: raw } : { value: raw };
+}
+
+function normalizeCodexToolResult(output) {
+  if (typeof output !== "string") return output;
+  const trimmed = output.trim();
+  if (!trimmed) return output;
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return output;
+  try {
+    return JSON.parse(output);
+  } catch {
+    return output;
+  }
+}
+
 export default function useAgent() {
   const [conversations, setConversations] = useState(new Map());
   const cleanupRefs = useRef([]);
   const pendingStartsRef = useRef(new Map());
+  const usageHydrationTimersRef = useRef(new Set());
 
   useEffect(() => {
     if (!window.api) return;
+
+    const scheduleUsageHydrationRetry = (conversationId, codexThreadId, attempt = 0) => {
+      if (!window.api?.loadSession) return;
+
+      void window.api.loadSession(codexThreadId).then((result) => {
+        const { usage: fallbackUsage, rateLimits: fallbackRateLimits } = extractSessionStatsFromResult(result);
+        if (fallbackUsage || fallbackRateLimits) {
+          setConversations((prev) => {
+            const next = new Map(prev);
+            const convo = next.get(conversationId);
+            if (!convo) return prev;
+
+            const msgs = [...convo.messages];
+            const latestAssistantIdx = findLatestAssistantIndex(msgs);
+            if (latestAssistantIdx < 0) return prev;
+
+            const currentAssistant = msgs[latestAssistantIdx];
+            const nextUsage = currentAssistant?._usage || fallbackUsage || null;
+            const nextRateLimits = currentAssistant?._rateLimits || fallbackRateLimits || null;
+
+            if (nextUsage === currentAssistant?._usage && nextRateLimits === currentAssistant?._rateLimits) {
+              return prev;
+            }
+
+            msgs[latestAssistantIdx] = {
+              ...currentAssistant,
+              ...(nextUsage ? { _usage: nextUsage } : {}),
+              ...(nextRateLimits ? { _rateLimits: nextRateLimits } : {}),
+            };
+            next.set(conversationId, { ...convo, messages: msgs });
+            return next;
+          });
+          return;
+        }
+
+        const nextDelay = CODEX_USAGE_HYDRATION_RETRY_DELAYS_MS[attempt + 1];
+        if (nextDelay == null) return;
+
+        const timerId = window.setTimeout(() => {
+          usageHydrationTimersRef.current.delete(timerId);
+          scheduleUsageHydrationRetry(conversationId, codexThreadId, attempt + 1);
+        }, nextDelay);
+        usageHydrationTimersRef.current.add(timerId);
+      }).catch(() => {
+        const nextDelay = CODEX_USAGE_HYDRATION_RETRY_DELAYS_MS[attempt + 1];
+        if (nextDelay == null) return;
+
+        const timerId = window.setTimeout(() => {
+          usageHydrationTimersRef.current.delete(timerId);
+          scheduleUsageHydrationRetry(conversationId, codexThreadId, attempt + 1);
+        }, nextDelay);
+        usageHydrationTimersRef.current.add(timerId);
+      });
+    };
 
     const offStream = window.api.onAgentStream(({ conversationId, event }) => {
       setConversations((prev) => {
@@ -69,8 +258,13 @@ export default function useAgent() {
               isStreaming: true,
               isThinking: false,
               _streamState: cloneStreamState(),
+              _startedAt: Date.now(),
+              _usage: null,
             };
             msgs.push(lastMsg);
+          } else if (!lastMsg._startedAt) {
+            lastMsg = { ...lastMsg, _startedAt: Date.now() };
+            msgs[msgs.length - 1] = lastMsg;
           }
           return lastMsg;
         };
@@ -85,6 +279,26 @@ export default function useAgent() {
             msgs[msgs.length - 1] = merged;
             lastMsg = merged;
           };
+
+          // Context-window fullness tracking.
+          //
+          // We deliberately track the LATEST API call's usage (not the turn
+          // aggregate). A multi-tool-use turn re-sends the prompt once per
+          // call, so aggregating would make `cache_read` balloon by the number
+          // of calls — that measures how much *work* was done, not how full
+          // the window is. The cumulative snapshot at the END of the last
+          // call is what actually reflects "tokens currently in the window."
+          //
+          // - `message_start` → overwrite `_usage` (new API call begins)
+          // - `message_delta` → merge (output_tokens grows during generation)
+          // - `result` below → ignored for usage (it's turn-aggregated)
+          if (inner.type === "message_start" && inner.message?.usage) {
+            ensureAssistant();
+            updateAssistant({ _usage: { ...inner.message.usage } });
+          } else if (inner.type === "message_delta" && inner.usage) {
+            ensureAssistant();
+            updateAssistant({ _usage: mergeUsage(lastMsg._usage, inner.usage) });
+          }
 
           if (inner.type === "content_block_start") {
             const block = inner.content_block;
@@ -174,8 +388,10 @@ export default function useAgent() {
         } else if (event.type === "assistant") {
           // With --include-partial-messages, assistant events contain full accumulated text.
           // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
+          // Usage here is per-API-call, not cumulative — skip it to avoid flicker;
+          // the `result` event below owns the authoritative cumulative usage.
           const am = ensureAssistant();
-          const parts = cloneParts(am.parts);
+          const parts = cloneParts(lastMsg.parts);
           const hasStreamParts = parts.length > 0;
           if (!hasStreamParts && event.message?.content) {
             for (const block of event.message.content) {
@@ -195,7 +411,8 @@ export default function useAgent() {
                 }
               }
             }
-            msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
+            msgs[msgs.length - 1] = { ...lastMsg, parts, isThinking: false };
+            lastMsg = msgs[msgs.length - 1];
           }
         } else if (event.type === "user") {
           // Capture the UUID from user events — needed for rewind/edit
@@ -230,6 +447,11 @@ export default function useAgent() {
           }
         } else if (event.type === "result") {
           if (lastMsg && lastMsg.role === "assistant") {
+            // Note: `event.usage` here is aggregated across every API call in
+            // the turn (ballooned `cache_read` when the turn had multiple tool
+            // loops). That's right for cost, wrong for window fullness — we
+            // already captured the final call's cumulative usage from
+            // `message_delta`. Leave `_usage` alone.
             if (event.is_error || event.subtype === "error_during_execution") {
               // Surface the error as text in the assistant message
               const errorText = event.result || event.error
@@ -237,7 +459,7 @@ export default function useAgent() {
                 || "An error occurred.";
               const parts = cloneParts(lastMsg.parts);
               parts.push({ type: "text", text: `**Error:** ${errorText}` });
-              msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };
+              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
             } else if (event.terminal_reason === "hook_stopped") {
               const parts = cloneParts(lastMsg.parts);
               const hasPausedStatus = parts.some((part) => part.type === "status" && part.kind === "paused");
@@ -249,20 +471,93 @@ export default function useAgent() {
                   text: "Claude stopped after a tool hook returned continue: false. This is expected — send another message when you want to continue.",
                 });
               }
-              msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };
+              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
             } else {
-              msgs[msgs.length - 1] = { ...lastMsg, isStreaming: false, isThinking: false };
+              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
             }
           }
         }
 
+        // Claude Code plan quota — synthetic event emitted by the main process
+        // after each `result`, sourced from `api.anthropic.com/api/oauth/usage`
+        // (Pro/Max only — silently absent for API-key users). Already
+        // normalized to the same `{ five_hour, seven_day }` shape Codex uses,
+        // so it just attaches to the latest assistant message.
+        else if (event.type === "rate_limits" && event.rate_limits) {
+          const idx = findLatestAssistantIndex(msgs);
+          if (idx >= 0) {
+            msgs[idx] = { ...msgs[idx], _rateLimits: event.rate_limits };
+            if (idx === msgs.length - 1) lastMsg = msgs[idx];
+          }
+        }
+
+        else if (event.type === "session_snapshot" && event.provider === "codex") {
+          if (event.thread_id) {
+            convo._codexThreadId = event.thread_id;
+          }
+          const idx = findLatestAssistantIndex(msgs);
+          if (idx >= 0) {
+            msgs[idx] = {
+              ...msgs[idx],
+              ...(event.usage
+                ? { _usage: mergeUsage(msgs[idx]._usage, event.usage) }
+                : {}),
+              ...(event.rate_limits ? { _rateLimits: event.rate_limits } : {}),
+            };
+            if (idx === msgs.length - 1) lastMsg = msgs[idx];
+          }
+        }
+
+        // Claude Code emits a top-level `system` event with
+        // `subtype: "compact_boundary"` whenever auto-compaction runs. Flag
+        // the message transiently so the live status can show "compacting…";
+        // `freezeElapsed` strips this on stream end so it doesn't persist.
+        else if (event.type === "system" && event.subtype === "compact_boundary") {
+          const am = ensureAssistant();
+          msgs[msgs.length - 1] = { ...am, _compacting: true };
+          lastMsg = msgs[msgs.length - 1];
+        }
+
         // --- Codex JSONL stream events ---
-        else if (event.type === "thread.started") {
+        else if (event.type === "session_meta" && event.payload?.id) {
+          convo._codexThreadId = event.payload.id;
+          console.log("[useAgent] Captured Codex thread ID:", {
+            conversationId,
+            threadId: event.payload.id,
+            source: "session_meta",
+          });
+        } else if (event.type === "thread.started") {
           convo._codexThreadId = event.thread_id;
           console.log("[useAgent] Captured Codex thread ID:", {
             conversationId,
             threadId: event.thread_id,
+            source: "thread.started",
           });
+        } else if (event.type === "event_msg" && event.payload?.type === "token_count") {
+          const tokenInfo = event.payload.info;
+          const usage = normalizeCodexUsage(
+            tokenInfo?.last_token_usage || tokenInfo?.total_token_usage,
+            tokenInfo?.model_context_window
+          );
+          const rateLimits = normalizeCodexRateLimits(event.payload.rate_limits);
+          if (usage || rateLimits) {
+            const am = ensureAssistant();
+            const patch = { ...am };
+            if (usage) patch._usage = usage;
+            if (rateLimits) patch._rateLimits = rateLimits;
+            msgs[msgs.length - 1] = patch;
+            lastMsg = msgs[msgs.length - 1];
+          }
+        } else if (event.type === "event_msg" && event.payload?.type === "task_started") {
+          const am = ensureAssistant();
+          const contextWindow = event.payload.model_context_window;
+          if (Number.isFinite(contextWindow)) {
+            msgs[msgs.length - 1] = {
+              ...am,
+              _usage: mergeUsage(am._usage, { context_window: contextWindow }),
+            };
+            lastMsg = msgs[msgs.length - 1];
+          }
         } else if (event.type === "turn.started") {
           ensureAssistant();
         } else if (event.type === "item.started") {
@@ -314,11 +609,102 @@ export default function useAgent() {
             msgs[msgs.length - 1] = { ...am, parts };
             lastMsg = msgs[msgs.length - 1];
           }
-        } else if (event.type === "turn.completed") {
-          if (lastMsg && lastMsg.role === "assistant") {
-            msgs[msgs.length - 1] = { ...lastMsg, isStreaming: false, isThinking: false };
+        } else if (event.type === "response_item") {
+          const payload = event.payload || {};
+          if (payload.type === "message" && payload.role === "assistant") {
+            const text = extractCodexResponseText(payload.content);
+            if (text) {
+              const am = ensureAssistant();
+              const parts = cloneParts(am.parts);
+              parts.push({ type: "text", text });
+              msgs[msgs.length - 1] = { ...am, parts };
+              lastMsg = msgs[msgs.length - 1];
+            }
+          } else if (payload.type === "function_call" || payload.type === "custom_tool_call") {
+            const am = ensureAssistant();
+            const parts = cloneParts(am.parts);
+            const toolId = payload.call_id || uid();
+            const existingIdx = parts.findIndex((p) => p.type === "tool" && p.id === toolId);
+            const nextTool = {
+              type: "tool",
+              id: toolId,
+              name: payload.name || "tool",
+              args: normalizeCodexToolArgs(payload),
+              result: existingIdx >= 0 ? parts[existingIdx].result : null,
+              status: payload.status === "completed" ? "done" : "running",
+            };
+
+            if (existingIdx >= 0) {
+              parts[existingIdx] = { ...parts[existingIdx], ...nextTool };
+            } else {
+              parts.push(nextTool);
+            }
+
+            msgs[msgs.length - 1] = { ...am, parts };
+            lastMsg = msgs[msgs.length - 1];
+          } else if (payload.type === "function_call_output" || payload.type === "custom_tool_call_output") {
+            const am = ensureAssistant();
+            const parts = cloneParts(am.parts);
+            const existingIdx = parts.findIndex(
+              (p) => p.type === "tool" && p.id === payload.call_id
+            );
+            const result = normalizeCodexToolResult(payload.output);
+
+            if (existingIdx >= 0) {
+              parts[existingIdx] = {
+                ...parts[existingIdx],
+                result,
+                status: "done",
+              };
+            } else {
+              parts.push({
+                type: "tool",
+                id: payload.call_id || uid(),
+                name: "tool",
+                args: {},
+                result,
+                status: "done",
+              });
+            }
+
+            msgs[msgs.length - 1] = { ...am, parts };
             lastMsg = msgs[msgs.length - 1];
           }
+        } else if (event.type === "turn.completed") {
+          if (lastMsg && lastMsg.role === "assistant") {
+            // RayLine's live Codex stdout still uses the older
+            // `thread.started`/`turn.completed` schema even though the saved
+            // session JSONL now contains the richer `token_count` event.
+            // Merge this older usage packet as an immediate fallback so the
+            // footer can render without waiting for session-file hydration.
+            const fallbackUsage = normalizeCodexUsage(event.usage);
+            msgs[msgs.length - 1] = freezeElapsed({
+              ...lastMsg,
+              ...(fallbackUsage
+                ? { _usage: mergeUsage(lastMsg._usage, fallbackUsage) }
+                : {}),
+              isStreaming: false,
+              isThinking: false,
+            });
+            lastMsg = msgs[msgs.length - 1];
+          }
+        } else if (event.type === "event_msg" && event.payload?.type === "task_complete") {
+          const completionText = event.payload.last_agent_message;
+          const am = ensureAssistant();
+          let parts = cloneParts(am.parts);
+          const hasText = parts.some((part) => part.type === "text" && part.text);
+
+          if (!hasText && completionText) {
+            parts.push({ type: "text", text: completionText });
+          }
+
+          msgs[msgs.length - 1] = freezeElapsed({
+            ...am,
+            parts,
+            isStreaming: false,
+            isThinking: false,
+          });
+          lastMsg = msgs[msgs.length - 1];
         }
 
         next.set(conversationId, { ...convo, messages: msgs });
@@ -326,19 +712,41 @@ export default function useAgent() {
       });
     });
 
-    const offDone = window.api.onAgentDone(({ conversationId }) => {
+    const offDone = window.api.onAgentDone(({ conversationId, provider, threadId }) => {
       pendingStartsRef.current.delete(conversationId);
+      let codexThreadId = null;
+      let needsUsageHydration = false;
       setConversations((prev) => {
         const next = new Map(prev);
         const convo = next.get(conversationId);
         if (convo) {
+          codexThreadId =
+            convo._codexThreadId ||
+            (provider === "codex" && typeof threadId === "string" && threadId ? threadId : null);
           const msgs = convo.messages.map((m) =>
-            m.role === "assistant" ? { ...m, isStreaming: false, isThinking: false } : m
+            m.role === "assistant" ? freezeElapsed({ ...m, isStreaming: false, isThinking: false }) : m
           );
-          next.set(conversationId, { ...convo, messages: msgs, isStreaming: false });
+          const latestAssistantIdx = findLatestAssistantIndex(msgs);
+          if (
+            latestAssistantIdx >= 0 &&
+            codexThreadId &&
+            (!msgs[latestAssistantIdx]?._usage || !msgs[latestAssistantIdx]?._rateLimits)
+          ) {
+            needsUsageHydration = true;
+          }
+          next.set(conversationId, {
+            ...convo,
+            ...(codexThreadId ? { _codexThreadId: codexThreadId } : {}),
+            messages: msgs,
+            isStreaming: false,
+          });
         }
         return next;
       });
+
+      if (needsUsageHydration && codexThreadId && window.api?.loadSession) {
+        scheduleUsageHydrationRetry(conversationId, codexThreadId);
+      }
     });
 
     const offError = window.api.onAgentError(({ conversationId, error }) => {
@@ -352,7 +760,7 @@ export default function useAgent() {
         if (lastMsg && lastMsg.role === "assistant") {
           const parts = cloneParts(lastMsg.parts);
           parts.push({ type: "text", text: `**Error:** ${error}` });
-          msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };
+          msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
         }
         next.set(conversationId, { messages: msgs, error, isStreaming: false });
         return next;
@@ -360,7 +768,11 @@ export default function useAgent() {
     });
 
     cleanupRefs.current = [offStream, offDone, offError];
-    return () => cleanupRefs.current.forEach((fn) => fn?.());
+    return () => {
+      cleanupRefs.current.forEach((fn) => fn?.());
+      usageHydrationTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      usageHydrationTimersRef.current.clear();
+    };
   }, []);
 
   const prepareMessage = useCallback(({ conversationId, prompt, images, files }) => {
@@ -372,7 +784,7 @@ export default function useAgent() {
       const msgs = [
         ...convo.messages,
         { id: uid(), role: "user", text: prompt, images, files },
-        { id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false },
+        { id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false, _startedAt: Date.now(), _usage: null },
       ];
       next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       return next;
@@ -423,7 +835,7 @@ export default function useAgent() {
         const convo = next.get(conversationId);
         if (convo) {
           const msgs = convo.messages.map((m) =>
-            m.role === "assistant" ? { ...m, isStreaming: false, isThinking: false } : m
+            m.role === "assistant" ? freezeElapsed({ ...m, isStreaming: false, isThinking: false }) : m
           );
           next.set(conversationId, { ...convo, messages: msgs, isStreaming: false, error: null });
         }
@@ -443,7 +855,7 @@ export default function useAgent() {
       if (convo) {
         const msgs = convo.messages.slice(0, messageIndex);
         msgs.push({ id: uid(), role: "user", text: newText });
-        msgs.push({ id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false });
+        msgs.push({ id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false, _startedAt: Date.now(), _usage: null });
         next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       }
       return next;

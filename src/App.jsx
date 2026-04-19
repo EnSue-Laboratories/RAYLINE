@@ -338,11 +338,17 @@ function buildProviderSessionLookup(sessions) {
   return providerSessions;
 }
 
+function stripTransientMessageState(message) {
+  if (!message || typeof message !== "object") return message;
+  const { _rateLimits, ...next } = message;
+  return next;
+}
+
 function normalizeConversationState(conversation) {
   if (!conversation) return conversation;
 
   const archivedMessages = Array.isArray(conversation.archivedMessages)
-    ? conversation.archivedMessages
+    ? conversation.archivedMessages.map(stripTransientMessageState)
     : [];
   const archivedMessageCount = archivedMessages.length;
   const sessionMap = new Map();
@@ -621,8 +627,61 @@ function serializeMessagesForState(messages) {
     if (Array.isArray(message.images) && message.images.length > 0) next.images = message.images;
     if (Array.isArray(message.files) && message.files.length > 0) next.files = message.files;
     if (message.claudeUuid) next.claudeUuid = message.claudeUuid;
+    if (message._usage) next._usage = message._usage;
+    if (message._elapsedMs != null) next._elapsedMs = message._elapsedMs;
     return next;
   });
+}
+
+function getArchivedMessageText(message) {
+  if (!message) return "";
+  if (typeof message.text === "string") return message.text.trim();
+  if (!Array.isArray(message.parts)) return "";
+  return message.parts
+    .filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("\n")
+    .trim();
+}
+
+function getArchivedMessageSignature(message) {
+  const normalizedText = getArchivedMessageText(message).replace(/\s+/g, " ").slice(0, 400);
+  return [
+    message?.role || "",
+    message?.mode || "",
+    message?.command || "",
+    message?.exitCode ?? "",
+    Array.isArray(message?.images) ? message.images.length : 0,
+    Array.isArray(message?.files) ? message.files.length : 0,
+    normalizedText,
+  ].join("|");
+}
+
+function mergeArchivedMessages(existingMessages, loadedMessages) {
+  const existing = Array.isArray(existingMessages) ? existingMessages : [];
+  const loaded = Array.isArray(loadedMessages) ? loadedMessages : [];
+
+  if (loaded.length === 0) return existing;
+  if (existing.length === 0) return loaded;
+
+  const existingSignatures = existing.map(getArchivedMessageSignature);
+  const loadedSignatures = loaded.map(getArchivedMessageSignature);
+  const maxOverlap = Math.min(existingSignatures.length, loadedSignatures.length);
+
+  for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
+    let matches = true;
+    for (let i = 0; i < overlap; i += 1) {
+      if (existingSignatures[existingSignatures.length - overlap + i] !== loadedSignatures[i]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) {
+      return [...existing, ...loaded.slice(overlap)];
+    }
+  }
+
+  return loaded.length > existing.length ? loaded : existing;
 }
 
 export default function App() {
@@ -940,6 +999,7 @@ export default function App() {
           providerSessions: convo.providerSessions || null,
         });
         if (msgs && msgs.length > 0) {
+          const serializedSessionMessages = serializeMessagesForState(msgs);
           if (data.messages.length === 0) {
             // For forked conversations, only load messages up to the fork point
             loadMessages(id, msgs);
@@ -975,7 +1035,7 @@ export default function App() {
                 ...next,
                 ...(previewText ? { lastPreview: previewText.slice(0, 60) } : {}),
                 ...(sessionCwd ? { cwd: sessionCwd } : {}),
-                archivedMessages: serializeMessagesForState(msgs),
+                archivedMessages: mergeArchivedMessages(c.archivedMessages, serializedSessionMessages),
               });
             })
           );
@@ -1033,6 +1093,7 @@ export default function App() {
           const result = await window.api.loadSession(sessionIdToLoad);
           const { msgs, sessionCwd, sessionProvider } = extractLoadedSessionMeta(result);
           if (msgs && msgs.length > 0) {
+            const serializedSessionMessages = serializeMessagesForState(msgs);
             const lastMsg = msgs[msgs.length - 1];
             const previewText = lastMsg?.parts
               ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
@@ -1064,7 +1125,7 @@ export default function App() {
                   ...next,
                   ...(previewText ? { lastPreview: previewText.slice(0, 60) } : {}),
                   ...(sessionCwd && !cv.cwd ? { cwd: sessionCwd } : {}),
-                  archivedMessages: serializeMessagesForState(msgs),
+                  archivedMessages: mergeArchivedMessages(cv.archivedMessages, serializedSessionMessages),
                 });
               })
             );

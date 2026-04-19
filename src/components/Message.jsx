@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Pencil, Loader2, FileText, PauseCircle, Terminal } from "lucide-react";
+import { Pencil, FileText, PauseCircle, Terminal } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -16,6 +16,7 @@ import MermaidBlock from "./MermaidBlock";
 import InteractiveBlock from "./InteractiveBlock";
 import ThinkingBlock from "./ThinkingBlock";
 import ValueControlBlock from "./ValueControlBlock";
+import LoadingStatus from "./LoadingStatus";
 import { useFontScale } from "../contexts/FontSizeContext";
 
 // Allow SVG tags in markdown (rehype-sanitize schema)
@@ -269,7 +270,7 @@ function renderControlAwareMarkdown({
   });
 }
 
-export default function Message({ msg, onEdit, onAnswer, onControlChange, canControlTarget }) {
+export default function Message({ msg, modelId, onEdit, onAnswer, onControlChange, canControlTarget }) {
   const s = useFontScale();
   const scaledMdStatic = useMemo(() => makeMdComponents(false, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
   const scaledMdStreaming = useMemo(() => makeMdComponents(true, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
@@ -591,11 +592,6 @@ export default function Message({ msg, onEdit, onAnswer, onControlChange, canCon
                 onControlChange,
                 canControlTarget,
               })}
-              {msg.isStreaming && isLastPart && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.2)", marginLeft: 4, verticalAlign: "middle" }}>
-                  <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
-                </span>
-              )}
             </div>
           );
         }
@@ -664,18 +660,16 @@ export default function Message({ msg, onEdit, onAnswer, onControlChange, canCon
         <ThinkingBlock text="" isThinking={true} />
       )}
 
-      {msg.isStreaming && !msg.isThinking && (msg.parts || []).length === 0 && (
-        <div style={{ display: "flex", gap: 5, alignItems: "center", padding: "4px 0" }}>
-          {[0, 1, 2].map(i => (
-            <span key={i} style={{
-              width: 5, height: 5,
-              borderRadius: "50%",
-              background: "rgba(255,255,255,0.25)",
-              display: "inline-block",
-              animation: `dotPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
-            }} />
-          ))}
-        </div>
+      {(msg.isStreaming || msg._usage || msg._rateLimits || msg._startedAt || msg._elapsedMs != null) && (
+        <LoadingStatus
+          startedAt={msg._startedAt}
+          elapsedMs={msg._elapsedMs}
+          usage={msg._usage}
+          rateLimits={msg._rateLimits}
+          isStreaming={Boolean(msg.isStreaming)}
+          modelId={modelId}
+          compacting={Boolean(msg._compacting)}
+        />
       )}
 
       {/* Fallback for old format messages (text + toolCalls) */}

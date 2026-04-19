@@ -3,9 +3,11 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const { buildSpawnPath, isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
+const { loadSessionMessages } = require("./session-reader.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
+const SESSION_SNAPSHOT_RETRY_DELAYS_MS = [0, 150, 500, 1200, 2500];
 
 function log(...args) {
   console.log("[codex-agent-manager]", ...args);
@@ -24,6 +26,46 @@ function shouldEmitStderrError({ stderrBuffer, exitCode, signal, cancelled, sawT
   if (cancelled) return false;
   if (sawTurnCompleted && exitCode === 0 && !signal) return false;
   return exitCode !== 0 || Boolean(signal) || !sawTurnCompleted;
+}
+
+function scheduleSessionSnapshot(webContents, conversationId, threadId, attempt = 0) {
+  if (!threadId) return;
+
+  const delay = SESSION_SNAPSHOT_RETRY_DELAYS_MS[attempt];
+  if (delay == null) return;
+
+  setTimeout(() => {
+    loadSessionMessages(threadId)
+      .then((result) => {
+        const usage = result?.usageSnapshot || null;
+        const rateLimits = result?.rateLimitsSnapshot || null;
+        if (usage || rateLimits) {
+          if (webContents.isDestroyed?.()) return;
+          log("Emitting Codex session snapshot:", {
+            conversationId,
+            threadId,
+            hasUsage: Boolean(usage),
+            hasRateLimits: Boolean(rateLimits),
+          });
+          webContents.send("agent-stream", {
+            conversationId,
+            event: {
+              type: "session_snapshot",
+              provider: "codex",
+              thread_id: threadId,
+              usage,
+              rate_limits: rateLimits,
+            },
+          });
+          return;
+        }
+
+        scheduleSessionSnapshot(webContents, conversationId, threadId, attempt + 1);
+      })
+      .catch(() => {
+        scheduleSessionSnapshot(webContents, conversationId, threadId, attempt + 1);
+      });
+  }, delay);
 }
 
 let cachedCodexBin = null;
@@ -282,6 +324,7 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
     child,
     cancelled: false,
     sawTurnCompleted: false,
+    threadId: null,
   };
 
   activeAgents.set(conversationId, state);
@@ -293,7 +336,15 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
     if (!line.trim()) return;
     try {
       const event = JSON.parse(line);
-      if (event.type === "turn.completed") {
+      if (event.type === "thread.started" && typeof event.thread_id === "string" && event.thread_id) {
+        state.threadId = event.thread_id;
+      } else if (event.type === "session_meta" && typeof event.payload?.id === "string" && event.payload.id) {
+        state.threadId = event.payload.id;
+      }
+      if (
+        event.type === "turn.completed" ||
+        (event.type === "event_msg" && event.payload?.type === "task_complete")
+      ) {
         state.sawTurnCompleted = true;
       }
       log("Parsed event type:", event.type);
@@ -334,7 +385,13 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
     if (state.cancelled) {
       if (isCurrentState) {
         activeAgents.delete(conversationId);
-        webContents.send("agent-done", { conversationId, exitCode, signal });
+        webContents.send("agent-done", {
+          conversationId,
+          exitCode,
+          signal,
+          provider: "codex",
+          threadId: state.threadId,
+        });
       }
       return;
     }
@@ -355,8 +412,16 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
       webContents.send("agent-error", { conversationId, error: stderrBuffer.trim() });
     }
 
+    scheduleSessionSnapshot(webContents, conversationId, state.threadId);
+
     activeAgents.delete(conversationId);
-    webContents.send("agent-done", { conversationId, exitCode, signal });
+    webContents.send("agent-done", {
+      conversationId,
+      exitCode,
+      signal,
+      provider: "codex",
+      threadId: state.threadId,
+    });
   });
 
   child.on("error", (err) => {

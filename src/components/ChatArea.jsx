@@ -397,6 +397,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               <Message
                 key={m.id}
                 msg={m}
+                modelId={convo?.model || defaultModel}
                 onEdit={m.role === "user" && m.mode !== "shell-command" ? (newText) => onEdit(i, newText) : undefined}
                 onAnswer={m.role === "assistant" ? (text) => onSend(text) : undefined}
                 onControlChange={m.role === "assistant" ? onControlChange : undefined}
