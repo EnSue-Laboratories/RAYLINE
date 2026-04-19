@@ -660,11 +660,12 @@ export default function Message({ msg, modelId, onEdit, onAnswer, onControlChang
         <ThinkingBlock text="" isThinking={true} />
       )}
 
-      {(msg.isStreaming || msg._usage || msg._startedAt || msg._elapsedMs != null) && (
+      {(msg.isStreaming || msg._usage || msg._rateLimits || msg._startedAt || msg._elapsedMs != null) && (
         <LoadingStatus
           startedAt={msg._startedAt}
           elapsedMs={msg._elapsedMs}
           usage={msg._usage}
+          rateLimits={msg._rateLimits}
           isStreaming={Boolean(msg.isStreaming)}
           modelId={modelId}
           compacting={Boolean(msg._compacting)}

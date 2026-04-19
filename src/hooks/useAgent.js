@@ -65,6 +65,32 @@ function normalizeCodexUsage(usage, contextWindow) {
   };
 }
 
+// Codex emits plan-quota snapshots inside the same `token_count` event as token
+// usage — `payload.rate_limits` is a sibling of `payload.info`. The shape uses
+// `primary` (5h rolling window, window_minutes=300) and `secondary` (7d, =10080).
+// Normalize to a provider-agnostic shape so Claude Code's statusline JSON
+// (`five_hour`/`seven_day`) can later reuse the same renderer.
+function normalizeCodexRateLimits(rl) {
+  if (!rl || typeof rl !== "object") return null;
+  const pickWindow = (w) => {
+    if (!w || typeof w !== "object") return null;
+    if (!Number.isFinite(w.used_percent)) return null;
+    return {
+      used_percent: w.used_percent,
+      resets_at: Number.isFinite(w.resets_at) ? w.resets_at : null,
+      window_minutes: Number.isFinite(w.window_minutes) ? w.window_minutes : null,
+    };
+  };
+  const five = pickWindow(rl.primary);
+  const seven = pickWindow(rl.secondary);
+  if (!five && !seven) return null;
+  return {
+    ...(five ? { five_hour: five } : {}),
+    ...(seven ? { seven_day: seven } : {}),
+    ...(rl.plan_type ? { plan_type: rl.plan_type } : {}),
+  };
+}
+
 function findLatestAssistantIndex(messages) {
   for (let i = (messages?.length || 0) - 1; i >= 0; i -= 1) {
     if (messages[i]?.role === "assistant") return i;
@@ -343,6 +369,19 @@ export default function useAgent() {
           }
         }
 
+        // Claude Code plan quota — synthetic event emitted by the main process
+        // after each `result`, sourced from `api.anthropic.com/api/oauth/usage`
+        // (Pro/Max only — silently absent for API-key users). Already
+        // normalized to the same `{ five_hour, seven_day }` shape Codex uses,
+        // so it just attaches to the latest assistant message.
+        else if (event.type === "rate_limits" && event.rate_limits) {
+          const idx = findLatestAssistantIndex(msgs);
+          if (idx >= 0) {
+            msgs[idx] = { ...msgs[idx], _rateLimits: event.rate_limits };
+            if (idx === msgs.length - 1) lastMsg = msgs[idx];
+          }
+        }
+
         // Claude Code emits a top-level `system` event with
         // `subtype: "compact_boundary"` whenever auto-compaction runs. Flag
         // the message transiently so the live status can show "compacting…";
@@ -366,9 +405,13 @@ export default function useAgent() {
             tokenInfo?.last_token_usage || tokenInfo?.total_token_usage,
             tokenInfo?.model_context_window
           );
-          if (usage) {
+          const rateLimits = normalizeCodexRateLimits(event.payload.rate_limits);
+          if (usage || rateLimits) {
             const am = ensureAssistant();
-            msgs[msgs.length - 1] = { ...am, _usage: usage };
+            const patch = { ...am };
+            if (usage) patch._usage = usage;
+            if (rateLimits) patch._rateLimits = rateLimits;
+            msgs[msgs.length - 1] = patch;
             lastMsg = msgs[msgs.length - 1];
           }
         } else if (event.type === "turn.started") {

@@ -44,6 +44,25 @@ function formatDuration(ms) {
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
+// Coarse "resets in" label for plan-quota windows (5h / 7d).
+// resetsAtSec is unix epoch seconds; nowMs is wall clock (param so the
+// component can re-render against its existing `now` tick).
+function formatResetIn(resetsAtSec, nowMs) {
+  if (!Number.isFinite(resetsAtSec)) return null;
+  const remaining = resetsAtSec * 1000 - nowMs;
+  if (remaining <= 0) return "now";
+  const min = Math.floor(remaining / 60000);
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  if (h < 24) {
+    const m = min % 60;
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
+  const d = Math.floor(h / 24);
+  const r = h % 24;
+  return r ? `${d}d ${r}h` : `${d}d`;
+}
+
 // Slash+dot spinner — keeps the RayLine logo's "/•" geometry but in a muted
 // whitish ink so it doesn't clash with the message ambiance. Both elements
 // pulse out of phase to keep a live feel while staying quiet.
@@ -93,7 +112,7 @@ function SlashSpinner() {
   );
 }
 
-export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, usage, isStreaming, modelId, compacting }) {
+export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, usage, rateLimits, isStreaming, modelId, compacting }) {
   const s = useFontScale();
   const [now, setNow] = useState(() => Date.now());
   const [phraseIdx, setPhraseIdx] = useState(0);
@@ -151,8 +170,13 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
 
   const hasUsage = contextUsed > 0 && !isLikelyCumulativeCodexUsage;
 
+  const fiveHour = rateLimits?.five_hour;
+  const sevenDay = rateLimits?.seven_day;
+  const hasRateLimits =
+    Number.isFinite(fiveHour?.used_percent) || Number.isFinite(sevenDay?.used_percent);
+
   // Nothing to say after completion if we never captured any stats.
-  if (!isStreaming && !hasUsage && !startedAt && frozenElapsedMs == null) return null;
+  if (!isStreaming && !hasUsage && !hasRateLimits && !startedAt && frozenElapsedMs == null) return null;
 
   const elapsedLabel = formatDuration(elapsedMs);
   const pctLabel = contextPct.toFixed(contextPct >= 10 || contextPct === 0 ? 0 : 1) + "%";
@@ -257,6 +281,42 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
           </span>
         </div>
       )}
+
+      {/* Line 3: plan quota windows (5h rolling + 7d weekly).
+          Codex sourced from `event_msg.token_count.rate_limits`. Claude Code
+          sourced from `api.anthropic.com/api/oauth/usage` (Pro/Max only —
+          API-key users have no token, so the line silently hides). */}
+      {hasRateLimits && (
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", color: secondaryColor, fontVariantNumeric: "tabular-nums" }}>
+          {Number.isFinite(fiveHour?.used_percent) && (
+            <PlanQuota label="5h" pct={fiveHour.used_percent} resetIn={formatResetIn(fiveHour.resets_at, now)} />
+          )}
+          {Number.isFinite(fiveHour?.used_percent) && Number.isFinite(sevenDay?.used_percent) && sep}
+          {Number.isFinite(sevenDay?.used_percent) && (
+            <PlanQuota label="7d" pct={sevenDay.used_percent} resetIn={formatResetIn(sevenDay.resets_at, now)} />
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+// Single plan-quota chip: "5h 100% · resets 4h 12m"
+// Saturated quota (≥95%) gets a warmer ink so it reads at a glance, but stays
+// within the existing muted palette — no full red.
+function PlanQuota({ label, pct, resetIn }) {
+  const saturated = pct >= 95;
+  const pctInk = saturated ? "rgba(255,180,180,0.78)" : "rgba(255,255,255,0.55)";
+  const pctLabel = pct.toFixed(pct >= 10 || pct === 0 ? 0 : 1) + "%";
+  return (
+    <span>
+      <span style={{ color: "rgba(255,255,255,0.22)" }}>{label} </span>
+      <span style={{ color: pctInk }}>{pctLabel}</span>
+      {resetIn && (
+        <span style={{ color: "rgba(255,255,255,0.22)", marginLeft: 6 }}>
+          resets {resetIn}
+        </span>
+      )}
+    </span>
   );
 }
