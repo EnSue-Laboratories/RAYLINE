@@ -293,7 +293,10 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
     if (!line.trim()) return;
     try {
       const event = JSON.parse(line);
-      if (event.type === "turn.completed") {
+      if (
+        event.type === "turn.completed" ||
+        (event.type === "event_msg" && event.payload?.type === "task_complete")
+      ) {
         state.sawTurnCompleted = true;
       }
       log("Parsed event type:", event.type);

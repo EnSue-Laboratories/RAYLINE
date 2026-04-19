@@ -168,17 +168,29 @@ function appendCodexUserMessage(messages, text) {
 }
 
 function normalizeCodexUsageSnapshot(info) {
-  const usage = info?.last_token_usage;
+  const usage = info?.last_token_usage || info?.total_token_usage;
   if (!usage) return null;
   return {
     input_tokens: usage.input_tokens ?? 0,
     output_tokens: usage.output_tokens ?? 0,
     total_tokens: usage.total_tokens ?? null,
-    cache_read_input_tokens: usage.cached_input_tokens ?? 0,
-    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: usage.cached_input_tokens ?? usage.cache_read_input_tokens ?? 0,
+    cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
     ...(Number.isFinite(info?.model_context_window)
       ? { context_window: info.model_context_window }
       : {}),
+  };
+}
+
+function normalizeLegacyCodexTurnUsage(usage, contextWindow) {
+  if (!usage) return null;
+  return {
+    input_tokens: usage.input_tokens ?? 0,
+    output_tokens: usage.output_tokens ?? 0,
+    total_tokens: usage.total_tokens ?? null,
+    cache_read_input_tokens: usage.cached_input_tokens ?? usage.cache_read_input_tokens ?? 0,
+    cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+    ...(Number.isFinite(contextWindow) ? { context_window: contextWindow } : {}),
   };
 }
 
@@ -188,6 +200,7 @@ function loadCodexSessionMessages(filePath) {
   const messages = [];
   let sessionCwd = null;
   let usageSnapshot = null;
+  let modelContextWindow = null;
 
   for (const line of lines) {
     if (!line.trim()) continue;
@@ -200,14 +213,25 @@ function loadCodexSessionMessages(filePath) {
     }
 
     if (evt.type === "event_msg") {
+      if (evt.payload?.type === "task_started" && Number.isFinite(evt.payload?.model_context_window)) {
+        modelContextWindow = evt.payload.model_context_window;
+      }
       if (evt.payload?.type === "token_count" && evt.payload?.info) {
         const snapshot = normalizeCodexUsageSnapshot(evt.payload.info);
         if (snapshot) usageSnapshot = snapshot;
+        if (Number.isFinite(evt.payload.info?.model_context_window)) {
+          modelContextWindow = evt.payload.info.model_context_window;
+        }
       }
       if (evt.payload?.type === "user_message" && typeof evt.payload.message === "string") {
         appendCodexUserMessage(messages, evt.payload.message);
       }
       continue;
+    }
+
+    if (evt.type === "turn.completed" && !usageSnapshot && evt.usage) {
+      const snapshot = normalizeLegacyCodexTurnUsage(evt.usage, modelContextWindow);
+      if (snapshot) usageSnapshot = snapshot;
     }
 
     if (evt.type === "response_item" && evt.payload?.role === "user") {

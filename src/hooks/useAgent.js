@@ -91,12 +91,23 @@ function normalizeCodexRateLimits(rl) {
   };
 }
 
+function extractUsageFromSessionResult(result) {
+  const fallbackAssistantIdx = findLatestAssistantIndex(result?.messages || []);
+  return (
+    result?.usageSnapshot ||
+    (fallbackAssistantIdx >= 0 ? result.messages[fallbackAssistantIdx]?._usage : null) ||
+    null
+  );
+}
+
 function findLatestAssistantIndex(messages) {
   for (let i = (messages?.length || 0) - 1; i >= 0; i -= 1) {
     if (messages[i]?.role === "assistant") return i;
   }
   return -1;
 }
+
+const CODEX_USAGE_HYDRATION_RETRY_DELAYS_MS = [0, 150, 500, 1200, 2500];
 
 function buildBlockKey(turn, blockIndex) {
   return `${turn}:${blockIndex}`;
@@ -115,13 +126,97 @@ function findToolPart(parts, toolId) {
   return null;
 }
 
+function extractCodexResponseText(content) {
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((item) => item?.type === "output_text" && typeof item.text === "string")
+    .map((item) => item.text)
+    .join("");
+}
+
+function normalizeCodexToolArgs(payload) {
+  const raw = payload?.arguments ?? payload?.input;
+  if (raw == null) return {};
+  if (typeof raw === "object") {
+    return raw.cmd && !raw.command ? { ...raw, command: raw.cmd } : raw;
+  }
+  if (typeof raw !== "string") return { value: raw };
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      return parsed.cmd && !parsed.command ? { ...parsed, command: parsed.cmd } : parsed;
+    }
+  } catch {}
+
+  return payload?.type === "custom_tool_call" ? { input: raw } : { value: raw };
+}
+
+function normalizeCodexToolResult(output) {
+  if (typeof output !== "string") return output;
+  const trimmed = output.trim();
+  if (!trimmed) return output;
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return output;
+  try {
+    return JSON.parse(output);
+  } catch {
+    return output;
+  }
+}
+
 export default function useAgent() {
   const [conversations, setConversations] = useState(new Map());
   const cleanupRefs = useRef([]);
   const pendingStartsRef = useRef(new Map());
+  const usageHydrationTimersRef = useRef(new Set());
 
   useEffect(() => {
     if (!window.api) return;
+
+    const scheduleUsageHydrationRetry = (conversationId, codexThreadId, attempt = 0) => {
+      if (!window.api?.loadSession) return;
+
+      void window.api.loadSession(codexThreadId).then((result) => {
+        const fallbackUsage = extractUsageFromSessionResult(result);
+        if (fallbackUsage) {
+          setConversations((prev) => {
+            const next = new Map(prev);
+            const convo = next.get(conversationId);
+            if (!convo) return prev;
+
+            const msgs = [...convo.messages];
+            const latestAssistantIdx = findLatestAssistantIndex(msgs);
+            if (latestAssistantIdx < 0 || msgs[latestAssistantIdx]?._usage) return prev;
+
+            msgs[latestAssistantIdx] = {
+              ...msgs[latestAssistantIdx],
+              _usage: fallbackUsage,
+            };
+            next.set(conversationId, { ...convo, messages: msgs });
+            return next;
+          });
+          return;
+        }
+
+        const nextDelay = CODEX_USAGE_HYDRATION_RETRY_DELAYS_MS[attempt + 1];
+        if (nextDelay == null) return;
+
+        const timerId = window.setTimeout(() => {
+          usageHydrationTimersRef.current.delete(timerId);
+          scheduleUsageHydrationRetry(conversationId, codexThreadId, attempt + 1);
+        }, nextDelay);
+        usageHydrationTimersRef.current.add(timerId);
+      }).catch(() => {
+        const nextDelay = CODEX_USAGE_HYDRATION_RETRY_DELAYS_MS[attempt + 1];
+        if (nextDelay == null) return;
+
+        const timerId = window.setTimeout(() => {
+          usageHydrationTimersRef.current.delete(timerId);
+          scheduleUsageHydrationRetry(conversationId, codexThreadId, attempt + 1);
+        }, nextDelay);
+        usageHydrationTimersRef.current.add(timerId);
+      });
+    };
 
     const offStream = window.api.onAgentStream(({ conversationId, event }) => {
       setConversations((prev) => {
@@ -393,11 +488,19 @@ export default function useAgent() {
         }
 
         // --- Codex JSONL stream events ---
-        else if (event.type === "thread.started") {
+        else if (event.type === "session_meta" && event.payload?.id) {
+          convo._codexThreadId = event.payload.id;
+          console.log("[useAgent] Captured Codex thread ID:", {
+            conversationId,
+            threadId: event.payload.id,
+            source: "session_meta",
+          });
+        } else if (event.type === "thread.started") {
           convo._codexThreadId = event.thread_id;
           console.log("[useAgent] Captured Codex thread ID:", {
             conversationId,
             threadId: event.thread_id,
+            source: "thread.started",
           });
         } else if (event.type === "event_msg" && event.payload?.type === "token_count") {
           const tokenInfo = event.payload.info;
@@ -412,6 +515,16 @@ export default function useAgent() {
             if (usage) patch._usage = usage;
             if (rateLimits) patch._rateLimits = rateLimits;
             msgs[msgs.length - 1] = patch;
+            lastMsg = msgs[msgs.length - 1];
+          }
+        } else if (event.type === "event_msg" && event.payload?.type === "task_started") {
+          const am = ensureAssistant();
+          const contextWindow = event.payload.model_context_window;
+          if (Number.isFinite(contextWindow)) {
+            msgs[msgs.length - 1] = {
+              ...am,
+              _usage: mergeUsage(am._usage, { context_window: contextWindow }),
+            };
             lastMsg = msgs[msgs.length - 1];
           }
         } else if (event.type === "turn.started") {
@@ -465,15 +578,102 @@ export default function useAgent() {
             msgs[msgs.length - 1] = { ...am, parts };
             lastMsg = msgs[msgs.length - 1];
           }
-        } else if (event.type === "turn.completed") {
-          if (lastMsg && lastMsg.role === "assistant") {
-            // Do not fall back to `turn.completed.usage` for Codex. Those
-            // numbers are cumulative across the whole session, not the current
-            // prompt window, and produce impossible `ctx` readings. The live
-            // `token_count` event above is the only trustworthy source here.
-            msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
+        } else if (event.type === "response_item") {
+          const payload = event.payload || {};
+          if (payload.type === "message" && payload.role === "assistant") {
+            const text = extractCodexResponseText(payload.content);
+            if (text) {
+              const am = ensureAssistant();
+              const parts = cloneParts(am.parts);
+              parts.push({ type: "text", text });
+              msgs[msgs.length - 1] = { ...am, parts };
+              lastMsg = msgs[msgs.length - 1];
+            }
+          } else if (payload.type === "function_call" || payload.type === "custom_tool_call") {
+            const am = ensureAssistant();
+            const parts = cloneParts(am.parts);
+            const toolId = payload.call_id || uid();
+            const existingIdx = parts.findIndex((p) => p.type === "tool" && p.id === toolId);
+            const nextTool = {
+              type: "tool",
+              id: toolId,
+              name: payload.name || "tool",
+              args: normalizeCodexToolArgs(payload),
+              result: existingIdx >= 0 ? parts[existingIdx].result : null,
+              status: payload.status === "completed" ? "done" : "running",
+            };
+
+            if (existingIdx >= 0) {
+              parts[existingIdx] = { ...parts[existingIdx], ...nextTool };
+            } else {
+              parts.push(nextTool);
+            }
+
+            msgs[msgs.length - 1] = { ...am, parts };
+            lastMsg = msgs[msgs.length - 1];
+          } else if (payload.type === "function_call_output" || payload.type === "custom_tool_call_output") {
+            const am = ensureAssistant();
+            const parts = cloneParts(am.parts);
+            const existingIdx = parts.findIndex(
+              (p) => p.type === "tool" && p.id === payload.call_id
+            );
+            const result = normalizeCodexToolResult(payload.output);
+
+            if (existingIdx >= 0) {
+              parts[existingIdx] = {
+                ...parts[existingIdx],
+                result,
+                status: "done",
+              };
+            } else {
+              parts.push({
+                type: "tool",
+                id: payload.call_id || uid(),
+                name: "tool",
+                args: {},
+                result,
+                status: "done",
+              });
+            }
+
+            msgs[msgs.length - 1] = { ...am, parts };
             lastMsg = msgs[msgs.length - 1];
           }
+        } else if (event.type === "turn.completed") {
+          if (lastMsg && lastMsg.role === "assistant") {
+            // RayLine's live Codex stdout still uses the older
+            // `thread.started`/`turn.completed` schema even though the saved
+            // session JSONL now contains the richer `token_count` event.
+            // Merge this older usage packet as an immediate fallback so the
+            // footer can render without waiting for session-file hydration.
+            const fallbackUsage = normalizeCodexUsage(event.usage);
+            msgs[msgs.length - 1] = freezeElapsed({
+              ...lastMsg,
+              ...(fallbackUsage
+                ? { _usage: mergeUsage(lastMsg._usage, fallbackUsage) }
+                : {}),
+              isStreaming: false,
+              isThinking: false,
+            });
+            lastMsg = msgs[msgs.length - 1];
+          }
+        } else if (event.type === "event_msg" && event.payload?.type === "task_complete") {
+          const completionText = event.payload.last_agent_message;
+          const am = ensureAssistant();
+          let parts = cloneParts(am.parts);
+          const hasText = parts.some((part) => part.type === "text" && part.text);
+
+          if (!hasText && completionText) {
+            parts.push({ type: "text", text: completionText });
+          }
+
+          msgs[msgs.length - 1] = freezeElapsed({
+            ...am,
+            parts,
+            isStreaming: false,
+            isThinking: false,
+          });
+          lastMsg = msgs[msgs.length - 1];
         }
 
         next.set(conversationId, { ...convo, messages: msgs });
@@ -503,31 +703,7 @@ export default function useAgent() {
       });
 
       if (needsUsageHydration && codexThreadId && window.api?.loadSession) {
-        void window.api.loadSession(codexThreadId).then((result) => {
-          const fallbackAssistantIdx = findLatestAssistantIndex(result?.messages || []);
-          const fallbackUsage =
-            result?.usageSnapshot ||
-            (fallbackAssistantIdx >= 0 ? result.messages[fallbackAssistantIdx]?._usage : null) ||
-            null;
-          if (!fallbackUsage) return;
-
-          setConversations((prev) => {
-            const next = new Map(prev);
-            const convo = next.get(conversationId);
-            if (!convo) return prev;
-
-            const msgs = [...convo.messages];
-            const latestAssistantIdx = findLatestAssistantIndex(msgs);
-            if (latestAssistantIdx < 0 || msgs[latestAssistantIdx]?._usage) return prev;
-
-            msgs[latestAssistantIdx] = {
-              ...msgs[latestAssistantIdx],
-              _usage: fallbackUsage,
-            };
-            next.set(conversationId, { ...convo, messages: msgs });
-            return next;
-          });
-        }).catch(() => {});
+        scheduleUsageHydrationRetry(conversationId, codexThreadId);
       }
     });
 
@@ -550,7 +726,11 @@ export default function useAgent() {
     });
 
     cleanupRefs.current = [offStream, offDone, offError];
-    return () => cleanupRefs.current.forEach((fn) => fn?.());
+    return () => {
+      cleanupRefs.current.forEach((fn) => fn?.());
+      usageHydrationTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      usageHydrationTimersRef.current.clear();
+    };
   }, []);
 
   const prepareMessage = useCallback(({ conversationId, prompt, images, files }) => {
