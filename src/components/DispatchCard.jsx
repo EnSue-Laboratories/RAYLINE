@@ -82,17 +82,6 @@ export default function DispatchCard({
       else seenBranches.add(r.branch);
     }
 
-    // eslint-disable-next-line no-unused-vars
-    const parentCwd = tab === "issues"
-      ? (issueRows[0]?.issue ? // derive from selected repo via IssueTab — pass through below instead
-          null : null)
-      : currentCwd;
-
-    // For the Issues tab the parent cwd is the folder selected inside IssueTab.
-    // We capture it by lifting state: easier to just require IssueTab to store it on each row.
-    // Simpler: require IssueTab to stamp a `cwd` on each row before they get here.
-    // (Make sure Task 6 set row.cwd = selectedPath when constructing rows — if not, adjust.)
-
     if (tab === "custom" && !currentCwd) {
       rowErrors.__global = "Select a folder in the sidebar first.";
     }
@@ -121,12 +110,7 @@ export default function DispatchCard({
       return;
     }
 
-    // Keep failed rows in modal; mark errors per row.
-    const failedMsgs = {};
-    for (const f of failed) {
-      failedMsgs[f.row.__rowKey || f.row.branch] = f.error?.message || "Dispatch failed.";
-    }
-    // Note: results' `row` is the payload row, which lacks `key`; reconstruct by branch.
+    // results' `row` is the payload row without `key`; reconstruct by branch to key errors.
     const byBranch = {};
     rowsToRun.forEach((r) => { byBranch[r.branch.trim()] = r.key; });
     const keyedErrors = {};
