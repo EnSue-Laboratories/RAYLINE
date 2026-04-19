@@ -3,8 +3,9 @@ import { ArrowLeft, Image } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
+import { CHIME_SOUNDS, playChime } from "../utils/chime";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, onClose }) {
   const s = useFontScale();
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
 
@@ -533,6 +534,93 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
 
           {developerMode && (
             <>
+              {/* NOTIFICATIONS section */}
+              <div
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: s(10),
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.25)",
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                  marginBottom: 20,
+                  marginTop: 12,
+                }}
+              >
+                NOTIFICATIONS
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)", marginBottom: 2 }}>
+                  Completion chime
+                </div>
+                <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.3)", marginBottom: 10 }}>
+                  Plays when a background run finishes. The currently-viewed conversation stays silent.
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <select
+                    value={notificationSound}
+                    onChange={(e) => onNotificationSoundChange?.(e.target.value)}
+                    disabled={notificationsMuted}
+                    style={{
+                      flex: 1,
+                      height: 32,
+                      padding: "0 10px",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 7,
+                      color: "rgba(255,255,255,0.9)",
+                      fontFamily: "system-ui, sans-serif",
+                      fontSize: s(12),
+                      outline: "none",
+                      opacity: notificationsMuted ? 0.4 : 1,
+                    }}
+                  >
+                    {CHIME_SOUNDS.map((c) => (
+                      <option key={c.id} value={c.id}>{c.label}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => playChime(notificationSound)}
+                    disabled={notificationsMuted}
+                    style={{
+                      height: 32,
+                      padding: "0 12px",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 7,
+                      color: "rgba(255,255,255,0.8)",
+                      fontSize: s(12),
+                      cursor: notificationsMuted ? "not-allowed" : "pointer",
+                      opacity: notificationsMuted ? 0.4 : 1,
+                    }}
+                  >
+                    Preview
+                  </button>
+                </div>
+              </div>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 24,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={notificationsMuted}
+                  onChange={(e) => onNotificationsMutedChange?.(e.target.checked)}
+                />
+                <span style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)" }}>
+                  Mute completion chime
+                </span>
+              </label>
+
               {/* GIT section label */}
               <div
                 style={{

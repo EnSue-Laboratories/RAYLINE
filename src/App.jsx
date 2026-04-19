@@ -2119,6 +2119,10 @@ export default function App() {
           onAppOpacityChange={setAppOpacity}
           developerMode={developerMode}
           onDeveloperModeChange={setDeveloperMode}
+          notificationSound={notificationSound}
+          onNotificationSoundChange={setNotificationSound}
+          notificationsMuted={notificationsMuted}
+          onNotificationsMutedChange={setNotificationsMuted}
           onClose={() => setShowSettings(false)}
         />
       ) : (
