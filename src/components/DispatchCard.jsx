@@ -61,6 +61,17 @@ export default function DispatchCard({
   const [issueRows, setIssueRows] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({}); // rowKey -> message
+  const [banner, setBanner] = useState(null);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    setBanner(null);
+  }, [tab]);
 
   const activeRows = tab === "issues"
     ? issueRows.filter((r) => r.enabled)
@@ -88,6 +99,7 @@ export default function DispatchCard({
       return;
     }
     setErrors({});
+    setBanner(null);
     setSubmitting(true);
 
     const payload = rowsToRun.map((r) => ({
@@ -108,6 +120,7 @@ export default function DispatchCard({
     }
     const failed = results.filter((x) => !x.ok);
     if (failed.length === 0) {
+      setBanner(null);
       onClose();
       return;
     }
@@ -121,6 +134,7 @@ export default function DispatchCard({
       if (key) keyedErrors[key] = f.error?.message || "Dispatch failed.";
     }
     setErrors(keyedErrors);
+    setBanner(`Dispatched ${results.length - failed.length}/${results.length} tasks. ${failed.length} failed — see rows.`);
 
     const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
     if (tab === "issues") {
@@ -141,6 +155,12 @@ export default function DispatchCard({
             <X size={16} />
           </button>
         </header>
+
+        {banner && (
+          <div style={{ background: "rgba(255,200,150,0.08)", color: "rgba(255,200,150,0.9)", padding: "8px 14px", fontSize: 12 }}>
+            {banner}
+          </div>
+        )}
 
         <div style={tabsStyle} role="tablist">
           <TabBtn active={tab === "issues"} onClick={() => setTab("issues")}>
