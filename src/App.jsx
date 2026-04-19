@@ -12,6 +12,8 @@ import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrim
 import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
+import { pinTabPatch, runEndedPatch, withTabPatch } from "./utils/tabs";
+import { playChime } from "./utils/chime";
 
 function logCheckpoint(...args) {
   console.log("[checkpoint-ui]", ...args);
@@ -905,6 +907,40 @@ export default function App() {
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
+
+  // Detect streaming start/end transitions per conversation:
+  //   - start  → pin a tab
+  //   - end    → stamp runEndedAt + chime if convo isn't currently viewed
+  const prevStreamingRef = useRef(new Map());
+  useEffect(() => {
+    const prev = prevStreamingRef.current;
+    const next = new Map();
+
+    for (const convo of convoList) {
+      const data = getConversation(convo.id);
+      const streaming = Boolean(data.isStreaming);
+      next.set(convo.id, streaming);
+
+      const wasStreaming = Boolean(prev.get(convo.id));
+
+      if (!wasStreaming && streaming) {
+        setConvoList((p) =>
+          p.map((c) => (c.id === convo.id ? withTabPatch(c, pinTabPatch()) : c))
+        );
+      } else if (wasStreaming && !streaming) {
+        setConvoList((p) =>
+          p.map((c) => (c.id === convo.id ? withTabPatch(c, runEndedPatch()) : c))
+        );
+
+        const isBackground = convo.id !== active;
+        if (isBackground && !notificationsMuted) {
+          playChime(notificationSound);
+        }
+      }
+    }
+
+    prevStreamingRef.current = next;
+  }, [convoList, getConversation, active, notificationSound, notificationsMuted]);
 
   const resolveStoredSessionProvider = useCallback(async (conversation) => {
     if (!conversation) return null;
