@@ -1996,7 +1996,7 @@ export default function App() {
   }, [active, activeData.isStreaming, handleSend]);
 
   const handleCreateChat = useCallback(async (opts) => {
-    const id = "c" + Date.now();
+    const id = opts.id || ("c" + Date.now());
     const effectiveCwd = opts.cwd !== undefined ? opts.cwd : (getMainRepoRoot(cwd) || undefined);
     const modelId = opts.model || defaultModel;
     const n = createConversationDraft({
@@ -2029,8 +2029,10 @@ export default function App() {
     }
 
     setConvoList((p) => [n, ...p]);
-    setActive(id);
-    setShowNewChatCard(false);
+    if (!opts.suppressActivate) {
+      setActive(id);
+      setShowNewChatCard(false);
+    }
 
     const projectRoot = getMainRepoRoot(opts.cwd || effectiveCwd);
     if (projectRoot && !projects[projectRoot]) {
@@ -2066,22 +2068,33 @@ export default function App() {
   const handleDispatch = useCallback(async (rows) => {
     // rows: Array<{ prompt, attachments?, model?, cwd, branch, issueContext?, tag? }>
     const dispatchId = "d" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
-    const tasks = rows.map((row) => ({
-      row,
-      promise: handleCreateChat({
-        prompt: row.prompt,
-        attachments: row.attachments,
-        model: row.model || defaultModel,
-        cwd: row.cwd,
-        worktree: true,
-        branch: row.branch,
-        issueContext: row.issueContext,
-        dispatchId,
-        tags: ["dispatch", ...(row.tag ? [row.tag] : [])],
-      }).then(() => ({ ok: true, row })).catch((err) => ({ ok: false, row, error: err })),
-    }));
+    const tasks = rows.map((row) => {
+      const chatId = "c" + Date.now() + "-" + Math.random().toString(36).slice(2, 6);
+      return {
+        row,
+        chatId,
+        promise: handleCreateChat({
+          id: chatId,
+          prompt: row.prompt,
+          attachments: row.attachments,
+          model: row.model || defaultModel,
+          cwd: row.cwd,
+          worktree: true,
+          branch: row.branch,
+          issueContext: row.issueContext,
+          dispatchId,
+          tags: ["dispatch", ...(row.tag ? [row.tag] : [])],
+          suppressActivate: true,
+        }).then(() => ({ ok: true, row, chatId })).catch((err) => ({ ok: false, row, chatId, error: err })),
+      };
+    });
 
     const results = await Promise.all(tasks.map((t) => t.promise));
+    const firstSuccess = results.find((r) => r.ok);
+    if (firstSuccess) {
+      setActive(firstSuccess.chatId);
+      setShowNewChatCard(false);
+    }
     return { dispatchId, results };
   }, [handleCreateChat, defaultModel]);
 

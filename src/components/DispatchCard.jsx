@@ -441,8 +441,6 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
 }
 
 function AttachmentPicker({ attachments, onChange }) {
-  // Minimal paperclip that appends image file paths. Integrate with
-  // whatever image-attachment pattern NewChatCard.jsx already uses.
   return (
     <label style={{ cursor: "pointer", color: "rgba(255,255,255,0.55)", fontSize: 16 }}>
       📎{attachments.length > 0 ? ` ${attachments.length}` : ""}
@@ -453,8 +451,15 @@ function AttachmentPicker({ attachments, onChange }) {
         hidden
         onChange={(e) => {
           const files = Array.from(e.target.files || []);
-          onChange([...attachments, ...files]);
           e.target.value = "";
+          Promise.all(files.map((file) => new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => resolve({ type: "image", dataUrl: ev.target.result, name: file.name || "image" });
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(file);
+          }))).then((added) => {
+            onChange([...attachments, ...added.filter(Boolean)]);
+          });
         }}
       />
     </label>
