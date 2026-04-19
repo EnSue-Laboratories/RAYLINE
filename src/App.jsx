@@ -55,6 +55,19 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function deriveConversationTitle(text, attachments) {
+  const trimmed = (text || "").trim();
+  if (trimmed) return trimmed.slice(0, 50);
+  const list = Array.isArray(attachments) ? attachments : [];
+  if (list.length) {
+    const first = list[0];
+    const name = first?.name || (first?.type === "image" ? "Image" : "Attachment");
+    const extra = list.length > 1 ? ` +${list.length - 1}` : "";
+    return `${name}${extra}`.slice(0, 50);
+  }
+  return "New chat";
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -455,6 +468,29 @@ function getPreferredLoadSessionId(conversation) {
   return getConversationSessions(conversation).find((session) => session.nativeSessionId)?.nativeSessionId || null;
 }
 
+function getStoredConversationMessageCount(conversation) {
+  if (!conversation) return 0;
+
+  const archivedMessageCount = Array.isArray(conversation.archivedMessages)
+    ? conversation.archivedMessages.length
+    : 0;
+  const syncedMessageCount = Array.isArray(conversation.sessions)
+    ? conversation.sessions.reduce(
+        (max, session) => Math.max(max, session?.syncedThroughMessageCount || 0),
+        0
+      )
+    : 0;
+
+  return Math.max(archivedMessageCount, syncedMessageCount);
+}
+
+function hasConversationMessages(conversation, conversationData) {
+  const liveMessageCount = Array.isArray(conversationData?.messages)
+    ? conversationData.messages.length
+    : 0;
+  return Math.max(getStoredConversationMessageCount(conversation), liveMessageCount) > 0;
+}
+
 function upsertConversationSession(
   conversation,
   sessionInput,
@@ -624,6 +660,21 @@ export default function App() {
   const messageQueue = useRef([]);
   const [queuedMessages, setQueuedMessages] = useState([]);
   const labControlTimersRef = useRef(new Map());
+  const persistableConversations = useMemo(
+    () =>
+      convoList
+        .map((conversation) => normalizeConversationState(conversation))
+        .filter((conversation) => hasConversationMessages(conversation, getConversation(conversation.id))),
+    [convoList, getConversation]
+  );
+  const persistedActive = useMemo(
+    () => (
+      persistableConversations.some((conversation) => conversation.id === active)
+        ? active
+        : persistableConversations[0]?.id || null
+    ),
+    [active, persistableConversations]
+  );
 
   const canControlTarget = useCallback((target) => (
     target === "wallpaper.imgBlur"
@@ -707,8 +758,8 @@ export default function App() {
     window.api.loadState().then((state) => {
       if (state) {
         if (state.convos) {
-          setConvoList(
-            state.convos.map((convo) =>
+          const restoredConversations = state.convos
+            .map((convo) =>
               normalizeConversationState({
                 ...convo,
                 model: normalizeModelId(convo.model),
@@ -717,9 +768,16 @@ export default function App() {
                 archivedMessages: Array.isArray(convo.archivedMessages) ? convo.archivedMessages : [],
               })
             )
+            .filter((conversation) => hasConversationMessages(conversation));
+
+          setConvoList(restoredConversations);
+          setActive(
+            restoredConversations.some((conversation) => conversation.id === state.active)
+              ? state.active
+              : restoredConversations[0]?.id || null
           );
         }
-        if (state.active) setActive(state.active);
+        else if (state.active) setActive(state.active);
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
         if (state.fontSize) setFontSize(state.fontSize);
@@ -757,8 +815,8 @@ export default function App() {
       // Strip dataUrl before persisting (too large for JSON, reloaded on startup)
       const wpSave = getPersistedWallpaper(wallpaper);
       window.api.saveState({
-        convos: convoList.map((conversation) => normalizeConversationState(conversation)),
-        active,
+        convos: persistableConversations,
+        active: persistedActive,
         cwd,
         defaultModel,
         fontSize,
@@ -772,7 +830,7 @@ export default function App() {
         developerMode,
       });
     }, 300);
-  }, [convoList, active, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, appBlur, appOpacity, developerMode, stateLoaded]);
+  }, [persistableConversations, persistedActive, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, appBlur, appOpacity, developerMode, stateLoaded]);
 
   // Push window opacity to Electron
   useEffect(() => {
@@ -1280,8 +1338,9 @@ export default function App() {
       const sendStartedAt = Date.now();
 
       if (isFirstMessage) {
+        const newTitle = deriveConversationTitle(titleText || text, attachments);
         setConvoList((p) =>
-          p.map((c) => c.id === conversationId ? { ...c, title: (titleText || text).slice(0, 50) } : c)
+          p.map((c) => c.id === conversationId ? { ...c, title: newTitle } : c)
         );
       }
 
@@ -1447,7 +1506,7 @@ export default function App() {
         const id = "c" + Date.now();
         convo = createConversationDraft({
           id,
-          title: text.slice(0, 50),
+          title: deriveConversationTitle(text, attachments),
           modelId: defaultModel,
           ts: Date.now(),
           cwd: getMainRepoRoot(cwd) || undefined,
@@ -1857,7 +1916,9 @@ export default function App() {
       lastPreview: preview || c.lastPreview || "Empty",
       isStreaming: data.isStreaming,
     };
-  });
+  }).filter((conversation) => (
+    conversation.id === active || hasConversationMessages(conversation, { messages: conversation.msgs })
+  ));
 
   // Refresh terminal sessions periodically (catches Claude-created sessions)
   useEffect(() => {
