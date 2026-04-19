@@ -23,7 +23,7 @@ function defaultCustomBranch(index) {
 
 function makeCustomRow(index) {
   return {
-    key: "r" + Date.now() + "-" + index,
+    key: "r" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
     prompt: "",
     branch: defaultCustomBranch(index),
     model: "",
@@ -222,6 +222,7 @@ function AttachmentPicker({ attachments, onChange }) {
         onChange={(e) => {
           const files = Array.from(e.target.files || []);
           onChange([...attachments, ...files]);
+          e.target.value = "";
         }}
       />
     </label>
