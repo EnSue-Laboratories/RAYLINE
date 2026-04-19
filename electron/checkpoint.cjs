@@ -572,10 +572,10 @@ async function createCheckpoint(cwdPath) {
 // ---------------------------------------------------------------------------
 
 /**
- * Revert the working tree (and index) to a previously created checkpoint.
- * Untracked files introduced after the checkpoint are removed selectively so
- * pre-existing skipped roots can be preserved without exact restaging on every
- * checkpoint.
+ * Revert the working tree (and index) to a previously created checkpoint
+ * without moving the current branch ref. Untracked files introduced after the
+ * checkpoint are removed selectively so pre-existing skipped roots can be
+ * preserved without exact restaging on every checkpoint.
  *
  * @param {string} cwdPath  Absolute path to the git repository
  * @param {string} ref      Checkpoint ID returned by createCheckpoint, e.g.
@@ -643,18 +643,11 @@ async function restoreCheckpoint(cwdPath, ref) {
 
   const zeros = "0000000000000000000000000000000000000000";
 
-  // 3. Reset HEAD to the captured commit (if there was one)
+  // 3. Keep the current branch/HEAD in place and restore only index/worktree
+  // state. Editing an older message should rewind files, not rewrite branch
+  // history or make the repo look artificially behind/ahead.
   if (headOid && headOid !== zeros) {
-    log("resetting HEAD to", headOid);
-    const resetResult = await execGit(
-      ["reset", "--hard", headOid],
-      repoRoot
-    );
-    if (resetResult.exitCode !== 0) {
-      throw new Error(
-        `[checkpoint] git reset --hard failed:\n${resetResult.stderr}`
-      );
-    }
+    log("preserving current HEAD; checkpoint captured head:", headOid);
   }
 
   // 4. Restore the worktree from the captured tree object
