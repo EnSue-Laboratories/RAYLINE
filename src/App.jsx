@@ -711,6 +711,8 @@ export default function App() {
   const [appBlur, setAppBlur] = useState(0);
   const [appOpacity, setAppOpacity] = useState(100);
   const [developerMode, setDeveloperMode] = useState(true);
+  const [notificationSound, setNotificationSound] = useState("glass");
+  const [notificationsMuted, setNotificationsMuted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [projects, setProjects] = useState({});
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
@@ -847,6 +849,8 @@ export default function App() {
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
+        if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
+        if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
         if (state.wallpaper) {
           setWallpaper(normalizeWallpaper(state.wallpaper));
           // Reload data URL from disk (not persisted — too large for JSON)
@@ -887,9 +891,11 @@ export default function App() {
         appBlur,
         appOpacity,
         developerMode,
+        notificationSound,
+        notificationsMuted,
       });
     }, 300);
-  }, [persistableConversations, persistedActive, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, appBlur, appOpacity, developerMode, stateLoaded]);
+  }, [persistableConversations, persistedActive, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, appBlur, appOpacity, developerMode, notificationSound, notificationsMuted, stateLoaded]);
 
   // Push window opacity to Electron
   useEffect(() => {
