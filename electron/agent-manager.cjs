@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const { buildSpawnPath, isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
 const { findSessionCwd } = require("./session-reader.cjs");
+const { fetchClaudeUsage } = require("./claude-usage-fetcher.cjs");
 
 const activeAgents = new Map();
 
@@ -347,6 +348,25 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
         }
 
         webContents.send("agent-stream", { conversationId, event });
+
+        // After the turn ends, fetch Claude Code 5h/7d plan quota and emit a
+        // synthetic event so the loading status can show it. Cached aggressively
+        // (180s TTL + 30s lock) so this is essentially free per-turn.
+        if (event.type === "result") {
+          fetchClaudeUsage()
+            .then((rateLimits) => {
+              if (!rateLimits) return;
+              if (state.cancelled || activeAgents.get(conversationId) !== state) {
+                // Conversation moved on — still emit so the now-frozen message updates.
+              }
+              if (webContents.isDestroyed?.()) return;
+              webContents.send("agent-stream", {
+                conversationId,
+                event: { type: "rate_limits", rate_limits: rateLimits },
+              });
+            })
+            .catch((err) => log("fetchClaudeUsage failed:", err?.message || err));
+        }
       } catch (e) {
         log("Failed to parse JSON line:", line.slice(0, 200), "error:", e.message);
       }
