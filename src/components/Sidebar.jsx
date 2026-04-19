@@ -389,9 +389,18 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                           whiteSpace: "nowrap",
                           fontFamily: "system-ui,sans-serif",
                           marginBottom: 4,
+                          display: "flex",
+                          alignItems: "center",
                         }}
                       >
                         {c.title}
+                        {(c.tags || []).slice(0, 2).map((t) => (
+                          <span key={t} style={{
+                            fontSize: 9, padding: "1px 5px", borderRadius: 4, marginLeft: 4,
+                            background: "rgba(180,220,255,0.12)", color: "rgba(180,220,255,0.85)",
+                            fontFamily: "monospace",
+                          }}>{t}</span>
+                        ))}
                       </div>
                       <div
                         style={{
