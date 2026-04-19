@@ -1,29 +1,68 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Sparkles, Quote, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-export default function SelectionToolbar({ onQuote, model }) {
-  const s = useFontScale();
+function getContainerNode(node) {
+  if (!node) return null;
+  return node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  textarea.style.pointerEvents = "none";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
   const [sel, setSel] = useState(null); // { text, x, y }
   const [explanation, setExplanation] = useState(null); // { text, loading }
   const [explaining, setExplaining] = useState(false);
   const toolbarRef = useRef(null);
+
+  const dismiss = useCallback(() => {
+    setSel(null);
+    setExplanation(null);
+  }, []);
+
+  const isSelectionInRoot = useCallback((selection) => {
+    const root = selectionRootRef?.current;
+    if (!root || !selection || selection.rangeCount === 0) return false;
+    return root.contains(getContainerNode(selection.anchorNode))
+      && root.contains(getContainerNode(selection.focusNode));
+  }, [selectionRootRef]);
+
+  const clearSelection = useCallback(() => {
+    window.getSelection()?.removeAllRanges();
+  }, []);
 
   const handleMouseUp = useCallback((e) => {
     // Ignore clicks inside the toolbar itself
     if (toolbarRef.current && toolbarRef.current.contains(e.target)) return;
 
     requestAnimationFrame(() => {
-      const s = window.getSelection();
-      const text = s?.toString().trim();
-      if (!text) {
-        if (!explanation && !explaining) setSel(null);
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+      if (!text || !isSelectionInRoot(selection)) {
+        dismiss();
         return;
       }
 
-      const range = s.getRangeAt(0);
+      const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
       setSel({
         text,
@@ -32,12 +71,7 @@ export default function SelectionToolbar({ onQuote, model }) {
       });
       if (!explaining) setExplanation(null);
     });
-  }, [explanation, explaining]);
-
-  const dismiss = useCallback(() => {
-    setSel(null);
-    setExplanation(null);
-  }, []);
+  }, [dismiss, explaining, isSelectionInRoot]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -45,8 +79,9 @@ export default function SelectionToolbar({ onQuote, model }) {
     };
     const onClick = (e) => {
       if (toolbarRef.current && !toolbarRef.current.contains(e.target)) {
-        const s = window.getSelection();
-        if (!s?.toString().trim()) dismiss();
+        const selection = window.getSelection();
+        const text = selection?.toString().trim();
+        if (!text || !isSelectionInRoot(selection)) dismiss();
       }
     };
     document.addEventListener("keydown", onKey);
@@ -55,7 +90,7 @@ export default function SelectionToolbar({ onQuote, model }) {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onClick);
     };
-  }, [dismiss]);
+  }, [dismiss, isSelectionInRoot]);
 
   useEffect(() => {
     document.addEventListener("mouseup", handleMouseUp);
@@ -79,9 +114,19 @@ export default function SelectionToolbar({ onQuote, model }) {
 
   const handleQuote = () => {
     onQuote?.(sel.text);
-    setSel(null);
-    setExplanation(null);
-    window.getSelection()?.removeAllRanges();
+    dismiss();
+    clearSelection();
+  };
+
+  const handleCopy = async () => {
+    try {
+      await copyText(sel.text);
+    } catch {
+      // Keep the toolbar open if copying fails so the user can retry.
+      return;
+    }
+    dismiss();
+    clearSelection();
   };
 
   // Clamp position and decide if toolbar goes above or below selection
@@ -131,6 +176,11 @@ export default function SelectionToolbar({ onQuote, model }) {
           <ToolbarBtn
             label="Quote"
             onClick={handleQuote}
+          />
+          <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.08)" }} />
+          <ToolbarBtn
+            label="Copy"
+            onClick={handleCopy}
           />
         </div>
 

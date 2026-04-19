@@ -20,6 +20,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const [attachments, setAttachments]   = useState([]);
   const endRef  = useRef(null);
   const inRef   = useRef(null);
+  const messageBodyRef = useRef(null);
 
   // Scroll to bottom on new messages and during streaming
   const scrollRef = useRef(null);
@@ -444,7 +445,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         ) : !convo || convo.msgs.length === 0 ? (
           <EmptyState model={convo?.model || "sonnet"} />
         ) : (
-          <div style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
+          <div ref={messageBodyRef} style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
             {convo.msgs.map((m, i) => (
               <Message
                 key={m.id}
@@ -462,7 +463,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         )}
       </div>
 
-      {!showNewChatCard && <SelectionToolbar onQuote={handleQuote} model={convo?.model || defaultModel || "sonnet"} />}
+      {!showNewChatCard && convo?.msgs?.length > 0 && (
+        <SelectionToolbar
+          onQuote={handleQuote}
+          model={convo?.model || defaultModel || "sonnet"}
+          selectionRootRef={messageBodyRef}
+        />
+      )}
 
       {/* Scroll to bottom button */}
       {!showNewChatCard && convo && convo.msgs.length > 0 && (
