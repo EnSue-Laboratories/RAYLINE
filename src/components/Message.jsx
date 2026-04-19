@@ -270,7 +270,7 @@ function renderControlAwareMarkdown({
   });
 }
 
-export default function Message({ msg, onEdit, onAnswer, onControlChange, canControlTarget }) {
+export default function Message({ msg, onEdit, onAnswer, onControlChange, canControlTarget, wallpaper }) {
   const s = useFontScale();
   const scaledMdStatic = useMemo(() => makeMdComponents(false, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
   const scaledMdStreaming = useMemo(() => makeMdComponents(true, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
@@ -733,7 +733,7 @@ export default function Message({ msg, onEdit, onAnswer, onControlChange, canCon
       {!msg.isStreaming && assistantText && (
         <div data-copy-image-ignore="true" style={{ marginTop: 8, display: "flex", gap: 6 }}>
           <CopyBtn text={assistantText} title="Copy markdown" />
-          <CopyImageBtn targetRef={assistantCaptureRef} />
+          <CopyImageBtn targetRef={assistantCaptureRef} wallpaper={wallpaper} />
         </div>
       )}
     </div>

@@ -401,6 +401,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 onAnswer={m.role === "assistant" ? (text) => onSend(text) : undefined}
                 onControlChange={m.role === "assistant" ? onControlChange : undefined}
                 canControlTarget={m.role === "assistant" ? canControlTarget : undefined}
+                wallpaper={wallpaper}
               />
             ))}
             <div ref={endRef} />
