@@ -307,7 +307,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             />
           )}
 
-          {convo && !showNewChatCard && !tabs.some((t) => t.id === convo.id) && (
+          {convo && !showNewChatCard && tabs.length === 0 && (
             <div style={{ animation: "dropIn .2s ease", flexShrink: 0 }}>
               <div style={{
                 fontSize: s(13),
