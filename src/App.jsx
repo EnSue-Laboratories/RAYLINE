@@ -2037,7 +2037,7 @@ export default function App() {
     conversation.id === active || hasConversationMessages(conversation, { messages: conversation.msgs })
   ));
 
-  const tabs = useMemo(() => {
+  const pinnedTabs = useMemo(() => {
     return convoList
       .filter((c) => c.tab?.pinned)
       .map((c) => {
@@ -2049,6 +2049,11 @@ export default function App() {
         };
       });
   }, [convoList, getConversation]);
+
+  const tabs = useMemo(
+    () => (pinnedTabs.length > 1 ? pinnedTabs : []),
+    [pinnedTabs]
+  );
 
   // Refresh terminal sessions periodically (catches Claude-created sessions)
   useEffect(() => {
