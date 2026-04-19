@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const { buildSpawnPath, isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
-const { findSessionCwd } = require("./session-reader.cjs");
+const { findSessionCwd, moveSession } = require("./session-reader.cjs");
 const { fetchClaudeUsage } = require("./claude-usage-fetcher.cjs");
 
 const activeAgents = new Map();
@@ -268,6 +268,27 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
       resumeSessionId: runResumeSessionId,
       forkSession: runForkSession,
     });
+
+    if (runResumeSessionId && launchCwd) {
+      try {
+        const prepared = moveSession(runResumeSessionId, launchCwd);
+        log("Prepared resume session for launch cwd", {
+          conversationId,
+          runNumber,
+          resumeSessionId: runResumeSessionId,
+          cwd: launchCwd,
+          prepared,
+        });
+      } catch (err) {
+        log("Failed to prepare resume session for launch cwd", {
+          conversationId,
+          runNumber,
+          resumeSessionId: runResumeSessionId,
+          cwd: launchCwd,
+          error: err.message || err,
+        });
+      }
+    }
 
     log("Run start:", {
       conversationId,

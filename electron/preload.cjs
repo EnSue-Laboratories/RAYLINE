@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld("api", {
   quickExplain: (opts) => ipcRenderer.invoke("quick-explain", opts),
   getSystemInfo: () => ipcRenderer.invoke("system-info"),
   getDraftsPath: () => ipcRenderer.invoke("get-drafts-path"),
+  pathExists: (p) => ipcRenderer.invoke("path-exists", p),
   shellRun: ({ command, cwd }) => ipcRenderer.invoke("shell-run", { command, cwd }),
 
   // Git operations
