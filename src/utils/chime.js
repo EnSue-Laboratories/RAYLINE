@@ -30,7 +30,8 @@ function getAudio(id) {
 
 export function playChime(id = DEFAULT_CHIME_ID, volume = DEFAULT_CHIME_VOLUME) {
   try {
-    const el = getAudio(id);
+    const template = getAudio(id);
+    const el = template.paused ? template : template.cloneNode(true);
     el.currentTime = 0;
     el.volume = Math.max(0, Math.min(1, volume));
     const result = el.play();

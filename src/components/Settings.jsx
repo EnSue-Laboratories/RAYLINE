@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { ArrowLeft, Image } from "lucide-react";
+import { ArrowLeft, Check, Image } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
@@ -555,7 +555,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   Completion chime
                 </div>
                 <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.3)", marginBottom: 10 }}>
-                  Plays when a background run finishes. The currently-viewed conversation stays silent.
+                  Plays each time a run finishes, even if multiple sessions complete back-to-back.
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -615,7 +615,41 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   type="checkbox"
                   checked={notificationsMuted}
                   onChange={(e) => onNotificationsMutedChange?.(e.target.checked)}
+                  style={{
+                    opacity: 0,
+                    width: 0,
+                    height: 0,
+                    margin: 0,
+                    pointerEvents: "none",
+                  }}
                 />
+                <span
+                  aria-hidden
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 5,
+                    border: "1px solid rgba(255,255,255,0.18)",
+                    background: "transparent",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: notificationsMuted ? "inset 0 0 0 1px rgba(255,255,255,0.06)" : "none",
+                    flexShrink: 0,
+                    transition: "border-color .15s, background .15s, box-shadow .15s",
+                  }}
+                >
+                  <Check
+                    size={12}
+                    strokeWidth={2.2}
+                    color="rgba(255,255,255,0.86)"
+                    style={{
+                      opacity: notificationsMuted ? 1 : 0,
+                      transform: notificationsMuted ? "scale(1)" : "scale(0.75)",
+                      transition: "opacity .12s ease, transform .12s ease",
+                    }}
+                  />
+                </span>
                 <span style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)" }}>
                   Mute completion chime
                 </span>

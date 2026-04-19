@@ -929,7 +929,8 @@ export default function App() {
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
 
-  // Auto-pinning only arms once per concurrent streaming burst.
+  // The first tab strip only appears for a concurrent streaming burst.
+  // Once the strip exists, any newly streaming session joins it immediately.
   // If the user collapses the pinned set below two tabs, we keep it dismissed
   // until concurrency drops back out and a new burst starts.
   const prevStreamingRef = useRef(new Map());
@@ -939,7 +940,7 @@ export default function App() {
     const next = new Map();
     const streamingIds = [];
     const endedIds = [];
-    let shouldChime = false;
+    const pinnedTabCount = countPinnedTabs(convoList);
 
     for (const convo of convoList) {
       const data = getConversation(convo.id);
@@ -951,22 +952,29 @@ export default function App() {
 
       if (wasStreaming && !streaming) {
         endedIds.push(convo.id);
-        if (convo.id !== active) shouldChime = true;
       }
     }
 
     const hasConcurrentStreaming = streamingIds.length > 1;
+    const hasVisibleTabs = pinnedTabCount >= 2;
     if (!hasConcurrentStreaming) {
       tabPinRoundStateRef.current = "idle";
     }
 
-    const shouldAutoPin = hasConcurrentStreaming && tabPinRoundStateRef.current === "idle";
-    if (shouldAutoPin) {
+    const shouldArmRound =
+      !hasVisibleTabs &&
+      hasConcurrentStreaming &&
+      tabPinRoundStateRef.current === "idle";
+    if (shouldArmRound) {
       tabPinRoundStateRef.current = "active";
     }
 
-    if (shouldAutoPin || endedIds.length > 0) {
-      const autoPinnedIds = shouldAutoPin ? new Set(streamingIds) : null;
+    const shouldPinStreamingSessions =
+      streamingIds.length > 0 &&
+      (hasVisibleTabs || (hasConcurrentStreaming && tabPinRoundStateRef.current !== "dismissed"));
+
+    if (shouldPinStreamingSessions || endedIds.length > 0) {
+      const autoPinnedIds = shouldPinStreamingSessions ? new Set(streamingIds) : null;
       const endedIdSet = endedIds.length > 0 ? new Set(endedIds) : null;
 
       setConvoList((p) => {
@@ -991,12 +999,14 @@ export default function App() {
       });
     }
 
-    if (shouldChime && !notificationsMuted) {
-      playChime(notificationSound);
+    if (endedIds.length > 0 && !notificationsMuted) {
+      endedIds.forEach((_, index) => {
+        window.setTimeout(() => playChime(notificationSound), index * 140);
+      });
     }
 
     prevStreamingRef.current = next;
-  }, [convoList, getConversation, active, notificationSound, notificationsMuted]);
+  }, [convoList, getConversation, notificationSound, notificationsMuted]);
 
   const resolveStoredSessionProvider = useCallback(async (conversation) => {
     if (!conversation) return null;
