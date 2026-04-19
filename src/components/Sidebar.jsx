@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight } from "lucide-react";
+import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight, Zap } from "lucide-react";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
 import { getM } from "../data/models";
@@ -77,7 +77,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
@@ -167,6 +167,22 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
         >
           <Plus size={15} strokeWidth={1.5} />
           New Chat
+        </button>
+        <button
+          onClick={onOpenDispatch}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 7,
+            background: "none", border: "none", cursor: "pointer",
+            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            fontFamily: "system-ui, sans-serif", transition: "all .15s",
+            textAlign: "left",
+          }}
+          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+        >
+          <Zap size={15} strokeWidth={1.5} />
+          Dispatch
         </button>
         {developerMode && (
           <button

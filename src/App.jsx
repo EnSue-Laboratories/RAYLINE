@@ -2,12 +2,13 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
+import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
-import { DEFAULT_MODEL_ID, getM, normalizeModelId } from "./data/models";
+import { DEFAULT_MODEL_ID, getM, MODELS, normalizeModelId } from "./data/models";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
@@ -770,6 +771,7 @@ export default function App() {
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
   const [draftsPath, setDraftsPath] = useState(null);
   const [showNewChatCard, setShowNewChatCard] = useState(false);
+  const [showDispatchCard, setShowDispatchCard] = useState(false);
   const messageQueue = useRef([]);
   const [queuedMessages, setQueuedMessages] = useState([]);
   const labControlTimersRef = useRef(new Map());
@@ -2465,6 +2467,7 @@ export default function App() {
           active={active}
           onSelect={handleSelect}
           onNew={handleNew}
+          onOpenDispatch={() => setShowDispatchCard(true)}
           onDelete={handleDelete}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
@@ -2550,6 +2553,17 @@ export default function App() {
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
           developerMode={developerMode}
+        />
+      )}
+
+      {showDispatchCard && (
+        <DispatchCard
+          onClose={() => setShowDispatchCard(false)}
+          onDispatch={handleDispatch}
+          currentCwd={getMainRepoRoot(cwd) || undefined}
+          projects={projects}
+          defaultModel={defaultModel}
+          availableModels={MODELS.map((m) => ({ id: m.id, label: m.tag }))}
         />
       )}
 
