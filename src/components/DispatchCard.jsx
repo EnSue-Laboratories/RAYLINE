@@ -49,7 +49,6 @@ function makeIssueRow(issue) {
 
 export default function DispatchCard({
   onClose,
-  // eslint-disable-next-line no-unused-vars
   onDispatch,
   currentCwd,
   projects,
@@ -60,9 +59,7 @@ export default function DispatchCard({
   const [globalModel, setGlobalModel] = useState(defaultModel);
   const [customRows, setCustomRows] = useState([]);
   const [issueRows, setIssueRows] = useState([]);
-  // eslint-disable-next-line no-unused-vars
   const [submitting, setSubmitting] = useState(false);
-  // eslint-disable-next-line no-unused-vars
   const [errors, setErrors] = useState({}); // rowKey -> message
 
   const activeRows = tab === "issues"
@@ -71,8 +68,86 @@ export default function DispatchCard({
   const canDispatch = activeRows.length > 0 && !submitting;
 
   const handleSubmit = useCallback(async () => {
-    // Implemented in Task 7
-  }, []);
+    const rowsToRun = tab === "issues"
+      ? issueRows.filter((r) => r.enabled)
+      : customRows;
+
+    // Build per-row errors map
+    const rowErrors = {};
+    const seenBranches = new Set();
+    for (const r of rowsToRun) {
+      if (!r.prompt?.trim()) rowErrors[r.key] = "Prompt is empty.";
+      else if (!r.branch?.trim()) rowErrors[r.key] = "Branch name is empty.";
+      else if (seenBranches.has(r.branch)) rowErrors[r.key] = "Branch name is duplicated in this batch.";
+      else seenBranches.add(r.branch);
+    }
+
+    // eslint-disable-next-line no-unused-vars
+    const parentCwd = tab === "issues"
+      ? (issueRows[0]?.issue ? // derive from selected repo via IssueTab — pass through below instead
+          null : null)
+      : currentCwd;
+
+    // For the Issues tab the parent cwd is the folder selected inside IssueTab.
+    // We capture it by lifting state: easier to just require IssueTab to store it on each row.
+    // Simpler: require IssueTab to stamp a `cwd` on each row before they get here.
+    // (Make sure Task 6 set row.cwd = selectedPath when constructing rows — if not, adjust.)
+
+    if (tab === "custom" && !currentCwd) {
+      rowErrors.__global = "Select a folder in the sidebar first.";
+    }
+
+    if (Object.keys(rowErrors).length) {
+      setErrors(rowErrors);
+      return;
+    }
+    setErrors({});
+    setSubmitting(true);
+
+    const payload = rowsToRun.map((r) => ({
+      prompt: r.prompt,
+      attachments: r.attachments,
+      model: r.model || globalModel,
+      cwd: r.cwd || currentCwd,
+      branch: r.branch.trim(),
+      issueContext: r.issue ? `Issue #${r.issue.number}: ${r.issue.title}` : undefined,
+      tag: r.issue ? `#${r.issue.number}` : undefined,
+    }));
+
+    const { results } = await onDispatch(payload);
+    const failed = results.filter((x) => !x.ok);
+    if (failed.length === 0) {
+      onClose();
+      return;
+    }
+
+    // Keep failed rows in modal; mark errors per row.
+    const failedMsgs = {};
+    for (const f of failed) {
+      failedMsgs[f.row.__rowKey || f.row.branch] = f.error?.message || "Dispatch failed.";
+    }
+    // Note: results' `row` is the payload row, which lacks `key`; reconstruct by branch.
+    const byBranch = {};
+    rowsToRun.forEach((r) => { byBranch[r.branch.trim()] = r.key; });
+    const keyedErrors = {};
+    for (const f of failed) {
+      const key = byBranch[f.row.branch];
+      if (key) keyedErrors[key] = f.error?.message || "Dispatch failed.";
+    }
+    setErrors(keyedErrors);
+
+    if (tab === "issues") {
+      // Turn off the `enabled` flag on successful rows so only failures remain armed.
+      const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
+      setIssueRows((prev) => prev.map((r) => successBranches.has(r.branch) ? { ...r, enabled: false } : r));
+    } else {
+      // Remove successful custom rows entirely.
+      const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
+      setCustomRows((prev) => prev.filter((r) => !successBranches.has(r.branch.trim())));
+    }
+
+    setSubmitting(false);
+  }, [tab, issueRows, customRows, currentCwd, globalModel, onDispatch, onClose]);
 
   return (
     <div style={backdropStyle} onClick={onClose}>
@@ -173,7 +248,7 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
         setSlug(s);
         const issues = await window.api.ghListIssues(s, "open");
         if (cancelled) return;
-        setRows((issues || []).map(makeIssueRow));
+        setRows((issues || []).map((iss) => ({ ...makeIssueRow(iss), cwd: selectedPath })));
       } catch (e) {
         if (!cancelled) setLoadError(e?.message || "Failed to load issues.");
       } finally {
