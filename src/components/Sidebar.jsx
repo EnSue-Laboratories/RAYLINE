@@ -382,23 +382,31 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: s(12.5),
-                          color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          fontFamily: "system-ui,sans-serif",
                           marginBottom: 4,
                           display: "flex",
                           alignItems: "center",
+                          minWidth: 0,
                         }}
                       >
-                        {c.title}
+                        <span
+                          style={{
+                            fontSize: s(12.5),
+                            color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            fontFamily: "system-ui,sans-serif",
+                            flex: 1,
+                            minWidth: 0,
+                          }}
+                        >
+                          {c.title}
+                        </span>
                         {(c.tags || []).slice(0, 2).map((t) => (
                           <span key={t} style={{
                             fontSize: 9, padding: "1px 5px", borderRadius: 4, marginLeft: 4,
                             background: "rgba(180,220,255,0.12)", color: "rgba(180,220,255,0.85)",
-                            fontFamily: "monospace",
+                            fontFamily: "monospace", flexShrink: 0,
                           }}>{t}</span>
                         ))}
                       </div>
