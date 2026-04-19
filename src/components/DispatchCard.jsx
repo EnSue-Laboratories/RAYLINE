@@ -65,25 +65,22 @@ export default function DispatchCard({
   const activeRows = tab === "issues"
     ? issueRows.filter((r) => r.enabled)
     : customRows;
-  const canDispatch = activeRows.length > 0 && !submitting;
+  const canDispatch = activeRows.length > 0 && !submitting
+    && (tab === "issues" || !!currentCwd);
 
   const handleSubmit = useCallback(async () => {
     const rowsToRun = tab === "issues"
       ? issueRows.filter((r) => r.enabled)
       : customRows;
 
-    // Build per-row errors map
     const rowErrors = {};
     const seenBranches = new Set();
     for (const r of rowsToRun) {
+      const trimmed = r.branch?.trim();
       if (!r.prompt?.trim()) rowErrors[r.key] = "Prompt is empty.";
-      else if (!r.branch?.trim()) rowErrors[r.key] = "Branch name is empty.";
-      else if (seenBranches.has(r.branch)) rowErrors[r.key] = "Branch name is duplicated in this batch.";
-      else seenBranches.add(r.branch);
-    }
-
-    if (tab === "custom" && !currentCwd) {
-      rowErrors.__global = "Select a folder in the sidebar first.";
+      else if (!trimmed) rowErrors[r.key] = "Branch name is empty.";
+      else if (seenBranches.has(trimmed)) rowErrors[r.key] = "Branch name is duplicated in this batch.";
+      else seenBranches.add(trimmed);
     }
 
     if (Object.keys(rowErrors).length) {
@@ -94,7 +91,7 @@ export default function DispatchCard({
     setSubmitting(true);
 
     const payload = rowsToRun.map((r) => ({
-      prompt: r.prompt,
+      prompt: r.prompt.trim(),
       attachments: r.attachments,
       model: r.model || globalModel,
       cwd: r.cwd || currentCwd,
@@ -103,7 +100,12 @@ export default function DispatchCard({
       tag: r.issue ? `#${r.issue.number}` : undefined,
     }));
 
-    const { results } = await onDispatch(payload);
+    let results;
+    try {
+      ({ results } = await onDispatch(payload));
+    } finally {
+      setSubmitting(false);
+    }
     const failed = results.filter((x) => !x.ok);
     if (failed.length === 0) {
       onClose();
@@ -120,17 +122,14 @@ export default function DispatchCard({
     }
     setErrors(keyedErrors);
 
+    const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
     if (tab === "issues") {
-      // Turn off the `enabled` flag on successful rows so only failures remain armed.
-      const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
-      setIssueRows((prev) => prev.map((r) => successBranches.has(r.branch) ? { ...r, enabled: false } : r));
+      setIssueRows((prev) => prev.map((r) =>
+        successBranches.has(r.branch.trim()) ? { ...r, enabled: false } : r
+      ));
     } else {
-      // Remove successful custom rows entirely.
-      const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
       setCustomRows((prev) => prev.filter((r) => !successBranches.has(r.branch.trim())));
     }
-
-    setSubmitting(false);
   }, [tab, issueRows, customRows, currentCwd, globalModel, onDispatch, onClose]);
 
   return (
