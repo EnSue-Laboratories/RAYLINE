@@ -200,7 +200,16 @@ export default function ProjectGroup({
       </div>
 
       {/* Conversation list */}
-      {expanded && project.convos.map((c) => {
+      {expanded && (
+      <div
+        className="folder-convo-scroll"
+        style={{
+          maxHeight: 320,
+          overflowY: project.convos.length > 4 ? "auto" : "visible",
+          overflowX: "hidden",
+        }}
+      >
+      {project.convos.map((c) => {
         const isActive = c.id === active;
         const cm = getM(c.model);
 
@@ -341,6 +350,8 @@ export default function ProjectGroup({
           </div>
         );
       })}
+      </div>
+      )}
 
       {/* Context menu portal */}
       {menuOpen && menuPos && createPortal(

@@ -558,9 +558,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               alignItems: "center",
               gap: 10,
               background: inputFocused ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
-              border: "1px solid " + (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)"),
+              border: (shellMode ? "2px solid " : "1px solid ") + (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)"),
               borderRadius: 12,
-              padding: "9px 14px",
+              padding: shellMode ? "8px 13px" : "9px 14px",
               backdropFilter: "blur(20px)",
               transition: "border-color .25s, background .25s",
             }}
