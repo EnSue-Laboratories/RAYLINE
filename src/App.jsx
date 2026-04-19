@@ -2061,6 +2061,28 @@ export default function App() {
     }
   }, [createConversationDraft, cwd, defaultModel, projects, sendMessageToConversation]);
 
+  const handleDispatch = useCallback(async (rows) => {
+    // rows: Array<{ prompt, attachments?, model?, cwd, branch, issueContext?, tag? }>
+    const dispatchId = "d" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+    const tasks = rows.map((row) => ({
+      row,
+      promise: handleCreateChat({
+        prompt: row.prompt,
+        attachments: row.attachments,
+        model: row.model || defaultModel,
+        cwd: row.cwd,
+        worktree: true,
+        branch: row.branch,
+        issueContext: row.issueContext,
+        dispatchId,
+        tags: ["dispatch", ...(row.tag ? [row.tag] : [])],
+      }).then(() => ({ ok: true, row })).catch((err) => ({ ok: false, row, error: err })),
+    }));
+
+    const results = await Promise.all(tasks.map((t) => t.promise));
+    return { dispatchId, results };
+  }, [handleCreateChat, defaultModel]);
+
   const handleCancel = useCallback(() => {
     if (active) cancelMessage(active);
   }, [active, cancelMessage]);
