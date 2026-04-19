@@ -532,6 +532,8 @@ function moveSession(sessionId, newCwd) {
   const destDir = path.join(CLAUDE_DIR, "projects", projectDirName(newCwd));
   const destPath = path.join(destDir, sessionId + ".jsonl");
 
+  if (fs.existsSync(destPath)) return true;
+
   // Don't copy if already in the right place
   if (srcPath === destPath) return true;
 
