@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { GitCommitHorizontal, GitPullRequestArrow, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
+import { GitCommitHorizontal, GitPullRequestArrow, CloudUpload, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import useGitStatus from "../hooks/useGitStatus";
 
@@ -45,6 +45,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [confirm, setConfirm] = useState(null); // { title, body, confirmLabel, destructive, onConfirm }
   const triggerRef = useRef(null);
@@ -119,7 +120,8 @@ export default function GitStatusPill({ cwd, defaultPrBranch }) {
   const canPull = !detached && upstream && behind > 0;
   const canCommit = !detached && dirty > 0 && message.trim().length > 0 && !busy;
   const prBase = (defaultPrBranch || "main").trim();
-  const canPr = !detached && !!branch && branch !== prBase && !busy;
+  const canPr = !detached && !!branch && branch !== prBase && !busy && !!upstream;
+  const canPublish = !detached && !!branch && !upstream && !busy;
 
   const handleCommitAndPush = async () => {
     if (!canCommit) return;
@@ -198,6 +200,35 @@ export default function GitStatusPill({ cwd, defaultPrBranch }) {
     try {
       const r = await window.api.gitCreatePr(cwd, prBase);
       if (!r.ok) { setError(r.stderr || "Failed to create PR"); return; }
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleGenerateMessage = async () => {
+    if (generating || !window.api?.gitGenCommitMessage) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      const r = await window.api.gitGenCommitMessage(cwd);
+      if (!r.ok) {
+        setError(r.stderr || "Failed to generate commit message");
+        return;
+      }
+      setMessage(r.message || "");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (!canPublish) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const p = await window.api.gitPush(cwd);
+      if (!p.ok) { setError(p.stderr || "Publish failed"); return; }
       await refresh();
     } finally {
       setBusy(false);
@@ -303,9 +334,17 @@ export default function GitStatusPill({ cwd, defaultPrBranch }) {
       {!detached && (
         <div style={{ padding: "8px 12px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           <textarea
-            placeholder="Commit message"
+            placeholder={generating ? "Generating…" : "Commit message  (⇥ to generate)"}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Tab" && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
+                if (message.trim().length > 0) return; // don't clobber user text
+                e.preventDefault();
+                handleGenerateMessage();
+              }
+            }}
+            disabled={generating}
             rows={1}
             style={{
               width: "100%",
@@ -320,6 +359,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch }) {
               lineHeight: 1.4,
               padding: "6px 8px",
               outline: "none",
+              opacity: generating ? 0.6 : 1,
             }}
           />
         </div>
@@ -345,26 +385,49 @@ export default function GitStatusPill({ cwd, defaultPrBranch }) {
         >
           {busy ? "…" : "Commit & Push"}
         </button>
-        <button
-          onClick={handleCreatePr}
-          disabled={!canPr}
-          title={canPr ? `Create PR → ${prBase}` : (branch === prBase ? `On base branch "${prBase}"` : "Cannot create PR")}
-          style={{
-            height: 30,
-            padding: "0 10px",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: canPr ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
-            border: "1px solid " + (canPr ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)"),
-            borderRadius: 6,
-            color: canPr ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
-            fontFamily: "system-ui,sans-serif",
-            cursor: canPr ? "pointer" : "default",
-          }}
-        >
-          <GitPullRequestArrow size={14} strokeWidth={1.6} />
-        </button>
+        {!upstream && !detached ? (
+          <button
+            onClick={handlePublish}
+            disabled={!canPublish}
+            title={canPublish ? `Publish "${branch}" to origin` : "Cannot publish branch"}
+            style={{
+              height: 30,
+              padding: "0 10px",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: canPublish ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+              border: "1px solid " + (canPublish ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)"),
+              borderRadius: 6,
+              color: canPublish ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
+              fontFamily: "system-ui,sans-serif",
+              cursor: canPublish ? "pointer" : "default",
+            }}
+          >
+            <CloudUpload size={14} strokeWidth={1.6} />
+          </button>
+        ) : (
+          <button
+            onClick={handleCreatePr}
+            disabled={!canPr}
+            title={canPr ? `Create PR → ${prBase}` : (branch === prBase ? `On base branch "${prBase}"` : "Cannot create PR")}
+            style={{
+              height: 30,
+              padding: "0 10px",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: canPr ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+              border: "1px solid " + (canPr ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)"),
+              borderRadius: 6,
+              color: canPr ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
+              fontFamily: "system-ui,sans-serif",
+              cursor: canPr ? "pointer" : "default",
+            }}
+          >
+            <GitPullRequestArrow size={14} strokeWidth={1.6} />
+          </button>
+        )}
         <button
           onClick={handlePull}
           disabled={!canPull || busy}
