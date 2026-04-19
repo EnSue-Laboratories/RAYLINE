@@ -257,7 +257,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         >
           <div
             style={{
-              width: "min(520px, 100%)",
+              flex: 1,
               minWidth: 0,
               pointerEvents: "auto",
             }}
@@ -646,7 +646,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 maxHeight: 120,
                 height: "auto",
                 display: "block",
-                overflow: "hidden",
+                overflow: "auto",
               }}
             />
             {isStreaming && !input.trim() ? (
