@@ -338,11 +338,17 @@ function buildProviderSessionLookup(sessions) {
   return providerSessions;
 }
 
+function stripTransientMessageState(message) {
+  if (!message || typeof message !== "object") return message;
+  const { _rateLimits, ...next } = message;
+  return next;
+}
+
 function normalizeConversationState(conversation) {
   if (!conversation) return conversation;
 
   const archivedMessages = Array.isArray(conversation.archivedMessages)
-    ? conversation.archivedMessages
+    ? conversation.archivedMessages.map(stripTransientMessageState)
     : [];
   const archivedMessageCount = archivedMessages.length;
   const sessionMap = new Map();
@@ -621,21 +627,8 @@ function serializeMessagesForState(messages) {
     if (Array.isArray(message.images) && message.images.length > 0) next.images = message.images;
     if (Array.isArray(message.files) && message.files.length > 0) next.files = message.files;
     if (message.claudeUuid) next.claudeUuid = message.claudeUuid;
+    if (message._usage) next._usage = message._usage;
     if (message._elapsedMs != null) next._elapsedMs = message._elapsedMs;
-    if (message._usage && typeof message._usage === "object") {
-      const usage = {};
-      for (const key of [
-        "input_tokens",
-        "output_tokens",
-        "total_tokens",
-        "cache_creation_input_tokens",
-        "cache_read_input_tokens",
-        "context_window",
-      ]) {
-        if (Number.isFinite(message._usage[key])) usage[key] = message._usage[key];
-      }
-      if (Object.keys(usage).length > 0) next._usage = usage;
-    }
     return next;
   });
 }

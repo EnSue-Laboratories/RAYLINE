@@ -182,6 +182,27 @@ function normalizeCodexUsageSnapshot(info) {
   };
 }
 
+function normalizeCodexRateLimitsSnapshot(rateLimits) {
+  if (!rateLimits || typeof rateLimits !== "object") return null;
+  const pickWindow = (window) => {
+    if (!window || typeof window !== "object") return null;
+    if (!Number.isFinite(window.used_percent)) return null;
+    return {
+      used_percent: window.used_percent,
+      resets_at: Number.isFinite(window.resets_at) ? window.resets_at : null,
+      window_minutes: Number.isFinite(window.window_minutes) ? window.window_minutes : null,
+    };
+  };
+  const five = pickWindow(rateLimits.primary);
+  const seven = pickWindow(rateLimits.secondary);
+  if (!five && !seven) return null;
+  return {
+    ...(five ? { five_hour: five } : {}),
+    ...(seven ? { seven_day: seven } : {}),
+    ...(rateLimits.plan_type ? { plan_type: rateLimits.plan_type } : {}),
+  };
+}
+
 function normalizeLegacyCodexTurnUsage(usage, contextWindow) {
   if (!usage) return null;
   return {
@@ -200,6 +221,7 @@ function loadCodexSessionMessages(filePath) {
   const messages = [];
   let sessionCwd = null;
   let usageSnapshot = null;
+  let rateLimitsSnapshot = null;
   let modelContextWindow = null;
 
   for (const line of lines) {
@@ -222,6 +244,10 @@ function loadCodexSessionMessages(filePath) {
         if (Number.isFinite(evt.payload.info?.model_context_window)) {
           modelContextWindow = evt.payload.info.model_context_window;
         }
+      }
+      if (evt.payload?.type === "token_count" && evt.payload?.rate_limits) {
+        const snapshot = normalizeCodexRateLimitsSnapshot(evt.payload.rate_limits);
+        if (snapshot) rateLimitsSnapshot = snapshot;
       }
       if (evt.payload?.type === "user_message" && typeof evt.payload.message === "string") {
         appendCodexUserMessage(messages, evt.payload.message);
@@ -276,15 +302,19 @@ function loadCodexSessionMessages(filePath) {
   }
 
   const result = messages.length > MAX_MESSAGES ? messages.slice(-MAX_MESSAGES) : messages;
-  if (usageSnapshot) {
+  if (usageSnapshot || rateLimitsSnapshot) {
     for (let i = result.length - 1; i >= 0; i -= 1) {
       if (result[i]?.role === "assistant") {
-        result[i] = { ...result[i], _usage: usageSnapshot };
+        result[i] = {
+          ...result[i],
+          ...(usageSnapshot ? { _usage: usageSnapshot } : {}),
+          ...(rateLimitsSnapshot ? { _rateLimits: rateLimitsSnapshot } : {}),
+        };
         break;
       }
     }
   }
-  return { messages: result, cwd: sessionCwd, provider: "codex", usageSnapshot };
+  return { messages: result, cwd: sessionCwd, provider: "codex", usageSnapshot, rateLimitsSnapshot };
 }
 
 async function listSessions(cwd) {

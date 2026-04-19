@@ -91,13 +91,18 @@ function normalizeCodexRateLimits(rl) {
   };
 }
 
-function extractUsageFromSessionResult(result) {
+function extractSessionStatsFromResult(result) {
   const fallbackAssistantIdx = findLatestAssistantIndex(result?.messages || []);
-  return (
-    result?.usageSnapshot ||
-    (fallbackAssistantIdx >= 0 ? result.messages[fallbackAssistantIdx]?._usage : null) ||
-    null
-  );
+  return {
+    usage:
+      result?.usageSnapshot ||
+      (fallbackAssistantIdx >= 0 ? result.messages[fallbackAssistantIdx]?._usage : null) ||
+      null,
+    rateLimits:
+      result?.rateLimitsSnapshot ||
+      (fallbackAssistantIdx >= 0 ? result.messages[fallbackAssistantIdx]?._rateLimits : null) ||
+      null,
+  };
 }
 
 function findLatestAssistantIndex(messages) {
@@ -177,8 +182,8 @@ export default function useAgent() {
       if (!window.api?.loadSession) return;
 
       void window.api.loadSession(codexThreadId).then((result) => {
-        const fallbackUsage = extractUsageFromSessionResult(result);
-        if (fallbackUsage) {
+        const { usage: fallbackUsage, rateLimits: fallbackRateLimits } = extractSessionStatsFromResult(result);
+        if (fallbackUsage || fallbackRateLimits) {
           setConversations((prev) => {
             const next = new Map(prev);
             const convo = next.get(conversationId);
@@ -186,11 +191,20 @@ export default function useAgent() {
 
             const msgs = [...convo.messages];
             const latestAssistantIdx = findLatestAssistantIndex(msgs);
-            if (latestAssistantIdx < 0 || msgs[latestAssistantIdx]?._usage) return prev;
+            if (latestAssistantIdx < 0) return prev;
+
+            const currentAssistant = msgs[latestAssistantIdx];
+            const nextUsage = currentAssistant?._usage || fallbackUsage || null;
+            const nextRateLimits = currentAssistant?._rateLimits || fallbackRateLimits || null;
+
+            if (nextUsage === currentAssistant?._usage && nextRateLimits === currentAssistant?._rateLimits) {
+              return prev;
+            }
 
             msgs[latestAssistantIdx] = {
-              ...msgs[latestAssistantIdx],
-              _usage: fallbackUsage,
+              ...currentAssistant,
+              ...(nextUsage ? { _usage: nextUsage } : {}),
+              ...(nextRateLimits ? { _rateLimits: nextRateLimits } : {}),
             };
             next.set(conversationId, { ...convo, messages: msgs });
             return next;
@@ -477,6 +491,23 @@ export default function useAgent() {
           }
         }
 
+        else if (event.type === "session_snapshot" && event.provider === "codex") {
+          if (event.thread_id) {
+            convo._codexThreadId = event.thread_id;
+          }
+          const idx = findLatestAssistantIndex(msgs);
+          if (idx >= 0) {
+            msgs[idx] = {
+              ...msgs[idx],
+              ...(event.usage
+                ? { _usage: mergeUsage(msgs[idx]._usage, event.usage) }
+                : {}),
+              ...(event.rate_limits ? { _rateLimits: event.rate_limits } : {}),
+            };
+            if (idx === msgs.length - 1) lastMsg = msgs[idx];
+          }
+        }
+
         // Claude Code emits a top-level `system` event with
         // `subtype: "compact_boundary"` whenever auto-compaction runs. Flag
         // the message transiently so the live status can show "compacting…";
@@ -681,7 +712,7 @@ export default function useAgent() {
       });
     });
 
-    const offDone = window.api.onAgentDone(({ conversationId }) => {
+    const offDone = window.api.onAgentDone(({ conversationId, provider, threadId }) => {
       pendingStartsRef.current.delete(conversationId);
       let codexThreadId = null;
       let needsUsageHydration = false;
@@ -689,15 +720,26 @@ export default function useAgent() {
         const next = new Map(prev);
         const convo = next.get(conversationId);
         if (convo) {
-          codexThreadId = convo._codexThreadId || null;
+          codexThreadId =
+            convo._codexThreadId ||
+            (provider === "codex" && typeof threadId === "string" && threadId ? threadId : null);
           const msgs = convo.messages.map((m) =>
             m.role === "assistant" ? freezeElapsed({ ...m, isStreaming: false, isThinking: false }) : m
           );
           const latestAssistantIdx = findLatestAssistantIndex(msgs);
-          if (latestAssistantIdx >= 0 && !msgs[latestAssistantIdx]?._usage && codexThreadId) {
+          if (
+            latestAssistantIdx >= 0 &&
+            codexThreadId &&
+            (!msgs[latestAssistantIdx]?._usage || !msgs[latestAssistantIdx]?._rateLimits)
+          ) {
             needsUsageHydration = true;
           }
-          next.set(conversationId, { ...convo, messages: msgs, isStreaming: false });
+          next.set(conversationId, {
+            ...convo,
+            ...(codexThreadId ? { _codexThreadId: codexThreadId } : {}),
+            messages: msgs,
+            isStreaming: false,
+          });
         }
         return next;
       });
