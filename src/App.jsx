@@ -12,6 +12,18 @@ import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrim
 import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
+import {
+  pinTabPatch,
+  runEndedPatch,
+  markSeenPatch,
+  unpinTabPatch,
+  withTabPatch,
+  computeTabState,
+  countPinnedTabs,
+  clearPinnedTabs,
+  resetPinnedTabs,
+} from "./utils/tabs";
+import { playChime } from "./utils/chime";
 
 function logCheckpoint(...args) {
   console.log("[checkpoint-ui]", ...args);
@@ -715,6 +727,8 @@ export default function App() {
   const [appBlur, setAppBlur] = useState(0);
   const [appOpacity, setAppOpacity] = useState(100);
   const [developerMode, setDeveloperMode] = useState(true);
+  const [notificationSound, setNotificationSound] = useState("glass");
+  const [notificationsMuted, setNotificationsMuted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [projects, setProjects] = useState({});
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
@@ -833,11 +847,22 @@ export default function App() {
             )
             .filter((conversation) => hasConversationMessages(conversation));
 
-          setConvoList(restoredConversations);
+          const sanitized = resetPinnedTabs(
+            restoredConversations.map((c) => {
+              if (!c?.tab?.pinned) return c;
+              // Persisted tab can't be mid-stream after relaunch.
+              // If runEndedAt is missing, stamp it now so the dot shows as "done" (unread).
+              if (c.tab.runEndedAt == null) {
+                return { ...c, tab: { ...c.tab, runEndedAt: Date.now() } };
+              }
+              return c;
+            })
+          );
+          setConvoList(sanitized);
           setActive(
-            restoredConversations.some((conversation) => conversation.id === state.active)
+            sanitized.some((conversation) => conversation.id === state.active)
               ? state.active
-              : restoredConversations[0]?.id || null
+              : sanitized[0]?.id || null
           );
         }
         else if (state.active) setActive(state.active);
@@ -853,6 +878,8 @@ export default function App() {
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
+        if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
+        if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
         if (state.wallpaper) {
           setWallpaper(normalizeWallpaper(state.wallpaper));
           // Reload data URL from disk (not persisted — too large for JSON)
@@ -895,9 +922,11 @@ export default function App() {
         appBlur,
         appOpacity,
         developerMode,
+        notificationSound,
+        notificationsMuted,
       });
     }, 300);
-  }, [persistableConversations, persistedActive, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, coauthorEnabled, coauthorTrailer, appBlur, appOpacity, developerMode, stateLoaded]);
+  }, [persistableConversations, persistedActive, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, coauthorEnabled, coauthorTrailer, appBlur, appOpacity, developerMode, notificationSound, notificationsMuted, stateLoaded]);
 
   // Push window opacity to Electron
   useEffect(() => {
@@ -907,6 +936,85 @@ export default function App() {
 
   const activeConvo = convoList.find((c) => c.id === active);
   const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
+
+  // The first tab strip only appears for a concurrent streaming burst.
+  // Once the strip exists, any newly streaming session joins it immediately.
+  // If the user collapses the pinned set below two tabs, we keep it dismissed
+  // until concurrency drops back out and a new burst starts.
+  const prevStreamingRef = useRef(new Map());
+  const tabPinRoundStateRef = useRef("idle");
+  useEffect(() => {
+    const prev = prevStreamingRef.current;
+    const next = new Map();
+    const streamingIds = [];
+    const endedIds = [];
+    const pinnedTabCount = countPinnedTabs(convoList);
+
+    for (const convo of convoList) {
+      const data = getConversation(convo.id);
+      const streaming = Boolean(data.isStreaming);
+      next.set(convo.id, streaming);
+      if (streaming) streamingIds.push(convo.id);
+
+      const wasStreaming = Boolean(prev.get(convo.id));
+
+      if (wasStreaming && !streaming) {
+        endedIds.push(convo.id);
+      }
+    }
+
+    const hasConcurrentStreaming = streamingIds.length > 1;
+    const hasVisibleTabs = pinnedTabCount >= 2;
+    if (!hasConcurrentStreaming) {
+      tabPinRoundStateRef.current = "idle";
+    }
+
+    const shouldArmRound =
+      !hasVisibleTabs &&
+      hasConcurrentStreaming &&
+      tabPinRoundStateRef.current === "idle";
+    if (shouldArmRound) {
+      tabPinRoundStateRef.current = "active";
+    }
+
+    const shouldPinStreamingSessions =
+      streamingIds.length > 0 &&
+      (hasVisibleTabs || (hasConcurrentStreaming && tabPinRoundStateRef.current !== "dismissed"));
+
+    if (shouldPinStreamingSessions || endedIds.length > 0) {
+      const autoPinnedIds = shouldPinStreamingSessions ? new Set(streamingIds) : null;
+      const endedIdSet = endedIds.length > 0 ? new Set(endedIds) : null;
+
+      setConvoList((p) => {
+        let changed = false;
+        const nextList = p.map((conversation) => {
+          let nextConversation = conversation;
+
+          if (autoPinnedIds?.has(conversation.id) && !conversation.tab?.pinned) {
+            nextConversation = withTabPatch(nextConversation, pinTabPatch());
+            changed = true;
+          }
+
+          if (endedIdSet?.has(conversation.id)) {
+            nextConversation = withTabPatch(nextConversation, runEndedPatch());
+            changed = true;
+          }
+
+          return nextConversation;
+        });
+
+        return changed ? nextList : p;
+      });
+    }
+
+    if (endedIds.length > 0 && !notificationsMuted) {
+      endedIds.forEach((_, index) => {
+        window.setTimeout(() => playChime(notificationSound), index * 140);
+      });
+    }
+
+    prevStreamingRef.current = next;
+  }, [convoList, getConversation, notificationSound, notificationsMuted]);
 
   const resolveStoredSessionProvider = useCallback(async (conversation) => {
     if (!conversation) return null;
@@ -988,6 +1096,7 @@ export default function App() {
   const handleSelect = useCallback(async (id) => {
     setShowNewChatCard(false);
     setActive(id);
+    setConvoList((p) => p.map((c) => (c.id === id ? withTabPatch(c, markSeenPatch()) : c)));
     const convo = convoList.find((c) => c.id === id);
     const data = getConversation(id);
     if (convo && window.api) {
@@ -1249,9 +1358,22 @@ export default function App() {
     e.stopPropagation();
     cancelMessage(id);
     const remaining = convoList.filter((c) => c.id !== id);
-    setConvoList(remaining);
-    if (active === id) setActive(remaining[0]?.id || null);
+    const nextConversations = resetPinnedTabs(remaining);
+    if (nextConversations !== remaining) {
+      tabPinRoundStateRef.current = "dismissed";
+    }
+    setConvoList(nextConversations);
+    if (active === id) setActive(nextConversations[0]?.id || null);
   };
+
+  const handleCloseTab = useCallback((id) => {
+    setConvoList((p) => {
+      const next = p.map((c) => (c.id === id ? withTabPatch(c, unpinTabPatch()) : c));
+      if (countPinnedTabs(next) >= 2) return next;
+      tabPinRoundStateRef.current = "dismissed";
+      return clearPinnedTabs(next);
+    });
+  }, []);
 
   // Capture provider-native session IDs as they arrive from the agent streams.
   useEffect(() => {
@@ -1989,6 +2111,30 @@ export default function App() {
     conversation.id === active || hasConversationMessages(conversation, { messages: conversation.msgs })
   ));
 
+  const pinnedTabs = useMemo(() => {
+    return convoList
+      .filter((c) => c.tab?.pinned)
+      .sort((a, b) => {
+        const aPinnedAt = Number(a.tab?.pinnedAt) || 0;
+        const bPinnedAt = Number(b.tab?.pinnedAt) || 0;
+        if (aPinnedAt !== bPinnedAt) return aPinnedAt - bPinnedAt;
+        return (a.ts || 0) - (b.ts || 0);
+      })
+      .map((c) => {
+        const data = getConversation(c.id);
+        return {
+          id: c.id,
+          title: c.title || "Untitled",
+          state: computeTabState(c, { isStreaming: Boolean(data.isStreaming) }),
+        };
+      });
+  }, [convoList, getConversation]);
+
+  const tabs = useMemo(
+    () => (pinnedTabs.length > 1 ? pinnedTabs : []),
+    [pinnedTabs]
+  );
+
   // Refresh terminal sessions periodically (catches Claude-created sessions)
   useEffect(() => {
     terminal.refreshSessions();
@@ -2136,6 +2282,10 @@ export default function App() {
           onAppOpacityChange={setAppOpacity}
           developerMode={developerMode}
           onDeveloperModeChange={setDeveloperMode}
+          notificationSound={notificationSound}
+          onNotificationSoundChange={setNotificationSound}
+          notificationsMuted={notificationsMuted}
+          onNotificationsMutedChange={setNotificationsMuted}
           onClose={() => setShowSettings(false)}
         />
       ) : (
@@ -2153,6 +2303,10 @@ export default function App() {
           onToggleTerminal={handleToggleTerminal}
           terminalOpen={terminal.drawerOpen}
           terminalCount={terminal.sessions.length}
+          tabs={tabs}
+          activeTabId={active}
+          onSelectTab={handleSelect}
+          onCloseTab={handleCloseTab}
           wallpaper={wallpaper}
           cwd={terminalCwd}
           onRefocusTerminal={terminal.focusActiveSession}

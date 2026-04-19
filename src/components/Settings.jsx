@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
-import { ArrowLeft, Image } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Image } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
+import { CHIME_SOUNDS, playChime } from "../utils/chime";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, coauthorTrailer = "", onCoauthorTrailerChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, coauthorTrailer = "", onCoauthorTrailerChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, onClose }) {
   const s = useFontScale();
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
 
@@ -533,6 +534,145 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
 
           {developerMode && (
             <>
+              {/* NOTIFICATIONS section */}
+              <div
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: s(10),
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.25)",
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                  marginBottom: 20,
+                  marginTop: 12,
+                }}
+              >
+                NOTIFICATIONS
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)", marginBottom: 2 }}>
+                  Completion chime
+                </div>
+                <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.3)", marginBottom: 10 }}>
+                  Plays each time a run finishes, even if multiple sessions complete back-to-back.
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center" }}>
+                    <select
+                      value={notificationSound}
+                      onChange={(e) => onNotificationSoundChange?.(e.target.value)}
+                      disabled={notificationsMuted}
+                      style={{
+                        width: "100%",
+                        height: 32,
+                        padding: "0 28px 0 10px",
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 7,
+                        color: "rgba(255,255,255,0.9)",
+                        fontFamily: "system-ui, sans-serif",
+                        fontSize: s(12),
+                        outline: "none",
+                        opacity: notificationsMuted ? 0.4 : 1,
+                        WebkitAppearance: "none",
+                        MozAppearance: "none",
+                        appearance: "none",
+                      }}
+                    >
+                      {CHIME_SOUNDS.map((c) => (
+                        <option key={c.id} value={c.id}>{c.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={12}
+                      strokeWidth={2}
+                      style={{
+                        position: "absolute",
+                        right: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "rgba(255,255,255,0.5)",
+                        pointerEvents: "none",
+                        opacity: notificationsMuted ? 0.4 : 1,
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => playChime(notificationSound)}
+                    disabled={notificationsMuted}
+                    style={{
+                      height: 32,
+                      padding: "0 12px",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 7,
+                      color: "rgba(255,255,255,0.8)",
+                      fontSize: s(12),
+                      cursor: notificationsMuted ? "not-allowed" : "pointer",
+                      opacity: notificationsMuted ? 0.4 : 1,
+                    }}
+                  >
+                    Preview
+                  </button>
+                </div>
+              </div>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 24,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={notificationsMuted}
+                  onChange={(e) => onNotificationsMutedChange?.(e.target.checked)}
+                  style={{
+                    opacity: 0,
+                    width: 0,
+                    height: 0,
+                    margin: 0,
+                    pointerEvents: "none",
+                  }}
+                />
+                <span
+                  aria-hidden
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 5,
+                    border: "1px solid rgba(255,255,255,0.18)",
+                    background: "transparent",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: notificationsMuted ? "inset 0 0 0 1px rgba(255,255,255,0.06)" : "none",
+                    flexShrink: 0,
+                    transition: "border-color .15s, background .15s, box-shadow .15s",
+                  }}
+                >
+                  <Check
+                    size={12}
+                    strokeWidth={2.2}
+                    color="rgba(255,255,255,0.86)"
+                    style={{
+                      opacity: notificationsMuted ? 1 : 0,
+                      transform: notificationsMuted ? "scale(1)" : "scale(0.75)",
+                      transition: "opacity .12s ease, transform .12s ease",
+                    }}
+                  />
+                </span>
+                <span style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)" }}>
+                  Mute completion chime
+                </span>
+              </label>
+
               {/* GIT section label */}
               <div
                 style={{
