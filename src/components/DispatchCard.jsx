@@ -329,7 +329,7 @@ function IssueRow({ row, availableModels, error, onChange }) {
         >
           <option value="">(default)</option>
           {availableModels.map((m) => (
-            <option key={m.id} value={m.id}>{m.label || m.id}</option>
+            <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
           ))}
         </select>
       </div>
@@ -406,7 +406,7 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
         >
           <option value="">(default)</option>
           {availableModels.map((m) => (
-            <option key={m.id} value={m.id}>{m.label || m.id}</option>
+            <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
           ))}
         </select>
         <AttachmentPicker
@@ -450,7 +450,7 @@ function ModelDropdown({ value, onChange, models, label }) {
         style={{ background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "4px 6px" }}
       >
         {models.map((m) => (
-          <option key={m.id} value={m.id}>{m.label || m.id}</option>
+          <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
         ))}
       </select>
     </label>

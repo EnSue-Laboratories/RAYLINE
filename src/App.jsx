@@ -2560,10 +2560,10 @@ export default function App() {
         <DispatchCard
           onClose={() => setShowDispatchCard(false)}
           onDispatch={handleDispatch}
-          currentCwd={getMainRepoRoot(cwd) || undefined}
+          currentCwd={newChatDefaultCwd || undefined}
           projects={projects}
           defaultModel={defaultModel}
-          availableModels={MODELS.map((m) => ({ id: m.id, label: m.tag }))}
+          availableModels={MODELS}
         />
       )}
 
