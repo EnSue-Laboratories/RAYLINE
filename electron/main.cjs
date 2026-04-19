@@ -374,7 +374,7 @@ ipcMain.handle("move-session", async (_event, sessionId, newCwd) => {
 // IPC: file-based state persistence (survives app name changes)
 const stateFilePath = path.join(app.getPath("userData"), "claudi-state.json");
 
-ipcMain.handle("save-state", async (_event, state) => {
+function persistStateToDisk(state) {
   try {
     // Preserve pmRepos from PM window (main app state doesn't include it)
     let existing = {};
@@ -393,6 +393,14 @@ ipcMain.handle("save-state", async (_event, state) => {
     console.error("Failed to save state:", e);
     return false;
   }
+}
+
+ipcMain.handle("save-state", async (_event, state) => {
+  return persistStateToDisk(state);
+});
+
+ipcMain.on("save-state-sync", (event, state) => {
+  event.returnValue = persistStateToDisk(state);
 });
 
 ipcMain.handle("load-state", async () => {

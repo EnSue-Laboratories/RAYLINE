@@ -645,6 +645,41 @@ function serializeMessagesForState(messages) {
   });
 }
 
+function getMessageTextPreview(message) {
+  if (!message) return "";
+  if (typeof message.text === "string") return message.text;
+  if (!Array.isArray(message.parts)) return "";
+  return message.parts
+    .filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join(" ");
+}
+
+function isPersistableLiveMessage(message) {
+  if (!message) return false;
+  if (message.role !== "assistant") return true;
+  if (typeof message.text === "string" && message.text.trim()) return true;
+  return Array.isArray(message.parts) && message.parts.length > 0;
+}
+
+function buildPersistedConversationSnapshot(conversation, conversationData) {
+  const normalized = normalizeConversationState(conversation);
+  const liveMessages = Array.isArray(conversationData?.messages)
+    ? conversationData.messages.filter(isPersistableLiveMessage)
+    : [];
+
+  if (liveMessages.length === 0) return normalized;
+
+  const archivedMessages = serializeMessagesForState(liveMessages);
+  const preview = getMessageTextPreview(liveMessages[liveMessages.length - 1]).slice(0, 60);
+
+  return normalizeConversationState({
+    ...normalized,
+    archivedMessages,
+    ...(preview ? { lastPreview: preview } : {}),
+  });
+}
+
 function getArchivedMessageText(message) {
   if (!message) return "";
   if (typeof message.text === "string") return message.text.trim();
@@ -740,7 +775,9 @@ export default function App() {
   const persistableConversations = useMemo(
     () =>
       convoList
-        .map((conversation) => normalizeConversationState(conversation))
+        .map((conversation) =>
+          buildPersistedConversationSnapshot(conversation, getConversation(conversation.id))
+        )
         .filter((conversation) => hasConversationMessages(conversation, getConversation(conversation.id))),
     [convoList, getConversation]
   );
@@ -751,6 +788,49 @@ export default function App() {
         : persistableConversations[0]?.id || null
     ),
     [active, persistableConversations]
+  );
+  const persistStatePayload = useMemo(() => ({
+    convos: persistableConversations,
+    active: persistedActive,
+    cwd,
+    defaultModel,
+    fontSize,
+    sidebarActiveOpacity,
+    wallpaper: getPersistedWallpaper(wallpaper),
+    projects,
+    draftsCollapsed,
+    defaultPrBranch,
+    coauthorEnabled,
+    coauthorTrailer,
+    appBlur,
+    appOpacity,
+    developerMode,
+    notificationSound,
+    notificationsMuted,
+    queuedMessages,
+  }), [
+    appBlur,
+    appOpacity,
+    coauthorEnabled,
+    coauthorTrailer,
+    cwd,
+    defaultModel,
+    defaultPrBranch,
+    developerMode,
+    draftsCollapsed,
+    fontSize,
+    notificationSound,
+    notificationsMuted,
+    persistedActive,
+    persistableConversations,
+    projects,
+    queuedMessages,
+    sidebarActiveOpacity,
+    wallpaper,
+  ]);
+  const activeQueuedMessages = useMemo(
+    () => queuedMessages.filter((item) => item?.conversationId === active),
+    [active, queuedMessages]
   );
 
   const canControlTarget = useCallback((target) => (
@@ -875,6 +955,13 @@ export default function App() {
         if (state.defaultPrBranch) setDefaultPrBranch(state.defaultPrBranch);
         if (state.coauthorEnabled != null) setCoauthorEnabled(!!state.coauthorEnabled);
         if (typeof state.coauthorTrailer === "string") setCoauthorTrailer(state.coauthorTrailer);
+        if (Array.isArray(state.queuedMessages)) {
+          const restoredQueue = state.queuedMessages.filter(
+            (item) => item && typeof item.conversationId === "string" && typeof item.text === "string"
+          );
+          messageQueue.current = restoredQueue;
+          setQueuedMessages(restoredQueue);
+        }
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
@@ -904,29 +991,19 @@ export default function App() {
     // Debounce saves
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      // Strip dataUrl before persisting (too large for JSON, reloaded on startup)
-      const wpSave = getPersistedWallpaper(wallpaper);
-      window.api.saveState({
-        convos: persistableConversations,
-        active: persistedActive,
-        cwd,
-        defaultModel,
-        fontSize,
-        sidebarActiveOpacity,
-        wallpaper: wpSave,
-        projects,
-        draftsCollapsed,
-        defaultPrBranch,
-        coauthorEnabled,
-        coauthorTrailer,
-        appBlur,
-        appOpacity,
-        developerMode,
-        notificationSound,
-        notificationsMuted,
-      });
+      window.api.saveState(persistStatePayload);
     }, 300);
-  }, [persistableConversations, persistedActive, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, coauthorEnabled, coauthorTrailer, appBlur, appOpacity, developerMode, notificationSound, notificationsMuted, stateLoaded]);
+    return () => clearTimeout(saveTimer.current);
+  }, [persistStatePayload, stateLoaded]);
+
+  useEffect(() => {
+    if (!stateLoaded || !window.api?.saveStateSync) return;
+    const handleBeforeUnload = () => {
+      window.api.saveStateSync(persistStatePayload);
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [persistStatePayload, stateLoaded]);
 
   // Push window opacity to Electron
   useEffect(() => {
@@ -1684,7 +1761,7 @@ export default function App() {
 
       // Queue if currently streaming
       if (activeData.isStreaming && active) {
-        messageQueue.current.push({ text, attachments });
+        messageQueue.current.push({ conversationId: active, text, attachments });
         setQueuedMessages([...messageQueue.current]);
         return;
       }
@@ -1792,12 +1869,13 @@ export default function App() {
 
   // Process queued messages when streaming ends
   useEffect(() => {
-    if (!activeData.isStreaming && messageQueue.current.length > 0) {
-      const next = messageQueue.current.shift();
-      setQueuedMessages([...messageQueue.current]);
-      setTimeout(() => handleSend(next.text, next.attachments), 300);
-    }
-  }, [activeData.isStreaming, handleSend]);
+    if (!active || activeData.isStreaming || messageQueue.current.length === 0) return;
+    const nextIndex = messageQueue.current.findIndex((item) => item?.conversationId === active);
+    if (nextIndex === -1) return;
+    const [next] = messageQueue.current.splice(nextIndex, 1);
+    setQueuedMessages([...messageQueue.current]);
+    setTimeout(() => handleSend(next.text, next.attachments), 300);
+  }, [active, activeData.isStreaming, handleSend]);
 
   const handleCreateChat = useCallback(async (opts) => {
     const id = "c" + Date.now();
@@ -2299,7 +2377,7 @@ export default function App() {
           onNew={handleNew}
           onModelChange={handleModelChange}
           defaultModel={defaultModel}
-          queuedMessages={queuedMessages}
+          queuedMessages={activeQueuedMessages}
           onToggleTerminal={handleToggleTerminal}
           terminalOpen={terminal.drawerOpen}
           terminalCount={terminal.sessions.length}
