@@ -833,7 +833,16 @@ export default function App() {
             )
             .filter((conversation) => hasConversationMessages(conversation));
 
-          setConvoList(restoredConversations);
+          const sanitized = restoredConversations.map((c) => {
+            if (!c?.tab?.pinned) return c;
+            // Persisted tab can't be mid-stream after relaunch.
+            // If runEndedAt is missing, stamp it now so the dot shows as "done" (unread).
+            if (c.tab.runEndedAt == null) {
+              return { ...c, tab: { ...c.tab, runEndedAt: Date.now() } };
+            }
+            return c;
+          });
+          setConvoList(sanitized);
           setActive(
             restoredConversations.some((conversation) => conversation.id === state.active)
               ? state.active
