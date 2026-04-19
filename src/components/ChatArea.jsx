@@ -12,7 +12,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -387,8 +387,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       >
         {showNewChatCard ? (
           <NewChatCard
-            defaultCwd={convo?.cwd || cwd}
+            defaultCwd={newChatDefaultCwd}
             defaultModel={convo?.model || defaultModel}
+            defaultBranch={defaultPrBranch}
             allCwdRoots={allCwdRoots}
             projects={projects}
             onPickFolder={() => window.api?.pickFolder?.()}

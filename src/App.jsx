@@ -2000,8 +2000,19 @@ export default function App() {
     const roots = new Set();
     convoList.forEach(c => { if (c.cwd) roots.add(getMainRepoRoot(c.cwd)); });
     Object.keys(projects).forEach(r => roots.add(getMainRepoRoot(r)));
-    return [...roots];
+    return [...roots].filter(r => r && !r.includes("/.worktrees/"));
   }, [convoList, projects]);
+
+  const newChatDefaultCwd = useMemo(() => {
+    const activeCwd = activeConvo?.cwd;
+    if (activeCwd) return getMainRepoRoot(activeCwd);
+    if (cwd) return getMainRepoRoot(cwd);
+    const sorted = [...convoList].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    for (const c of sorted) {
+      if (c.cwd) return getMainRepoRoot(c.cwd);
+    }
+    return null;
+  }, [activeConvo, cwd, convoList]);
 
   const terminalCwd = activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd);
 
@@ -2161,6 +2172,7 @@ export default function App() {
           allCwdRoots={allCwdRoots}
           projects={projects}
           defaultPrBranch={defaultPrBranch}
+          newChatDefaultCwd={newChatDefaultCwd}
           coauthorEnabled={coauthorEnabled}
           coauthorTrailer={coauthorTrailer}
           onControlChange={handleControlChange}

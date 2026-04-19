@@ -44,6 +44,7 @@ export default function NewChatCard({
   onCreateChat,
   defaultCwd,
   defaultModel,
+  defaultBranch,
   allCwdRoots,
   projects,
   onPickFolder,
@@ -180,10 +181,14 @@ export default function NewChatCard({
         const info = await window.api.gitBranches(selectedCwd);
         if (cancelled) return;
         const current = info?.current || "";
+        const branches = info?.branches || [];
         setCurrentBranch(current);
-        setBranchList(info?.branches || []);
-        setBranch((prev) => prev || current);
-        setBranchMode((prev) => prev || (current ? "existing" : null));
+        setBranchList(branches);
+        const preferred = defaultBranch && branches.includes(defaultBranch)
+          ? defaultBranch
+          : current;
+        setBranch((prev) => prev || preferred);
+        setBranchMode((prev) => prev || (preferred ? "existing" : null));
       } catch {
         if (!cancelled) {
           setCurrentBranch("");
@@ -195,7 +200,7 @@ export default function NewChatCard({
     })();
 
     return () => { cancelled = true; };
-  }, [selectedCwd]);
+  }, [selectedCwd, defaultBranch]);
 
   // Auto-grow textarea
   const autoGrow = useCallback((el) => {
@@ -293,9 +298,9 @@ export default function NewChatCard({
       return;
     }
     setError(null);
-    setBranchSearchQuery(branch);
+    setBranchSearchQuery("");
     setShowBranchSearch((prev) => !prev);
-  }, [branch, selectedCwd]);
+  }, [selectedCwd]);
 
   const selectExistingBranch = useCallback((name) => {
     setBranch(name);
