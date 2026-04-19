@@ -23,9 +23,11 @@ function cloneStreamState(streamState) {
 // survives reloads (`Date.now() - _startedAt` would drift across sessions).
 function freezeElapsed(msg) {
   if (!msg || msg.role !== "assistant") return msg;
-  if (msg._elapsedMs != null) return msg;
-  if (!msg._startedAt) return msg;
-  return { ...msg, _elapsedMs: Date.now() - msg._startedAt };
+  // Compaction is a transient mid-turn signal — never persist it past stream end.
+  const { _compacting, ...rest } = msg;
+  if (rest._elapsedMs != null) return rest;
+  if (!rest._startedAt) return rest;
+  return { ...rest, _elapsedMs: Date.now() - rest._startedAt };
 }
 
 function mergeUsage(prev, incoming) {
@@ -38,7 +40,36 @@ function mergeUsage(prev, incoming) {
       incoming.cache_creation_input_tokens ?? base.cache_creation_input_tokens ?? 0,
     cache_read_input_tokens:
       incoming.cache_read_input_tokens ?? base.cache_read_input_tokens ?? 0,
+    ...(Number.isFinite(incoming.total_tokens)
+      ? { total_tokens: incoming.total_tokens }
+      : Number.isFinite(base.total_tokens)
+        ? { total_tokens: base.total_tokens }
+        : {}),
+    ...(Number.isFinite(incoming.context_window)
+      ? { context_window: incoming.context_window }
+      : Number.isFinite(base.context_window)
+        ? { context_window: base.context_window }
+        : {}),
   };
+}
+
+function normalizeCodexUsage(usage, contextWindow) {
+  if (!usage) return null;
+  return {
+    input_tokens: usage.input_tokens ?? 0,
+    output_tokens: usage.output_tokens ?? 0,
+    total_tokens: usage.total_tokens ?? null,
+    cache_read_input_tokens: usage.cached_input_tokens ?? usage.cache_read_input_tokens ?? 0,
+    cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+    ...(Number.isFinite(contextWindow) ? { context_window: contextWindow } : {}),
+  };
+}
+
+function findLatestAssistantIndex(messages) {
+  for (let i = (messages?.length || 0) - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === "assistant") return i;
+  }
+  return -1;
 }
 
 function buildBlockKey(turn, blockIndex) {
@@ -114,10 +145,21 @@ export default function useAgent() {
             lastMsg = merged;
           };
 
-          // Capture usage deltas so the loading indicator can show live token counts.
+          // Context-window fullness tracking.
+          //
+          // We deliberately track the LATEST API call's usage (not the turn
+          // aggregate). A multi-tool-use turn re-sends the prompt once per
+          // call, so aggregating would make `cache_read` balloon by the number
+          // of calls — that measures how much *work* was done, not how full
+          // the window is. The cumulative snapshot at the END of the last
+          // call is what actually reflects "tokens currently in the window."
+          //
+          // - `message_start` → overwrite `_usage` (new API call begins)
+          // - `message_delta` → merge (output_tokens grows during generation)
+          // - `result` below → ignored for usage (it's turn-aggregated)
           if (inner.type === "message_start" && inner.message?.usage) {
             ensureAssistant();
-            updateAssistant({ _usage: mergeUsage(lastMsg._usage, inner.message.usage) });
+            updateAssistant({ _usage: { ...inner.message.usage } });
           } else if (inner.type === "message_delta" && inner.usage) {
             ensureAssistant();
             updateAssistant({ _usage: mergeUsage(lastMsg._usage, inner.usage) });
@@ -211,12 +253,9 @@ export default function useAgent() {
         } else if (event.type === "assistant") {
           // With --include-partial-messages, assistant events contain full accumulated text.
           // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
+          // Usage here is per-API-call, not cumulative — skip it to avoid flicker;
+          // the `result` event below owns the authoritative cumulative usage.
           const am = ensureAssistant();
-          if (event.message?.usage) {
-            const merged = { ...am, _usage: mergeUsage(am._usage, event.message.usage) };
-            msgs[msgs.length - 1] = merged;
-            lastMsg = merged;
-          }
           const parts = cloneParts(lastMsg.parts);
           const hasStreamParts = parts.length > 0;
           if (!hasStreamParts && event.message?.content) {
@@ -273,11 +312,11 @@ export default function useAgent() {
           }
         } else if (event.type === "result") {
           if (lastMsg && lastMsg.role === "assistant") {
-            if (event.usage) {
-              const merged = { ...lastMsg, _usage: mergeUsage(lastMsg._usage, event.usage) };
-              msgs[msgs.length - 1] = merged;
-              lastMsg = merged;
-            }
+            // Note: `event.usage` here is aggregated across every API call in
+            // the turn (ballooned `cache_read` when the turn had multiple tool
+            // loops). That's right for cost, wrong for window fullness — we
+            // already captured the final call's cumulative usage from
+            // `message_delta`. Leave `_usage` alone.
             if (event.is_error || event.subtype === "error_during_execution") {
               // Surface the error as text in the assistant message
               const errorText = event.result || event.error
@@ -304,6 +343,16 @@ export default function useAgent() {
           }
         }
 
+        // Claude Code emits a top-level `system` event with
+        // `subtype: "compact_boundary"` whenever auto-compaction runs. Flag
+        // the message transiently so the live status can show "compacting…";
+        // `freezeElapsed` strips this on stream end so it doesn't persist.
+        else if (event.type === "system" && event.subtype === "compact_boundary") {
+          const am = ensureAssistant();
+          msgs[msgs.length - 1] = { ...am, _compacting: true };
+          lastMsg = msgs[msgs.length - 1];
+        }
+
         // --- Codex JSONL stream events ---
         else if (event.type === "thread.started") {
           convo._codexThreadId = event.thread_id;
@@ -311,6 +360,17 @@ export default function useAgent() {
             conversationId,
             threadId: event.thread_id,
           });
+        } else if (event.type === "event_msg" && event.payload?.type === "token_count") {
+          const tokenInfo = event.payload.info;
+          const usage = normalizeCodexUsage(
+            tokenInfo?.last_token_usage || tokenInfo?.total_token_usage,
+            tokenInfo?.model_context_window
+          );
+          if (usage) {
+            const am = ensureAssistant();
+            msgs[msgs.length - 1] = { ...am, _usage: usage };
+            lastMsg = msgs[msgs.length - 1];
+          }
         } else if (event.type === "turn.started") {
           ensureAssistant();
         } else if (event.type === "item.started") {
@@ -364,6 +424,10 @@ export default function useAgent() {
           }
         } else if (event.type === "turn.completed") {
           if (lastMsg && lastMsg.role === "assistant") {
+            // Do not fall back to `turn.completed.usage` for Codex. Those
+            // numbers are cumulative across the whole session, not the current
+            // prompt window, and produce impossible `ctx` readings. The live
+            // `token_count` event above is the only trustworthy source here.
             msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
             lastMsg = msgs[msgs.length - 1];
           }
@@ -376,17 +440,52 @@ export default function useAgent() {
 
     const offDone = window.api.onAgentDone(({ conversationId }) => {
       pendingStartsRef.current.delete(conversationId);
+      let codexThreadId = null;
+      let needsUsageHydration = false;
       setConversations((prev) => {
         const next = new Map(prev);
         const convo = next.get(conversationId);
         if (convo) {
+          codexThreadId = convo._codexThreadId || null;
           const msgs = convo.messages.map((m) =>
             m.role === "assistant" ? freezeElapsed({ ...m, isStreaming: false, isThinking: false }) : m
           );
+          const latestAssistantIdx = findLatestAssistantIndex(msgs);
+          if (latestAssistantIdx >= 0 && !msgs[latestAssistantIdx]?._usage && codexThreadId) {
+            needsUsageHydration = true;
+          }
           next.set(conversationId, { ...convo, messages: msgs, isStreaming: false });
         }
         return next;
       });
+
+      if (needsUsageHydration && codexThreadId && window.api?.loadSession) {
+        void window.api.loadSession(codexThreadId).then((result) => {
+          const fallbackAssistantIdx = findLatestAssistantIndex(result?.messages || []);
+          const fallbackUsage =
+            result?.usageSnapshot ||
+            (fallbackAssistantIdx >= 0 ? result.messages[fallbackAssistantIdx]?._usage : null) ||
+            null;
+          if (!fallbackUsage) return;
+
+          setConversations((prev) => {
+            const next = new Map(prev);
+            const convo = next.get(conversationId);
+            if (!convo) return prev;
+
+            const msgs = [...convo.messages];
+            const latestAssistantIdx = findLatestAssistantIndex(msgs);
+            if (latestAssistantIdx < 0 || msgs[latestAssistantIdx]?._usage) return prev;
+
+            msgs[latestAssistantIdx] = {
+              ...msgs[latestAssistantIdx],
+              _usage: fallbackUsage,
+            };
+            next.set(conversationId, { ...convo, messages: msgs });
+            return next;
+          });
+        }).catch(() => {});
+      }
     });
 
     const offError = window.api.onAgentError(({ conversationId, error }) => {

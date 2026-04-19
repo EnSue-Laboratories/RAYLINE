@@ -136,11 +136,58 @@ function stripCodexSystemContext(text) {
   return trimmed.slice(markerIndex + CODEX_USER_PROMPT_MARKER.length).trim();
 }
 
+function stripCodexImagePreamble(text) {
+  if (typeof text !== "string") return "";
+  return text.replace(/^(?:<image\b[^>]*><\/image>\s*)+/i, "").trim();
+}
+
+function cleanCodexUserMessage(text) {
+  const withoutImages = stripCodexImagePreamble(text);
+  const stripped = stripCodexSystemContext(withoutImages);
+  const cleaned = stripCodexImagePreamble(stripped);
+
+  if (!cleaned || cleaned.startsWith("<environment_context>")) {
+    return "";
+  }
+
+  return cleaned;
+}
+
+function appendCodexUserMessage(messages, text) {
+  const cleaned = cleanCodexUserMessage(text);
+  if (!cleaned) return;
+
+  const lastMsg = messages[messages.length - 1];
+  if (lastMsg?.role === "user" && lastMsg.text === cleaned) return;
+
+  messages.push({
+    id: "u" + Date.now() + Math.random(),
+    role: "user",
+    text: cleaned,
+  });
+}
+
+function normalizeCodexUsageSnapshot(info) {
+  const usage = info?.last_token_usage;
+  if (!usage) return null;
+  return {
+    input_tokens: usage.input_tokens ?? 0,
+    output_tokens: usage.output_tokens ?? 0,
+    total_tokens: usage.total_tokens ?? null,
+    cache_read_input_tokens: usage.cached_input_tokens ?? 0,
+    cache_creation_input_tokens: 0,
+    ...(Number.isFinite(info?.model_context_window)
+      ? { context_window: info.model_context_window }
+      : {}),
+  };
+}
+
 function loadCodexSessionMessages(filePath) {
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
   const messages = [];
   let sessionCwd = null;
+  let usageSnapshot = null;
 
   for (const line of lines) {
     if (!line.trim()) continue;
@@ -152,7 +199,16 @@ function loadCodexSessionMessages(filePath) {
       continue;
     }
 
-    if (evt.type === "event_msg") continue;
+    if (evt.type === "event_msg") {
+      if (evt.payload?.type === "token_count" && evt.payload?.info) {
+        const snapshot = normalizeCodexUsageSnapshot(evt.payload.info);
+        if (snapshot) usageSnapshot = snapshot;
+      }
+      if (evt.payload?.type === "user_message" && typeof evt.payload.message === "string") {
+        appendCodexUserMessage(messages, evt.payload.message);
+      }
+      continue;
+    }
 
     if (evt.type === "response_item" && evt.payload?.role === "user") {
       let text = "";
@@ -163,15 +219,7 @@ function loadCodexSessionMessages(filePath) {
           }
         }
       }
-      // Skip system injections
-      const trimmed = stripCodexSystemContext(text);
-      if (!trimmed || trimmed.startsWith("<") || trimmed.startsWith("#")) continue;
-
-      messages.push({
-        id: "u" + Date.now() + Math.random(),
-        role: "user",
-        text: trimmed,
-      });
+      appendCodexUserMessage(messages, text);
     } else if (
       evt.type === "response_item" &&
       evt.payload?.type === "message" &&
@@ -204,7 +252,15 @@ function loadCodexSessionMessages(filePath) {
   }
 
   const result = messages.length > MAX_MESSAGES ? messages.slice(-MAX_MESSAGES) : messages;
-  return { messages: result, cwd: sessionCwd, provider: "codex" };
+  if (usageSnapshot) {
+    for (let i = result.length - 1; i >= 0; i -= 1) {
+      if (result[i]?.role === "assistant") {
+        result[i] = { ...result[i], _usage: usageSnapshot };
+        break;
+      }
+    }
+  }
+  return { messages: result, cwd: sessionCwd, provider: "codex", usageSnapshot };
 }
 
 async function listSessions(cwd) {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { getM } from "../data/models";
 
 // Hard-coded rotating status phrases — cycles while the agent is working.
 const PHRASES = [
@@ -15,8 +16,8 @@ const PHRASES = [
   "Synthesizing",
 ];
 
-// Context window size in tokens. Claude Sonnet/Opus default to 200k.
-const CONTEXT_WINDOW = 200_000;
+// Fallback context window when no model is known. Claude Sonnet/Opus defaults.
+const DEFAULT_CONTEXT_WINDOW = 200_000;
 
 const PHRASE_INTERVAL_MS = 2400;
 
@@ -92,7 +93,7 @@ function SlashSpinner() {
   );
 }
 
-export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, usage, isStreaming }) {
+export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, usage, isStreaming, modelId, compacting }) {
   const s = useFontScale();
   const [now, setNow] = useState(() => Date.now());
   const [phraseIdx, setPhraseIdx] = useState(0);
@@ -125,16 +126,30 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
     ? (startedAt ? now - startedAt : 0)
     : (frozenElapsedMs ?? finalElapsedRef.current ?? 0);
 
+  const model = modelId ? getM(modelId) : null;
+  const isCodex = model?.provider === "codex";
   const inputTokens = usage?.input_tokens || 0;
   const outputTokens = usage?.output_tokens || 0;
   const cacheRead = usage?.cache_read_input_tokens || 0;
   const cacheCreate = usage?.cache_creation_input_tokens || 0;
-  const contextUsed = inputTokens + cacheRead + cacheCreate + outputTokens;
+  const derivedContextUsed = isCodex
+    ? inputTokens + outputTokens
+    : inputTokens + cacheRead + cacheCreate + outputTokens;
+  const contextUsed = Number.isFinite(usage?.total_tokens) && usage.total_tokens > 0
+    ? usage.total_tokens
+    : derivedContextUsed;
+  const configuredContextWindow = model?.contextWindow || DEFAULT_CONTEXT_WINDOW;
+  const contextWindow = usage?.context_window || configuredContextWindow;
+  const hasExplicitContextWindow = Number.isFinite(usage?.context_window);
+  const isLikelyCumulativeCodexUsage =
+    isCodex &&
+    !hasExplicitContextWindow &&
+    contextUsed > configuredContextWindow * 1.2;
   const contextPct = contextUsed
-    ? Math.max(0, Math.min(100, (contextUsed / CONTEXT_WINDOW) * 100))
+    ? Math.max(0, Math.min(100, (contextUsed / contextWindow) * 100))
     : 0;
 
-  const hasUsage = contextUsed > 0;
+  const hasUsage = contextUsed > 0 && !isLikelyCumulativeCodexUsage;
 
   // Nothing to say after completion if we never captured any stats.
   if (!isStreaming && !hasUsage && !startedAt && frozenElapsedMs == null) return null;
@@ -184,6 +199,10 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
           0%, 100% { opacity: 1; transform: scale(1); }
           50%      { opacity: 0.35; transform: scale(0.7); }
         }
+        @keyframes compactSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
       `}</style>
       {/* Line 1: slash spinner + phrase + elapsed */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -197,6 +216,15 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
         <span style={{ color: secondaryColor, fontVariantNumeric: "tabular-nums" }}>
           {elapsedLabel}
         </span>
+        {isStreaming && compacting && (
+          <span
+            title="Claude Code is auto-compacting earlier context."
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.55)" }}
+          >
+            <span style={{ display: "inline-block", animation: "compactSpin 1.6s linear infinite" }}>↻</span>
+            compacting
+          </span>
+        )}
       </div>
 
       {/* Line 2: token breakdown + context */}
@@ -224,7 +252,7 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
           <span>
             <span style={{ color: "rgba(255,255,255,0.22)" }}>ctx </span>
             {formatCompact(contextUsed)}
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>/{formatCompact(CONTEXT_WINDOW)}</span>
+            <span style={{ color: "rgba(255,255,255,0.22)" }}>/{formatCompact(contextWindow)}</span>
             <span style={{ marginLeft: 5, color: "rgba(255,255,255,0.42)" }}>{pctLabel}</span>
           </span>
         </div>

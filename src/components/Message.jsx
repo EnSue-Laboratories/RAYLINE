@@ -270,7 +270,7 @@ function renderControlAwareMarkdown({
   });
 }
 
-export default function Message({ msg, onEdit, onAnswer, onControlChange, canControlTarget }) {
+export default function Message({ msg, modelId, onEdit, onAnswer, onControlChange, canControlTarget }) {
   const s = useFontScale();
   const scaledMdStatic = useMemo(() => makeMdComponents(false, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
   const scaledMdStreaming = useMemo(() => makeMdComponents(true, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
@@ -666,6 +666,8 @@ export default function Message({ msg, onEdit, onAnswer, onControlChange, canCon
           elapsedMs={msg._elapsedMs}
           usage={msg._usage}
           isStreaming={Boolean(msg.isStreaming)}
+          modelId={modelId}
+          compacting={Boolean(msg._compacting)}
         />
       )}
 
