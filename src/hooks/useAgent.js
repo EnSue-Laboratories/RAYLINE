@@ -18,6 +18,19 @@ function cloneStreamState(streamState) {
   };
 }
 
+function mergeUsage(prev, incoming) {
+  if (!incoming) return prev || null;
+  const base = prev || {};
+  return {
+    input_tokens: incoming.input_tokens ?? base.input_tokens ?? 0,
+    output_tokens: incoming.output_tokens ?? base.output_tokens ?? 0,
+    cache_creation_input_tokens:
+      incoming.cache_creation_input_tokens ?? base.cache_creation_input_tokens ?? 0,
+    cache_read_input_tokens:
+      incoming.cache_read_input_tokens ?? base.cache_read_input_tokens ?? 0,
+  };
+}
+
 function buildBlockKey(turn, blockIndex) {
   return `${turn}:${blockIndex}`;
 }
@@ -69,8 +82,13 @@ export default function useAgent() {
               isStreaming: true,
               isThinking: false,
               _streamState: cloneStreamState(),
+              _startedAt: Date.now(),
+              _usage: null,
             };
             msgs.push(lastMsg);
+          } else if (!lastMsg._startedAt) {
+            lastMsg = { ...lastMsg, _startedAt: Date.now() };
+            msgs[msgs.length - 1] = lastMsg;
           }
           return lastMsg;
         };
@@ -85,6 +103,15 @@ export default function useAgent() {
             msgs[msgs.length - 1] = merged;
             lastMsg = merged;
           };
+
+          // Capture usage deltas so the loading indicator can show live token counts.
+          if (inner.type === "message_start" && inner.message?.usage) {
+            ensureAssistant();
+            updateAssistant({ _usage: mergeUsage(lastMsg._usage, inner.message.usage) });
+          } else if (inner.type === "message_delta" && inner.usage) {
+            ensureAssistant();
+            updateAssistant({ _usage: mergeUsage(lastMsg._usage, inner.usage) });
+          }
 
           if (inner.type === "content_block_start") {
             const block = inner.content_block;
@@ -175,7 +202,12 @@ export default function useAgent() {
           // With --include-partial-messages, assistant events contain full accumulated text.
           // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
           const am = ensureAssistant();
-          const parts = cloneParts(am.parts);
+          if (event.message?.usage) {
+            const merged = { ...am, _usage: mergeUsage(am._usage, event.message.usage) };
+            msgs[msgs.length - 1] = merged;
+            lastMsg = merged;
+          }
+          const parts = cloneParts(lastMsg.parts);
           const hasStreamParts = parts.length > 0;
           if (!hasStreamParts && event.message?.content) {
             for (const block of event.message.content) {
@@ -195,7 +227,8 @@ export default function useAgent() {
                 }
               }
             }
-            msgs[msgs.length - 1] = { ...am, parts, isThinking: false };
+            msgs[msgs.length - 1] = { ...lastMsg, parts, isThinking: false };
+            lastMsg = msgs[msgs.length - 1];
           }
         } else if (event.type === "user") {
           // Capture the UUID from user events — needed for rewind/edit
@@ -230,6 +263,11 @@ export default function useAgent() {
           }
         } else if (event.type === "result") {
           if (lastMsg && lastMsg.role === "assistant") {
+            if (event.usage) {
+              const merged = { ...lastMsg, _usage: mergeUsage(lastMsg._usage, event.usage) };
+              msgs[msgs.length - 1] = merged;
+              lastMsg = merged;
+            }
             if (event.is_error || event.subtype === "error_during_execution") {
               // Surface the error as text in the assistant message
               const errorText = event.result || event.error
@@ -372,7 +410,7 @@ export default function useAgent() {
       const msgs = [
         ...convo.messages,
         { id: uid(), role: "user", text: prompt, images, files },
-        { id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false },
+        { id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false, _startedAt: Date.now(), _usage: null },
       ];
       next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       return next;
@@ -443,7 +481,7 @@ export default function useAgent() {
       if (convo) {
         const msgs = convo.messages.slice(0, messageIndex);
         msgs.push({ id: uid(), role: "user", text: newText });
-        msgs.push({ id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false });
+        msgs.push({ id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false, _startedAt: Date.now(), _usage: null });
         next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       }
       return next;

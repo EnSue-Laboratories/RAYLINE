@@ -16,6 +16,7 @@ import MermaidBlock from "./MermaidBlock";
 import InteractiveBlock from "./InteractiveBlock";
 import ThinkingBlock from "./ThinkingBlock";
 import ValueControlBlock from "./ValueControlBlock";
+import LoadingStatus from "./LoadingStatus";
 import { useFontScale } from "../contexts/FontSizeContext";
 
 // Allow SVG tags in markdown (rehype-sanitize schema)
@@ -664,18 +665,12 @@ export default function Message({ msg, onEdit, onAnswer, onControlChange, canCon
         <ThinkingBlock text="" isThinking={true} />
       )}
 
-      {msg.isStreaming && !msg.isThinking && (msg.parts || []).length === 0 && (
-        <div style={{ display: "flex", gap: 5, alignItems: "center", padding: "4px 0" }}>
-          {[0, 1, 2].map(i => (
-            <span key={i} style={{
-              width: 5, height: 5,
-              borderRadius: "50%",
-              background: "rgba(255,255,255,0.25)",
-              display: "inline-block",
-              animation: `dotPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
-            }} />
-          ))}
-        </div>
+      {(msg.isStreaming || msg._usage || msg._startedAt) && (
+        <LoadingStatus
+          startedAt={msg._startedAt}
+          usage={msg._usage}
+          isStreaming={Boolean(msg.isStreaming)}
+        />
       )}
 
       {/* Fallback for old format messages (text + toolCalls) */}
