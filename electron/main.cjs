@@ -429,6 +429,11 @@ ipcMain.handle("load-state", async () => {
 // IPC: system info
 ipcMain.handle("get-drafts-path", () => getDraftsStorageDir());
 
+ipcMain.handle("path-exists", (_e, p) => {
+  if (!p || typeof p !== "string") return false;
+  try { return fs.existsSync(p); } catch { return false; }
+});
+
 ipcMain.handle("system-info", () => ({
   user: os.userInfo().username,
   hostname: os.hostname(),

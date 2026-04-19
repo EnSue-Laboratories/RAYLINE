@@ -9,6 +9,7 @@ import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
 import { DEFAULT_MODEL_ID, getM, normalizeModelId } from "./data/models";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
+import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
@@ -1170,6 +1171,78 @@ export default function App() {
   }, [resolveStoredSessionProvider]);
 
   // Load messages and session metadata when selecting a conversation
+  // Pure existence check — given a candidate cwd, returns a resolveSafeCwd
+  // result indicating whether it's missing and what to use instead.
+  // Returns null when no check could be performed.
+  const checkCwdRecovery = useCallback(async (candidateCwd) => {
+    if (!candidateCwd || !window.api?.pathExists) return null;
+    const candidates = Array.from(new Set([
+      candidateCwd,
+      getMainRepoRootUtil(candidateCwd),
+      cwd,
+    ].filter(Boolean)));
+    try {
+      const results = await Promise.all(candidates.map((p) => window.api.pathExists(p)));
+      const existsMap = new Map(candidates.map((p, i) => [p, results[i]]));
+      return resolveSafeCwd({
+        cwd: candidateCwd,
+        appCwd: cwd,
+        exists: (p) => existsMap.get(p) === true,
+      });
+    } catch (err) {
+      console.warn("[cwd-recovery] existence check failed:", err?.message || err);
+      return null;
+    }
+  }, [cwd]);
+
+  // Heal a conversation whose cwd no longer exists on disk. Persists the
+  // recovered cwd and a `pendingCwdRecovery` marker so the next send can
+  // inject a hidden reminder to the model. Returns the recovery result
+  // (or null when no check was run).
+  const healConversationCwdIfMissing = useCallback(async (conversationId, conversation) => {
+    const convoCwd = conversation?.cwd;
+    if (!convoCwd) return null;
+    const recovery = await checkCwdRecovery(convoCwd);
+    if (!recovery || !recovery.wasMissing) return recovery;
+    const marker = {
+      originalCwd: recovery.originalCwd,
+      recoveredCwd: recovery.cwd,
+      recoveryReason: recovery.recoveryReason,
+    };
+    setConvoList((p) =>
+      p.map((c) => {
+        if (c.id !== conversationId) return c;
+        return {
+          ...c,
+          ...(recovery.cwd ? { cwd: recovery.cwd } : {}),
+          pendingCwdRecovery: marker,
+        };
+      })
+    );
+    logSendFlow("cwd-recovery:healed", { conversationId, ...marker });
+    return recovery;
+  }, [checkCwdRecovery]);
+
+  // Given a sessionCwd loaded from a saved session file, route it through
+  // the recovery check so we don't write back a stale worktree path. Returns
+  // { cwd, marker } where cwd is safe-to-persist and marker is the pending
+  // recovery metadata (or null if no recovery was needed).
+  const resolveSessionCwdForWrite = useCallback(async (sessionCwd) => {
+    if (!sessionCwd) return { cwd: sessionCwd, marker: null };
+    const recovery = await checkCwdRecovery(sessionCwd);
+    if (!recovery || !recovery.wasMissing) {
+      return { cwd: sessionCwd, marker: null };
+    }
+    return {
+      cwd: recovery.cwd || sessionCwd,
+      marker: {
+        originalCwd: recovery.originalCwd,
+        recoveredCwd: recovery.cwd,
+        recoveryReason: recovery.recoveryReason,
+      },
+    };
+  }, [checkCwdRecovery]);
+
   const handleSelect = useCallback(async (id) => {
     setShowNewChatCard(false);
     setActive(id);
@@ -1177,6 +1250,11 @@ export default function App() {
     const convo = convoList.find((c) => c.id === id);
     const data = getConversation(id);
     if (convo && window.api) {
+      // Fire-and-forget: if this chat's worktree was promoted/deleted, rewrite
+      // its cwd to the project root so the sidebar and status bar don't keep
+      // pointing at a ghost directory. The next send consumes the pending
+      // marker and tells the model out-of-band.
+      healConversationCwdIfMissing(id, convo);
       if (data.messages.length === 0 && Array.isArray(convo.archivedMessages) && convo.archivedMessages.length > 0) {
         loadMessages(id, convo.archivedMessages);
       }
@@ -1192,6 +1270,9 @@ export default function App() {
           lastProvider: convo.lastProvider || null,
           providerSessions: convo.providerSessions || null,
         });
+        // Route sessionCwd through recovery so we don't overwrite a healed
+        // conversation.cwd with the stale worktree path stored in the session file.
+        const { cwd: safeSessionCwd, marker: sessionCwdMarker } = await resolveSessionCwdForWrite(sessionCwd);
         if (msgs && msgs.length > 0) {
           const serializedSessionMessages = serializeMessagesForState(msgs);
           if (data.messages.length === 0) {
@@ -1228,7 +1309,8 @@ export default function App() {
               return normalizeConversationState({
                 ...next,
                 ...(previewText ? { lastPreview: previewText.slice(0, 60) } : {}),
-                ...(sessionCwd ? { cwd: sessionCwd } : {}),
+                ...(safeSessionCwd ? { cwd: safeSessionCwd } : {}),
+                ...(sessionCwdMarker ? { pendingCwdRecovery: sessionCwdMarker } : {}),
                 archivedMessages: mergeArchivedMessages(c.archivedMessages, serializedSessionMessages),
               });
             })
@@ -1259,7 +1341,8 @@ export default function App() {
 
               return normalizeConversationState({
                 ...next,
-                ...(sessionCwd ? { cwd: sessionCwd } : {}),
+                ...(safeSessionCwd ? { cwd: safeSessionCwd } : {}),
+                ...(sessionCwdMarker ? { pendingCwdRecovery: sessionCwdMarker } : {}),
               });
             })
           );
@@ -1268,7 +1351,7 @@ export default function App() {
         console.error("Failed to load session:", e);
       }
     }
-  }, [convoList, getConversation, loadMessages]);
+  }, [convoList, getConversation, loadMessages, healConversationCwdIfMissing, resolveSessionCwdForWrite]);
 
   // Load active conversation + previews after state is loaded
   useEffect(() => {
@@ -1286,6 +1369,7 @@ export default function App() {
           if (!sessionIdToLoad) return;
           const result = await window.api.loadSession(sessionIdToLoad);
           const { msgs, sessionCwd, sessionProvider } = extractLoadedSessionMeta(result);
+          const { cwd: safeSessionCwd, marker: sessionCwdMarker } = await resolveSessionCwdForWrite(sessionCwd);
           if (msgs && msgs.length > 0) {
             const serializedSessionMessages = serializeMessagesForState(msgs);
             const lastMsg = msgs[msgs.length - 1];
@@ -1318,7 +1402,8 @@ export default function App() {
                 return normalizeConversationState({
                   ...next,
                   ...(previewText ? { lastPreview: previewText.slice(0, 60) } : {}),
-                  ...(sessionCwd && !cv.cwd ? { cwd: sessionCwd } : {}),
+                  ...(safeSessionCwd && !cv.cwd ? { cwd: safeSessionCwd } : {}),
+                  ...(sessionCwdMarker && !cv.cwd ? { pendingCwdRecovery: sessionCwdMarker } : {}),
                   archivedMessages: mergeArchivedMessages(cv.archivedMessages, serializedSessionMessages),
                 });
               })
@@ -1349,7 +1434,8 @@ export default function App() {
 
                 return normalizeConversationState({
                   ...next,
-                  ...(sessionCwd && !cv.cwd ? { cwd: sessionCwd } : {}),
+                  ...(safeSessionCwd && !cv.cwd ? { cwd: safeSessionCwd } : {}),
+                  ...(sessionCwdMarker && !cv.cwd ? { pendingCwdRecovery: sessionCwdMarker } : {}),
                 });
               })
             );
@@ -1543,7 +1629,32 @@ export default function App() {
     async ({ conversationId, conversation, text, attachments, titleText }) => {
       if (!conversationId || !conversation) return false;
 
-      const effectiveCwd = getEffectiveConversationCwd(conversation, cwd, draftsPath);
+      // Live cwd check (belt-and-suspenders — select-time heal covers most cases
+      // but directory may have vanished between select and send).
+      const recovery = await healConversationCwdIfMissing(conversationId, conversation);
+      const pendingRecovery = conversation?.pendingCwdRecovery || null;
+      let reminderSource = null;
+      if (recovery?.wasMissing) {
+        reminderSource = {
+          originalCwd: recovery.originalCwd,
+          recoveredCwd: recovery.cwd,
+          recoveryReason: recovery.recoveryReason,
+        };
+      } else if (pendingRecovery) {
+        reminderSource = pendingRecovery;
+      }
+      // Clear the pending marker whenever we have one to consume, regardless
+      // of whether the live or pending recovery is what we used — either way
+      // it's accounted for in the current send.
+      if (pendingRecovery) {
+        setConvoList((p) =>
+          p.map((c) => (c.id === conversationId ? { ...c, pendingCwdRecovery: undefined } : c))
+        );
+      }
+      const missingCwdReminder = reminderSource ? buildMissingCwdReminder(reminderSource) : null;
+      const effectiveCwd = recovery
+        ? (recovery.cwd ?? undefined)
+        : getEffectiveConversationCwd(conversation, cwd, draftsPath);
       const thisConvoData = getConversation(conversationId);
       const normalizedConversation = normalizeConversationState(conversation);
       const activeSession = getActiveConversationSession(normalizedConversation);
@@ -1602,7 +1713,8 @@ export default function App() {
         : needsHistoryPrimeFallback
           ? buildConversationPrime(thisConvoData.messages)
           : null;
-      const wirePrompt = prime ? decoratePromptWithPrime(text, prime) : text;
+      const primedPrompt = prime ? decoratePromptWithPrime(text, prime) : text;
+      const wirePrompt = decoratePromptWithReminder(primedPrompt, missingCwdReminder);
       const sendStartedAt = Date.now();
 
       if (isFirstMessage) {
@@ -1733,7 +1845,7 @@ export default function App() {
 
       return started;
     },
-    [cwd, draftsPath, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage]
+    [cwd, draftsPath, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
   );
 
   const handleSend = useCallback(
