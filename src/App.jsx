@@ -1453,6 +1453,8 @@ export default function App() {
     modelId,
     ts,
     cwd: conversationCwd,
+    dispatchId,
+    tags,
   }) => {
     const provider = getM(modelId).provider || "claude";
     const seedSession = createConversationSession({
@@ -1474,6 +1476,8 @@ export default function App() {
       sessions: [seedSession],
       activeSessionId: seedSession.id,
       archivedMessages: [],
+      dispatchId,
+      tags,
     });
   }, []);
 
@@ -1999,6 +2003,8 @@ export default function App() {
       modelId,
       ts: Date.now(),
       cwd: effectiveCwd,
+      dispatchId: opts.dispatchId,
+      tags: opts.tags,
     });
 
     if (opts.worktree && !opts.branch) {
