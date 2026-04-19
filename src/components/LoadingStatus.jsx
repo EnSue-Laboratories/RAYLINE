@@ -147,13 +147,19 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
 
   const model = modelId ? getM(modelId) : null;
   const isCodex = model?.provider === "codex";
-  const inputTokens = usage?.input_tokens || 0;
+  const rawInputTokens = usage?.input_tokens || 0;
   const outputTokens = usage?.output_tokens || 0;
   const cacheRead = usage?.cache_read_input_tokens || 0;
   const cacheCreate = usage?.cache_creation_input_tokens || 0;
+  // Claude's `input_tokens` field excludes cached portions; users read "in" as
+  // the total prompt size, so fold cache read/create into it. `cached` still
+  // shows the breakdown of how much of that was served from cache.
+  const inputTokens = isCodex
+    ? rawInputTokens
+    : rawInputTokens + cacheRead + cacheCreate;
   const derivedContextUsed = isCodex
-    ? inputTokens + outputTokens
-    : inputTokens + cacheRead + cacheCreate + outputTokens;
+    ? rawInputTokens + outputTokens
+    : inputTokens + outputTokens;
   const contextUsed = Number.isFinite(usage?.total_tokens) && usage.total_tokens > 0
     ? usage.total_tokens
     : derivedContextUsed;
