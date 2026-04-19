@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Pencil, Loader2, FileText, PauseCircle, Terminal } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,6 +10,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import "katex/dist/katex.min.css";
 import CopyBtn from "./CopyBtn";
+import CopyImageBtn from "./CopyImageBtn";
 import ToolCallBlock from "./ToolCallBlock";
 import AskUserQuestionBlock from "./AskUserQuestionBlock";
 import MermaidBlock from "./MermaidBlock";
@@ -278,6 +279,16 @@ export default function Message({ msg, onEdit, onAnswer, onControlChange, canCon
   const isShellCommand = msg.mode === "shell-command";
   const hasThinkingPart = Boolean(msg.parts?.some((part) => part.type === "thinking"));
   const activeThinkingByStreamKey = msg._streamState?.activeThinking || {};
+  const assistantCaptureRef = useRef(null);
+  const assistantText = useMemo(() => {
+    if (msg.parts) {
+      return msg.parts
+        .filter((part) => part.type === "text" && part.text)
+        .map((part) => part.text)
+        .join("\n");
+    }
+    return msg.text || "";
+  }, [msg.parts, msg.text]);
 
   // Strip [Attached files/images: ...] prefix from display text and extract file names
   let displayText = msg.text || "";
@@ -552,166 +563,177 @@ export default function Message({ msg, onEdit, onAnswer, onControlChange, canCon
         paddingTop: 8,
       }}
     >
-      <div style={{
-        fontSize: s(9),
-        fontFamily: "'JetBrains Mono',monospace",
-        color: "rgba(255,255,255,0.38)",
-        letterSpacing: ".14em",
-        marginBottom: 12,
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-      }}>
-        ASSISTANT
-      </div>
+      <div ref={assistantCaptureRef}>
+        <div style={{
+          fontSize: s(9),
+          fontFamily: "'JetBrains Mono',monospace",
+          color: "rgba(255,255,255,0.38)",
+          letterSpacing: ".14em",
+          marginBottom: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}>
+          ASSISTANT
+        </div>
 
-      {/* Render parts in order — text and tool calls interleaved */}
-      {(msg.parts || []).map((part, i) => {
-        if (part.type === "text" && part.text) {
-          const isLastPart = i === (msg.parts || []).length - 1;
-          return (
-            <div key={i} style={{
-              color: "rgba(255,255,255,0.75)",
-              fontSize: s(15),
-              lineHeight: 1.85,
-              fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
-              letterSpacing: "0.008em",
-              marginBottom: 4,
-            }}>
-              {renderControlAwareMarkdown({
-                text: part.text,
-                blockKey: `part-${part.id || i}`,
-                markdownProps: {
-                  remarkPlugins: [remarkGfm, remarkMath],
-                  rehypePlugins: [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex],
-                },
-                components: (msg.isStreaming && isLastPart) ? scaledMdStreaming : scaledMdStatic,
-                isStreaming: msg.isStreaming && isLastPart,
-                onAnswer,
-                onControlChange,
-                canControlTarget,
-              })}
-              {msg.isStreaming && isLastPart && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.2)", marginLeft: 4, verticalAlign: "middle" }}>
-                  <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
-                </span>
-              )}
-            </div>
-          );
-        }
-        if (part.type === "thinking") {
-          const isPartThinking = part._streamKey
-            ? Boolean(activeThinkingByStreamKey[part._streamKey])
-            : msg.isThinking;
-          return <ThinkingBlock key={"think-" + i} text={part.text} isThinking={isPartThinking} />;
-        }
-        if (part.type === "tool") {
-          if (part.name === "AskUserQuestion") {
-            return <AskUserQuestionBlock key={part.id || i} tool={part} onAnswer={onAnswer} />;
+        {/* Render parts in order — text and tool calls interleaved */}
+        {(msg.parts || []).map((part, i) => {
+          if (part.type === "text" && part.text) {
+            const isLastPart = i === (msg.parts || []).length - 1;
+            return (
+              <div key={i} style={{
+                color: "rgba(255,255,255,0.75)",
+                fontSize: s(15),
+                lineHeight: 1.85,
+                fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
+                letterSpacing: "0.008em",
+                marginBottom: 4,
+              }}>
+                {renderControlAwareMarkdown({
+                  text: part.text,
+                  blockKey: `part-${part.id || i}`,
+                  markdownProps: {
+                    remarkPlugins: [remarkGfm, remarkMath],
+                    rehypePlugins: [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex],
+                  },
+                  components: (msg.isStreaming && isLastPart) ? scaledMdStreaming : scaledMdStatic,
+                  isStreaming: msg.isStreaming && isLastPart,
+                  onAnswer,
+                  onControlChange,
+                  canControlTarget,
+                })}
+                {msg.isStreaming && isLastPart && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.2)", marginLeft: 4, verticalAlign: "middle" }}>
+                    <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
+                  </span>
+                )}
+              </div>
+            );
           }
-          return <ToolCallBlock key={part.id || i} tool={part} />;
-        }
-        if (part.type === "status") {
-          const isPaused = part.kind === "paused";
-          return (
-            <div
-              key={`status-${i}`}
-              style={{
-                margin: "10px 0 14px",
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: isPaused ? "rgba(255,214,153,0.08)" : "rgba(255,255,255,0.04)",
-                color: "rgba(255,255,255,0.72)",
-                maxWidth: "80%",
-              }}
-            >
+          if (part.type === "thinking") {
+            const isPartThinking = part._streamKey
+              ? Boolean(activeThinkingByStreamKey[part._streamKey])
+              : msg.isThinking;
+            return (
+              <div key={"think-" + i} data-copy-image-ignore="true">
+                <ThinkingBlock text={part.text} isThinking={isPartThinking} />
+              </div>
+            );
+          }
+          if (part.type === "tool") {
+            return (
+              <div key={part.id || i} data-copy-image-ignore="true">
+                {part.name === "AskUserQuestion"
+                  ? <AskUserQuestionBlock tool={part} onAnswer={onAnswer} />
+                  : <ToolCallBlock tool={part} />}
+              </div>
+            );
+          }
+          if (part.type === "status") {
+            const isPaused = part.kind === "paused";
+            return (
               <div
+                key={`status-${i}`}
+                data-copy-image-ignore="true"
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  fontSize: s(11),
-                  fontFamily: "'JetBrains Mono',monospace",
-                  letterSpacing: ".04em",
-                  textTransform: "uppercase",
-                  color: isPaused ? "rgba(255,220,170,0.9)" : "rgba(255,255,255,0.6)",
+                  margin: "10px 0 14px",
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: isPaused ? "rgba(255,214,153,0.08)" : "rgba(255,255,255,0.04)",
+                  color: "rgba(255,255,255,0.72)",
+                  maxWidth: "80%",
                 }}
               >
-                {isPaused && <PauseCircle size={14} strokeWidth={1.8} />}
-                <span>{part.title || "Status"}</span>
-              </div>
-              {part.text && (
                 <div
                   style={{
-                    marginTop: 6,
-                    fontSize: s(13),
-                    lineHeight: 1.65,
-                    fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
-                    color: "rgba(255,255,255,0.66)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: s(11),
+                    fontFamily: "'JetBrains Mono',monospace",
+                    letterSpacing: ".04em",
+                    textTransform: "uppercase",
+                    color: isPaused ? "rgba(255,220,170,0.9)" : "rgba(255,255,255,0.6)",
                   }}
                 >
-                  {part.text}
+                  {isPaused && <PauseCircle size={14} strokeWidth={1.8} />}
+                  <span>{part.title || "Status"}</span>
                 </div>
-              )}
-            </div>
-          );
-        }
-        return null;
-      })}
+                {part.text && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: s(13),
+                      lineHeight: 1.65,
+                      fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
+                      color: "rgba(255,255,255,0.66)",
+                    }}
+                  >
+                    {part.text}
+                  </div>
+                )}
+              </div>
+            );
+          }
+          return null;
+        })}
 
-      {msg.isThinking && !hasThinkingPart && (
-        <ThinkingBlock text="" isThinking={true} />
-      )}
+        {msg.isThinking && !hasThinkingPart && (
+          <div data-copy-image-ignore="true">
+            <ThinkingBlock text="" isThinking={true} />
+          </div>
+        )}
 
-      {msg.isStreaming && !msg.isThinking && (msg.parts || []).length === 0 && (
-        <div style={{ display: "flex", gap: 5, alignItems: "center", padding: "4px 0" }}>
-          {[0, 1, 2].map(i => (
-            <span key={i} style={{
-              width: 5, height: 5,
-              borderRadius: "50%",
-              background: "rgba(255,255,255,0.25)",
-              display: "inline-block",
-              animation: `dotPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
-            }} />
-          ))}
-        </div>
-      )}
+        {msg.isStreaming && !msg.isThinking && (msg.parts || []).length === 0 && (
+          <div style={{ display: "flex", gap: 5, alignItems: "center", padding: "4px 0" }}>
+            {[0, 1, 2].map(i => (
+              <span key={i} style={{
+                width: 5, height: 5,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.25)",
+                display: "inline-block",
+                animation: `dotPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+              }} />
+            ))}
+          </div>
+        )}
 
-      {/* Fallback for old format messages (text + toolCalls) */}
-      {!msg.parts && msg.text && (
-        <div style={{
-          color: "rgba(255,255,255,0.75)",
-          fontSize: s(15),
-          lineHeight: 1.85,
-          fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
-          letterSpacing: "0.008em",
-        }}>
-          {renderControlAwareMarkdown({
-            text: msg.text,
-            blockKey: `legacy-${msg.id}`,
-            markdownProps: {
-              remarkPlugins: [remarkGfm, remarkMath],
-              rehypePlugins: [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex],
-            },
-            components: scaledMdStatic,
-            onAnswer,
-            onControlChange,
-            canControlTarget,
-          })}
-        </div>
-      )}
-      {!msg.parts && msg.toolCalls && msg.toolCalls.map((tc) => (
-        <ToolCallBlock key={tc.id} tool={tc} />
-      ))}
+        {/* Fallback for old format messages (text + toolCalls) */}
+        {!msg.parts && msg.text && (
+          <div style={{
+            color: "rgba(255,255,255,0.75)",
+            fontSize: s(15),
+            lineHeight: 1.85,
+            fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
+            letterSpacing: "0.008em",
+          }}>
+            {renderControlAwareMarkdown({
+              text: msg.text,
+              blockKey: `legacy-${msg.id}`,
+              markdownProps: {
+                remarkPlugins: [remarkGfm, remarkMath],
+                rehypePlugins: [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex],
+              },
+              components: scaledMdStatic,
+              onAnswer,
+              onControlChange,
+              canControlTarget,
+            })}
+          </div>
+        )}
+        {!msg.parts && msg.toolCalls && msg.toolCalls.map((tc) => (
+          <div key={tc.id} data-copy-image-ignore="true">
+            <ToolCallBlock tool={tc} />
+          </div>
+        ))}
+      </div>
 
-      {!msg.isStreaming && (msg.parts?.some(p => p.type === "text" && p.text) || msg.text) && (
-        <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
-          <CopyBtn text={
-            msg.parts
-              ? msg.parts.filter(p => p.type === "text").map(p => p.text).join("\n")
-              : msg.text
-          } />
+      {!msg.isStreaming && assistantText && (
+        <div data-copy-image-ignore="true" style={{ marginTop: 8, display: "flex", gap: 6 }}>
+          <CopyBtn text={assistantText} title="Copy markdown" />
+          <CopyImageBtn targetRef={assistantCaptureRef} />
         </div>
       )}
     </div>

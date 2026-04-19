@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell, clipboard } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -217,6 +217,24 @@ ipcMain.handle("set-window-opacity", (event, opacity) => {
   if (!Number.isFinite(v)) return false;
   win.setOpacity(Math.max(0.2, Math.min(1, v)));
   return true;
+});
+
+ipcMain.handle("clipboard-write-image", (_event, dataUrl) => {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+    return false;
+  }
+
+  try {
+    const image = nativeImage.createFromDataURL(dataUrl);
+    if (image.isEmpty()) {
+      return false;
+    }
+    clipboard.writeImage(image);
+    return true;
+  } catch (error) {
+    console.error("[clipboard-write-image] Failed to write image", error);
+    return false;
+  }
 });
 
 // IPC: open path in Finder / file manager

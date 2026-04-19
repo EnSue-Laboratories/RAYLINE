@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-export default function CopyBtn({ text }) {
+export default function CopyBtn({ text, title = "Copy" }) {
   const [ok, set] = useState(false);
   const s = useFontScale();
 
@@ -17,6 +17,8 @@ export default function CopyBtn({ text }) {
   return (
     <button
       onClick={handleCopy}
+      title={ok ? "Copied" : title}
+      data-copy-image-ignore="true"
       style={{
         background: "none",
         border: "none",
