@@ -1,7 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { X, GitBranch, FileText } from "lucide-react";
 
-// eslint-disable-next-line no-unused-vars
 function slugifyBranch(text, fallbackIndex) {
   const slug = (text || "")
     .toLowerCase()
@@ -28,6 +27,23 @@ function makeCustomRow(index) {
     branch: defaultCustomBranch(index),
     model: "",
     attachments: [],
+  };
+}
+
+function buildIssuePrompt(issue) {
+  const body = issue.body ? `\n\n${issue.body}` : "";
+  return `Fix issue #${issue.number}: ${issue.title}${body}`;
+}
+
+function makeIssueRow(issue) {
+  return {
+    key: `issue-${issue.number}`,
+    enabled: false,
+    issue,
+    prompt: buildIssuePrompt(issue),
+    branch: `issue-${issue.number}-${slugifyBranch(issue.title, issue.number)}`,
+    model: "",
+    expanded: false,
   };
 }
 
@@ -131,8 +147,146 @@ function TabBtn({ active, onClick, children }) {
   );
 }
 
-// Placeholder stubs — filled in by Tasks 5 & 6
-function IssueTab() { return <div style={{ padding: 12, color: "rgba(255,255,255,0.5)" }}>Issue tab (Task 6)</div>; }
+function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors }) {
+  const [selectedPath, setSelectedPath] = useState(currentCwd || "");
+  const [slug, setSlug] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+
+  const projectPaths = useMemo(
+    () => Object.keys(projects || {}).filter((p) => !projects[p]?.hidden),
+    [projects]
+  );
+
+  useEffect(() => {
+    if (!selectedPath) { setSlug(null); setRows([]); return; }
+    let cancelled = false;
+    setLoading(true); setLoadError(null);
+    (async () => {
+      try {
+        const s = await window.api.gitRemoteSlug(selectedPath);
+        if (cancelled) return;
+        if (!s) {
+          setSlug(null); setRows([]); setLoadError("No GitHub remote on this folder.");
+          setLoading(false); return;
+        }
+        setSlug(s);
+        const issues = await window.api.ghListIssues(s, "open");
+        if (cancelled) return;
+        setRows((issues || []).map(makeIssueRow));
+      } catch (e) {
+        if (!cancelled) setLoadError(e?.message || "Failed to load issues.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedPath, setRows]);
+
+  const toggleAll = (checked) => setRows((prev) => prev.map((r) => ({ ...r, enabled: checked })));
+  const updateRow = (key, patch) => setRows((prev) =>
+    prev.map((r) => (r.key === key ? { ...r, ...patch } : r))
+  );
+
+  const allChecked = rows.length > 0 && rows.every((r) => r.enabled);
+
+  return (
+    <div style={{ padding: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <label style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>Repo folder</label>
+        <select
+          value={selectedPath}
+          onChange={(e) => setSelectedPath(e.target.value)}
+          style={{ ...selectStyle, flex: 1, fontSize: 12 }}
+        >
+          <option value="">(select)</option>
+          {projectPaths.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        {slug && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{slug}</span>}
+      </div>
+
+      {loading && <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>Loading issues…</div>}
+      {loadError && <div style={errorStyle}>{loadError}</div>}
+      {!loading && !loadError && rows.length === 0 && selectedPath && (
+        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>No open issues.</div>
+      )}
+
+      {rows.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <input type="checkbox" checked={allChecked} onChange={(e) => toggleAll(e.target.checked)} />
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+            Select all ({rows.filter((r) => r.enabled).length}/{rows.length})
+          </span>
+        </div>
+      )}
+
+      {rows.map((r) => (
+        <IssueRow
+          key={r.key}
+          row={r}
+          availableModels={availableModels}
+          error={errors[r.key]}
+          onChange={(patch) => updateRow(r.key, patch)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function IssueRow({ row, availableModels, error, onChange }) {
+  const { issue } = row;
+  return (
+    <div style={{ ...rowStyle(!!error), flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <input
+          type="checkbox"
+          checked={row.enabled}
+          onChange={(e) => onChange({ enabled: e.target.checked })}
+        />
+        <button
+          onClick={() => onChange({ expanded: !row.expanded })}
+          style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 0 }}
+          aria-label="Toggle details"
+        >
+          {row.expanded ? "▾" : "▸"}
+        </button>
+        <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, fontFamily: "monospace" }}>
+          #{issue.number}
+        </span>
+        <span style={{ fontSize: 12, color: "white", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {issue.title}
+        </span>
+        <input
+          type="text"
+          value={row.branch}
+          onChange={(e) => onChange({ branch: e.target.value })}
+          style={{ ...inputStyle, width: 180, flex: "none" }}
+        />
+        <select
+          value={row.model}
+          onChange={(e) => onChange({ model: e.target.value })}
+          style={selectStyle}
+        >
+          <option value="">(default)</option>
+          {availableModels.map((m) => (
+            <option key={m.id} value={m.id}>{m.label || m.id}</option>
+          ))}
+        </select>
+      </div>
+      {row.expanded && (
+        <textarea
+          value={row.prompt}
+          onChange={(e) => onChange({ prompt: e.target.value })}
+          rows={6}
+          style={textareaStyle}
+        />
+      )}
+      {error && <div style={errorStyle}>{error}</div>}
+    </div>
+  );
+}
 
 function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
   const addRow = () => setRows((prev) => [...prev, makeCustomRow(prev.length)]);
