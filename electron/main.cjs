@@ -744,6 +744,50 @@ ipcMain.handle("git-worktree-remove", async (_event, cwd, worktreePath) => {
   return { success: true };
 });
 
+ipcMain.handle("git-worktree-promote", async (_event, mainRepoPath, worktreePath, branchName) => {
+  if (!mainRepoPath || !worktreePath) {
+    return { success: false, error: "missing paths" };
+  }
+  // Verify main repo is clean
+  try {
+    const porcelain = await git(["status", "--porcelain"], mainRepoPath);
+    if (porcelain.trim().length > 0) {
+      return { success: false, code: "DIRTY", error: "Main repo has uncommitted changes" };
+    }
+    const gitDirRaw = await git(["rev-parse", "--git-dir"], mainRepoPath);
+    const gitDir = path.isAbsolute(gitDirRaw) ? gitDirRaw : path.join(mainRepoPath, gitDirRaw);
+    const markers = [
+      ["MERGE_HEAD", "merge"],
+      ["REBASE_HEAD", "rebase"],
+      ["rebase-merge", "rebase"],
+      ["rebase-apply", "rebase"],
+      ["CHERRY_PICK_HEAD", "cherry-pick"],
+      ["REVERT_HEAD", "revert"],
+      ["BISECT_LOG", "bisect"],
+    ];
+    for (const [file, label] of markers) {
+      if (fs.existsSync(path.join(gitDir, file))) {
+        return { success: false, code: "BUSY", error: `Main repo has an in-progress ${label}` };
+      }
+    }
+  } catch (err) {
+    return { success: false, error: err.message || "Failed to check main repo" };
+  }
+  try {
+    await git(["worktree", "remove", worktreePath], mainRepoPath);
+  } catch (err) {
+    return { success: false, error: err.message || "Failed to remove worktree" };
+  }
+  if (branchName) {
+    try {
+      await git(["checkout", branchName], mainRepoPath);
+    } catch (err) {
+      return { success: false, error: `Worktree removed, but checkout failed: ${err.message || err}` };
+    }
+  }
+  return { success: true };
+});
+
 ipcMain.handle("git-status", async (_event, cwd) => {
   if (!cwd) return null;
   try {

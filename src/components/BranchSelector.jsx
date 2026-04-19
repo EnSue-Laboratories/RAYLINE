@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { GitBranch, Plus, Check, X, ChevronDown, Trash2 } from "lucide-react";
+import { GitBranch, Plus, Check, X, ChevronDown, Trash2, ArrowUpFromLine } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
 const MENU_GAP = 6;
@@ -18,6 +18,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
   const [error, setError] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // { type, name, path, branch }
   const [deleteBranchToo, setDeleteBranchToo] = useState(false);
+  const [confirmPromote, setConfirmPromote] = useState(null); // { path, branch }
+  const [promoteError, setPromoteError] = useState(null);
+  const [promoting, setPromoting] = useState(false);
   const [hoveredRow, setHoveredRow] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const ref = useRef(null);
@@ -55,6 +58,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
     setError(null);
     setConfirmDelete(null);
     setDeleteBranchToo(false);
+    setConfirmPromote(null);
+    setPromoteError(null);
+    setPromoting(false);
     setHoveredRow(null);
     setSearchQuery("");
   }, []);
@@ -190,6 +196,35 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
       refresh();
     } catch (e) {
       setError(e.message);
+    }
+  };
+
+  const handlePromoteWorktree = async () => {
+    if (!confirmPromote || !mainWorktree) return;
+    setPromoteError(null);
+    setPromoting(true);
+    try {
+      const result = await window.api.gitWorktreePromote(
+        mainWorktree.path,
+        confirmPromote.path,
+        confirmPromote.branch || null,
+      );
+      if (!result?.success) {
+        setPromoteError(result?.error || "Promote failed");
+        setPromoting(false);
+        return;
+      }
+      // If the user was inside the worktree being promoted, switch them to the main repo.
+      if (cwd === confirmPromote.path && onCwdChange) {
+        onCwdChange(mainWorktree.path);
+      }
+      setConfirmPromote(null);
+      setPromoting(false);
+      refresh();
+      onRefocusTerminal?.();
+    } catch (e) {
+      setPromoteError(e.message || "Promote failed");
+      setPromoting(false);
     }
   };
 
@@ -518,6 +553,69 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
               {filteredWorktrees.map((wt) => {
                 const isActive = wt.path === cwd;
                 const isConfirming = confirmDelete?.type === "worktree" && confirmDelete.path === wt.path;
+                const isPromoting = confirmPromote?.path === wt.path;
+
+                if (isPromoting) {
+                  return (
+                    <div key={wt.path} style={{
+                      padding: "8px 12px",
+                      background: "rgba(180,220,255,0.06)",
+                      borderRadius: 7,
+                    }}>
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                      }}>
+                        <span style={{
+                          fontSize: s(10),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          color: "rgba(180,220,255,0.7)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>Promote {wt.branch || "worktree"} to main?</span>
+                        <span style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                          <button
+                            onClick={handlePromoteWorktree}
+                            disabled={promoting}
+                            style={{
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              width: 24, height: 24, borderRadius: 6,
+                              background: "rgba(180,220,255,0.12)", border: "none",
+                              color: "rgba(180,220,255,0.7)",
+                              cursor: promoting ? "default" : "pointer",
+                              opacity: promoting ? 0.5 : 1,
+                            }}
+                          ><Check size={12} strokeWidth={2} /></button>
+                          <button
+                            onClick={() => { setConfirmPromote(null); setPromoteError(null); }}
+                            disabled={promoting}
+                            style={{
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              width: 24, height: 24, borderRadius: 6,
+                              background: "rgba(255,255,255,0.02)", border: "none",
+                              color: "rgba(255,255,255,0.3)",
+                              cursor: promoting ? "default" : "pointer",
+                            }}
+                          ><X size={12} strokeWidth={2} /></button>
+                        </span>
+                      </div>
+                      <div style={{
+                        marginTop: 6,
+                        fontSize: s(9),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        color: promoteError ? "rgba(255,180,180,0.7)" : "rgba(255,255,255,0.35)",
+                        lineHeight: 1.4,
+                      }}>
+                        {promoteError
+                          ? promoteError
+                          : "Removes this worktree and checks out the branch in the main repo. Main must be clean."}
+                      </div>
+                    </div>
+                  );
+                }
 
                 if (isConfirming) {
                   return (
@@ -644,6 +742,29 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                         {wt.branch || "detached"}
                       </span>
                     </button>
+                    {mainWorktree && (
+                      <button
+                        title="Promote to main"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmPromote({ path: wt.path, branch: wt.branch });
+                          setPromoteError(null);
+                          setConfirmDelete(null);
+                          setError(null);
+                        }}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          width: 22, height: 22, borderRadius: 5,
+                          background: "transparent", border: "none",
+                          color: "rgba(255,255,255,0.15)", cursor: "pointer",
+                          opacity: hoveredRow === `wt-${wt.path}` ? 1 : 0,
+                          transition: "opacity .12s, color .12s",
+                          flexShrink: 0, marginLeft: 4,
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(180,220,255,0.7)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.15)"; }}
+                      ><ArrowUpFromLine size={11} strokeWidth={2} /></button>
+                    )}
                     {!isActive && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setConfirmDelete({ type: "worktree", path: wt.path, branch: wt.branch }); setDeleteBranchToo(false); setError(null); }}
