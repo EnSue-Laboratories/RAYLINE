@@ -55,6 +55,19 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function deriveConversationTitle(text, attachments) {
+  const trimmed = (text || "").trim();
+  if (trimmed) return trimmed.slice(0, 50);
+  const list = Array.isArray(attachments) ? attachments : [];
+  if (list.length) {
+    const first = list[0];
+    const name = first?.name || (first?.type === "image" ? "Image" : "Attachment");
+    const extra = list.length > 1 ? ` +${list.length - 1}` : "";
+    return `${name}${extra}`.slice(0, 50);
+  }
+  return "New chat";
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -1325,8 +1338,9 @@ export default function App() {
       const sendStartedAt = Date.now();
 
       if (isFirstMessage) {
+        const newTitle = deriveConversationTitle(titleText || text, attachments);
         setConvoList((p) =>
-          p.map((c) => c.id === conversationId ? { ...c, title: (titleText || text).slice(0, 50) } : c)
+          p.map((c) => c.id === conversationId ? { ...c, title: newTitle } : c)
         );
       }
 
@@ -1492,7 +1506,7 @@ export default function App() {
         const id = "c" + Date.now();
         convo = createConversationDraft({
           id,
-          title: text.slice(0, 50),
+          title: deriveConversationTitle(text, attachments),
           modelId: defaultModel,
           ts: Date.now(),
           cwd: getMainRepoRoot(cwd) || undefined,
