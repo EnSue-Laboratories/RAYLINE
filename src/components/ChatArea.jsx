@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { flushSync } from "react-dom";
 import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
@@ -94,10 +95,15 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   const send = useCallback(() => {
     if (!canSend) return;
-    onSend(trimmedInput, shellMode ? undefined : (attachments.length > 0 ? attachments : undefined));
-    setInput("");
-    setAttachments([]);
+    const nextInput = trimmedInput;
+    const nextAttachments = shellMode ? undefined : (attachments.length > 0 ? attachments : undefined);
+    flushSync(() => {
+      setInput("");
+      setAttachments([]);
+      setSelectedCmd(0);
+    });
     if (inRef.current) inRef.current.style.height = "20px";
+    onSend(nextInput, nextAttachments);
   }, [attachments, canSend, onSend, shellMode, trimmedInput]);
 
   const handleInput = (e) => {
