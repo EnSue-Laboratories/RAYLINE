@@ -708,7 +708,7 @@ export default function App() {
   const [fontSize, setFontSize] = useState(15);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
-  const [coauthorEnabled, setCoauthorEnabled] = useState(false);
+  const [coauthorEnabled, setCoauthorEnabled] = useState(true);
   const [coauthorTrailer, setCoauthorTrailer] = useState(
     "Co-Authored-By: r-yline[bot] <277407097+r-yline[bot]@users.noreply.github.com>"
   );

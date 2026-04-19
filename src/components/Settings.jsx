@@ -657,33 +657,6 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   </button>
                 </div>
               </div>
-
-              {/* Coauthor trailer */}
-              {coauthorEnabled && (
-                <div style={{ marginBottom: 24 }}>
-                  <textarea
-                    value={coauthorTrailer ?? ""}
-                    placeholder="Co-Authored-By: Name <email>"
-                    onChange={(e) => onCoauthorTrailerChange?.(e.target.value)}
-                    spellCheck={false}
-                    rows={2}
-                    style={{
-                      width: "100%",
-                      boxSizing: "border-box",
-                      padding: "8px 10px",
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      borderRadius: 7,
-                      color: "rgba(255,255,255,0.9)",
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: s(12),
-                      lineHeight: 1.4,
-                      outline: "none",
-                      resize: "vertical",
-                    }}
-                  />
-                </div>
-              )}
             </>
           )}
         </div>
