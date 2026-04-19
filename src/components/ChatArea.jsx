@@ -296,6 +296,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             WebkitAppRegion: "no-drag",
             minWidth: 0,
             flex: 1,
+            paddingLeft: !sidebarOpen && tabs.length > 0 ? 80 : 0,
           }}
         >
           {tabs.length > 0 && (
