@@ -1,6 +1,36 @@
 import { useState, useCallback } from "react";
 import { X, GitBranch, FileText } from "lucide-react";
 
+// eslint-disable-next-line no-unused-vars
+function slugifyBranch(text, fallbackIndex) {
+  const slug = (text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-+|-+$)/g, "")
+    .slice(0, 32);
+  return slug || `task-${fallbackIndex + 1}`;
+}
+
+function defaultCustomBranch(index) {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `dispatch-${yyyy}${mm}${dd}-${hh}${mi}-${index + 1}`;
+}
+
+function makeCustomRow(index) {
+  return {
+    key: "r" + Date.now() + "-" + index,
+    prompt: "",
+    branch: defaultCustomBranch(index),
+    model: "",
+    attachments: [],
+  };
+}
+
 export default function DispatchCard({
   onClose,
   // eslint-disable-next-line no-unused-vars
@@ -103,7 +133,100 @@ function TabBtn({ active, onClick, children }) {
 
 // Placeholder stubs — filled in by Tasks 5 & 6
 function IssueTab() { return <div style={{ padding: 12, color: "rgba(255,255,255,0.5)" }}>Issue tab (Task 6)</div>; }
-function CustomTab() { return <div style={{ padding: 12, color: "rgba(255,255,255,0.5)" }}>Custom tab (Task 5)</div>; }
+
+function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
+  const addRow = () => setRows((prev) => [...prev, makeCustomRow(prev.length)]);
+  const removeRow = (key) => setRows((prev) => prev.filter((r) => r.key !== key));
+  const updateRow = (key, patch) => setRows((prev) =>
+    prev.map((r) => (r.key === key ? { ...r, ...patch } : r))
+  );
+
+  return (
+    <div style={{ padding: 14 }}>
+      {!currentCwd && (
+        <div style={noticeStyle}>
+          Select a folder in the sidebar before dispatching custom tasks.
+        </div>
+      )}
+      {rows.length === 0 && (
+        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, padding: "8px 0" }}>
+          No tasks yet.
+        </div>
+      )}
+      {rows.map((r, i) => (
+        <CustomRow
+          key={r.key}
+          row={r}
+          index={i}
+          availableModels={availableModels}
+          error={errors[r.key]}
+          onChange={(patch) => updateRow(r.key, patch)}
+          onRemove={() => removeRow(r.key)}
+        />
+      ))}
+      <button onClick={addRow} style={addBtnStyle}>+ Add task</button>
+    </div>
+  );
+}
+
+function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
+  return (
+    <div style={rowStyle(!!error)}>
+      <textarea
+        placeholder={`Task ${index + 1} prompt…`}
+        value={row.prompt}
+        onChange={(e) => onChange({ prompt: e.target.value })}
+        rows={3}
+        style={textareaStyle}
+      />
+      <div style={rowControlsStyle}>
+        <input
+          type="text"
+          value={row.branch}
+          placeholder="branch name"
+          onChange={(e) => onChange({ branch: e.target.value })}
+          style={inputStyle}
+        />
+        <select
+          value={row.model}
+          onChange={(e) => onChange({ model: e.target.value })}
+          style={selectStyle}
+        >
+          <option value="">(default)</option>
+          {availableModels.map((m) => (
+            <option key={m.id} value={m.id}>{m.label || m.id}</option>
+          ))}
+        </select>
+        <AttachmentPicker
+          attachments={row.attachments}
+          onChange={(a) => onChange({ attachments: a })}
+        />
+        <button onClick={onRemove} style={removeBtnStyle} aria-label="Remove row">✕</button>
+      </div>
+      {error && <div style={errorStyle}>{error}</div>}
+    </div>
+  );
+}
+
+function AttachmentPicker({ attachments, onChange }) {
+  // Minimal paperclip that appends image file paths. Integrate with
+  // whatever image-attachment pattern NewChatCard.jsx already uses.
+  return (
+    <label style={{ cursor: "pointer", color: "rgba(255,255,255,0.55)", fontSize: 16 }}>
+      📎{attachments.length > 0 ? ` ${attachments.length}` : ""}
+      <input
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files || []);
+          onChange([...attachments, ...files]);
+        }}
+      />
+    </label>
+  );
+}
 function ModelDropdown({ value, onChange, models, label }) {
   return (
     <label style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, display: "flex", gap: 6, alignItems: "center" }}>
@@ -166,3 +289,44 @@ const primaryBtnStyle = (enabled) => ({
   cursor: enabled ? "pointer" : "not-allowed",
   fontSize: 12, fontWeight: 500,
 });
+
+const noticeStyle = {
+  background: "rgba(255,200,150,0.08)", border: "1px solid rgba(255,200,150,0.25)",
+  color: "rgba(255,200,150,0.9)", borderRadius: 6, padding: "8px 10px",
+  fontSize: 12, marginBottom: 10,
+};
+const rowStyle = (hasError) => ({
+  border: "1px solid " + (hasError ? "rgba(255,180,180,0.4)" : "rgba(255,255,255,0.08)"),
+  borderRadius: 8, padding: 10, marginBottom: 10,
+  display: "flex", flexDirection: "column", gap: 8,
+  background: "rgba(255,255,255,0.02)",
+});
+const textareaStyle = {
+  width: "100%", minHeight: 48, resize: "vertical",
+  background: "rgba(255,255,255,0.04)", color: "white",
+  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6,
+  padding: "6px 8px", fontSize: 12, fontFamily: "inherit",
+};
+const rowControlsStyle = { display: "flex", gap: 8, alignItems: "center" };
+const inputStyle = {
+  flex: 1, background: "rgba(255,255,255,0.04)", color: "white",
+  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6,
+  padding: "5px 8px", fontSize: 11, fontFamily: "monospace",
+};
+const selectStyle = {
+  background: "rgba(255,255,255,0.04)", color: "white",
+  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6,
+  padding: "5px 6px", fontSize: 11,
+};
+const removeBtnStyle = {
+  background: "none", border: "none", color: "rgba(255,255,255,0.4)",
+  cursor: "pointer", fontSize: 13, padding: "4px 6px",
+};
+const addBtnStyle = {
+  background: "none", border: "1px dashed rgba(255,255,255,0.15)",
+  color: "rgba(255,255,255,0.6)", borderRadius: 6, padding: "6px 10px",
+  cursor: "pointer", fontSize: 12, width: "100%",
+};
+const errorStyle = {
+  color: "rgba(255,180,180,0.9)", fontSize: 11, marginTop: 2,
+};
