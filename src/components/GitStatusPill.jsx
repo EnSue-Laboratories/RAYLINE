@@ -39,7 +39,7 @@ const rowIconBtnStyle = {
   transition: "color .15s",
 };
 
-export default function GitStatusPill({ cwd, defaultPrBranch }) {
+export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = false, coauthorTrailer = "" }) {
   const s = useFontScale();
   const { status, refresh, refetch } = useGitStatus(cwd);
   const [open, setOpen] = useState(false);
@@ -128,7 +128,8 @@ export default function GitStatusPill({ cwd, defaultPrBranch }) {
     setBusy(true);
     setError(null);
     try {
-      const c = await window.api.gitCommit(cwd, message.trim());
+      const trailer = coauthorEnabled ? (coauthorTrailer || "").trim() : "";
+      const c = await window.api.gitCommit(cwd, message.trim(), trailer);
       if (!c.ok) { setError(c.stderr || "Commit failed"); return; }
       setMessage("");
       if (canPush) {

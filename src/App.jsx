@@ -708,6 +708,10 @@ export default function App() {
   const [fontSize, setFontSize] = useState(15);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
+  const [coauthorEnabled, setCoauthorEnabled] = useState(false);
+  const [coauthorTrailer, setCoauthorTrailer] = useState(
+    "Co-Authored-By: r-yline[bot] <277407097+r-yline[bot]@users.noreply.github.com>"
+  );
   const [appBlur, setAppBlur] = useState(0);
   const [appOpacity, setAppOpacity] = useState(100);
   const [developerMode, setDeveloperMode] = useState(true);
@@ -844,6 +848,8 @@ export default function App() {
           setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
         }
         if (state.defaultPrBranch) setDefaultPrBranch(state.defaultPrBranch);
+        if (state.coauthorEnabled != null) setCoauthorEnabled(!!state.coauthorEnabled);
+        if (typeof state.coauthorTrailer === "string") setCoauthorTrailer(state.coauthorTrailer);
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
@@ -884,12 +890,14 @@ export default function App() {
         projects,
         draftsCollapsed,
         defaultPrBranch,
+        coauthorEnabled,
+        coauthorTrailer,
         appBlur,
         appOpacity,
         developerMode,
       });
     }, 300);
-  }, [persistableConversations, persistedActive, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, appBlur, appOpacity, developerMode, stateLoaded]);
+  }, [persistableConversations, persistedActive, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, coauthorEnabled, coauthorTrailer, appBlur, appOpacity, developerMode, stateLoaded]);
 
   // Push window opacity to Electron
   useEffect(() => {
@@ -2107,6 +2115,10 @@ export default function App() {
           onFontSizeChange={setFontSize}
           defaultPrBranch={defaultPrBranch}
           onDefaultPrBranchChange={setDefaultPrBranch}
+          coauthorEnabled={coauthorEnabled}
+          onCoauthorEnabledChange={setCoauthorEnabled}
+          coauthorTrailer={coauthorTrailer}
+          onCoauthorTrailerChange={setCoauthorTrailer}
           appBlur={appBlur}
           onAppBlurChange={setAppBlur}
           appOpacity={appOpacity}
@@ -2149,6 +2161,8 @@ export default function App() {
           allCwdRoots={allCwdRoots}
           projects={projects}
           defaultPrBranch={defaultPrBranch}
+          coauthorEnabled={coauthorEnabled}
+          coauthorTrailer={coauthorTrailer}
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
           developerMode={developerMode}

@@ -65,7 +65,7 @@ contextBridge.exposeInMainWorld("api", {
   gitUnstage: (cwd, paths) => ipcRenderer.invoke("git-unstage", cwd, paths),
   gitRevert: (cwd, path, untracked) => ipcRenderer.invoke("git-revert", cwd, path, untracked),
   gitIgnore: (cwd, path) => ipcRenderer.invoke("git-ignore", cwd, path),
-  gitCommit: (cwd, message) => ipcRenderer.invoke("git-commit", cwd, message),
+  gitCommit: (cwd, message, coauthor) => ipcRenderer.invoke("git-commit", cwd, message, coauthor),
   gitPush: (cwd) => ipcRenderer.invoke("git-push", cwd),
   gitPull: (cwd) => ipcRenderer.invoke("git-pull", cwd),
   gitCreatePr: (cwd, base) => ipcRenderer.invoke("git-create-pr", cwd, base),
