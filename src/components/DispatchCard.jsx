@@ -157,7 +157,7 @@ export default function DispatchCard({
         </header>
 
         {banner && (
-          <div style={{ background: "rgba(255,200,150,0.08)", color: "rgba(255,200,150,0.9)", padding: "8px 14px", fontSize: 12 }}>
+          <div role="status" aria-live="polite" style={{ background: "rgba(255,200,150,0.08)", color: "rgba(255,200,150,0.9)", padding: "8px 14px", fontSize: 12 }}>
             {banner}
           </div>
         )}
