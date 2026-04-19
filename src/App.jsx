@@ -2106,6 +2106,12 @@ export default function App() {
   const pinnedTabs = useMemo(() => {
     return convoList
       .filter((c) => c.tab?.pinned)
+      .sort((a, b) => {
+        const aPinnedAt = Number(a.tab?.pinnedAt) || 0;
+        const bPinnedAt = Number(b.tab?.pinnedAt) || 0;
+        if (aPinnedAt !== bPinnedAt) return aPinnedAt - bPinnedAt;
+        return (a.ts || 0) - (b.ts || 0);
+      })
       .map((c) => {
         const data = getConversation(c.id);
         return {

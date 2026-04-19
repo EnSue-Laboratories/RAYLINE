@@ -1,11 +1,12 @@
 /* eslint-disable no-unused-vars */
 // Shape of conversation.tab:
-//   { pinned: boolean, lastSeenAt: number, runEndedAt: number|null }
+//   { pinned: boolean, pinnedAt: number, lastSeenAt: number, runEndedAt: number|null }
 
 export function getTabMeta(conversation) {
   const t = conversation?.tab;
   return {
     pinned: Boolean(t?.pinned),
+    pinnedAt: Number(t?.pinnedAt) || 0,
     lastSeenAt: Number(t?.lastSeenAt) || 0,
     runEndedAt: t?.runEndedAt == null ? null : Number(t.runEndedAt),
   };
@@ -31,7 +32,7 @@ export function countPinnedTabs(conversations = []) {
 }
 
 export function pinTabPatch(now = Date.now()) {
-  return { pinned: true, runEndedAt: null };
+  return { pinned: true, pinnedAt: now, runEndedAt: null };
 }
 
 export function runEndedPatch(now = Date.now()) {

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { ArrowLeft, Check, Image } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Image } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
@@ -559,28 +559,46 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <select
-                    value={notificationSound}
-                    onChange={(e) => onNotificationSoundChange?.(e.target.value)}
-                    disabled={notificationsMuted}
-                    style={{
-                      flex: 1,
-                      height: 32,
-                      padding: "0 10px",
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      borderRadius: 7,
-                      color: "rgba(255,255,255,0.9)",
-                      fontFamily: "system-ui, sans-serif",
-                      fontSize: s(12),
-                      outline: "none",
-                      opacity: notificationsMuted ? 0.4 : 1,
-                    }}
-                  >
-                    {CHIME_SOUNDS.map((c) => (
-                      <option key={c.id} value={c.id}>{c.label}</option>
-                    ))}
-                  </select>
+                  <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center" }}>
+                    <select
+                      value={notificationSound}
+                      onChange={(e) => onNotificationSoundChange?.(e.target.value)}
+                      disabled={notificationsMuted}
+                      style={{
+                        width: "100%",
+                        height: 32,
+                        padding: "0 28px 0 10px",
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 7,
+                        color: "rgba(255,255,255,0.9)",
+                        fontFamily: "system-ui, sans-serif",
+                        fontSize: s(12),
+                        outline: "none",
+                        opacity: notificationsMuted ? 0.4 : 1,
+                        WebkitAppearance: "none",
+                        MozAppearance: "none",
+                        appearance: "none",
+                      }}
+                    >
+                      {CHIME_SOUNDS.map((c) => (
+                        <option key={c.id} value={c.id}>{c.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={12}
+                      strokeWidth={2}
+                      style={{
+                        position: "absolute",
+                        right: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "rgba(255,255,255,0.5)",
+                        pointerEvents: "none",
+                        opacity: notificationsMuted ? 0.4 : 1,
+                      }}
+                    />
+                  </div>
 
                   <button
                     onClick={() => playChime(notificationSound)}
