@@ -61,6 +61,7 @@ contextBridge.exposeInMainWorld("api", {
   gitWorktreeRemove: (cwd, path) => ipcRenderer.invoke("git-worktree-remove", cwd, path),
   gitWorktreePromote: (mainRepoPath, worktreePath, branchName) => ipcRenderer.invoke("git-worktree-promote", mainRepoPath, worktreePath, branchName),
   gitStatus: (cwd) => ipcRenderer.invoke("git-status", cwd),
+  gitRemoteSlug: (cwd) => ipcRenderer.invoke("git-remote-slug", cwd),
   gitFetch: (cwd) => ipcRenderer.invoke("git-fetch", cwd),
   gitDiff: (cwd) => ipcRenderer.invoke("git-diff", cwd),
   gitStage: (cwd, paths) => ipcRenderer.invoke("git-stage", cwd, paths),

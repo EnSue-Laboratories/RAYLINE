@@ -855,6 +855,18 @@ ipcMain.handle("git-status", async (_event, cwd) => {
   }
 });
 
+ipcMain.handle("git-remote-slug", async (_event, cwd) => {
+  if (!cwd) return null;
+  try {
+    const raw = await git(["remote", "get-url", "origin"], cwd);
+    // Match "git@github.com:owner/repo.git" or "https://github.com/owner/repo(.git)?"
+    const m = raw.trim().match(/github\.com[:/]([^/]+)\/([^/.\s]+?)(?:\.git)?$/);
+    return m ? `${m[1]}/${m[2]}` : null;
+  } catch {
+    return null;
+  }
+});
+
 ipcMain.handle("git-fetch", async (_event, cwd) => {
   if (!cwd) return { ok: false, stderr: "no cwd" };
   try {
