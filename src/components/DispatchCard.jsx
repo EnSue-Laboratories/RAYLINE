@@ -38,7 +38,7 @@ export default function DispatchCard({
           </button>
         </header>
 
-        <div style={tabsStyle}>
+        <div style={tabsStyle} role="tablist">
           <TabBtn active={tab === "issues"} onClick={() => setTab("issues")}>
             <GitBranch size={13} /> From Issues
           </TabBtn>
@@ -90,7 +90,14 @@ export default function DispatchCard({
 
 function TabBtn({ active, onClick, children }) {
   return (
-    <button onClick={onClick} style={tabBtnStyle(active)}>{children}</button>
+    <button
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      style={tabBtnStyle(active)}
+    >
+      {children}
+    </button>
   );
 }
 
