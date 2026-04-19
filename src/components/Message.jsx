@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Pencil, Loader2, FileText, PauseCircle, Terminal } from "lucide-react";
+import { Pencil, FileText, PauseCircle, Terminal } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -592,11 +592,6 @@ export default function Message({ msg, onEdit, onAnswer, onControlChange, canCon
                 onControlChange,
                 canControlTarget,
               })}
-              {msg.isStreaming && isLastPart && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.2)", marginLeft: 4, verticalAlign: "middle" }}>
-                  <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
-                </span>
-              )}
             </div>
           );
         }
@@ -665,9 +660,10 @@ export default function Message({ msg, onEdit, onAnswer, onControlChange, canCon
         <ThinkingBlock text="" isThinking={true} />
       )}
 
-      {(msg.isStreaming || msg._usage || msg._startedAt) && (
+      {(msg.isStreaming || msg._usage || msg._startedAt || msg._elapsedMs != null) && (
         <LoadingStatus
           startedAt={msg._startedAt}
+          elapsedMs={msg._elapsedMs}
           usage={msg._usage}
           isStreaming={Boolean(msg.isStreaming)}
         />

@@ -18,6 +18,16 @@ function cloneStreamState(streamState) {
   };
 }
 
+// Freeze the final elapsed duration onto the assistant message when the
+// stream ends. Once persisted, the loading indicator uses this value so it
+// survives reloads (`Date.now() - _startedAt` would drift across sessions).
+function freezeElapsed(msg) {
+  if (!msg || msg.role !== "assistant") return msg;
+  if (msg._elapsedMs != null) return msg;
+  if (!msg._startedAt) return msg;
+  return { ...msg, _elapsedMs: Date.now() - msg._startedAt };
+}
+
 function mergeUsage(prev, incoming) {
   if (!incoming) return prev || null;
   const base = prev || {};
@@ -275,7 +285,7 @@ export default function useAgent() {
                 || "An error occurred.";
               const parts = cloneParts(lastMsg.parts);
               parts.push({ type: "text", text: `**Error:** ${errorText}` });
-              msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };
+              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
             } else if (event.terminal_reason === "hook_stopped") {
               const parts = cloneParts(lastMsg.parts);
               const hasPausedStatus = parts.some((part) => part.type === "status" && part.kind === "paused");
@@ -287,9 +297,9 @@ export default function useAgent() {
                   text: "Claude stopped after a tool hook returned continue: false. This is expected — send another message when you want to continue.",
                 });
               }
-              msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };
+              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
             } else {
-              msgs[msgs.length - 1] = { ...lastMsg, isStreaming: false, isThinking: false };
+              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
             }
           }
         }
@@ -354,7 +364,7 @@ export default function useAgent() {
           }
         } else if (event.type === "turn.completed") {
           if (lastMsg && lastMsg.role === "assistant") {
-            msgs[msgs.length - 1] = { ...lastMsg, isStreaming: false, isThinking: false };
+            msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
             lastMsg = msgs[msgs.length - 1];
           }
         }
@@ -371,7 +381,7 @@ export default function useAgent() {
         const convo = next.get(conversationId);
         if (convo) {
           const msgs = convo.messages.map((m) =>
-            m.role === "assistant" ? { ...m, isStreaming: false, isThinking: false } : m
+            m.role === "assistant" ? freezeElapsed({ ...m, isStreaming: false, isThinking: false }) : m
           );
           next.set(conversationId, { ...convo, messages: msgs, isStreaming: false });
         }
@@ -390,7 +400,7 @@ export default function useAgent() {
         if (lastMsg && lastMsg.role === "assistant") {
           const parts = cloneParts(lastMsg.parts);
           parts.push({ type: "text", text: `**Error:** ${error}` });
-          msgs[msgs.length - 1] = { ...lastMsg, parts, isStreaming: false, isThinking: false };
+          msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
         }
         next.set(conversationId, { messages: msgs, error, isStreaming: false });
         return next;
@@ -461,7 +471,7 @@ export default function useAgent() {
         const convo = next.get(conversationId);
         if (convo) {
           const msgs = convo.messages.map((m) =>
-            m.role === "assistant" ? { ...m, isStreaming: false, isThinking: false } : m
+            m.role === "assistant" ? freezeElapsed({ ...m, isStreaming: false, isThinking: false }) : m
           );
           next.set(conversationId, { ...convo, messages: msgs, isStreaming: false, error: null });
         }

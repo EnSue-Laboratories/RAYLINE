@@ -20,6 +20,10 @@ const CONTEXT_WINDOW = 200_000;
 
 const PHRASE_INTERVAL_MS = 2400;
 
+// Muted spinner ink — keeps the logo's slash+dot geometry but drops the red
+// accent so the indicator stays quiet in the message vibe.
+const SPINNER_INK = "rgba(255,255,255,0.55)";
+
 function formatCompact(n) {
   if (!n && n !== 0) return "0";
   if (n < 1000) return String(n);
@@ -39,28 +43,56 @@ function formatDuration(ms) {
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
-// Inline dot spinner — three dots pulsing in sequence.
-function DotSpinner() {
+// Slash+dot spinner — keeps the RayLine logo's "/•" geometry but in a muted
+// whitish ink so it doesn't clash with the message ambiance. Both elements
+// pulse out of phase to keep a live feel while staying quiet.
+function SlashSpinner() {
   return (
-    <span style={{ display: "inline-flex", gap: 3, alignItems: "center", flexShrink: 0 }}>
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        flexShrink: 0,
+        width: 16,
+        height: 14,
+      }}
+      aria-hidden="true"
+    >
+      <svg
+        width="16"
+        height="14"
+        viewBox="0 0 16 14"
+        style={{ overflow: "visible" }}
+      >
+        {/* Slash — same angle as the logo (upper-right to lower-left). */}
+        <line
+          x1="8"
+          y1="1.5"
+          x2="2"
+          y2="12.5"
+          stroke={SPINNER_INK}
+          strokeWidth="2"
+          strokeLinecap="square"
+          style={{ animation: "slashPulse 1.4s ease-in-out infinite" }}
+        />
+        {/* Dot — trailing accent that echoes the logo's period. */}
+        <circle
+          cx="13"
+          cy="11.5"
+          r="1.5"
+          fill={SPINNER_INK}
           style={{
-            width: 4,
-            height: 4,
-            borderRadius: "50%",
-            background: "rgba(255,255,255,0.55)",
-            display: "inline-block",
-            animation: `dotPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+            animation: "slashDot 1.4s ease-in-out 0.35s infinite",
+            transformOrigin: "center",
+            transformBox: "fill-box",
           }}
         />
-      ))}
+      </svg>
     </span>
   );
 }
 
-export default function LoadingStatus({ startedAt, usage, isStreaming }) {
+export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, usage, isStreaming }) {
   const s = useFontScale();
   const [now, setNow] = useState(() => Date.now());
   const [phraseIdx, setPhraseIdx] = useState(0);
@@ -80,16 +112,18 @@ export default function LoadingStatus({ startedAt, usage, isStreaming }) {
     };
   }, [isStreaming]);
 
-  // Freeze elapsed at stream end so the persistent footer shows total runtime.
+  // Freeze elapsed at stream end (same mount) so the footer shows total runtime.
   useEffect(() => {
     if (!isStreaming && startedAt && finalElapsedRef.current == null) {
       finalElapsedRef.current = Date.now() - startedAt;
     }
   }, [isStreaming, startedAt]);
 
+  // Prefer a persisted elapsed value from the message itself — this survives
+  // reloads, whereas `Date.now() - _startedAt` would drift across sessions.
   const elapsedMs = isStreaming
     ? (startedAt ? now - startedAt : 0)
-    : (finalElapsedRef.current ?? (startedAt ? Date.now() - startedAt : 0));
+    : (frozenElapsedMs ?? finalElapsedRef.current ?? 0);
 
   const inputTokens = usage?.input_tokens || 0;
   const outputTokens = usage?.output_tokens || 0;
@@ -103,7 +137,7 @@ export default function LoadingStatus({ startedAt, usage, isStreaming }) {
   const hasUsage = contextUsed > 0;
 
   // Nothing to say after completion if we never captured any stats.
-  if (!isStreaming && !hasUsage && !startedAt) return null;
+  if (!isStreaming && !hasUsage && !startedAt && frozenElapsedMs == null) return null;
 
   const elapsedLabel = formatDuration(elapsedMs);
   const pctLabel = contextPct.toFixed(contextPct >= 10 || contextPct === 0 ? 0 : 1) + "%";
@@ -111,8 +145,19 @@ export default function LoadingStatus({ startedAt, usage, isStreaming }) {
   const primary = isStreaming ? PHRASES[phraseIdx] : "Done";
   const primaryColor = isStreaming ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.38)";
   const secondaryColor = "rgba(255,255,255,0.32)";
+  // Stat separator — subtle skewed slash glyph in neutral dim.
   const sep = (
-    <span style={{ color: "rgba(255,255,255,0.18)", margin: "0 6px" }}>·</span>
+    <span
+      aria-hidden="true"
+      style={{
+        color: "rgba(255,255,255,0.22)",
+        margin: "0 6px",
+        transform: "skewX(-18deg)",
+        display: "inline-block",
+      }}
+    >
+      /
+    </span>
   );
 
   return (
@@ -130,9 +175,19 @@ export default function LoadingStatus({ startedAt, usage, isStreaming }) {
         lineHeight: 1.55,
       }}
     >
-      {/* Line 1: spinner + phrase + elapsed */}
+      <style>{`
+        @keyframes slashPulse {
+          0%, 100% { opacity: 1; }
+          50%      { opacity: 0.35; }
+        }
+        @keyframes slashDot {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%      { opacity: 0.35; transform: scale(0.7); }
+        }
+      `}</style>
+      {/* Line 1: slash spinner + phrase + elapsed */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        {isStreaming && <DotSpinner />}
+        {isStreaming && <SlashSpinner />}
         <span style={{ color: primaryColor }}>
           {primary}
           {isStreaming && (
