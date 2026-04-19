@@ -11,8 +11,9 @@ import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
+import TabStrip from "./TabStrip";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, onControlChange, canControlTarget, developerMode = true }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -285,12 +286,29 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           alignItems: "center",
           justifyContent: "space-between",
           width: "100%",
-          maxWidth: sidebarOpen ? "none" : 640,
+          maxWidth: (!sidebarOpen && tabs.length === 0) ? 640 : "none",
         }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, WebkitAppRegion: "no-drag" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            WebkitAppRegion: "no-drag",
+            minWidth: 0,
+            flex: 1,
+          }}
+        >
+          {tabs.length > 0 && (
+            <TabStrip
+              tabs={tabs}
+              activeId={activeTabId}
+              onSelect={onSelectTab}
+              onClose={onCloseTab}
+            />
+          )}
 
-          {convo && !showNewChatCard && (
-            <div style={{ animation: "dropIn .2s ease" }}>
+          {convo && !showNewChatCard && !tabs.some((t) => t.id === convo.id) && (
+            <div style={{ animation: "dropIn .2s ease", flexShrink: 0 }}>
               <div style={{
                 fontSize: s(13),
                 color: "rgba(255,255,255,0.88)",
@@ -315,7 +333,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               </div>
             </div>
           )}
-
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>

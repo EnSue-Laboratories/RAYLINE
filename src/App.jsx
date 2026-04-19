@@ -12,7 +12,7 @@ import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrim
 import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
-import { pinTabPatch, runEndedPatch, withTabPatch } from "./utils/tabs";
+import { pinTabPatch, runEndedPatch, markSeenPatch, unpinTabPatch, withTabPatch, computeTabState } from "./utils/tabs";
 import { playChime } from "./utils/chime";
 
 function logCheckpoint(...args) {
@@ -1022,6 +1022,7 @@ export default function App() {
   const handleSelect = useCallback(async (id) => {
     setShowNewChatCard(false);
     setActive(id);
+    setConvoList((p) => p.map((c) => (c.id === id ? withTabPatch(c, markSeenPatch()) : c)));
     const convo = convoList.find((c) => c.id === id);
     const data = getConversation(id);
     if (convo && window.api) {
@@ -1286,6 +1287,10 @@ export default function App() {
     setConvoList(remaining);
     if (active === id) setActive(remaining[0]?.id || null);
   };
+
+  const handleCloseTab = useCallback((id) => {
+    setConvoList((p) => p.map((c) => (c.id === id ? withTabPatch(c, unpinTabPatch()) : c)));
+  }, []);
 
   // Capture provider-native session IDs as they arrive from the agent streams.
   useEffect(() => {
@@ -2023,6 +2028,19 @@ export default function App() {
     conversation.id === active || hasConversationMessages(conversation, { messages: conversation.msgs })
   ));
 
+  const tabs = useMemo(() => {
+    return convoList
+      .filter((c) => c.tab?.pinned)
+      .map((c) => {
+        const data = getConversation(c.id);
+        return {
+          id: c.id,
+          title: c.title || "Untitled",
+          state: computeTabState(c, { isStreaming: Boolean(data.isStreaming) }),
+        };
+      });
+  }, [convoList, getConversation]);
+
   // Refresh terminal sessions periodically (catches Claude-created sessions)
   useEffect(() => {
     terminal.refreshSessions();
@@ -2176,6 +2194,10 @@ export default function App() {
           onToggleTerminal={handleToggleTerminal}
           terminalOpen={terminal.drawerOpen}
           terminalCount={terminal.sessions.length}
+          tabs={tabs}
+          activeTabId={active}
+          onSelectTab={handleSelect}
+          onCloseTab={handleCloseTab}
           wallpaper={wallpaper}
           cwd={terminalCwd}
           onRefocusTerminal={terminal.focusActiveSession}
