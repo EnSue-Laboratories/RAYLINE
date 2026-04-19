@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { flushSync } from "react-dom";
 import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
@@ -20,6 +21,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const [attachments, setAttachments]   = useState([]);
   const endRef  = useRef(null);
   const inRef   = useRef(null);
+  const messageBodyRef = useRef(null);
 
   // Scroll to bottom on new messages and during streaming
   const scrollRef = useRef(null);
@@ -93,10 +95,15 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   const send = useCallback(() => {
     if (!canSend) return;
-    onSend(trimmedInput, shellMode ? undefined : (attachments.length > 0 ? attachments : undefined));
-    setInput("");
-    setAttachments([]);
+    const nextInput = trimmedInput;
+    const nextAttachments = shellMode ? undefined : (attachments.length > 0 ? attachments : undefined);
+    flushSync(() => {
+      setInput("");
+      setAttachments([]);
+      setSelectedCmd(0);
+    });
     if (inRef.current) inRef.current.style.height = "20px";
+    onSend(nextInput, nextAttachments);
   }, [attachments, canSend, onSend, shellMode, trimmedInput]);
 
   const handleInput = (e) => {
@@ -444,7 +451,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         ) : !convo || convo.msgs.length === 0 ? (
           <EmptyState model={convo?.model || "sonnet"} />
         ) : (
-          <div style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
+          <div ref={messageBodyRef} style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
             {convo.msgs.map((m, i) => (
               <Message
                 key={m.id}
@@ -462,7 +469,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         )}
       </div>
 
-      {!showNewChatCard && <SelectionToolbar onQuote={handleQuote} model={convo?.model || defaultModel || "sonnet"} />}
+      {!showNewChatCard && convo?.msgs?.length > 0 && (
+        <SelectionToolbar
+          onQuote={handleQuote}
+          model={convo?.model || defaultModel || "sonnet"}
+          selectionRootRef={messageBodyRef}
+        />
+      )}
 
       {/* Scroll to bottom button */}
       {!showNewChatCard && convo && convo.msgs.length > 0 && (
@@ -639,7 +652,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 maxHeight: 120,
                 height: "auto",
                 display: "block",
-                overflow: "hidden",
+                overflow: "auto",
               }}
             />
             {isStreaming && !input.trim() ? (

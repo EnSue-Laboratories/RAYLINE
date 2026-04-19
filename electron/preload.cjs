@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld("api", {
     return ipcRenderer.invoke("checkpoint-restore", cwdPath, ref);
   },
   saveState: (state) => ipcRenderer.invoke("save-state", state),
+  saveStateSync: (state) => ipcRenderer.sendSync("save-state-sync", state),
   loadState: () => ipcRenderer.invoke("load-state"),
   getFilePath: (file) => {
     try { return webUtils.getPathForFile(file); } catch { return null; }
