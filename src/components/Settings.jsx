@@ -5,7 +5,7 @@ import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, coauthorTrailer = "", onCoauthorTrailerChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, onClose }) {
   const s = useFontScale();
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
 
@@ -733,6 +733,69 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     outline: "none",
                   }}
                 />
+              </div>
+
+              {/* Auto coauthor toggle */}
+              <div style={{ marginBottom: 12 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: s(13),
+                        color: "rgba(255,255,255,0.8)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      Auto coauthor
+                    </div>
+                    <div
+                      style={{
+                        fontSize: s(11),
+                        color: "rgba(255,255,255,0.3)",
+                      }}
+                    >
+                      Append a Co-Authored-By trailer to every commit
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={coauthorEnabled}
+                    onClick={() => onCoauthorEnabledChange?.(!coauthorEnabled)}
+                    style={{
+                      flexShrink: 0,
+                      width: 38,
+                      height: 22,
+                      borderRadius: 999,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: coauthorEnabled ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                      position: "relative",
+                      cursor: "pointer",
+                      padding: 0,
+                      transition: "background 120ms ease",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        left: coauthorEnabled ? 18 : 2,
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        background: "rgba(255,255,255,0.9)",
+                        transition: "left 120ms ease",
+                      }}
+                    />
+                  </button>
+                </div>
               </div>
             </>
           )}

@@ -13,7 +13,7 @@ import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import TabStrip from "./TabStrip";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -363,7 +363,14 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
-          {!showNewChatCard && developerMode && <GitStatusPill cwd={cwd} defaultPrBranch={defaultPrBranch} />}
+          {!showNewChatCard && developerMode && (
+            <GitStatusPill
+              cwd={cwd}
+              defaultPrBranch={defaultPrBranch}
+              coauthorEnabled={coauthorEnabled}
+              coauthorTrailer={coauthorTrailer}
+            />
+          )}
           {!showNewChatCard && developerMode && (
             <BranchSelector
               cwd={cwd}
@@ -424,8 +431,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       >
         {showNewChatCard ? (
           <NewChatCard
-            defaultCwd={convo?.cwd || cwd}
+            defaultCwd={newChatDefaultCwd}
             defaultModel={convo?.model || defaultModel}
+            defaultBranch={defaultPrBranch}
             allCwdRoots={allCwdRoots}
             projects={projects}
             onPickFolder={() => window.api?.pickFolder?.()}

@@ -928,13 +928,17 @@ ipcMain.handle("git-ignore", async (_event, cwd, path) => {
   }
 });
 
-ipcMain.handle("git-commit", async (_event, cwd, message) => {
+ipcMain.handle("git-commit", async (_event, cwd, message, coauthor) => {
   if (!cwd) return { ok: false, stderr: "no cwd" };
   if (!message || !message.trim()) return { ok: false, stderr: "empty message" };
   try {
     const staged = await git(["diff", "--cached", "--name-only"], cwd);
     if (!staged.trim()) await git(["add", "-A"], cwd);
-    const stdout = await git(["commit", "-m", message], cwd);
+    const trailer = typeof coauthor === "string" ? coauthor.trim() : "";
+    const finalMessage = trailer && !message.includes(trailer)
+      ? `${message.trimEnd()}\n\n${trailer}\n`
+      : message;
+    const stdout = await git(["commit", "-m", finalMessage], cwd);
     return { ok: true, stdout };
   } catch (err) {
     return { ok: false, stderr: err.message };

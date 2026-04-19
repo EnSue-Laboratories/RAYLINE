@@ -720,6 +720,10 @@ export default function App() {
   const [fontSize, setFontSize] = useState(15);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
+  const [coauthorEnabled, setCoauthorEnabled] = useState(true);
+  const [coauthorTrailer, setCoauthorTrailer] = useState(
+    "Co-Authored-By: r-yline[bot] <277407097+r-yline[bot]@users.noreply.github.com>"
+  );
   const [appBlur, setAppBlur] = useState(0);
   const [appOpacity, setAppOpacity] = useState(100);
   const [developerMode, setDeveloperMode] = useState(true);
@@ -869,6 +873,8 @@ export default function App() {
           setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
         }
         if (state.defaultPrBranch) setDefaultPrBranch(state.defaultPrBranch);
+        if (state.coauthorEnabled != null) setCoauthorEnabled(!!state.coauthorEnabled);
+        if (typeof state.coauthorTrailer === "string") setCoauthorTrailer(state.coauthorTrailer);
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
@@ -911,6 +917,8 @@ export default function App() {
         projects,
         draftsCollapsed,
         defaultPrBranch,
+        coauthorEnabled,
+        coauthorTrailer,
         appBlur,
         appOpacity,
         developerMode,
@@ -918,7 +926,7 @@ export default function App() {
         notificationsMuted,
       });
     }, 300);
-  }, [persistableConversations, persistedActive, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, appBlur, appOpacity, developerMode, notificationSound, notificationsMuted, stateLoaded]);
+  }, [persistableConversations, persistedActive, cwd, defaultModel, fontSize, sidebarActiveOpacity, wallpaper, projects, draftsCollapsed, defaultPrBranch, coauthorEnabled, coauthorTrailer, appBlur, appOpacity, developerMode, notificationSound, notificationsMuted, stateLoaded]);
 
   // Push window opacity to Electron
   useEffect(() => {
@@ -2138,8 +2146,19 @@ export default function App() {
     const roots = new Set();
     convoList.forEach(c => { if (c.cwd) roots.add(getMainRepoRoot(c.cwd)); });
     Object.keys(projects).forEach(r => roots.add(getMainRepoRoot(r)));
-    return [...roots];
+    return [...roots].filter(r => r && !r.includes("/.worktrees/"));
   }, [convoList, projects]);
+
+  const newChatDefaultCwd = useMemo(() => {
+    const activeCwd = activeConvo?.cwd;
+    if (activeCwd) return getMainRepoRoot(activeCwd);
+    if (cwd) return getMainRepoRoot(cwd);
+    const sorted = [...convoList].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    for (const c of sorted) {
+      if (c.cwd) return getMainRepoRoot(c.cwd);
+    }
+    return null;
+  }, [activeConvo, cwd, convoList]);
 
   const terminalCwd = activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd);
 
@@ -2253,6 +2272,10 @@ export default function App() {
           onFontSizeChange={setFontSize}
           defaultPrBranch={defaultPrBranch}
           onDefaultPrBranchChange={setDefaultPrBranch}
+          coauthorEnabled={coauthorEnabled}
+          onCoauthorEnabledChange={setCoauthorEnabled}
+          coauthorTrailer={coauthorTrailer}
+          onCoauthorTrailerChange={setCoauthorTrailer}
           appBlur={appBlur}
           onAppBlurChange={setAppBlur}
           appOpacity={appOpacity}
@@ -2303,6 +2326,9 @@ export default function App() {
           allCwdRoots={allCwdRoots}
           projects={projects}
           defaultPrBranch={defaultPrBranch}
+          newChatDefaultCwd={newChatDefaultCwd}
+          coauthorEnabled={coauthorEnabled}
+          coauthorTrailer={coauthorTrailer}
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
           developerMode={developerMode}
