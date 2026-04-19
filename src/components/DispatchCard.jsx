@@ -168,7 +168,7 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
         if (cancelled) return;
         if (!s) {
           setSlug(null); setRows([]); setLoadError("No GitHub remote on this folder.");
-          setLoading(false); return;
+          return;
         }
         setSlug(s);
         const issues = await window.api.ghListIssues(s, "open");
