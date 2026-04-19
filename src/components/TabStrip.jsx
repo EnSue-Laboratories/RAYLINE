@@ -17,12 +17,14 @@ export default function TabStrip({ tabs, activeId, onSelect, onClose }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 6,
+        gap: 7,
         overflowX: "auto",
         scrollbarWidth: "none",
         msOverflowStyle: "none",
         flex: 1,
         minWidth: 0,
+        padding: "1px 0",
+        maskImage: "linear-gradient(to right, transparent 0, black 10px, black calc(100% - 10px), transparent 100%)",
       }}
       className="tab-strip-scroll"
     >

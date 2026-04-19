@@ -24,38 +24,40 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 6,
-        height: 26,
-        padding: "0 6px 0 10px",
+        gap: 7,
+        height: 28,
+        padding: "0 7px 0 10px",
         background: active
-          ? "rgba(255,255,255,0.06)"
+          ? "rgba(255,255,255,0.07)"
           : hover
             ? "rgba(255,255,255,0.04)"
-            : "transparent",
-        border: "1px solid " + (active ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.08)"),
-        borderRadius: 8,
+            : "rgba(255,255,255,0.018)",
+        border: "none",
+        borderRadius: 999,
         cursor: "pointer",
         flexShrink: 0,
-        maxWidth: 200,
-        transition: "background .15s, border-color .15s",
+        maxWidth: 190,
+        backdropFilter: active ? "blur(12px) saturate(1.1)" : "none",
+        transition: "background .15s, color .15s, backdrop-filter .15s",
       }}
     >
       <span
         aria-hidden
         style={{
-          width: 6,
-          height: 6,
+          width: 5,
+          height: 5,
           borderRadius: "50%",
           background: dotColor,
           flexShrink: 0,
           animation: pulse ? "tabDotPulse 1.4s ease-in-out infinite" : "none",
-          transition: "background .25s",
+          boxShadow: state === "seen" ? "none" : `0 0 14px ${dotColor}`,
+          transition: "background .25s, box-shadow .25s",
         }}
       />
       <span
         style={{
-          fontSize: s(12),
-          color: active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.7)",
+          fontSize: s(11.5),
+          color: active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.66)",
           fontFamily: "system-ui, sans-serif",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -75,12 +77,12 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 16,
-          height: 16,
-          borderRadius: 4,
+          width: 15,
+          height: 15,
+          borderRadius: 999,
           background: "transparent",
           border: "none",
-          color: "rgba(255,255,255,0.4)",
+          color: active ? "rgba(255,255,255,0.48)" : "rgba(255,255,255,0.34)",
           cursor: "pointer",
           flexShrink: 0,
           opacity: showClose ? 1 : 0,
@@ -88,15 +90,15 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
           transition: "opacity .15s, background .15s, color .15s",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-          e.currentTarget.style.color = "rgba(255,255,255,0.85)";
+          e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+          e.currentTarget.style.color = "rgba(255,255,255,0.78)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "transparent";
-          e.currentTarget.style.color = "rgba(255,255,255,0.4)";
+          e.currentTarget.style.color = active ? "rgba(255,255,255,0.48)" : "rgba(255,255,255,0.34)";
         }}
       >
-        <X size={11} strokeWidth={1.75} />
+        <X size={10} strokeWidth={1.75} />
       </button>
       <style>{`
         @keyframes tabDotPulse {

@@ -9,7 +9,7 @@ import GitStatusPill from "./GitStatusPill";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
+import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import TabStrip from "./TabStrip";
 
@@ -179,6 +179,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   };
 
   const [dragOver, setDragOver] = useState(false);
+  const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
+  const showConversationTitle = Boolean(convo && !showNewChatCard);
+  const topTabsLeft = sidebarOpen ? 18 : 104;
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -236,6 +239,38 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       {/* Drag region matching sidebar spacer */}
       <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0 }} />
 
+      {showHeaderTabs && (
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: topTabsLeft,
+            right: 24,
+            zIndex: 40,
+            display: "flex",
+            alignItems: "center",
+            minWidth: 0,
+            pointerEvents: "none",
+            WebkitAppRegion: "no-drag",
+          }}
+        >
+          <div
+            style={{
+              width: "min(520px, 100%)",
+              minWidth: 0,
+              pointerEvents: "auto",
+            }}
+          >
+            <TabStrip
+              tabs={tabs}
+              activeId={activeTabId}
+              onSelect={onSelectTab}
+              onClose={onCloseTab}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Sidebar collapsed: icon buttons below traffic lights */}
       {!sidebarOpen && (
         <div style={{
@@ -286,7 +321,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           alignItems: "center",
           justifyContent: "space-between",
           width: "100%",
-          maxWidth: (!sidebarOpen && tabs.length === 0) ? 640 : "none",
+          maxWidth: !sidebarOpen ? 640 : "none",
         }}>
         <div
           style={{
@@ -296,28 +331,19 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             WebkitAppRegion: "no-drag",
             minWidth: 0,
             flex: 1,
-            paddingLeft: !sidebarOpen && tabs.length > 0 ? 80 : 0,
           }}
         >
-          {tabs.length > 0 && (
-            <TabStrip
-              tabs={tabs}
-              activeId={activeTabId}
-              onSelect={onSelectTab}
-              onClose={onCloseTab}
-            />
-          )}
-
-          {convo && !showNewChatCard && tabs.length === 0 && (
-            <div style={{ animation: "dropIn .2s ease", flexShrink: 0 }}>
+          {showConversationTitle && (
+            <div style={{ animation: "dropIn .2s ease", minWidth: 0 }}>
               <div style={{
-                fontSize: s(13),
+                fontSize: s(12.5),
                 color: "rgba(255,255,255,0.88)",
                 fontFamily: "system-ui,sans-serif",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
-                maxWidth: 300,
+                maxWidth: 360,
+                letterSpacing: "0.01em",
               }}>
                 {convo.title}
               </div>
@@ -325,9 +351,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 style={{
                   fontSize: s(9),
                   fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.3)",
-                  marginTop: 1,
-                  letterSpacing: ".08em",
+                  color: "rgba(255,255,255,0.28)",
+                  marginTop: 2,
+                  letterSpacing: ".1em",
                 }}
               >
                 {convo.msgs.length} MESSAGES
