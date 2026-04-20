@@ -2228,6 +2228,13 @@ export default function App() {
     const isMulticaModel = isMulticaModelId(modelId);
     let multicaSession = null;
     if (isMulticaModel) {
+      // Resolve agent id from "multica:<uuid>" model id; validate BEFORE any side-effects
+      // so a malformed id doesn't leave a pushed-but-unused branch on origin.
+      const parts = modelId.split(":");
+      if (parts.length !== 2 || !parts[1]) {
+        throw new Error(`Invalid Multica model id: ${modelId}`);
+      }
+      const agentId = parts[1];
       const { loadMulticaState } = await import("./multica/store");
       const mState = loadMulticaState();
       // Publish the branch so Multica's runtime can fetch.
@@ -2238,8 +2245,6 @@ export default function App() {
           throw new Error(`Failed to publish branch '${opts.branch}': ${err?.message || err}`);
         }
       }
-      // Resolve agent id from "multica:<uuid>" model id
-      const agentId = modelId.split(":")[1];
       multicaSession = await window.api.multicaEnsureSession({
         serverUrl: mState.serverUrl,
         token: mState.token,
