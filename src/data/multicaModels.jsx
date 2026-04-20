@@ -6,7 +6,7 @@ export function multicaAgentToModel(agent, state) {
   return {
     id: `multica:${agent.id}`,
     name: agent.name,
-    tag: (agent.status || "unknown").toUpperCase(),
+    tag: (agent.name || "agent").toUpperCase(),
     provider: "multica",
     agentId: agent.id,
     workspaceId: state.workspaceId,
@@ -57,7 +57,7 @@ export function useMulticaModels() {
       const agent = e.detail;
       if (!agent?.id) return;
       setModels((prev) => prev.map((m) => m.agentId === agent.id
-        ? { ...m, tag: (agent.status || "unknown").toUpperCase(), status: agent.status }
+        ? { ...m, status: agent.status }
         : m));
     };
     window.addEventListener("multica-agent-status", h);
