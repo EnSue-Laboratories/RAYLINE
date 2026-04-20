@@ -25,14 +25,17 @@ export function useMulticaModels() {
   const refresh = useCallback(async () => {
     const s = loadMulticaState();
     setState(s);
-    if (!s.token || !s.serverUrl || !s.workspaceSlug) {
+    if (!s.token || !s.serverUrl || (!s.workspaceId && !s.workspaceSlug)) {
       setModels([]);
       return;
     }
     setLoading(true); setError(null);
     try {
       const agents = await window.api.multicaListAgents({
-        serverUrl: s.serverUrl, token: s.token, workspaceSlug: s.workspaceSlug,
+        serverUrl: s.serverUrl,
+        token: s.token,
+        workspaceId: s.workspaceId,
+        workspaceSlug: s.workspaceSlug,
       });
       saveMulticaState({ agentsCache: agents, agentsCachedAt: Date.now() });
       setModels(agents.map((a) => multicaAgentToModel(a, s)));

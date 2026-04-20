@@ -30,6 +30,6 @@ export function clearMulticaState() {
 }
 
 export function isMulticaAuthenticated() {
-  const { token, serverUrl, workspaceSlug } = loadMulticaState();
-  return Boolean(token && serverUrl && workspaceSlug);
+  const { token, serverUrl, workspaceId, workspaceSlug } = loadMulticaState();
+  return Boolean(token && serverUrl && (workspaceId || workspaceSlug));
 }

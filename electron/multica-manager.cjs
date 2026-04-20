@@ -13,12 +13,13 @@ const https = require("node:https");
 const http = require("node:http");
 const WebSocket = require("ws");
 
-function rest({ serverUrl, method = "GET", path, token, workspaceSlug, body }) {
+function rest({ serverUrl, method = "GET", path, token, workspaceId, workspaceSlug, body }) {
   return new Promise((resolve, reject) => {
     const u = new URL(path, serverUrl);
     const mod = u.protocol === "http:" ? http : https;
     const headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
+    if (workspaceId) headers["X-Workspace-ID"] = workspaceId;
     if (workspaceSlug) headers["X-Workspace-Slug"] = workspaceSlug;
     const payload = body ? Buffer.from(JSON.stringify(body)) : null;
     if (payload) headers["Content-Length"] = payload.length;
@@ -69,7 +70,7 @@ module.exports = {
   multicaListMessages,
 };
 
-// Map<string, { ws, ready: Promise<void>, subscriptions: Map<conversationId, {sessionId, sender}> }>
+// Map<string, { ws, ready: Promise<void>, subscriptions: Map<conversationId, {sessionId, sender, taskId}> }>
 const wsPool = new Map();
 
 function wsKey({ serverUrl, workspaceId }) {
@@ -125,13 +126,20 @@ function dispatchWSMessage(key, msg) {
   // Events are workspace-scoped; fan out to all subs that match session_id
   for (const [conversationId, sub] of entry.subscriptions.entries()) {
     const sid = payload?.chat_session_id || payload?.session_id;
+    const taskId = payload?.task_id;
     // agent:status is workspace-scoped (fan out to all subs). Everything else
-    // is gated by session id match.
-    const isBroadcast = type === "agent:status" || sid === sub.sessionId;
+    // is gated by session id or current task id match.
+    const isBroadcast =
+      type === "agent:status" ||
+      sid === sub.sessionId ||
+      Boolean(taskId && sub.taskId && taskId === sub.taskId);
     if (!isBroadcast) continue;
     try {
       sub.sender.send("agent-stream", { conversationId, event: { type: `multica:${type}`, payload } });
     } catch { /* sender destroyed */ }
+    if (type === "chat:done" || type === "task:completed" || type === "task:failed" || type === "task:cancelled") {
+      sub.taskId = null;
+    }
   }
 }
 
@@ -143,10 +151,12 @@ async function startMulticaAgent(opts, sender) {
   if (!token) throw new Error("startMulticaAgent: missing token");
 
   const entry = await getOrOpenWS({ serverUrl, workspaceId, token });
-  entry.subscriptions.set(conversationId, { sessionId, sender });
+  entry.subscriptions.set(conversationId, { sessionId, sender, taskId: null });
 
   // Fire the message via REST — the actual content comes back over WS
-  await multicaSendMessage({ serverUrl, token, workspaceSlug, sessionId, content: prompt });
+  const sendResult = await multicaSendMessage({ serverUrl, token, workspaceId, workspaceSlug, sessionId, content: prompt });
+  const sub = entry.subscriptions.get(conversationId);
+  if (sub) sub.taskId = sendResult?.task_id || null;
 }
 
 function cancelMulticaAgent(conversationId) {
@@ -170,29 +180,29 @@ async function multicaListWorkspaces({ serverUrl, token }) {
   return rest({ serverUrl, method: "GET", path: "/api/workspaces", token });
 }
 
-async function multicaListAgents({ serverUrl, token, workspaceSlug }) {
-  return rest({ serverUrl, method: "GET", path: "/api/agents", token, workspaceSlug });
+async function multicaListAgents({ serverUrl, token, workspaceId, workspaceSlug }) {
+  return rest({ serverUrl, method: "GET", path: "/api/agents", token, workspaceId, workspaceSlug });
 }
 
-async function multicaEnsureSession({ serverUrl, token, workspaceSlug, agentId, title }) {
+async function multicaEnsureSession({ serverUrl, token, workspaceId, workspaceSlug, agentId, title }) {
   return rest({
     serverUrl, method: "POST", path: "/api/chat/sessions",
-    token, workspaceSlug,
+    token, workspaceId, workspaceSlug,
     body: { agent_id: agentId, title: title || "RayLine chat" },
   });
 }
 
-async function multicaSendMessage({ serverUrl, token, workspaceSlug, sessionId, content }) {
+async function multicaSendMessage({ serverUrl, token, workspaceId, workspaceSlug, sessionId, content }) {
   return rest({
     serverUrl, method: "POST", path: `/api/chat/sessions/${sessionId}/messages`,
-    token, workspaceSlug, body: { content },
+    token, workspaceId, workspaceSlug, body: { content },
   });
 }
 
-async function multicaListMessages({ serverUrl, token, workspaceSlug, sessionId }) {
+async function multicaListMessages({ serverUrl, token, workspaceId, workspaceSlug, sessionId }) {
   return rest({
     serverUrl, method: "GET", path: `/api/chat/sessions/${sessionId}/messages`,
-    token, workspaceSlug,
+    token, workspaceId, workspaceSlug,
   });
 }
 
@@ -204,7 +214,7 @@ async function subscribeMulticaAgent({ conversationId, _multica, token }, sender
   if (!token) throw new Error("subscribeMulticaAgent: missing token");
   const { serverUrl, workspaceId, sessionId } = _multica;
   const entry = await getOrOpenWS({ serverUrl, workspaceId, token });
-  entry.subscriptions.set(conversationId, { sessionId, sender });
+  entry.subscriptions.set(conversationId, { sessionId, sender, taskId: null });
 }
 
 // Expose sendMessage for startMulticaAgent (added later)

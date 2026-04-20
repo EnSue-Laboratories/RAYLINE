@@ -9,7 +9,7 @@ import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
-import { DEFAULT_MODEL_ID, getM, isMulticaModelId, MODELS, normalizeModelId } from "./data/models";
+import { DEFAULT_MODEL_ID, getMOrMulticaFallback, isMulticaModelId, MODELS, normalizeModelId } from "./data/models";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
@@ -1630,7 +1630,7 @@ export default function App() {
     dispatchId,
     tags,
   }) => {
-    const provider = getM(modelId).provider || "claude";
+    const provider = getMOrMulticaFallback(modelId).provider || "claude";
     const seedSession = createConversationSession({
       provider,
       nativeSessionId: null,
@@ -1831,6 +1831,90 @@ export default function App() {
     );
   }, [active, convoList, conversations, getConversation]);
 
+  const ensureMulticaContextForConversation = useCallback(
+    async ({ conversationId, conversation, normalizedConversation, modelId, title, forceNewSession = false }) => {
+      const parts = String(modelId || "").split(":");
+      if (parts.length !== 2 || !parts[1]) {
+        throw new Error(`Invalid Multica model id: ${modelId}`);
+      }
+      const agentId = parts[1];
+      const { loadMulticaState } = await import("./multica/store");
+      const mState = loadMulticaState();
+      const token = mState.token;
+      if (!token) throw new Error("Multica not authenticated (no token)");
+      if (!mState.serverUrl) throw new Error("Multica server URL is missing");
+      if (!mState.workspaceId && !mState.workspaceSlug) {
+        throw new Error("Multica workspace is not configured");
+      }
+
+      const existing = normalizedConversation?._multica || conversation?._multica || null;
+      const desiredServerUrl = mState.serverUrl;
+      const desiredWorkspaceId = mState.workspaceId || existing?.workspaceId || "";
+      const desiredWorkspaceSlug = mState.workspaceSlug || existing?.workspaceSlug || "";
+      const hydratedContext = existing
+        ? {
+            ...existing,
+            serverUrl: desiredServerUrl,
+            workspaceId: desiredWorkspaceId,
+            workspaceSlug: desiredWorkspaceSlug,
+          }
+        : null;
+      const workspaceChanged = Boolean(
+        existing &&
+        (
+          existing.serverUrl !== desiredServerUrl ||
+          (existing.workspaceId && desiredWorkspaceId && existing.workspaceId !== desiredWorkspaceId) ||
+          (existing.workspaceSlug && desiredWorkspaceSlug && existing.workspaceSlug !== desiredWorkspaceSlug)
+        )
+      );
+      const shouldPersistHydratedContext =
+        Boolean(hydratedContext) &&
+        (
+          hydratedContext.serverUrl !== existing?.serverUrl ||
+          hydratedContext.workspaceId !== existing?.workspaceId ||
+          hydratedContext.workspaceSlug !== existing?.workspaceSlug
+        );
+
+      if (
+        hydratedContext &&
+        !forceNewSession &&
+        !workspaceChanged &&
+        hydratedContext.agentId === agentId &&
+        hydratedContext.sessionId &&
+        hydratedContext.serverUrl &&
+        (hydratedContext.workspaceId || hydratedContext.workspaceSlug)
+      ) {
+        if (shouldPersistHydratedContext) {
+          setConvoList((p) =>
+            p.map((c) => (c.id === conversationId ? { ...c, _multica: hydratedContext } : c))
+          );
+        }
+        return { context: hydratedContext, token };
+      }
+
+      const session = await window.api.multicaEnsureSession({
+        serverUrl: desiredServerUrl,
+        token,
+        workspaceId: desiredWorkspaceId,
+        workspaceSlug: desiredWorkspaceSlug,
+        agentId,
+        title: title || "RayLine chat",
+      });
+      const context = {
+        serverUrl: desiredServerUrl,
+        workspaceSlug: desiredWorkspaceSlug,
+        workspaceId: desiredWorkspaceId,
+        agentId,
+        sessionId: session.id,
+      };
+      setConvoList((p) =>
+        p.map((c) => (c.id === conversationId ? { ...c, _multica: context } : c))
+      );
+      return { context, token };
+    },
+    []
+  );
+
   const sendMessageToConversation = useCallback(
     async ({ conversationId, conversation, text, attachments, titleText }) => {
       if (!conversationId || !conversation) return false;
@@ -1869,22 +1953,19 @@ export default function App() {
       const syncedMessageCount = thisConvoData.messages.length;
       const images = attachments?.filter((a) => a.type === "image").map((a) => a.dataUrl);
       const files = attachments?.filter((a) => a.type === "file");
-      const m = getM(normalizedConversation.model);
+      const m = getMOrMulticaFallback(normalizedConversation.model);
       const currentProvider = m.provider || "claude";
       // Multica context must be resolved BEFORE prepareMessage so a missing
       // context doesn't leave an orphan streaming assistant bubble.
       let multicaContext, multicaToken;
       if (m.provider === "multica") {
-        const { loadMulticaState } = await import("./multica/store");
-        const mState = loadMulticaState();
-        multicaToken = mState.token;
-        // The _multica context was attached at handleCreateChat (Task 3.1)
-        // onto the convoList row; `conversation` (and normalizedConversation)
-        // is that row, so read from it directly. (getConversation returns
-        // useAgent state which only tracks messages/isStreaming/error.)
-        multicaContext = normalizedConversation?._multica || conversation?._multica;
-        if (!multicaContext) throw new Error("Multica conversation missing _multica context");
-        if (!multicaToken) throw new Error("Multica not authenticated (no token)");
+        ({ context: multicaContext, token: multicaToken } = await ensureMulticaContextForConversation({
+          conversationId,
+          conversation,
+          normalizedConversation,
+          modelId: normalizedConversation.model,
+          title: titleText || conversation?.title || normalizedConversation?.title || text.slice(0, 60),
+        }));
       }
       const prevProvider = isFirstMessage
         ? normalizedConversation.lastProvider || activeSession?.provider || null
@@ -2068,7 +2149,7 @@ export default function App() {
 
       return started;
     },
-    [cwd, draftsPath, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
+    [cwd, draftsPath, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
   );
 
   const handleSend = useCallback(
@@ -2123,7 +2204,7 @@ export default function App() {
         const effectiveCwd = getEffectiveConversationCwd(convo, cwd, draftsPath);
         const normalizedConversation = normalizeConversationState(convo);
         const activeSession = getActiveConversationSession(normalizedConversation);
-        const currentProvider = getM(normalizedConversation.model).provider || "claude";
+        const currentProvider = getMOrMulticaFallback(normalizedConversation.model).provider || "claude";
         const currentMessageCount = getConversation(convoId).messages.length;
         const isFirstMessage = currentMessageCount === 0;
         let result;
@@ -2268,6 +2349,7 @@ export default function App() {
       multicaSession = await window.api.multicaEnsureSession({
         serverUrl: mState.serverUrl,
         token: mState.token,
+        workspaceId: mState.workspaceId,
         workspaceSlug: mState.workspaceSlug,
         agentId,
         title: opts.title || opts.prompt?.slice(0, 60) || "RayLine chat",
@@ -2371,13 +2453,13 @@ export default function App() {
     const { loadMulticaState } = await import("./multica/store");
     const { token } = loadMulticaState();
     if (!token) throw new Error("Multica not authenticated (no token)");
-    const { serverUrl, workspaceSlug, sessionId } = multicaCtx;
+    const { serverUrl, workspaceId, workspaceSlug, sessionId } = multicaCtx;
 
     try {
       await window.api.multicaSubscribe({ conversationId, _multica: multicaCtx, token });
       markMulticaConnected(conversationId);
 
-      const remote = await window.api.multicaListMessages({ serverUrl, token, workspaceSlug, sessionId });
+      const remote = await window.api.multicaListMessages({ serverUrl, token, workspaceId, workspaceSlug, sessionId });
       const list = Array.isArray(remote) ? remote : (remote?.messages || remote?.data || []);
       // Map REST payload to the same archived-message shape the WS path builds
       // (assistant: parts=[{type:"text", text}]; user: text string) so the
@@ -2415,7 +2497,7 @@ export default function App() {
     async (messageIndex, newText) => {
       if (!activeConvo) return;
       const normalizedConvo = normalizeConversationState(activeConvo);
-      const m = getM(normalizedConvo.model);
+      const m = getMOrMulticaFallback(normalizedConvo.model);
       const convoCwd = normalizedConvo.cwd || cwd || undefined;
       const currentMessages = getConversation(active).messages;
 
@@ -2484,6 +2566,18 @@ export default function App() {
         primeMode: providerSwitched ? "cross-provider" : (needsHistoryPrimeFallback ? "history-fallback" : null),
       });
 
+      let multicaContext, multicaToken;
+      if (currentProvider === "multica") {
+        ({ context: multicaContext, token: multicaToken } = await ensureMulticaContextForConversation({
+          conversationId: active,
+          conversation: activeConvo,
+          normalizedConversation: normalizedConvo,
+          modelId: normalizedConvo.model,
+          title: normalizedConvo.title || newText.slice(0, 60),
+          forceNewSession: true,
+        }));
+      }
+
       const started = editAndResend({
         conversationId: active,
         sessionId: canResumeExistingSession ? currentProviderSession.nativeSessionId : undefined,
@@ -2494,6 +2588,8 @@ export default function App() {
         provider: currentProvider,
         effort: m.effort,
         cwd: convoCwd,
+        multicaContext,
+        multicaToken,
       });
 
       if (started) {
@@ -2524,11 +2620,11 @@ export default function App() {
         );
       }
     },
-    [activeConvo, active, cwd, getConversation, editAndResend, resolveConversationLastProvider, resolveConversationProviderSession]
+    [activeConvo, active, cwd, editAndResend, ensureMulticaContextForConversation, getConversation, resolveConversationLastProvider, resolveConversationProviderSession]
   );
 
   const handleModelChange = (modelId) => {
-    const nextProvider = getM(modelId).provider || "claude";
+    const nextProvider = getMOrMulticaFallback(modelId).provider || "claude";
     const normalizedActiveConvo = activeConvo ? normalizeConversationState(activeConvo) : null;
     logSessionState("handleModelChange", {
       conversationId: active || null,

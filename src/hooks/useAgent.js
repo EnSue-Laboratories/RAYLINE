@@ -919,7 +919,7 @@ export default function useAgent() {
     }
   }, []);
 
-  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, cwd }) => {
+  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, cwd, multicaContext, multicaToken }) => {
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId);
@@ -933,6 +933,19 @@ export default function useAgent() {
     });
 
     if (window.api) {
+      if (provider === "multica") {
+        window.api.agentStart({
+          conversationId,
+          prompt: wirePrompt ?? newText,
+          model,
+          provider,
+          effort,
+          cwd,
+          _multica: multicaContext,
+          _multicaToken: multicaToken,
+        });
+        return true;
+      }
       window.api.agentEditAndResend({
         conversationId,
         resumeSessionId: sessionId,
