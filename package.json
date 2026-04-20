@@ -9,7 +9,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
-    "dev:electron": "concurrently \"vite --port 5199 --strictPort\" \"wait-on http://localhost:5199 && VITE_PORT=5199 electron .\"",
+    "dev:electron": "concurrently \"vite --port 5199 --strictPort\" \"wait-on http://localhost:5199 && node scripts/dev-electron.cjs 5199\"",
     "build": "vite build",
     "build:electron": "vite build && electron-builder",
     "lint": "eslint .",
