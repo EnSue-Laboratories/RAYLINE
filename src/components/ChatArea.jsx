@@ -14,13 +14,16 @@ import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import TabStrip from "./TabStrip";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
+  const [editingQueueId, setEditingQueueId] = useState(null);
+  const [queueDraft, setQueueDraft] = useState("");
   const endRef  = useRef(null);
   const inRef   = useRef(null);
+  const queueEditRef = useRef(null);
   const messageBodyRef = useRef(null);
 
   // Scroll to bottom on new messages and during streaming
@@ -216,6 +219,61 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const removeAttachment = (index) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const startQueuedEdit = useCallback((item) => {
+    if (!item?.id) return;
+    setEditingQueueId(item.id);
+    setQueueDraft(item.text || "");
+  }, []);
+
+  const cancelQueuedEdit = useCallback(() => {
+    setEditingQueueId(null);
+    setQueueDraft("");
+  }, []);
+
+  const saveQueuedEdit = useCallback((queueId) => {
+    const trimmed = queueDraft.trim();
+    if (!trimmed) {
+      onRemoveQueuedMessage?.(queueId);
+    } else {
+      onUpdateQueuedMessage?.(queueId, trimmed);
+    }
+    setEditingQueueId(null);
+    setQueueDraft("");
+  }, [onRemoveQueuedMessage, onUpdateQueuedMessage, queueDraft]);
+
+  const removeQueuedItem = useCallback((queueId) => {
+    if (editingQueueId === queueId) {
+      setEditingQueueId(null);
+      setQueueDraft("");
+    }
+    onRemoveQueuedMessage?.(queueId);
+  }, [editingQueueId, onRemoveQueuedMessage]);
+
+  const handleQueuedDraftKeyDown = useCallback((event, queueId) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelQueuedEdit();
+      return;
+    }
+
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      saveQueuedEdit(queueId);
+    }
+  }, [cancelQueuedEdit, saveQueuedEdit]);
+
+  useEffect(() => {
+    if (editingQueueId === null) return;
+    queueEditRef.current?.focus();
+  }, [editingQueueId]);
+
+  useEffect(() => {
+    const el = queueEditRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, 24), 52)}px`;
+  }, [editingQueueId, queueDraft]);
 
   // Selection toolbar handlers
   const handleQuote = useCallback((text) => {
@@ -537,34 +595,152 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         <div style={{ width: "100%", maxWidth: 560 }}>
           {queuedMessages && queuedMessages.length > 0 && (
             <div style={{ marginBottom: 8 }}>
-              {queuedMessages.map((q, i) => (
-                <div key={i} style={{
-                  display: "flex",
+              {queuedMessages.map((q, i) => {
+                const isEditingQueueItem = editingQueueId === q.id;
+                const attachmentCount = Array.isArray(q.attachments) ? q.attachments.length : 0;
+                const queueActionButtonStyle = {
+                  height: 24,
+                  padding: "0 9px",
+                  borderRadius: 7,
+                  border: "1px solid rgba(255,255,255,0.04)",
+                  background: "transparent",
+                  color: "rgba(255,255,255,0.3)",
+                  cursor: "pointer",
+                  fontSize: s(9),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: ".05em",
+                  display: "inline-flex",
                   alignItems: "center",
-                  gap: 6,
-                  padding: "5px 10px",
-                  marginBottom: 4,
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.05)",
-                  borderRadius: 8,
-                  fontSize: s(12),
-                  color: "rgba(255,255,255,0.35)",
-                  fontFamily: "system-ui,sans-serif",
-                }}>
-                  <span style={{
-                    fontSize: s(9),
-                    fontFamily: "'JetBrains Mono',monospace",
-                    color: "rgba(255,255,255,0.2)",
-                    letterSpacing: ".06em",
-                    flexShrink: 0,
-                  }}>QUEUED</span>
-                  <span style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}>{q.text}</span>
-                </div>
-              ))}
+                  justifyContent: "center",
+                };
+                return (
+                  <div
+                    key={q.id || i}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 8px",
+                      marginBottom: 4,
+                      background: "rgba(255,255,255,0.014)",
+                      border: "1px solid rgba(255,255,255,0.035)",
+                      borderRadius: 12,
+                      fontSize: s(12),
+                      color: "rgba(255,255,255,0.44)",
+                      fontFamily: "system-ui,sans-serif",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        <span style={{
+                          fontSize: s(9),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          color: "rgba(255,255,255,0.14)",
+                          letterSpacing: ".06em",
+                          flexShrink: 0,
+                        }}>
+                          {i === 0 ? "QUEUED NEXT" : "QUEUED"}
+                        </span>
+                        {attachmentCount > 0 && (
+                          <span style={{
+                            fontSize: s(9),
+                            fontFamily: "'JetBrains Mono',monospace",
+                            color: "rgba(255,255,255,0.13)",
+                            letterSpacing: ".06em",
+                          }}>
+                            {attachmentCount} ATTACHMENT{attachmentCount === 1 ? "" : "S"}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {isEditingQueueItem ? (
+                          <textarea
+                            ref={queueEditRef}
+                            value={queueDraft}
+                            onChange={(event) => setQueueDraft(event.target.value)}
+                            onKeyDown={(event) => handleQueuedDraftKeyDown(event, q.id)}
+                            rows={1}
+                            style={{
+                              width: "100%",
+                              background: "rgba(255,255,255,0.014)",
+                              border: "1px solid rgba(255,255,255,0.05)",
+                              borderRadius: 7,
+                              padding: "2px 8px",
+                              color: "rgba(255,255,255,0.82)",
+                              fontSize: s(12),
+                              lineHeight: "18px",
+                              fontFamily: "inherit",
+                              resize: "none",
+                              minHeight: 24,
+                              maxHeight: 52,
+                              overflowY: "auto",
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            minHeight: 24,
+                            display: "flex",
+                            alignItems: "center",
+                            padding: "2px 8px",
+                            transform: "translateY(-1.5px)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            lineHeight: "18px",
+                            color: "rgba(255,255,255,0.62)",
+                          }}>
+                            {q.text}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isEditingQueueItem ? (
+                        <>
+                          <button
+                            onClick={() => saveQueuedEdit(q.id)}
+                            style={{
+                              ...queueActionButtonStyle,
+                              background: "rgba(255,255,255,0.06)",
+                              color: "rgba(255,255,255,0.54)",
+                            }}
+                          >
+                            SAVE
+                          </button>
+                          <button
+                            onClick={cancelQueuedEdit}
+                            style={queueActionButtonStyle}
+                          >
+                            CANCEL
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => startQueuedEdit(q)}
+                            style={queueActionButtonStyle}
+                          >
+                            EDIT
+                          </button>
+                          <button
+                            onClick={() => removeQueuedItem(q.id)}
+                            style={queueActionButtonStyle}
+                          >
+                            DELETE
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
           {/* Slash command palette */}

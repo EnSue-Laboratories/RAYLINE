@@ -294,6 +294,89 @@ function extractLoadedSessionMeta(result) {
   };
 }
 
+function makeEphemeralId(prefix = "id") {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeQueuedAttachment(attachment) {
+  if (!attachment || typeof attachment !== "object") return null;
+
+  if (attachment.type === "image" && typeof attachment.dataUrl === "string") {
+    return {
+      type: "image",
+      dataUrl: attachment.dataUrl,
+      ...(typeof attachment.name === "string" ? { name: attachment.name } : {}),
+      ...(typeof attachment.path === "string" ? { path: attachment.path } : {}),
+    };
+  }
+
+  if (
+    attachment.type === "file" &&
+    (typeof attachment.path === "string" || typeof attachment.name === "string")
+  ) {
+    return {
+      type: "file",
+      ...(typeof attachment.name === "string" ? { name: attachment.name } : {}),
+      ...(typeof attachment.path === "string" ? { path: attachment.path } : {}),
+    };
+  }
+
+  return null;
+}
+
+function normalizeQueuedMessage(entry) {
+  if (!entry || typeof entry.conversationId !== "string" || typeof entry.text !== "string") {
+    return null;
+  }
+
+  const attachments = Array.isArray(entry.attachments)
+    ? entry.attachments.map(normalizeQueuedAttachment).filter(Boolean)
+    : [];
+
+  return {
+    id: typeof entry.id === "string" && entry.id ? entry.id : makeEphemeralId("queue"),
+    conversationId: entry.conversationId,
+    text: entry.text,
+    ...(attachments.length > 0 ? { attachments } : {}),
+    queuedAt: Number.isFinite(entry.queuedAt) ? entry.queuedAt : Date.now(),
+  };
+}
+
+function isQueuedMessageReleaseBoundary(event) {
+  if (!event || typeof event !== "object") return false;
+
+  if (
+    event.type === "user" &&
+    Array.isArray(event.message?.content) &&
+    event.message.content.some((block) => block?.type === "tool_result")
+  ) {
+    return true;
+  }
+
+  if (event.type === "result" || event.type === "turn.completed") {
+    return true;
+  }
+
+  if (
+    event.type === "item.completed" &&
+    event.item?.type === "command_execution"
+  ) {
+    return true;
+  }
+
+  if (
+    event.type === "response_item" &&
+    (
+      event.payload?.type === "function_call_output" ||
+      event.payload?.type === "custom_tool_call_output"
+    )
+  ) {
+    return true;
+  }
+
+  return event.type === "event_msg" && event.payload?.type === "task_complete";
+}
+
 function makeSessionLedgerId(provider = "unknown") {
   return `session-${provider}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -773,6 +856,8 @@ export default function App() {
   const [showNewChatCard, setShowNewChatCard] = useState(false);
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const messageQueue = useRef([]);
+  const queueInterruptRequestedRef = useRef(new Set());
+  const activeConversationIdRef = useRef(null);
   const [queuedMessages, setQueuedMessages] = useState([]);
   const labControlTimersRef = useRef(new Map());
   const persistableConversations = useMemo(
@@ -836,6 +921,10 @@ export default function App() {
     [active, queuedMessages]
   );
 
+  useEffect(() => {
+    activeConversationIdRef.current = active;
+  }, [active]);
+
   const canControlTarget = useCallback((target) => (
     target === "wallpaper.imgBlur"
     || target === "wallpaper.imgOpacity"
@@ -872,6 +961,54 @@ export default function App() {
 
     timers.set(target, timer);
   }, []);
+
+  const syncQueuedMessages = useCallback((nextQueue) => {
+    messageQueue.current = nextQueue;
+    setQueuedMessages(nextQueue);
+    return nextQueue;
+  }, []);
+
+  const removeQueuedMessage = useCallback((queueId) => {
+    if (!queueId) return;
+
+    const nextQueue = messageQueue.current.filter((item) => item?.id !== queueId);
+    const removed = messageQueue.current.find((item) => item?.id === queueId);
+    if (
+      removed?.conversationId &&
+      !nextQueue.some((item) => item?.conversationId === removed.conversationId)
+    ) {
+      queueInterruptRequestedRef.current.delete(removed.conversationId);
+    }
+    syncQueuedMessages(nextQueue);
+  }, [syncQueuedMessages]);
+
+  const updateQueuedMessage = useCallback((queueId, nextText) => {
+    if (!queueId) return;
+    const trimmed = typeof nextText === "string" ? nextText.trim() : "";
+    if (!trimmed) {
+      removeQueuedMessage(queueId);
+      return;
+    }
+
+    syncQueuedMessages(
+      messageQueue.current.map((item) => (
+        item?.id === queueId
+          ? { ...item, text: trimmed }
+          : item
+      ))
+    );
+  }, [removeQueuedMessage, syncQueuedMessages]);
+
+  const enqueueQueuedMessage = useCallback(({ conversationId, text, attachments }) => {
+    const nextEntry = normalizeQueuedMessage({
+      conversationId,
+      text,
+      attachments,
+    });
+    if (!nextEntry) return null;
+    syncQueuedMessages([...messageQueue.current, nextEntry]);
+    return nextEntry;
+  }, [syncQueuedMessages]);
 
   const handleControlChange = useCallback(({ target, value }) => {
     if (!target) return;
@@ -911,6 +1048,31 @@ export default function App() {
         return;
     }
   }, [queueLabControlUpdate]);
+
+  useEffect(() => {
+    if (!window.api?.onAgentStream || !window.api?.onAgentDone) return undefined;
+
+    const offStream = window.api.onAgentStream(({ conversationId, event }) => {
+      if (!conversationId || conversationId !== activeConversationIdRef.current) return;
+      if (queueInterruptRequestedRef.current.has(conversationId)) return;
+      if (!messageQueue.current.some((item) => item?.conversationId === conversationId)) return;
+      if (!isQueuedMessageReleaseBoundary(event)) return;
+
+      queueInterruptRequestedRef.current.add(conversationId);
+      cancelMessage(conversationId);
+    });
+
+    const offDone = window.api.onAgentDone(({ conversationId }) => {
+      if (conversationId) {
+        queueInterruptRequestedRef.current.delete(conversationId);
+      }
+    });
+
+    return () => {
+      offStream?.();
+      offDone?.();
+    };
+  }, [cancelMessage]);
 
   // Load state from file on mount
   useEffect(() => {
@@ -959,9 +1121,9 @@ export default function App() {
         if (state.coauthorEnabled != null) setCoauthorEnabled(!!state.coauthorEnabled);
         if (typeof state.coauthorTrailer === "string") setCoauthorTrailer(state.coauthorTrailer);
         if (Array.isArray(state.queuedMessages)) {
-          const restoredQueue = state.queuedMessages.filter(
-            (item) => item && typeof item.conversationId === "string" && typeof item.text === "string"
-          );
+          const restoredQueue = state.queuedMessages
+            .map(normalizeQueuedMessage)
+            .filter(Boolean);
           messageQueue.current = restoredQueue;
           setQueuedMessages(restoredQueue);
         }
@@ -1907,8 +2069,7 @@ export default function App() {
 
       // Queue if currently streaming
       if (activeData.isStreaming && active) {
-        messageQueue.current.push({ conversationId: active, text, attachments });
-        setQueuedMessages([...messageQueue.current]);
+        enqueueQueuedMessage({ conversationId: active, text, attachments });
         return;
       }
 
@@ -2010,18 +2171,19 @@ export default function App() {
         titleText: text,
       });
     },
-    [activeConvo, active, activeData, appendLocalMessages, cwd, defaultModel, draftsPath, getConversation, sendMessageToConversation]
+    [activeConvo, active, activeData, appendLocalMessages, cwd, defaultModel, draftsPath, enqueueQueuedMessage, getConversation, sendMessageToConversation]
   );
 
   // Process queued messages when streaming ends
   useEffect(() => {
     if (!active || activeData.isStreaming || messageQueue.current.length === 0) return;
-    const nextIndex = messageQueue.current.findIndex((item) => item?.conversationId === active);
-    if (nextIndex === -1) return;
-    const [next] = messageQueue.current.splice(nextIndex, 1);
-    setQueuedMessages([...messageQueue.current]);
-    setTimeout(() => handleSend(next.text, next.attachments), 300);
-  }, [active, activeData.isStreaming, handleSend]);
+    const next = messageQueue.current.find((item) => item?.conversationId === active);
+    if (!next) return;
+
+    queueInterruptRequestedRef.current.delete(active);
+    syncQueuedMessages(messageQueue.current.filter((item) => item?.id !== next.id));
+    void handleSend(next.text, next.attachments);
+  }, [active, activeData.isStreaming, handleSend, syncQueuedMessages]);
 
   const handleCreateChat = useCallback(async (opts) => {
     const id = opts.id || ("c" + Date.now());
@@ -2543,6 +2705,8 @@ export default function App() {
           onModelChange={handleModelChange}
           defaultModel={defaultModel}
           queuedMessages={activeQueuedMessages}
+          onUpdateQueuedMessage={updateQueuedMessage}
+          onRemoveQueuedMessage={removeQueuedMessage}
           onToggleTerminal={handleToggleTerminal}
           terminalOpen={terminal.drawerOpen}
           terminalCount={terminal.sessions.length}
