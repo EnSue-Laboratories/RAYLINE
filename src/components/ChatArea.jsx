@@ -674,6 +674,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                             display: "flex",
                             alignItems: "center",
                             padding: "2px 8px",
+                            transform: "translateY(-1.5px)",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
