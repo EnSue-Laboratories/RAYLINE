@@ -36,6 +36,23 @@ function TransparentCheckbox({ checked, onChange, ariaLabel }) {
   );
 }
 
+const sectionLabelStyle = {
+  fontSize: 9,
+  color: "rgba(255,255,255,0.35)",
+  fontFamily: "'JetBrains Mono', monospace",
+  letterSpacing: ".12em",
+  textTransform: "uppercase",
+};
+
+const onFieldHoverIn = (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; };
+const onFieldHoverOut = (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; };
+const fieldHoverProps = {
+  onMouseEnter: onFieldHoverIn,
+  onMouseLeave: onFieldHoverOut,
+  onFocus: onFieldHoverIn,
+  onBlur: onFieldHoverOut,
+};
+
 function slugifyBranch(text, fallbackIndex) {
   const slug = (text || "")
     .toLowerCase()
@@ -262,7 +279,6 @@ function TabBtn({ active, onClick, children }) {
 
 function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors }) {
   const [selectedPath, setSelectedPath] = useState(currentCwd || "");
-  const [slug, setSlug] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
 
@@ -272,7 +288,7 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
   );
 
   useEffect(() => {
-    if (!selectedPath) { setSlug(null); setRows([]); return; }
+    if (!selectedPath) { setRows([]); return; }
     let cancelled = false;
     setLoading(true); setLoadError(null);
     (async () => {
@@ -280,10 +296,9 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
         const s = await window.api.gitRemoteSlug(selectedPath);
         if (cancelled) return;
         if (!s) {
-          setSlug(null); setRows([]); setLoadError("No GitHub remote on this folder.");
+          setRows([]); setLoadError("No GitHub remote on this folder.");
           return;
         }
-        setSlug(s);
         const issues = await window.api.ghListIssues(s, "open");
         if (cancelled) return;
         setRows((issues || []).map((iss) => ({ ...makeIssueRow(iss), cwd: selectedPath })));
@@ -305,20 +320,31 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
 
   return (
     <div style={{ padding: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <label style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>Repo folder</label>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+        <label style={sectionLabelStyle}>Work dir</label>
         <select
           value={selectedPath}
           onChange={(e) => setSelectedPath(e.target.value)}
-          style={{ ...selectStyle, flex: 1, fontSize: 12 }}
+          style={{ ...selectStyle, width: "100%" }}
+          {...fieldHoverProps}
         >
           <option value="">(select)</option>
           {projectPaths.map((p) => (
             <option key={p} value={p}>{p}</option>
           ))}
         </select>
-        {slug && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{slug}</span>}
       </div>
+
+      {selectedPath && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <span style={sectionLabelStyle}>Issues</span>
+          {rows.length > 0 && (
+            <span style={{ ...sectionLabelStyle, color: "rgba(255,255,255,0.25)" }}>
+              {rows.filter((r) => r.enabled).length}/{rows.length}
+            </span>
+          )}
+        </div>
+      )}
 
       {loading && <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>Loading issues…</div>}
       {loadError && <div style={errorStyle}>{loadError}</div>}
@@ -334,7 +360,7 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
             ariaLabel="Select all issues"
           />
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-            Select all ({rows.filter((r) => r.enabled).length}/{rows.length})
+            Select all
           </span>
         </div>
       )}
@@ -380,11 +406,13 @@ function IssueRow({ row, availableModels, error, onChange }) {
           value={row.branch}
           onChange={(e) => onChange({ branch: e.target.value })}
           style={{ ...inputStyle, width: 180, flex: "none" }}
+          {...fieldHoverProps}
         />
         <select
           value={row.model}
           onChange={(e) => onChange({ model: e.target.value })}
           style={selectStyle}
+          {...fieldHoverProps}
         >
           <option value="">(default)</option>
           {availableModels.map((m) => (
@@ -398,6 +426,7 @@ function IssueRow({ row, availableModels, error, onChange }) {
           onChange={(e) => onChange({ prompt: e.target.value })}
           rows={6}
           style={textareaStyle}
+          {...fieldHoverProps}
         />
       )}
       {error && <div style={errorStyle}>{error}</div>}
@@ -449,6 +478,7 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
         onChange={(e) => onChange({ prompt: e.target.value })}
         rows={3}
         style={textareaStyle}
+        {...fieldHoverProps}
       />
       <div style={rowControlsStyle}>
         <input
@@ -457,11 +487,13 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
           placeholder="branch name"
           onChange={(e) => onChange({ branch: e.target.value })}
           style={inputStyle}
+          {...fieldHoverProps}
         />
         <select
           value={row.model}
           onChange={(e) => onChange({ model: e.target.value })}
           style={selectStyle}
+          {...fieldHoverProps}
         >
           <option value="">(default)</option>
           {availableModels.map((m) => (
@@ -511,7 +543,8 @@ function ModelDropdown({ value, onChange, models, label }) {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        style={{ ...selectStyle, fontSize: 12, padding: "5px 24px 5px 10px" }}
+        style={selectStyle}
+        {...fieldHoverProps}
       >
         {models.map((m) => (
           <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
@@ -584,29 +617,43 @@ const rowStyle = (hasError) => ({
 });
 const textareaStyle = {
   width: "100%", minHeight: 48, resize: "vertical",
-  background: "var(--pane-hover)", color: "rgba(255,255,255,0.85)",
-  border: "1px solid var(--pane-border)", borderRadius: 6,
-  padding: "6px 8px", fontSize: 12, fontFamily: "inherit",
+  background: "rgba(255,255,255,0.02)", color: "rgba(255,255,255,0.8)",
+  border: "1px solid rgba(255,255,255,0.04)", borderRadius: 7,
+  padding: "8px 10px", fontSize: 12, fontFamily: "inherit",
   outline: "none",
+  transition: "border-color .2s",
 };
 const rowControlsStyle = { display: "flex", gap: 8, alignItems: "center" };
 const inputStyle = {
-  flex: 1, background: "var(--pane-hover)", color: "rgba(255,255,255,0.85)",
-  border: "1px solid var(--pane-border)", borderRadius: 6,
-  padding: "5px 8px", fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
+  flex: 1,
+  background: "rgba(255,255,255,0.02)",
+  color: "rgba(255,255,255,0.6)",
+  border: "1px solid rgba(255,255,255,0.04)",
+  borderRadius: 7,
+  padding: "8px 12px",
+  fontSize: 10,
+  fontFamily: "'JetBrains Mono', monospace",
+  letterSpacing: ".06em",
   outline: "none",
+  transition: "border-color .2s",
 };
 const selectStyle = {
-  background: "var(--pane-hover)", color: "rgba(255,255,255,0.85)",
-  border: "1px solid var(--pane-border)", borderRadius: 6,
-  padding: "5px 24px 5px 8px", fontSize: 11,
+  background: "rgba(255,255,255,0.02)",
+  color: "rgba(255,255,255,0.6)",
+  border: "1px solid rgba(255,255,255,0.04)",
+  borderRadius: 7,
+  padding: "8px 26px 8px 12px",
+  fontSize: 10,
+  fontFamily: "'JetBrains Mono', monospace",
+  letterSpacing: ".06em",
   WebkitAppearance: "none",
   appearance: "none",
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
   backgroundRepeat: "no-repeat",
-  backgroundPosition: "right 8px center",
+  backgroundPosition: "right 10px center",
   outline: "none",
   cursor: "pointer",
+  transition: "border-color .2s",
 };
 const removeBtnStyle = {
   background: "none", border: "none", color: "rgba(255,255,255,0.4)",
