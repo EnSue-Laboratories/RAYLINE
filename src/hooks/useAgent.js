@@ -31,10 +31,14 @@ function freezeElapsed(msg) {
 }
 
 function mapMulticaTaskMessage(p) {
+  // Target the `{type: "tool"}` part shape that Message.jsx renders via
+  // ToolCallBlock. Multica task:message events carry no tool_use_id, so we
+  // can't merge use/result into a single part like Claude does — emit them
+  // as two adjacent tool parts.
   switch (p.type) {
     case "text": return { type: "text", text: p.content || "" };
-    case "tool_use": return { type: "tool_use", name: p.tool, args: p.input || {} };
-    case "tool_result": return { type: "tool_result", name: p.tool, result: p.output || "" };
+    case "tool_use": return { type: "tool", name: p.tool, args: p.input || {} };
+    case "tool_result": return { type: "tool", name: p.tool, result: p.output || "" };
     case "error": return { type: "text", text: `_${p.content || "error"}_` };
     default: return null;
   }
@@ -280,14 +284,19 @@ export default function useAgent() {
         };
 
         if (typeof event.type === "string" && event.type.startsWith("multica:")) {
-          const assistant = ensureAssistant();
           const inner = event.type.slice("multica:".length);
           const p = event.payload || {};
 
-          if (inner === "chat:message" && p.role === "user") {
-            // Server echoes the user message — already appended locally; ignore.
+          // No-op branches return early WITHOUT running ensureAssistant — we
+          // don't want a stray empty assistant bubble if a user echo arrives
+          // before any task:message.
+          if (inner === "chat:message" && p.role === "user") return next;
+          if (inner === "agent:status") {
+            window.dispatchEvent(new CustomEvent("multica-agent-status", { detail: p.agent }));
             return next;
           }
+
+          const assistant = ensureAssistant();
 
           if (inner === "task:message") {
             const part = mapMulticaTaskMessage(p);
@@ -295,12 +304,6 @@ export default function useAgent() {
             const parts = [...(assistant.parts || []), part];
             msgs[msgs.length - 1] = { ...assistant, parts, isStreaming: true };
             next.set(conversationId, { ...convo, messages: msgs, isStreaming: true });
-            return next;
-          }
-
-          if (inner === "agent:status") {
-            // Broadcast so the picker can refresh tags. Don't mutate the transcript.
-            window.dispatchEvent(new CustomEvent("multica-agent-status", { detail: p.agent }));
             return next;
           }
 

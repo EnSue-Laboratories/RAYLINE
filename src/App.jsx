@@ -1868,6 +1868,21 @@ export default function App() {
       const files = attachments?.filter((a) => a.type === "file");
       const m = getM(normalizedConversation.model);
       const currentProvider = m.provider || "claude";
+      // Multica context must be resolved BEFORE prepareMessage so a missing
+      // context doesn't leave an orphan streaming assistant bubble.
+      let multicaContext, multicaToken;
+      if (m.provider === "multica") {
+        const { loadMulticaState } = await import("./multica/store");
+        const mState = loadMulticaState();
+        multicaToken = mState.token;
+        // The _multica context was attached at handleCreateChat (Task 3.1)
+        // onto the convoList row; `conversation` (and normalizedConversation)
+        // is that row, so read from it directly. (getConversation returns
+        // useAgent state which only tracks messages/isStreaming/error.)
+        multicaContext = normalizedConversation?._multica || conversation?._multica;
+        if (!multicaContext) throw new Error("Multica conversation missing _multica context");
+        if (!multicaToken) throw new Error("Multica not authenticated (no token)");
+      }
       const prevProvider = isFirstMessage
         ? normalizedConversation.lastProvider || activeSession?.provider || null
         : await resolveConversationLastProvider(normalizedConversation);
@@ -1994,20 +2009,6 @@ export default function App() {
           });
           console.warn("Checkpoint creation failed:", e.message);
         }
-      }
-
-      let multicaContext, multicaToken;
-      if (m.provider === "multica") {
-        const { loadMulticaState } = await import("./multica/store");
-        const mState = loadMulticaState();
-        multicaToken = mState.token;
-        // The _multica context was attached at handleCreateChat (Task 3.1)
-        // onto the convoList row; `conversation` (and normalizedConversation)
-        // is that row, so read from it directly. (getConversation returns
-        // useAgent state which only tracks messages/isStreaming/error.)
-        multicaContext = normalizedConversation?._multica || conversation?._multica;
-        if (!multicaContext) throw new Error("Multica conversation missing _multica context");
-        if (!multicaToken) throw new Error("Multica not authenticated (no token)");
       }
 
       const started = startPreparedMessage({
