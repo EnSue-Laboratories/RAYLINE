@@ -104,4 +104,10 @@ contextBridge.exposeInMainWorld("api", {
   // Window appearance
   setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
   writeClipboardImage: (dataUrl) => ipcRenderer.invoke("clipboard-write-image", dataUrl),
+
+  // multica
+  multicaSendCode: (args) => ipcRenderer.invoke("multica-send-code", args),
+  multicaVerifyCode: (args) => ipcRenderer.invoke("multica-verify-code", args),
+  multicaListWorkspaces: (args) => ipcRenderer.invoke("multica-list-workspaces", args),
+  multicaListAgents: (args) => ipcRenderer.invoke("multica-list-agents", args),
 });

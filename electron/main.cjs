@@ -4,6 +4,12 @@ const fs = require("fs");
 const os = require("os");
 const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
 const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
+const {
+  multicaSendCode,
+  multicaVerifyCode,
+  multicaListWorkspaces,
+  multicaListAgents,
+} = require("./multica-manager.cjs");
 const { buildSpawnPath, resolveCliBin } = require("./cli-bin-resolver.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
@@ -309,6 +315,12 @@ ipcMain.on("agent-edit-resend", (event, opts) => {
     startAgent({ ...opts, forkSession: true }, event.sender);
   }
 });
+
+// IPC: multica
+ipcMain.handle("multica-send-code", (_e, args) => multicaSendCode(args));
+ipcMain.handle("multica-verify-code", (_e, args) => multicaVerifyCode(args));
+ipcMain.handle("multica-list-workspaces", (_e, args) => multicaListWorkspaces(args));
+ipcMain.handle("multica-list-agents", (_e, args) => multicaListAgents(args));
 
 ipcMain.handle("rewind-files", async (_event, opts) => {
   return rewindFiles(opts);
