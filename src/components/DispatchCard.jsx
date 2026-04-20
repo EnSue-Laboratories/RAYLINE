@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { X, GitBranch, FileText, Check } from "lucide-react";
+import { X, GitBranch, FileText, Check, ChevronRight, ChevronDown, Paperclip, Plus } from "lucide-react";
 
 function TransparentCheckbox({ checked, onChange, ariaLabel }) {
   return (
@@ -249,7 +249,6 @@ export default function DispatchCard({
             value={globalModel}
             onChange={setGlobalModel}
             models={availableModels}
-            label="Default model"
           />
           <button
             onClick={handleSubmit}
@@ -319,13 +318,13 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
   const allChecked = rows.length > 0 && rows.every((r) => r.enabled);
 
   return (
-    <div style={{ padding: 14 }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
-        <label style={sectionLabelStyle}>Work dir</label>
+    <div style={{ padding: "24px 14px 14px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+        <label style={sectionLabelStyle}>Working directory</label>
         <select
           value={selectedPath}
           onChange={(e) => setSelectedPath(e.target.value)}
-          style={{ ...selectStyle, width: "100%" }}
+          style={{ ...selectStyle, width: "100%", padding: "14px 28px 14px 14px", fontSize: 11 }}
           {...fieldHoverProps}
         >
           <option value="">(select)</option>
@@ -390,10 +389,10 @@ function IssueRow({ row, availableModels, error, onChange }) {
         />
         <button
           onClick={() => onChange({ expanded: !row.expanded })}
-          style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 0 }}
+          style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
           aria-label="Toggle details"
         >
-          {row.expanded ? "▾" : "▸"}
+          {row.expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </button>
         <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, fontFamily: "monospace" }}>
           #{issue.number}
@@ -442,7 +441,7 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
   );
 
   return (
-    <div style={{ padding: 14 }}>
+    <div style={{ padding: "24px 14px 14px" }}>
       {!currentCwd && (
         <div style={noticeStyle}>
           Select a folder in the sidebar before dispatching custom tasks.
@@ -464,7 +463,10 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
           onRemove={() => removeRow(r.key)}
         />
       ))}
-      <button onClick={addRow} style={addBtnStyle}>+ Add task</button>
+      <button onClick={addRow} style={addBtnStyle} {...fieldHoverProps}>
+        <Plus size={14} />
+        Add task
+      </button>
     </div>
   );
 }
@@ -504,7 +506,9 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
           attachments={row.attachments}
           onChange={(a) => onChange({ attachments: a })}
         />
-        <button onClick={onRemove} style={removeBtnStyle} aria-label="Remove row">✕</button>
+        <button onClick={onRemove} style={removeBtnStyle} aria-label="Remove row">
+          <X size={14} />
+        </button>
       </div>
       {error && <div style={errorStyle}>{error}</div>}
     </div>
@@ -513,8 +517,9 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
 
 function AttachmentPicker({ attachments, onChange }) {
   return (
-    <label style={{ cursor: "pointer", color: "rgba(255,255,255,0.55)", fontSize: 16 }}>
-      📎{attachments.length > 0 ? ` ${attachments.length}` : ""}
+    <label style={{ cursor: "pointer", color: "rgba(255,255,255,0.5)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+      <Paperclip size={13} />
+      {attachments.length > 0 ? attachments.length : ""}
       <input
         type="file"
         accept="image/*"
@@ -536,21 +541,19 @@ function AttachmentPicker({ attachments, onChange }) {
     </label>
   );
 }
-function ModelDropdown({ value, onChange, models, label }) {
+function ModelDropdown({ value, onChange, models }) {
   return (
-    <label style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, display: "flex", gap: 6, alignItems: "center" }}>
-      {label}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={selectStyle}
-        {...fieldHoverProps}
-      >
-        {models.map((m) => (
-          <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
-        ))}
-      </select>
-    </label>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label="Default model"
+      style={{ ...selectStyle, padding: "6px 24px 6px 10px" }}
+      {...fieldHoverProps}
+    >
+      {models.map((m) => (
+        <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
+      ))}
+    </select>
   );
 }
 
@@ -660,9 +663,16 @@ const removeBtnStyle = {
   cursor: "pointer", fontSize: 13, padding: "4px 6px",
 };
 const addBtnStyle = {
-  background: "none", border: "1px dashed rgba(255,255,255,0.15)",
-  color: "rgba(255,255,255,0.6)", borderRadius: 6, padding: "6px 10px",
-  cursor: "pointer", fontSize: 12, width: "100%",
+  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+  background: "rgba(255,255,255,0.02)",
+  border: "1px dashed rgba(255,255,255,0.08)",
+  color: "rgba(255,255,255,0.55)",
+  borderRadius: 7, padding: "14px 10px",
+  cursor: "pointer", fontSize: 11,
+  fontFamily: "'JetBrains Mono', monospace",
+  letterSpacing: ".06em",
+  width: "100%",
+  transition: "border-color .2s, color .2s",
 };
 const errorStyle = {
   color: "rgba(255,180,180,0.9)", fontSize: 11, marginTop: 2,
