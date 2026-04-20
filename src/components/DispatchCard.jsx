@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X, GitBranch, FileText, Check, ChevronRight, ChevronDown, Paperclip, Plus } from "lucide-react";
 
 function TransparentCheckbox({ checked, onChange, ariaLabel }) {
@@ -245,10 +246,18 @@ export default function DispatchCard({
         </div>
 
         <footer style={footerStyle}>
-          <ModelDropdown
+          <DispatchDropdown
+            ariaLabel="Default model"
             value={globalModel}
             onChange={setGlobalModel}
-            models={availableModels}
+            options={availableModels.map((m) => ({
+              value: m.id,
+              label: m.name || m.label || m.id,
+              triggerLabel: m.tag || m.label || m.id,
+              sublabel: m.tag,
+              group: (m.provider || "MODEL").toUpperCase(),
+            }))}
+            grouped
           />
           <button
             onClick={handleSubmit}
@@ -321,17 +330,17 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
     <div style={{ padding: "24px 14px 14px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
         <label style={sectionLabelStyle}>Working directory</label>
-        <select
+        <DispatchDropdown
+          fullWidth
+          ariaLabel="Working directory"
           value={selectedPath}
-          onChange={(e) => setSelectedPath(e.target.value)}
-          style={{ ...selectStyle, width: "100%", padding: "14px 28px 14px 14px", fontSize: 11 }}
-          {...fieldHoverProps}
-        >
-          <option value="">(select)</option>
-          {projectPaths.map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
+          onChange={setSelectedPath}
+          placeholder="(select)"
+          options={[
+            { value: "", label: "(select)" },
+            ...projectPaths.map((p) => ({ value: p, label: p })),
+          ]}
+        />
       </div>
 
       {selectedPath && (
@@ -407,17 +416,13 @@ function IssueRow({ row, availableModels, error, onChange }) {
           style={{ ...inputStyle, width: 180, flex: "none" }}
           {...fieldHoverProps}
         />
-        <select
+        <DispatchDropdown
+          ariaLabel={`Model for issue #${issue.number}`}
           value={row.model}
-          onChange={(e) => onChange({ model: e.target.value })}
-          style={selectStyle}
-          {...fieldHoverProps}
-        >
-          <option value="">(default)</option>
-          {availableModels.map((m) => (
-            <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
-          ))}
-        </select>
+          onChange={(v) => onChange({ model: v })}
+          options={modelOptionsWithDefault(availableModels)}
+          grouped
+        />
       </div>
       {row.expanded && (
         <textarea
@@ -447,11 +452,6 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
           Select a folder in the sidebar before dispatching custom tasks.
         </div>
       )}
-      {rows.length === 0 && (
-        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, padding: "8px 0" }}>
-          No tasks yet.
-        </div>
-      )}
       {rows.map((r, i) => (
         <CustomRow
           key={r.key}
@@ -463,9 +463,14 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
           onRemove={() => removeRow(r.key)}
         />
       ))}
-      <button onClick={addRow} style={addBtnStyle} {...fieldHoverProps}>
-        <Plus size={14} />
-        Add task
+      <button
+        onClick={addRow}
+        style={addBtnStyle}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.8)"; e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "transparent"; }}
+      >
+        <Plus size={13} strokeWidth={2} />
+        <span>Add task</span>
       </button>
     </div>
   );
@@ -490,16 +495,14 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
           style={customBranchStyle}
         />
         <span style={customDividerStyle} aria-hidden />
-        <select
+        <DispatchDropdown
+          compact
+          ariaLabel={`Model for task ${index + 1}`}
           value={row.model}
-          onChange={(e) => onChange({ model: e.target.value })}
-          style={customSelectStyle}
-        >
-          <option value="">(default)</option>
-          {availableModels.map((m) => (
-            <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
-          ))}
-        </select>
+          onChange={(v) => onChange({ model: v })}
+          options={modelOptionsWithDefault(availableModels)}
+          grouped
+        />
         <span style={customDividerStyle} aria-hidden />
         <AttachmentPicker
           attachments={row.attachments}
@@ -540,20 +543,202 @@ function AttachmentPicker({ attachments, onChange }) {
     </label>
   );
 }
-function ModelDropdown({ value, onChange, models }) {
+function DispatchDropdown({
+  value,
+  onChange,
+  options,
+  placeholder,
+  fullWidth,
+  compact,
+  grouped,
+  ariaLabel,
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  const selected = options.find((o) => o.value === value);
+  const triggerText = selected ? (selected.triggerLabel || selected.label) : (placeholder || "");
+
+  const updateMenuPosition = useCallback(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const menuWidth = fullWidth ? rect.width : Math.max(200, rect.width);
+    const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
+    const gap = 6;
+    const spaceBelow = window.innerHeight - rect.bottom - gap - 8;
+    const spaceAbove = rect.top - gap - 8;
+    const flipUp = spaceBelow < 180 && spaceAbove > spaceBelow;
+    const maxHeight = Math.min(320, Math.max(120, flipUp ? spaceAbove : spaceBelow));
+    setMenuStyle({
+      top: flipUp ? undefined : rect.bottom + gap,
+      bottom: flipUp ? window.innerHeight - rect.top + gap : undefined,
+      left,
+      width: menuWidth,
+      maxHeight,
+    });
+  }, [fullWidth]);
+
+  useEffect(() => {
+    const h = (e) => {
+      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false);
+      setMenuStyle(null);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = () => updateMenuPosition();
+    window.addEventListener("resize", h);
+    window.addEventListener("scroll", h, true);
+    return () => {
+      window.removeEventListener("resize", h);
+      window.removeEventListener("scroll", h, true);
+    };
+  }, [open, updateMenuPosition]);
+
+  const toggle = () => {
+    if (open) { setOpen(false); setMenuStyle(null); return; }
+    updateMenuPosition();
+    setOpen(true);
+  };
+
+  const triggerStyle = compact
+    ? {
+        display: "inline-flex", alignItems: "center", gap: 6,
+        padding: "4px 0",
+        background: "transparent",
+        border: "none",
+        color: selected ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.45)",
+        fontSize: 10,
+        fontFamily: "'JetBrains Mono',monospace",
+        letterSpacing: ".06em",
+        cursor: "pointer",
+        outline: "none",
+      }
+    : {
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 6,
+        padding: fullWidth ? "12px 12px" : "6px 10px",
+        background: "rgba(255,255,255,0.02)",
+        border: "1px solid rgba(255,255,255,0.04)",
+        borderRadius: 7,
+        color: selected ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.45)",
+        fontSize: fullWidth ? 11 : 10,
+        fontFamily: "'JetBrains Mono',monospace",
+        letterSpacing: ".06em",
+        cursor: "pointer",
+        width: fullWidth ? "100%" : "auto",
+        transition: "border-color .2s",
+        outline: "none",
+      };
+
+  const groups = grouped
+    ? options.reduce((acc, opt) => {
+        const g = opt.group || "";
+        if (!acc[g]) acc[g] = [];
+        acc[g].push(opt);
+        return acc;
+      }, {})
+    : { "": options };
+
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label="Default model"
-      style={{ ...selectStyle, padding: "6px 24px 6px 10px" }}
-      {...fieldHoverProps}
-    >
-      {models.map((m) => (
-        <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
-      ))}
-    </select>
+    <div ref={ref} style={{ position: "relative", width: fullWidth ? "100%" : "auto", flexShrink: 0 }}>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={ariaLabel}
+        style={triggerStyle}
+        onMouseEnter={compact ? undefined : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+        onMouseLeave={compact ? undefined : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: fullWidth ? 1 : undefined, textAlign: "left" }}>
+          {triggerText}
+        </span>
+        <ChevronDown size={11} strokeWidth={2} style={{ opacity: 0.45, flexShrink: 0 }} />
+      </button>
+      {open && menuStyle && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            top: menuStyle.top,
+            bottom: menuStyle.bottom,
+            left: menuStyle.left,
+            width: menuStyle.width,
+            zIndex: 1200,
+            background: "rgba(8,8,12,0.55)",
+            backdropFilter: "blur(48px) saturate(1.2)",
+            WebkitBackdropFilter: "blur(48px) saturate(1.2)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            borderRadius: 10,
+            padding: 3,
+            maxHeight: menuStyle.maxHeight || 320,
+            overflowY: "auto",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+          }}
+        >
+          {Object.entries(groups).map(([groupLabel, opts], gi) => (
+            <div key={groupLabel || `g${gi}`}>
+              {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
+              {groupLabel && (
+                <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: 8, color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace", textTransform: "uppercase" }}>
+                  {groupLabel}
+                </div>
+              )}
+              {opts.map((opt) => (
+                <button
+                  key={String(opt.value)}
+                  type="button"
+                  onClick={() => { onChange(opt.value); setOpen(false); setMenuStyle(null); }}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    width: "100%", padding: "8px 12px",
+                    background: opt.value === value ? "rgba(255,255,255,0.04)" : "transparent",
+                    border: "none", borderRadius: 7,
+                    color: opt.value === value ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
+                    fontSize: 11,
+                    fontFamily: "'JetBrains Mono',monospace",
+                    cursor: "pointer", textAlign: "left",
+                    transition: "background .12s, color .12s",
+                  }}
+                  onMouseEnter={(e) => { if (opt.value !== value) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                  onMouseLeave={(e) => { if (opt.value !== value) e.currentTarget.style.background = "transparent"; }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {opt.label}
+                  </span>
+                  {opt.sublabel && (
+                    <span style={{ fontSize: 9, opacity: 0.4, letterSpacing: ".1em", marginLeft: 8, flexShrink: 0 }}>
+                      {opt.sublabel}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
+    </div>
   );
+}
+
+function modelOptionsWithDefault(availableModels) {
+  return [
+    { value: "", label: "(default)", group: "INHERIT" },
+    ...availableModels.map((m) => ({
+      value: m.id,
+      label: m.name || m.label || m.id,
+      triggerLabel: m.tag || m.label || m.id,
+      sublabel: m.tag,
+      group: (m.provider || "MODEL").toUpperCase(),
+    })),
+  ];
 }
 
 // Styles — mirror NewChatCard.jsx conventions
@@ -625,7 +810,6 @@ const textareaStyle = {
   outline: "none",
   transition: "border-color .2s",
 };
-const rowControlsStyle = { display: "flex", gap: 8, alignItems: "center" };
 const inputStyle = {
   flex: 1,
   background: "rgba(255,255,255,0.02)",
@@ -639,24 +823,6 @@ const inputStyle = {
   outline: "none",
   transition: "border-color .2s",
 };
-const selectStyle = {
-  background: "rgba(255,255,255,0.02)",
-  color: "rgba(255,255,255,0.6)",
-  border: "1px solid rgba(255,255,255,0.04)",
-  borderRadius: 7,
-  padding: "8px 26px 8px 12px",
-  fontSize: 10,
-  fontFamily: "'JetBrains Mono', monospace",
-  letterSpacing: ".06em",
-  WebkitAppearance: "none",
-  appearance: "none",
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-  backgroundRepeat: "no-repeat",
-  backgroundPosition: "right 10px center",
-  outline: "none",
-  cursor: "pointer",
-  transition: "border-color .2s",
-};
 const removeBtnStyle = {
   background: "none", border: "none", color: "rgba(255,255,255,0.4)",
   cursor: "pointer", fontSize: 13, padding: "4px 6px",
@@ -665,13 +831,14 @@ const addBtnStyle = {
   display: "inline-flex", alignItems: "center", gap: 6,
   background: "transparent",
   border: "none",
-  color: "rgba(255,255,255,0.5)",
-  padding: "6px 0",
+  color: "rgba(255,255,255,0.4)",
+  padding: "6px 8px",
+  borderRadius: 6,
   marginTop: 2,
   cursor: "pointer", fontSize: 11,
   fontFamily: "'JetBrains Mono', monospace",
   letterSpacing: ".06em",
-  transition: "color .15s",
+  transition: "color .15s, background .15s",
 };
 
 const customRowStyle = (hasError) => ({
@@ -714,22 +881,6 @@ const customBranchStyle = {
   fontFamily: "'JetBrains Mono', monospace",
   letterSpacing: ".06em",
   outline: "none",
-};
-const customSelectStyle = {
-  background: "transparent",
-  color: "rgba(255,255,255,0.5)",
-  border: "none",
-  padding: "4px 18px 4px 0",
-  fontSize: 10,
-  fontFamily: "'JetBrains Mono', monospace",
-  letterSpacing: ".06em",
-  WebkitAppearance: "none",
-  appearance: "none",
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.35)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
-  backgroundRepeat: "no-repeat",
-  backgroundPosition: "right 2px center",
-  outline: "none",
-  cursor: "pointer",
 };
 const customDividerStyle = {
   width: 1, height: 12,
