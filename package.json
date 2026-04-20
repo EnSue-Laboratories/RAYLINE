@@ -9,7 +9,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
-    "dev:electron": "concurrently \"vite --port 5199 --strictPort\" \"wait-on http://localhost:5199 && VITE_PORT=5199 electron .\"",
+    "dev:electron": "concurrently \"vite --port 5199 --strictPort\" \"wait-on http://localhost:5199 && cross-env VITE_PORT=5199 electron .\"",
     "build": "vite build",
     "build:electron": "vite build && electron-builder",
     "lint": "eslint .",
@@ -82,6 +82,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "electron": "^41.2.0",
     "electron-builder": "^26.8.1",
     "eslint": "^9.39.4",
