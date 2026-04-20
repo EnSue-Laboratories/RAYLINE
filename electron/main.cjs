@@ -5,6 +5,8 @@ const os = require("os");
 const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
 const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
 const {
+  startMulticaAgent,
+  cancelMulticaAgent,
   multicaSendCode,
   multicaVerifyCode,
   multicaListWorkspaces,
@@ -298,7 +300,15 @@ ipcMain.handle("read-image", async (_event, filePath) => {
 
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
-  if (opts.provider === "codex") {
+  if (opts.provider === "multica") {
+    startMulticaAgent(opts, event.sender).catch((err) => {
+      event.sender.send("agent-stream", {
+        conversationId: opts.conversationId,
+        event: { type: "multica:error", payload: { message: err?.message || String(err) } },
+      });
+      event.sender.send("agent-done", { conversationId: opts.conversationId });
+    });
+  } else if (opts.provider === "codex") {
     startCodexAgent(opts, event.sender);
   } else {
     startAgent(opts, event.sender);
@@ -308,6 +318,7 @@ ipcMain.on("agent-start", (event, opts) => {
 ipcMain.on("agent-cancel", (_event, { conversationId }) => {
   cancelAgent(conversationId);
   cancelCodexAgent(conversationId);
+  cancelMulticaAgent(conversationId);
 });
 
 ipcMain.on("agent-edit-resend", (event, opts) => {
