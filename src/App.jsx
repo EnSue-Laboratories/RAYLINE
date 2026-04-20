@@ -59,6 +59,106 @@ function getEffectiveConversationCwd(conversation, appCwd, draftsPath) {
   return appCwd || undefined;
 }
 
+function stripInjectedPromptMetadata(text) {
+  let next = typeof text === "string" ? text : String(text ?? "");
+  if (!next) return "";
+
+  const multicaSetupBlock = /^\s*<rayline-multica-setup>[\s\S]*?<\/rayline-multica-setup>\s*/;
+  const reminderBlock = /^\s*<system-reminder>[\s\S]*?<\/system-reminder>\s*/;
+  const primeBlock = /^\s*\[(?:Prior conversation context|Prior conversation with a different model)[^\]]*\][\s\S]*?\[End of prior conversation\]\s*(?:---\s*)?/;
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const withoutMulticaSetup = next.replace(multicaSetupBlock, "");
+    if (withoutMulticaSetup !== next) {
+      next = withoutMulticaSetup;
+      changed = true;
+    }
+    const withoutReminder = next.replace(reminderBlock, "");
+    if (withoutReminder !== next) {
+      next = withoutReminder;
+      changed = true;
+    }
+    const withoutPrime = next.replace(primeBlock, "");
+    if (withoutPrime !== next) {
+      next = withoutPrime;
+      changed = true;
+    }
+  }
+
+  return next.trim();
+}
+
+function sanitizeArchivedMessage(message) {
+  if (!message) return message;
+  if (message.role !== "user" || typeof message.text !== "string") return message;
+  const sanitizedText = stripInjectedPromptMetadata(message.text);
+  return sanitizedText === message.text ? message : { ...message, text: sanitizedText };
+}
+
+function isNonEmptyArchivedMessage(message) {
+  if (!message) return false;
+  if (message.role !== "user") return true;
+  return typeof message.text !== "string" || message.text.trim().length > 0;
+}
+
+function conversationHasInjectedPromptMetadata(messages) {
+  if (!Array.isArray(messages)) return false;
+  return messages.some((message) => {
+    if (!message || message.role !== "user" || typeof message.text !== "string") return false;
+    return stripInjectedPromptMetadata(message.text) !== message.text;
+  });
+}
+
+function normalizeMulticaCheckoutUrl(remoteUrl, remoteSlug) {
+  const slug = typeof remoteSlug === "string" ? remoteSlug.trim().replace(/\.git$/i, "") : "";
+  if (slug) return `https://github.com/${slug}`;
+
+  const raw = typeof remoteUrl === "string" ? remoteUrl.trim() : "";
+  if (!raw) return "";
+
+  const sshGitHub = raw.match(/^git@github\.com:(.+?)(?:\.git)?$/i);
+  if (sshGitHub?.[1]) return `https://github.com/${sshGitHub[1]}`;
+
+  const httpsGitHub = raw.match(/^https?:\/\/github\.com\/(.+?)(?:\.git)?$/i);
+  if (httpsGitHub?.[1]) return `https://github.com/${httpsGitHub[1]}`;
+
+  return raw.replace(/\.git$/i, "");
+}
+
+function buildMulticaSetupBlock({ remoteUrl, remoteSlug, branch, upstream, detached }) {
+  const checkoutUrl = normalizeMulticaCheckoutUrl(remoteUrl, remoteSlug);
+  if (!checkoutUrl && !branch && !upstream) return null;
+
+  const lines = [
+    "<rayline-multica-setup>",
+    "RayLine declared git context for this Multica chat.",
+  ];
+
+  if (checkoutUrl) {
+    lines.push(`Repository URL: ${checkoutUrl}`);
+  }
+  if (remoteSlug) {
+    lines.push(`GitHub repository: ${remoteSlug}`);
+  }
+  if (branch && !detached) {
+    lines.push(`Target branch: ${branch}`);
+  }
+  if (upstream) {
+    lines.push(`Tracked upstream: ${upstream}`);
+  }
+  if (detached) {
+    lines.push("The local checkout that launched this chat was in detached HEAD state, so verify the correct branch before editing.");
+  }
+  lines.push("Use this as the intended git context for the conversation.");
+  lines.push("Do not claim that this repo is currently checked out, or that you are on this branch, unless you verify that in your runtime.");
+  lines.push("Do not quote this setup block back unless the user explicitly asks.");
+  lines.push("</rayline-multica-setup>");
+
+  return lines.join("\n");
+}
+
 function truncateShellText(text) {
   if (!text) return "";
   if (text.length <= SHELL_TRANSCRIPT_LIMIT) return text;
@@ -446,7 +546,9 @@ function normalizeConversationState(conversation) {
   if (!conversation) return conversation;
 
   const archivedMessages = Array.isArray(conversation.archivedMessages)
-    ? conversation.archivedMessages.map(stripTransientMessageState)
+    ? conversation.archivedMessages
+      .map((message) => sanitizeArchivedMessage(stripTransientMessageState(message)))
+      .filter(isNonEmptyArchivedMessage)
     : [];
   const archivedMessageCount = archivedMessages.length;
   const sessionMap = new Map();
@@ -758,7 +860,9 @@ function buildPersistedConversationSnapshot(conversation, conversationData) {
 
   if (liveMessages.length === 0) return normalized;
 
-  const archivedMessages = serializeMessagesForState(liveMessages);
+  const archivedMessages = serializeMessagesForState(liveMessages)
+    .map(sanitizeArchivedMessage)
+    .filter(isNonEmptyArchivedMessage);
   const preview = getMessageTextPreview(liveMessages[liveMessages.length - 1]).slice(0, 60);
 
   return normalizeConversationState({
@@ -1614,7 +1718,9 @@ export default function App() {
               })
             );
           }
-        } catch {}
+        } catch {
+          // Ignore hydrate-time cwd/session recovery failures and keep loading.
+        }
       }
     });
   }, [stateLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1915,6 +2021,39 @@ export default function App() {
     []
   );
 
+  const buildMulticaBootstrapPrompt = useCallback(async (effectiveCwd, prompt) => {
+    if (!effectiveCwd || !window.api) return prompt;
+
+    const [status, remoteSlug, remoteResult] = await Promise.all([
+      window.api.gitStatus
+        ? window.api.gitStatus(effectiveCwd).catch(() => null)
+        : Promise.resolve(null),
+      window.api.gitRemoteSlug
+        ? window.api.gitRemoteSlug(effectiveCwd).catch(() => null)
+        : Promise.resolve(null),
+      window.api.shellRun
+        ? window.api.shellRun({ command: "git remote get-url origin", cwd: effectiveCwd }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+    const remoteUrl = (() => {
+      const stdout = remoteResult?.stdout?.trim?.() || "";
+      if (remoteResult?.exitCode === 0 && stdout) return stdout;
+      if (remoteSlug) return `https://github.com/${remoteSlug}.git`;
+      return "";
+    })();
+    const setup = buildMulticaSetupBlock({
+      remoteUrl,
+      remoteSlug,
+      branch: status?.branch || "",
+      upstream: status?.upstream || "",
+      detached: Boolean(status?.detached),
+    });
+
+    if (!setup) return prompt;
+    return `${setup}\n\n${prompt}`;
+  }, []);
+
   const sendMessageToConversation = useCallback(
     async ({ conversationId, conversation, text, attachments, titleText }) => {
       if (!conversationId || !conversation) return false;
@@ -1957,6 +2096,12 @@ export default function App() {
       const currentProvider = m.provider || "claude";
       // Multica context must be resolved BEFORE prepareMessage so a missing
       // context doesn't leave an orphan streaming assistant bubble.
+      const multicaSessionPolluted =
+        currentProvider === "multica" &&
+        (
+          conversationHasInjectedPromptMetadata(normalizedConversation.archivedMessages) ||
+          conversationHasInjectedPromptMetadata(thisConvoData.messages)
+        );
       let multicaContext, multicaToken;
       if (m.provider === "multica") {
         ({ context: multicaContext, token: multicaToken } = await ensureMulticaContextForConversation({
@@ -1965,6 +2110,7 @@ export default function App() {
           normalizedConversation,
           modelId: normalizedConversation.model,
           title: titleText || conversation?.title || normalizedConversation?.title || text.slice(0, 60),
+          forceNewSession: multicaSessionPolluted,
         }));
       }
       const prevProvider = isFirstMessage
@@ -2010,13 +2156,23 @@ export default function App() {
         needsFreshSession && currentProvider === "claude"
           ? seededSession?.nativeSessionId || undefined
           : undefined;
-      const prime = providerSwitched
-        ? buildCrossProviderPrime(thisConvoData.messages)
-        : needsHistoryPrimeFallback
-          ? buildConversationPrime(thisConvoData.messages)
-          : null;
+      const shouldDecoratePrompt = currentProvider !== "multica";
+      const prime = shouldDecoratePrompt
+        ? (
+            providerSwitched
+              ? buildCrossProviderPrime(thisConvoData.messages)
+              : needsHistoryPrimeFallback
+                ? buildConversationPrime(thisConvoData.messages)
+                : null
+          )
+        : null;
       const primedPrompt = prime ? decoratePromptWithPrime(text, prime) : text;
-      const wirePrompt = decoratePromptWithReminder(primedPrompt, missingCwdReminder);
+      let wirePrompt = shouldDecoratePrompt
+        ? decoratePromptWithReminder(primedPrompt, missingCwdReminder)
+        : text;
+      if (currentProvider === "multica" && needsFreshSession) {
+        wirePrompt = await buildMulticaBootstrapPrompt(effectiveCwd, text);
+      }
       const sendStartedAt = Date.now();
 
       if (isFirstMessage) {
@@ -2043,6 +2199,7 @@ export default function App() {
         initialSessionId: initialSessionId || null,
         resumeSessionId: canResumeExistingSession ? currentProviderSession.nativeSessionId : null,
         primeMode: providerSwitched ? "cross-provider" : (needsHistoryPrimeFallback ? "history-fallback" : null),
+        multicaSessionPolluted,
       });
 
       const pendingId = prepareMessage({
@@ -2149,7 +2306,7 @@ export default function App() {
 
       return started;
     },
-    [cwd, draftsPath, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
+    [buildMulticaBootstrapPrompt, cwd, draftsPath, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
   );
 
   const handleSend = useCallback(
@@ -2279,7 +2436,7 @@ export default function App() {
         titleText: text,
       });
     },
-    [activeConvo, active, activeData, appendLocalMessages, cwd, defaultModel, draftsPath, enqueueQueuedMessage, getConversation, sendMessageToConversation]
+    [activeConvo, active, activeData, appendLocalMessages, createConversationDraft, cwd, defaultModel, draftsPath, enqueueQueuedMessage, getConversation, sendMessageToConversation]
   );
 
   // Process queued messages when streaming ends
@@ -2394,10 +2551,6 @@ export default function App() {
       prompt = `${opts.issueContext}\n\n${prompt}`;
     }
 
-    if (isMulticaModel && opts.branch) {
-      prompt = `Work on branch \`${opts.branch}\` — commit and push there. Your changes will be pulled down by the user locally.\n\n${prompt}`;
-    }
-
     if (prompt) {
       await sendMessageToConversation({
         conversationId: id,
@@ -2445,9 +2598,9 @@ export default function App() {
     if (active) cancelMessage(active);
   }, [active, cancelMessage]);
 
-  // v1 MVP: click-only reconnect + backfill for Multica conversations.
-  // Re-registers the main-process WS subscription and fetches any messages
-  // that arrived while we weren't listening. No auto-retry.
+  // Resume a Multica conversation after renderer restart / ws loss by
+  // re-registering the WS subscription and fetching any transcript messages
+  // that landed while we were disconnected.
   const handleMulticaReconnect = useCallback(async (conversationId, multicaCtx) => {
     if (!conversationId || !multicaCtx) return;
     const { loadMulticaState } = await import("./multica/store");
@@ -2468,10 +2621,13 @@ export default function App() {
         .filter((m) => m && m.id != null)
         .map((m) => {
           const role = m.role === "user" ? "user" : "assistant";
-          const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? "");
+          const rawText = typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? "");
+          const text = role === "user" ? stripInjectedPromptMetadata(rawText) : rawText;
+          if (role === "user" && !text) return null;
           if (role === "user") return { role, text, _multicaId: m.id };
           return { role, parts: [{ type: "text", text }], _multicaId: m.id };
-        });
+        })
+        .filter(Boolean);
       if (mapped.length > 0) {
         const existingMsgs = getConversation(conversationId).messages || [];
         const merged = mergeArchivedMessages(existingMsgs, mapped);
@@ -2493,12 +2649,54 @@ export default function App() {
     }
   }, [appendLocalMessages, getConversation, markMulticaConnected]);
 
+  const activeMulticaSessionId = activeConvo?._multica?.sessionId || null;
+  const activeMulticaServerUrl = activeConvo?._multica?.serverUrl || null;
+  const activeMulticaWorkspaceId = activeConvo?._multica?.workspaceId || null;
+  const activeMulticaWorkspaceSlug = activeConvo?._multica?.workspaceSlug || null;
+  const activeMulticaAgentId = activeConvo?._multica?.agentId || null;
+  const activeMulticaConnected = activeMulticaSessionId ? Boolean(activeData.multicaConnected) : true;
+  const multicaReconnectInFlightRef = useRef(new Set());
+
+  useEffect(() => {
+    if (showNewChatCard || !active || !activeMulticaSessionId || activeData.isStreaming || activeMulticaConnected) {
+      return;
+    }
+    if (multicaReconnectInFlightRef.current.has(active)) return;
+
+    const multicaCtx = {
+      sessionId: activeMulticaSessionId,
+      serverUrl: activeMulticaServerUrl,
+      workspaceId: activeMulticaWorkspaceId,
+      workspaceSlug: activeMulticaWorkspaceSlug,
+      agentId: activeMulticaAgentId,
+    };
+    multicaReconnectInFlightRef.current.add(active);
+    handleMulticaReconnect(active, multicaCtx)
+      .catch((err) => {
+        console.error("[multica] automatic reconnect failed:", err);
+      })
+      .finally(() => {
+        multicaReconnectInFlightRef.current.delete(active);
+      });
+  }, [
+    active,
+    activeData.isStreaming,
+    activeMulticaAgentId,
+    activeMulticaServerUrl,
+    activeMulticaSessionId,
+    activeMulticaWorkspaceId,
+    activeMulticaWorkspaceSlug,
+    activeMulticaConnected,
+    handleMulticaReconnect,
+    showNewChatCard,
+  ]);
+
   const handleEdit = useCallback(
     async (messageIndex, newText) => {
       if (!activeConvo) return;
       const normalizedConvo = normalizeConversationState(activeConvo);
       const m = getMOrMulticaFallback(normalizedConvo.model);
-      const convoCwd = normalizedConvo.cwd || cwd || undefined;
+      const convoCwd = getEffectiveConversationCwd(activeConvo, cwd, draftsPath);
       const currentMessages = getConversation(active).messages;
 
       // Restore git checkpoint to the state before this message
@@ -2549,7 +2747,7 @@ export default function App() {
         : needsHistoryPrimeFallback
           ? buildConversationPrime(priorMessages)
           : null;
-      const wirePrompt = prime ? decoratePromptWithPrime(newText, prime) : newText;
+      const primedPrompt = prime ? decoratePromptWithPrime(newText, prime) : newText;
 
       logSendFlow("handleEdit:start", {
         conversationId: active,
@@ -2577,6 +2775,10 @@ export default function App() {
           forceNewSession: true,
         }));
       }
+
+      const wirePrompt = currentProvider === "multica"
+        ? await buildMulticaBootstrapPrompt(convoCwd, newText)
+        : primedPrompt;
 
       const started = editAndResend({
         conversationId: active,
@@ -2620,7 +2822,7 @@ export default function App() {
         );
       }
     },
-    [activeConvo, active, cwd, editAndResend, ensureMulticaContextForConversation, getConversation, resolveConversationLastProvider, resolveConversationProviderSession]
+    [activeConvo, active, buildMulticaBootstrapPrompt, cwd, draftsPath, editAndResend, ensureMulticaContextForConversation, getConversation, resolveConversationLastProvider, resolveConversationProviderSession]
   );
 
   const handleModelChange = (modelId) => {
@@ -2729,8 +2931,6 @@ export default function App() {
         error: activeData.error,
       }
     : null;
-
-  const multicaConnected = convo?._multica ? Boolean(activeData.multicaConnected) : true;
 
   // Build convos for Sidebar
   const convosForSidebar = convoList.map((c) => {
@@ -2956,8 +3156,6 @@ export default function App() {
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
           developerMode={developerMode}
-          multicaConnected={multicaConnected}
-          onMulticaReconnect={handleMulticaReconnect}
         />
       )}
 

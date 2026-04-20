@@ -79,19 +79,13 @@ const ChatTranscript = memo(function ChatTranscript({
   );
 });
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, multicaConnected = true, onMulticaReconnect }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
   const [editingQueueId, setEditingQueueId] = useState(null);
   const [queueDraft, setQueueDraft] = useState("");
-  const [multicaReconnecting, setMulticaReconnecting] = useState(false);
-  const [multicaReconnectError, setMulticaReconnectError] = useState(null);
-  useEffect(() => {
-    setMulticaReconnectError(null);
-    setMulticaReconnecting(false);
-  }, [convo?.id]);
   const endRef  = useRef(null);
   const inRef   = useRef(null);
   const queueEditRef = useRef(null);
@@ -599,45 +593,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           messageBodyRef={messageBodyRef}
           endRef={endRef}
         />
-
-        {/* Multica manual reconnect pill — v1 MVP (Task 5.2). Visible only
-            when this convo has Multica context but the current renderer has
-            never received a multica:* event for it (happens after restart,
-            since the main-process ws pool is empty). */}
-        {!showNewChatCard && convo?._multica && !convo?.isStreaming && !multicaConnected && onMulticaReconnect && (
-          <div style={{ maxWidth: 640, width: "100%", margin: "4px auto 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-            <button
-              type="button"
-              disabled={multicaReconnecting}
-              onClick={async () => {
-                setMulticaReconnectError(null);
-                setMulticaReconnecting(true);
-                try {
-                  await onMulticaReconnect(convo.id, convo._multica);
-                } catch (e) {
-                  setMulticaReconnectError(e?.message || String(e));
-                } finally {
-                  setMulticaReconnecting(false);
-                }
-              }}
-              style={{
-                padding: "4px 12px",
-                fontSize: 11,
-                borderRadius: 999,
-                border: "1px solid rgba(255,255,255,0.12)",
-                background: "rgba(255,255,255,0.04)",
-                color: "rgba(255,255,255,0.7)",
-                cursor: multicaReconnecting ? "default" : "pointer",
-                opacity: multicaReconnecting ? 0.6 : 1,
-              }}
-            >
-              {multicaReconnecting ? "Reconnecting…" : "Reconnect & backfill"}
-            </button>
-            {multicaReconnectError && (
-              <div style={{ fontSize: 10, color: "rgba(255,120,120,0.85)" }}>{multicaReconnectError}</div>
-            )}
-          </div>
-        )}
       </div>
 
       {!showNewChatCard && convo?.msgs?.length > 0 && (
