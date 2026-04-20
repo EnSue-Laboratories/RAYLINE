@@ -2,12 +2,13 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
+import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
-import { DEFAULT_MODEL_ID, getM, normalizeModelId } from "./data/models";
+import { DEFAULT_MODEL_ID, getM, MODELS, normalizeModelId } from "./data/models";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
@@ -770,6 +771,7 @@ export default function App() {
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
   const [draftsPath, setDraftsPath] = useState(null);
   const [showNewChatCard, setShowNewChatCard] = useState(false);
+  const [showDispatchCard, setShowDispatchCard] = useState(false);
   const messageQueue = useRef([]);
   const [queuedMessages, setQueuedMessages] = useState([]);
   const labControlTimersRef = useRef(new Map());
@@ -1453,6 +1455,8 @@ export default function App() {
     modelId,
     ts,
     cwd: conversationCwd,
+    dispatchId,
+    tags,
   }) => {
     const provider = getM(modelId).provider || "claude";
     const seedSession = createConversationSession({
@@ -1474,6 +1478,8 @@ export default function App() {
       sessions: [seedSession],
       activeSessionId: seedSession.id,
       archivedMessages: [],
+      dispatchId,
+      tags,
     });
   }, []);
 
@@ -1990,7 +1996,7 @@ export default function App() {
   }, [active, activeData.isStreaming, handleSend]);
 
   const handleCreateChat = useCallback(async (opts) => {
-    const id = "c" + Date.now();
+    const id = opts.id || ("c" + Date.now());
     const effectiveCwd = opts.cwd !== undefined ? opts.cwd : (getMainRepoRoot(cwd) || undefined);
     const modelId = opts.model || defaultModel;
     const n = createConversationDraft({
@@ -1999,6 +2005,8 @@ export default function App() {
       modelId,
       ts: Date.now(),
       cwd: effectiveCwd,
+      dispatchId: opts.dispatchId,
+      tags: opts.tags,
     });
 
     if (opts.worktree && !opts.branch) {
@@ -2021,8 +2029,10 @@ export default function App() {
     }
 
     setConvoList((p) => [n, ...p]);
-    setActive(id);
-    setShowNewChatCard(false);
+    if (!opts.suppressActivate) {
+      setActive(id);
+      setShowNewChatCard(false);
+    }
 
     const projectRoot = getMainRepoRoot(opts.cwd || effectiveCwd);
     if (projectRoot && !projects[projectRoot]) {
@@ -2054,6 +2064,39 @@ export default function App() {
       });
     }
   }, [createConversationDraft, cwd, defaultModel, projects, sendMessageToConversation]);
+
+  const handleDispatch = useCallback(async (rows) => {
+    // rows: Array<{ prompt, attachments?, model?, cwd, branch, issueContext?, tag? }>
+    const dispatchId = "d" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+    const tasks = rows.map((row) => {
+      const chatId = "c" + Date.now() + "-" + Math.random().toString(36).slice(2, 6);
+      return {
+        row,
+        chatId,
+        promise: handleCreateChat({
+          id: chatId,
+          prompt: row.prompt,
+          attachments: row.attachments,
+          model: row.model || defaultModel,
+          cwd: row.cwd,
+          worktree: true,
+          branch: row.branch,
+          issueContext: row.issueContext,
+          dispatchId,
+          tags: ["dispatch", ...(row.tag ? [row.tag] : [])],
+          suppressActivate: true,
+        }).then(() => ({ ok: true, row, chatId })).catch((err) => ({ ok: false, row, chatId, error: err })),
+      };
+    });
+
+    const results = await Promise.all(tasks.map((t) => t.promise));
+    const firstSuccess = results.find((r) => r.ok);
+    if (firstSuccess) {
+      setActive(firstSuccess.chatId);
+      setShowNewChatCard(false);
+    }
+    return { dispatchId, results };
+  }, [handleCreateChat, defaultModel]);
 
   const handleCancel = useCallback(() => {
     if (active) cancelMessage(active);
@@ -2437,6 +2480,7 @@ export default function App() {
           active={active}
           onSelect={handleSelect}
           onNew={handleNew}
+          onOpenDispatch={() => setShowDispatchCard(true)}
           onDelete={handleDelete}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
@@ -2522,6 +2566,17 @@ export default function App() {
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
           developerMode={developerMode}
+        />
+      )}
+
+      {showDispatchCard && (
+        <DispatchCard
+          onClose={() => setShowDispatchCard(false)}
+          onDispatch={handleDispatch}
+          currentCwd={newChatDefaultCwd || undefined}
+          projects={projects}
+          defaultModel={defaultModel}
+          availableModels={MODELS}
         />
       )}
 
