@@ -972,6 +972,28 @@ export default function useAgent() {
     });
   }, []);
 
+  const replaceMessages = useCallback((conversationId, messages) => {
+    if (!conversationId) return;
+    const nextMessages = Array.isArray(messages)
+      ? messages.map((message) => ({
+          id: message.id || uid(),
+          ...message,
+        }))
+      : [];
+
+    setConversations((prev) => {
+      const next = new Map(prev);
+      const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
+      next.set(conversationId, {
+        ...convo,
+        messages: nextMessages,
+        isStreaming: false,
+        error: null,
+      });
+      return next;
+    });
+  }, []);
+
   const getConversation = useCallback((id) => {
     return conversations.get(id) || { messages: [], isStreaming: false, error: null };
   }, [conversations]);
@@ -997,6 +1019,7 @@ export default function useAgent() {
     cancelMessage,
     editAndResend,
     loadMessages,
+    replaceMessages,
     markMulticaConnected,
   };
 }

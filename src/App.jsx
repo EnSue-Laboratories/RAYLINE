@@ -923,6 +923,51 @@ function mergeArchivedMessages(existingMessages, loadedMessages) {
   return loaded.length > existing.length ? loaded : existing;
 }
 
+function areArchivedMessageListsEqual(a, b) {
+  const left = Array.isArray(a) ? a : [];
+  const right = Array.isArray(b) ? b : [];
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    if (getArchivedMessageSignature(left[i]) !== getArchivedMessageSignature(right[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isArchivedMessagePrefix(prefixMessages, fullMessages) {
+  const prefix = Array.isArray(prefixMessages) ? prefixMessages : [];
+  const full = Array.isArray(fullMessages) ? fullMessages : [];
+  if (prefix.length > full.length) return false;
+  for (let i = 0; i < prefix.length; i += 1) {
+    if (getArchivedMessageSignature(prefix[i]) !== getArchivedMessageSignature(full[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function collapseRepeatedRemoteBackfill(existingMessages, remoteMessages) {
+  const existing = Array.isArray(existingMessages) ? existingMessages : [];
+  const remote = Array.isArray(remoteMessages) ? remoteMessages : [];
+  if (existing.length === 0 || remote.length === 0) return existing;
+  if (existing.length <= remote.length || existing.length % remote.length !== 0) return existing;
+
+  const remoteSignatures = remote.map(getArchivedMessageSignature);
+  const repeatCount = existing.length / remote.length;
+  if (repeatCount < 2) return existing;
+
+  for (let repeat = 0; repeat < repeatCount; repeat += 1) {
+    for (let i = 0; i < remote.length; i += 1) {
+      if (getArchivedMessageSignature(existing[(repeat * remote.length) + i]) !== remoteSignatures[i]) {
+        return existing;
+      }
+    }
+  }
+
+  return remote;
+}
+
 export default function App() {
   const {
     conversations,
@@ -933,6 +978,7 @@ export default function App() {
     cancelMessage,
     editAndResend,
     loadMessages,
+    replaceMessages,
     markMulticaConnected,
   } = useAgent();
   const terminal = useTerminal();
@@ -2629,10 +2675,25 @@ export default function App() {
         })
         .filter(Boolean);
       if (mapped.length > 0) {
-        const existingMsgs = getConversation(conversationId).messages || [];
-        const merged = mergeArchivedMessages(existingMsgs, mapped);
-        const tail = merged.slice(existingMsgs.length);
-        if (tail.length > 0) appendLocalMessages(conversationId, tail);
+        const liveMessages = getConversation(conversationId).messages || [];
+        const persistedMessages =
+          normalizeConversationState(convoList.find((conversation) => conversation.id === conversationId))
+            ?.archivedMessages || [];
+        const baseMessages = liveMessages.length > 0 ? liveMessages : persistedMessages;
+        const repairedBaseMessages = collapseRepeatedRemoteBackfill(baseMessages, mapped);
+        const merged = mergeArchivedMessages(repairedBaseMessages, mapped);
+
+        if (areArchivedMessageListsEqual(liveMessages, merged)) {
+          return;
+        }
+
+        if (liveMessages.length > 0 && isArchivedMessagePrefix(liveMessages, merged)) {
+          const tail = merged.slice(liveMessages.length);
+          if (tail.length > 0) appendLocalMessages(conversationId, tail);
+          return;
+        }
+
+        replaceMessages(conversationId, merged);
       }
     } catch (err) {
       // `err.status` is set by rest() in the main process but does not survive
@@ -2647,7 +2708,7 @@ export default function App() {
       }
       throw err;
     }
-  }, [appendLocalMessages, getConversation, markMulticaConnected]);
+  }, [appendLocalMessages, convoList, getConversation, markMulticaConnected, replaceMessages]);
 
   const activeMulticaSessionId = activeConvo?._multica?.sessionId || null;
   const activeMulticaServerUrl = activeConvo?._multica?.serverUrl || null;
@@ -2655,10 +2716,23 @@ export default function App() {
   const activeMulticaWorkspaceSlug = activeConvo?._multica?.workspaceSlug || null;
   const activeMulticaAgentId = activeConvo?._multica?.agentId || null;
   const activeMulticaConnected = activeMulticaSessionId ? Boolean(activeData.multicaConnected) : true;
+  const activeMulticaHydrated =
+    !activeMulticaSessionId ||
+    activeData.messages.length > 0 ||
+    !Array.isArray(activeConvo?.archivedMessages) ||
+    activeConvo.archivedMessages.length === 0;
   const multicaReconnectInFlightRef = useRef(new Set());
 
   useEffect(() => {
-    if (showNewChatCard || !active || !activeMulticaSessionId || activeData.isStreaming || activeMulticaConnected) {
+    if (
+      !stateLoaded ||
+      showNewChatCard ||
+      !active ||
+      !activeMulticaSessionId ||
+      activeData.isStreaming ||
+      activeMulticaConnected ||
+      !activeMulticaHydrated
+    ) {
       return;
     }
     if (multicaReconnectInFlightRef.current.has(active)) return;
@@ -2687,7 +2761,9 @@ export default function App() {
     activeMulticaWorkspaceId,
     activeMulticaWorkspaceSlug,
     activeMulticaConnected,
+    activeMulticaHydrated,
     handleMulticaReconnect,
+    stateLoaded,
     showNewChatCard,
   ]);
 
