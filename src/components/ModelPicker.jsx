@@ -8,7 +8,15 @@ const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 const MIN_MENU_WIDTH = 220;
 
-export default function ModelPicker({ value, onChange, extraModels = [], extraError = null }) {
+function extractMulticaErrorStatus(err) {
+  if (!err) return null;
+  if (typeof err.status === "number") return err.status;
+  const msg = err.message || String(err);
+  const m = msg.match(/multica \S+ \S+ (\d+):/);
+  return m ? Number(m[1]) : null;
+}
+
+export default function ModelPicker({ value, onChange, extraModels = [], extraError = null, extraLoading = false }) {
   const s = useFontScale();
   const [open, set] = useState(false);
   const ref = useRef(null);
@@ -117,17 +125,142 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                   <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
                     {provider.toUpperCase()}
                   </div>
-                  {isMulticaEmpty && extraError && (() => {
-                    const raw = (extraError.message || String(extraError)).split("\n")[0];
-                    const text = raw.length > 80 ? raw.slice(0, 79) + "\u2026" : raw;
+                  {isMulticaEmpty && (() => {
+                    const status = extractMulticaErrorStatus(extraError);
+                    if (extraLoading && !extraError) {
+                      return (
+                        <button
+                          key="multica-loading"
+                          disabled
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "flex-start",
+                            width: "100%",
+                            padding: "9px 13px",
+                            background: "transparent",
+                            border: "none",
+                            borderRadius: 7,
+                            color: "rgba(255,255,255,0.4)",
+                            fontSize: s(11),
+                            fontFamily: "'JetBrains Mono',monospace",
+                            cursor: "default",
+                            textAlign: "left",
+                            opacity: 0.5,
+                          }}
+                        >
+                          {"Loading agents\u2026"}
+                        </button>
+                      );
+                    }
+                    if (extraError && status === 401) {
+                      return (
+                        <button
+                          key="multica-reconnect"
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent("open-multica-setup"));
+                            setMenuStyle(null);
+                            set(false);
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            width: "100%",
+                            padding: "9px 13px",
+                            background: "transparent",
+                            border: "none",
+                            borderRadius: 7,
+                            color: "rgba(255,255,255,0.4)",
+                            fontSize: s(11),
+                            fontFamily: "'JetBrains Mono',monospace",
+                            cursor: "pointer",
+                            textAlign: "left",
+                            transition: "all .12s",
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                        >
+                          {"Session expired \u2014 reconnect"}
+                        </button>
+                      );
+                    }
+                    if (extraError && (status === 403 || status === 404)) {
+                      const raw = (extraError.message || String(extraError)).split("\n")[0];
+                      const text = raw.length > 80 ? raw.slice(0, 79) + "\u2026" : raw;
+                      return (
+                        <button
+                          key="multica-error-verbatim"
+                          disabled
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "flex-start",
+                            width: "100%",
+                            padding: "9px 13px",
+                            background: "transparent",
+                            border: "none",
+                            borderRadius: 7,
+                            color: "rgba(255,255,255,0.4)",
+                            fontSize: s(11),
+                            fontFamily: "'JetBrains Mono',monospace",
+                            cursor: "not-allowed",
+                            textAlign: "left",
+                            opacity: 0.4,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                          title={extraError.message || String(extraError)}
+                        >
+                          {text}
+                        </button>
+                      );
+                    }
+                    if (extraError) {
+                      const raw = (extraError.message || String(extraError)).split("\n")[0];
+                      const text = raw.length > 80 ? raw.slice(0, 79) + "\u2026" : raw;
+                      return (
+                        <button
+                          key="multica-error"
+                          disabled
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "flex-start",
+                            width: "100%",
+                            padding: "9px 13px",
+                            background: "transparent",
+                            border: "none",
+                            borderRadius: 7,
+                            color: "rgba(255,255,255,0.4)",
+                            fontSize: s(11),
+                            fontFamily: "'JetBrains Mono',monospace",
+                            cursor: "not-allowed",
+                            textAlign: "left",
+                            opacity: 0.4,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                          title={extraError.message || String(extraError)}
+                        >
+                          {text}
+                        </button>
+                      );
+                    }
                     return (
                       <button
-                        key="multica-error"
-                        disabled
+                        key="multica-connect"
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent("open-multica-setup"));
+                          setMenuStyle(null);
+                          set(false);
+                        }}
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          justifyContent: "flex-start",
+                          justifyContent: "space-between",
                           width: "100%",
                           padding: "9px 13px",
                           background: "transparent",
@@ -136,49 +269,17 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                           color: "rgba(255,255,255,0.4)",
                           fontSize: s(11),
                           fontFamily: "'JetBrains Mono',monospace",
-                          cursor: "not-allowed",
+                          cursor: "pointer",
                           textAlign: "left",
-                          opacity: 0.4,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
+                          transition: "all .12s",
                         }}
-                        title={extraError.message || String(extraError)}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                       >
-                        {text}
+                        {"Connect Multica\u2026"}
                       </button>
                     );
                   })()}
-                  {isMulticaEmpty && !extraError && (
-                    <button
-                      key="multica-connect"
-                      onClick={() => {
-                        window.dispatchEvent(new CustomEvent("open-multica-setup"));
-                        setMenuStyle(null);
-                        set(false);
-                      }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        width: "100%",
-                        padding: "9px 13px",
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: 7,
-                        color: "rgba(255,255,255,0.4)",
-                        fontSize: s(11),
-                        fontFamily: "'JetBrains Mono',monospace",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all .12s",
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                    >
-                      {"Connect Multica\u2026"}
-                    </button>
-                  )}
                   {entries.map((mm) => (
                     <button
                       key={mm.id}
