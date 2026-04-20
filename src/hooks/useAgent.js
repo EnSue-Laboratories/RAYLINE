@@ -30,6 +30,16 @@ function freezeElapsed(msg) {
   return { ...rest, _elapsedMs: Date.now() - rest._startedAt };
 }
 
+function mapMulticaTaskMessage(p) {
+  switch (p.type) {
+    case "text": return { type: "text", text: p.content || "" };
+    case "tool_use": return { type: "tool_use", name: p.tool, args: p.input || {} };
+    case "tool_result": return { type: "tool_result", name: p.tool, result: p.output || "" };
+    case "error": return { type: "text", text: `_${p.content || "error"}_` };
+    default: return null;
+  }
+}
+
 function mergeUsage(prev, incoming) {
   if (!incoming) return prev || null;
   const base = prev || {};
@@ -268,6 +278,49 @@ export default function useAgent() {
           }
           return lastMsg;
         };
+
+        if (typeof event.type === "string" && event.type.startsWith("multica:")) {
+          const assistant = ensureAssistant();
+          const inner = event.type.slice("multica:".length);
+          const p = event.payload || {};
+
+          if (inner === "chat:message" && p.role === "user") {
+            // Server echoes the user message — already appended locally; ignore.
+            return next;
+          }
+
+          if (inner === "task:message") {
+            const part = mapMulticaTaskMessage(p);
+            if (!part) return next;
+            const parts = [...(assistant.parts || []), part];
+            msgs[msgs.length - 1] = { ...assistant, parts, isStreaming: true };
+            next.set(conversationId, { ...convo, messages: msgs, isStreaming: true });
+            return next;
+          }
+
+          if (inner === "agent:status") {
+            // Broadcast so the picker can refresh tags. Don't mutate the transcript.
+            window.dispatchEvent(new CustomEvent("multica-agent-status", { detail: p.agent }));
+            return next;
+          }
+
+          if (inner === "chat:done" || inner === "task:completed") {
+            msgs[msgs.length - 1] = freezeElapsed({ ...assistant, isStreaming: false });
+            next.set(conversationId, { ...convo, messages: msgs, isStreaming: false });
+            return next;
+          }
+
+          if (inner === "task:failed" || inner === "task:cancelled" || inner === "error") {
+            msgs[msgs.length - 1] = freezeElapsed({
+              ...assistant, isStreaming: false,
+              parts: [...(assistant.parts || []), { type: "text", text: `_Multica ${inner}: ${p.message || p.reason || ""}_` }],
+            });
+            next.set(conversationId, { ...convo, messages: msgs, isStreaming: false, error: p.message || inner });
+            return next;
+          }
+
+          return next;
+        }
 
         if (event.type === "stream_event") {
           const inner = event.event;
@@ -813,7 +866,7 @@ export default function useAgent() {
     });
   }, []);
 
-  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession }) => {
+  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
     const expectedPendingId = pendingStartsRef.current.get(conversationId);
     if (pendingId && expectedPendingId !== pendingId) {
       console.log("[useAgent] Skipping stale or cancelled pending start", { conversationId, pendingId, expectedPendingId });
@@ -821,7 +874,12 @@ export default function useAgent() {
     }
     if (pendingId) pendingStartsRef.current.delete(conversationId);
     if (window.api) {
-      window.api.agentStart({ conversationId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession });
+      const payload = { conversationId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession };
+      if (provider === "multica") {
+        payload._multica = multicaContext;
+        payload._multicaToken = multicaToken;
+      }
+      window.api.agentStart(payload);
     }
     return true;
   }, []);

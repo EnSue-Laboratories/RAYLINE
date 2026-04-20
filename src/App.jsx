@@ -1996,6 +1996,20 @@ export default function App() {
         }
       }
 
+      let multicaContext, multicaToken;
+      if (m.provider === "multica") {
+        const { loadMulticaState } = await import("./multica/store");
+        const mState = loadMulticaState();
+        multicaToken = mState.token;
+        // The _multica context was attached at handleCreateChat (Task 3.1)
+        // onto the convoList row; `conversation` (and normalizedConversation)
+        // is that row, so read from it directly. (getConversation returns
+        // useAgent state which only tracks messages/isStreaming/error.)
+        multicaContext = normalizedConversation?._multica || conversation?._multica;
+        if (!multicaContext) throw new Error("Multica conversation missing _multica context");
+        if (!multicaToken) throw new Error("Multica not authenticated (no token)");
+      }
+
       const started = startPreparedMessage({
         conversationId,
         pendingId,
@@ -2008,6 +2022,8 @@ export default function App() {
         cwd: effectiveCwd,
         images: images?.length ? images : undefined,
         files: files?.length ? files : undefined,
+        multicaContext,
+        multicaToken,
       });
 
       if (started) {
