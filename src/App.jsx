@@ -1530,13 +1530,22 @@ export default function App() {
   };
 
   const handleCloseTab = useCallback((id) => {
+    const closingIndex = pinnedTabs.findIndex((tab) => tab.id === id);
+    const nextActiveId = active === id
+      ? (pinnedTabs[closingIndex - 1]?.id || pinnedTabs[closingIndex + 1]?.id || null)
+      : null;
+
     setConvoList((p) => {
       const next = p.map((c) => (c.id === id ? withTabPatch(c, unpinTabPatch()) : c));
       if (countPinnedTabs(next) >= 2) return next;
       tabPinRoundStateRef.current = "dismissed";
       return clearPinnedTabs(next);
     });
-  }, []);
+
+    if (nextActiveId) {
+      handleSelect(nextActiveId);
+    }
+  }, [active, handleSelect, pinnedTabs]);
 
   // Capture provider-native session IDs as they arrive from the agent streams.
   useEffect(() => {

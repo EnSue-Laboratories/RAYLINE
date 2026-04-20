@@ -41,19 +41,21 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
         transition: "background .15s, color .15s, backdrop-filter .15s",
       }}
     >
-      <span
-        aria-hidden
-        style={{
-          width: 5,
-          height: 5,
-          borderRadius: "50%",
-          background: dotColor,
-          flexShrink: 0,
-          animation: pulse ? "tabDotPulse 1.4s ease-in-out infinite" : "none",
-          boxShadow: state === "seen" ? "none" : `0 0 14px ${dotColor}`,
-          transition: "background .25s, box-shadow .25s",
-        }}
-      />
+      {!active && (
+        <span
+          aria-hidden
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: "50%",
+            background: dotColor,
+            flexShrink: 0,
+            animation: pulse ? "tabDotPulse 1.4s ease-in-out infinite" : "none",
+            boxShadow: state === "seen" ? "none" : `0 0 14px ${dotColor}`,
+            transition: "background .25s, box-shadow .25s",
+          }}
+        />
+      )}
       <span
         style={{
           fontSize: s(11.5),
