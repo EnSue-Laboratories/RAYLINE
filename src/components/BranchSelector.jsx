@@ -211,10 +211,6 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
 
   const handlePromoteWorktree = async () => {
     if (!confirmPromote || !mainWorktree) return;
-    if (worktreeLocked && cwd === confirmPromote.path) {
-      setPromoteError(worktreeLockMessage);
-      return;
-    }
     setPromoteError(null);
     setPromoting(true);
     try {
@@ -565,7 +561,6 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
               )}
               {filteredWorktrees.map((wt) => {
                 const isActive = wt.path === cwd;
-                const promoteLocked = worktreeLocked && isActive;
                 const isConfirming = confirmDelete?.type === "worktree" && confirmDelete.path === wt.path;
                 const isPromoting = confirmPromote?.path === wt.path;
 
@@ -758,13 +753,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     </button>
                     {mainWorktree && (
                       <button
-                        title={promoteLocked ? worktreeLockMessage : "Promote to main"}
+                        title="Promote to main"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (promoteLocked) {
-                            setError(worktreeLockMessage);
-                            return;
-                          }
                           setConfirmPromote({ path: wt.path, branch: wt.branch });
                           setPromoteError(null);
                           setConfirmDelete(null);
@@ -774,21 +765,13 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                           display: "flex", alignItems: "center", justifyContent: "center",
                           width: 22, height: 22, borderRadius: 5,
                           background: "transparent", border: "none",
-                          color: promoteLocked ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.15)",
-                          cursor: promoteLocked ? "default" : "pointer",
-                          opacity: hoveredRow === `wt-${wt.path}` ? (promoteLocked ? 0.55 : 1) : 0,
+                          color: "rgba(255,255,255,0.15)", cursor: "pointer",
+                          opacity: hoveredRow === `wt-${wt.path}` ? 1 : 0,
                           transition: "opacity .12s, color .12s",
                           flexShrink: 0, marginLeft: 4,
                         }}
-                        onMouseEnter={(e) => {
-                          if (promoteLocked) return;
-                          e.currentTarget.style.color = "rgba(180,220,255,0.7)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = promoteLocked
-                            ? "rgba(255,255,255,0.08)"
-                            : "rgba(255,255,255,0.15)";
-                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(180,220,255,0.7)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.15)"; }}
                       ><ArrowUpFromLine size={11} strokeWidth={2} /></button>
                     )}
                     {!isActive && (
