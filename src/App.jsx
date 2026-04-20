@@ -749,7 +749,9 @@ function isPersistableLiveMessage(message) {
 }
 
 function buildPersistedConversationSnapshot(conversation, conversationData) {
-  const normalized = normalizeConversationState(conversation);
+  // transient — resets per-session; never persist into normalized snapshot
+  const { multicaConnected: _multicaConnected, ...conversationForPersist } = conversation || {};
+  const normalized = normalizeConversationState(conversationForPersist);
   const liveMessages = Array.isArray(conversationData?.messages)
     ? conversationData.messages.filter(isPersistableLiveMessage)
     : [];
@@ -827,7 +829,6 @@ export default function App() {
     cancelMessage,
     editAndResend,
     loadMessages,
-    multicaConnectedRef,
     markMulticaConnected,
   } = useAgent();
   const terminal = useTerminal();
@@ -859,10 +860,6 @@ export default function App() {
   const [showNewChatCard, setShowNewChatCard] = useState(false);
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const [showMulticaSetup, setShowMulticaSetup] = useState(false);
-  // Bumped after a successful Multica reconnect to force a re-render so the
-  // "Reconnect & backfill" pill hides even when the backfill returned zero
-  // new messages (otherwise nothing else in render-state would have changed).
-  const [multicaReconnectTick, setMulticaReconnectTick] = useState(0);
   useEffect(() => {
     const h = () => setShowMulticaSetup(true);
     window.addEventListener("open-multica-setup", h);
@@ -2368,8 +2365,7 @@ export default function App() {
 
   // v1 MVP: click-only reconnect + backfill for Multica conversations.
   // Re-registers the main-process WS subscription and fetches any messages
-  // that arrived while we weren't listening. No auto-retry, no dedupe beyond
-  // "skip echoes of messages already in the transcript by id."
+  // that arrived while we weren't listening. No auto-retry.
   const handleMulticaReconnect = useCallback(async (conversationId, multicaCtx) => {
     if (!conversationId || !multicaCtx) return;
     const { loadMulticaState } = await import("./multica/store");
@@ -2377,24 +2373,42 @@ export default function App() {
     if (!token) throw new Error("Multica not authenticated (no token)");
     const { serverUrl, workspaceSlug, sessionId } = multicaCtx;
 
-    await window.api.multicaSubscribe({ conversationId, _multica: multicaCtx, token });
-    markMulticaConnected(conversationId);
+    try {
+      await window.api.multicaSubscribe({ conversationId, _multica: multicaCtx, token });
+      markMulticaConnected(conversationId);
 
-    const remote = await window.api.multicaListMessages({ serverUrl, token, workspaceSlug, sessionId });
-    const list = Array.isArray(remote) ? remote : (remote?.messages || remote?.data || []);
-    const existing = new Set((getConversation(conversationId).messages || []).map((m) => m?._multicaId).filter(Boolean));
-    const mapped = list
-      .filter((m) => m && m.id != null && !existing.has(m.id))
-      .map((m) => ({
-        // TODO: once the /messages response shape is exercised in anger,
-        // switch this to a dedicated mapMulticaListedMessage that preserves
-        // tool parts + assistant part ordering. For v1 MVP we flatten to text.
-        role: m.role === "user" ? "user" : "assistant",
-        text: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
-        _multicaId: m.id,
-      }));
-    if (mapped.length > 0) appendLocalMessages(conversationId, mapped);
-    setMulticaReconnectTick((t) => t + 1);
+      const remote = await window.api.multicaListMessages({ serverUrl, token, workspaceSlug, sessionId });
+      const list = Array.isArray(remote) ? remote : (remote?.messages || remote?.data || []);
+      // Map REST payload to the same archived-message shape the WS path builds
+      // (assistant: parts=[{type:"text", text}]; user: text string) so the
+      // signature-based dedupe in mergeArchivedMessages can align them.
+      const mapped = list
+        .filter((m) => m && m.id != null)
+        .map((m) => {
+          const role = m.role === "user" ? "user" : "assistant";
+          const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? "");
+          if (role === "user") return { role, text, _multicaId: m.id };
+          return { role, parts: [{ type: "text", text }], _multicaId: m.id };
+        });
+      if (mapped.length > 0) {
+        const existingMsgs = getConversation(conversationId).messages || [];
+        const merged = mergeArchivedMessages(existingMsgs, mapped);
+        const tail = merged.slice(existingMsgs.length);
+        if (tail.length > 0) appendLocalMessages(conversationId, tail);
+      }
+    } catch (err) {
+      // `err.status` is set by rest() in the main process but does not survive
+      // IPC serialization — fall back to parsing the message. `multicaSubscribe`
+      // can also reject via the ws path with a generic error; treat its auth
+      // failures the same way.
+      const msg = err?.message || "";
+      const status = err?.status ?? (msg.match(/\b(401|403)\b/) ? Number(msg.match(/\b(401|403)\b/)[1]) : null);
+      if (status === 401 || status === 403) {
+        window.dispatchEvent(new CustomEvent("open-multica-setup"));
+        throw new Error("Session expired — please reconnect Multica.");
+      }
+      throw err;
+    }
   }, [appendLocalMessages, getConversation, markMulticaConnected]);
 
   const handleEdit = useCallback(
@@ -2620,13 +2634,7 @@ export default function App() {
       }
     : null;
 
-  // Setting `multicaReconnectTick` forces a re-render that re-evaluates
-  // the ref read below, so the "Reconnect & backfill" pill hides after a
-  // successful reconnect even when the backfill returned zero messages.
-  void multicaReconnectTick;
-  const multicaConnected = convo?._multica
-    ? multicaConnectedRef.current.has(convo.id)
-    : true;
+  const multicaConnected = convo?._multica ? Boolean(activeData.multicaConnected) : true;
 
   // Build convos for Sidebar
   const convosForSidebar = convoList.map((c) => {

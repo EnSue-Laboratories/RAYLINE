@@ -188,12 +188,6 @@ export default function useAgent() {
   const cleanupRefs = useRef([]);
   const pendingStartsRef = useRef(new Map());
   const usageHydrationTimersRef = useRef(new Set());
-  // Set of conversationIds that have received at least one multica:* event
-  // since this renderer was mounted. Used by ChatArea to decide whether to
-  // show the "Reconnect & backfill" pill. Resets on restart (which is correct:
-  // the main-process wsPool is also empty on restart, so every Multica convo
-  // needs a click to rejoin).
-  const multicaConnectedRef = useRef(new Set());
 
   useEffect(() => {
     if (!window.api) return;
@@ -292,14 +286,19 @@ export default function useAgent() {
         if (typeof event.type === "string" && event.type.startsWith("multica:")) {
           const inner = event.type.slice("multica:".length);
           const p = event.payload || {};
-          multicaConnectedRef.current.add(conversationId);
+          // transient — resets per-session; stripped in buildPersistedConversationSnapshot
+          const connectedPatch = convo.multicaConnected ? null : { multicaConnected: true };
 
           // No-op branches return early WITHOUT running ensureAssistant — we
           // don't want a stray empty assistant bubble if a user echo arrives
           // before any task:message.
-          if (inner === "chat:message" && p.role === "user") return next;
+          if (inner === "chat:message" && p.role === "user") {
+            if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
+            return next;
+          }
           if (inner === "agent:status") {
             window.dispatchEvent(new CustomEvent("multica-agent-status", { detail: p.agent }));
+            if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
             return next;
           }
 
@@ -307,16 +306,19 @@ export default function useAgent() {
 
           if (inner === "task:message") {
             const part = mapMulticaTaskMessage(p);
-            if (!part) return next;
+            if (!part) {
+              if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
+              return next;
+            }
             const parts = [...(assistant.parts || []), part];
             msgs[msgs.length - 1] = { ...assistant, parts, isStreaming: true };
-            next.set(conversationId, { ...convo, messages: msgs, isStreaming: true });
+            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: true });
             return next;
           }
 
           if (inner === "chat:done" || inner === "task:completed") {
             msgs[msgs.length - 1] = freezeElapsed({ ...assistant, isStreaming: false });
-            next.set(conversationId, { ...convo, messages: msgs, isStreaming: false });
+            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false });
             return next;
           }
 
@@ -325,10 +327,11 @@ export default function useAgent() {
               ...assistant, isStreaming: false,
               parts: [...(assistant.parts || []), { type: "text", text: `_Multica ${inner}: ${p.message || p.reason || ""}_` }],
             });
-            next.set(conversationId, { ...convo, messages: msgs, isStreaming: false, error: p.message || inner });
+            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false, error: p.message || inner });
             return next;
           }
 
+          if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
           return next;
         }
 
@@ -962,7 +965,14 @@ export default function useAgent() {
 
   const markMulticaConnected = useCallback((conversationId) => {
     if (!conversationId) return;
-    multicaConnectedRef.current.add(conversationId);
+    setConversations((prev) => {
+      const next = new Map(prev);
+      const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
+      if (convo.multicaConnected) return prev;
+      // transient — resets per-session; stripped in buildPersistedConversationSnapshot
+      next.set(conversationId, { ...convo, multicaConnected: true });
+      return next;
+    });
   }, []);
 
   return {
@@ -974,7 +984,6 @@ export default function useAgent() {
     cancelMessage,
     editAndResend,
     loadMessages,
-    multicaConnectedRef,
     markMulticaConnected,
   };
 }
