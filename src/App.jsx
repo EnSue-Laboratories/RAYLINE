@@ -827,6 +827,8 @@ export default function App() {
     cancelMessage,
     editAndResend,
     loadMessages,
+    multicaConnectedRef,
+    markMulticaConnected,
   } = useAgent();
   const terminal = useTerminal();
 
@@ -857,6 +859,10 @@ export default function App() {
   const [showNewChatCard, setShowNewChatCard] = useState(false);
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const [showMulticaSetup, setShowMulticaSetup] = useState(false);
+  // Bumped after a successful Multica reconnect to force a re-render so the
+  // "Reconnect & backfill" pill hides even when the backfill returned zero
+  // new messages (otherwise nothing else in render-state would have changed).
+  const [multicaReconnectTick, setMulticaReconnectTick] = useState(0);
   useEffect(() => {
     const h = () => setShowMulticaSetup(true);
     window.addEventListener("open-multica-setup", h);
@@ -2360,6 +2366,37 @@ export default function App() {
     if (active) cancelMessage(active);
   }, [active, cancelMessage]);
 
+  // v1 MVP: click-only reconnect + backfill for Multica conversations.
+  // Re-registers the main-process WS subscription and fetches any messages
+  // that arrived while we weren't listening. No auto-retry, no dedupe beyond
+  // "skip echoes of messages already in the transcript by id."
+  const handleMulticaReconnect = useCallback(async (conversationId, multicaCtx) => {
+    if (!conversationId || !multicaCtx) return;
+    const { loadMulticaState } = await import("./multica/store");
+    const { token } = loadMulticaState();
+    if (!token) throw new Error("Multica not authenticated (no token)");
+    const { serverUrl, workspaceSlug, sessionId } = multicaCtx;
+
+    await window.api.multicaSubscribe({ conversationId, _multica: multicaCtx, token });
+    markMulticaConnected(conversationId);
+
+    const remote = await window.api.multicaListMessages({ serverUrl, token, workspaceSlug, sessionId });
+    const list = Array.isArray(remote) ? remote : (remote?.messages || remote?.data || []);
+    const existing = new Set((getConversation(conversationId).messages || []).map((m) => m?._multicaId).filter(Boolean));
+    const mapped = list
+      .filter((m) => m && m.id != null && !existing.has(m.id))
+      .map((m) => ({
+        // TODO: once the /messages response shape is exercised in anger,
+        // switch this to a dedicated mapMulticaListedMessage that preserves
+        // tool parts + assistant part ordering. For v1 MVP we flatten to text.
+        role: m.role === "user" ? "user" : "assistant",
+        text: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
+        _multicaId: m.id,
+      }));
+    if (mapped.length > 0) appendLocalMessages(conversationId, mapped);
+    setMulticaReconnectTick((t) => t + 1);
+  }, [appendLocalMessages, getConversation, markMulticaConnected]);
+
   const handleEdit = useCallback(
     async (messageIndex, newText) => {
       if (!activeConvo) return;
@@ -2582,6 +2619,14 @@ export default function App() {
         error: activeData.error,
       }
     : null;
+
+  // Setting `multicaReconnectTick` forces a re-render that re-evaluates
+  // the ref read below, so the "Reconnect & backfill" pill hides after a
+  // successful reconnect even when the backfill returned zero messages.
+  void multicaReconnectTick;
+  const multicaConnected = convo?._multica
+    ? multicaConnectedRef.current.has(convo.id)
+    : true;
 
   // Build convos for Sidebar
   const convosForSidebar = convoList.map((c) => {
@@ -2807,6 +2852,8 @@ export default function App() {
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
           developerMode={developerMode}
+          multicaConnected={multicaConnected}
+          onMulticaReconnect={handleMulticaReconnect}
         />
       )}
 

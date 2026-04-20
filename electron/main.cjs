@@ -13,6 +13,8 @@ const {
   multicaListAgents,
   multicaEnsureSession,
   multicaSendMessage,
+  multicaListMessages,
+  subscribeMulticaAgent,
 } = require("./multica-manager.cjs");
 const { buildSpawnPath, resolveCliBin } = require("./cli-bin-resolver.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
@@ -336,6 +338,8 @@ ipcMain.handle("multica-list-workspaces", (_e, args) => multicaListWorkspaces(ar
 ipcMain.handle("multica-list-agents", (_e, args) => multicaListAgents(args));
 ipcMain.handle("multica-ensure-session", (_e, args) => multicaEnsureSession(args));
 ipcMain.handle("multica-send-message", (_e, args) => multicaSendMessage(args));
+ipcMain.handle("multica-list-messages", (_e, args) => multicaListMessages(args));
+ipcMain.handle("multica-subscribe", (event, args) => subscribeMulticaAgent(args, event.sender));
 
 ipcMain.handle("rewind-files", async (_event, opts) => {
   return rewindFiles(opts);

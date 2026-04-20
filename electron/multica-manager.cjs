@@ -59,12 +59,14 @@ function rest({ serverUrl, method = "GET", path, token, workspaceSlug, body }) {
 module.exports = {
   startMulticaAgent,
   cancelMulticaAgent,
+  subscribeMulticaAgent,
   // Setup-flow helpers (called directly via ipcMain.handle, not via agent-start)
   multicaSendCode,
   multicaVerifyCode,
   multicaListWorkspaces,
   multicaListAgents,
   multicaEnsureSession, // used by handleCreateChat to create a session + push branch
+  multicaListMessages,
 };
 
 // Map<string, { ws, ready: Promise<void>, subscriptions: Map<conversationId, {sessionId, sender}> }>
@@ -185,6 +187,24 @@ async function multicaSendMessage({ serverUrl, token, workspaceSlug, sessionId, 
     serverUrl, method: "POST", path: `/api/chat/sessions/${sessionId}/messages`,
     token, workspaceSlug, body: { content },
   });
+}
+
+async function multicaListMessages({ serverUrl, token, workspaceSlug, sessionId }) {
+  return rest({
+    serverUrl, method: "GET", path: `/api/chat/sessions/${sessionId}/messages`,
+    token, workspaceSlug,
+  });
+}
+
+// Re-register a conversation's WS subscription after the pool was emptied
+// (e.g. after app restart, or after a ws close). v1 MVP is click-to-reconnect
+// only — the caller is ChatArea's Reconnect pill.
+async function subscribeMulticaAgent({ conversationId, _multica, token }, sender) {
+  if (!_multica) throw new Error("subscribeMulticaAgent: missing _multica context");
+  if (!token) throw new Error("subscribeMulticaAgent: missing token");
+  const { serverUrl, workspaceId, sessionId } = _multica;
+  const entry = await getOrOpenWS({ serverUrl, workspaceId, token });
+  entry.subscriptions.set(conversationId, { sessionId, sender });
 }
 
 // Expose sendMessage for startMulticaAgent (added later)
