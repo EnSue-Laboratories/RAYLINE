@@ -49,6 +49,18 @@ export function useMulticaModels() {
     return () => window.removeEventListener("multica-refresh", h);
   }, [refresh]);
 
+  useEffect(() => {
+    const h = (e) => {
+      const agent = e.detail;
+      if (!agent?.id) return;
+      setModels((prev) => prev.map((m) => m.agentId === agent.id
+        ? { ...m, tag: (agent.status || "unknown").toUpperCase(), status: agent.status }
+        : m));
+    };
+    window.addEventListener("multica-agent-status", h);
+    return () => window.removeEventListener("multica-agent-status", h);
+  }, []);
+
   return { models, loading, error, refresh, state };
 }
 
