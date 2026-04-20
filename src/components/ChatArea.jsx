@@ -30,32 +30,47 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const lastParts = lastMsg?.parts;
   const lastPartText = lastParts?.[lastParts.length - 1]?.text || lastMsg?.text;
   const prevMsgCount = useRef(0);
+  // Sticky follow-mode: true until the user actively scrolls up, flips back
+  // on when they return to the bottom. Ref (not state) so rapid streaming
+  // updates don't trigger re-renders and stay in sync with scroll events.
+  const followingRef = useRef(true);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
-    // Always scroll on new messages (count changed)
+    // New message → force follow on and smooth-scroll to bottom
     if (msgCount !== prevMsgCount.current) {
       prevMsgCount.current = msgCount;
+      followingRef.current = true;
       endRef.current?.scrollIntoView({ behavior: "smooth" });
       return;
     }
 
-    // During streaming, only scroll if near bottom
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 300;
-    if (nearBottom) {
-      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Streaming update → pin to bottom instantly so chunks can't outrun us
+    if (followingRef.current) {
+      endRef.current?.scrollIntoView({ behavior: "auto" });
     }
   }, [msgCount, convo?.isStreaming, lastPartText]);
 
-  // Track whether the user is near the bottom to toggle the scroll-to-bottom button
+  // Track whether the user is near the bottom to toggle the scroll-to-bottom
+  // button, and maintain follow-mode based on user scroll direction.
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    let lastScrollTop = el.scrollTop;
     const handleScroll = () => {
       const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      // scrollTop dropping means the user (or momentum) scrolled up
+      if (el.scrollTop < lastScrollTop - 2) {
+        followingRef.current = false;
+      }
+      // Reached the bottom again → resume following
+      if (distanceFromBottom < 40) {
+        followingRef.current = true;
+      }
+      lastScrollTop = el.scrollTop;
       setShowScrollToBottom(distanceFromBottom > 120);
     };
     handleScroll();
@@ -64,6 +79,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   }, [convo?.id, msgCount]);
 
   const scrollToBottom = useCallback(() => {
+    followingRef.current = true;
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
