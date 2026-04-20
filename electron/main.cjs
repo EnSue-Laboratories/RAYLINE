@@ -9,6 +9,8 @@ const {
   multicaVerifyCode,
   multicaListWorkspaces,
   multicaListAgents,
+  multicaEnsureSession,
+  multicaSendMessage,
 } = require("./multica-manager.cjs");
 const { buildSpawnPath, resolveCliBin } = require("./cli-bin-resolver.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
@@ -321,6 +323,8 @@ ipcMain.handle("multica-send-code", (_e, args) => multicaSendCode(args));
 ipcMain.handle("multica-verify-code", (_e, args) => multicaVerifyCode(args));
 ipcMain.handle("multica-list-workspaces", (_e, args) => multicaListWorkspaces(args));
 ipcMain.handle("multica-list-agents", (_e, args) => multicaListAgents(args));
+ipcMain.handle("multica-ensure-session", (_e, args) => multicaEnsureSession(args));
+ipcMain.handle("multica-send-message", (_e, args) => multicaSendMessage(args));
 
 ipcMain.handle("rewind-files", async (_event, opts) => {
   return rewindFiles(opts);

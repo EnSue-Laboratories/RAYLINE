@@ -9,7 +9,7 @@ import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
-import { DEFAULT_MODEL_ID, getM, MODELS, normalizeModelId } from "./data/models";
+import { DEFAULT_MODEL_ID, getM, isMulticaModelId, MODELS, normalizeModelId } from "./data/models";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
@@ -2225,6 +2225,38 @@ export default function App() {
       }
     }
 
+    const isMulticaModel = isMulticaModelId(modelId);
+    let multicaSession = null;
+    if (isMulticaModel) {
+      const { loadMulticaState } = await import("./multica/store");
+      const mState = loadMulticaState();
+      // Publish the branch so Multica's runtime can fetch.
+      if (n.cwd && opts.branch) {
+        try {
+          await window.api.gitPush(n.cwd);
+        } catch (err) {
+          throw new Error(`Failed to publish branch '${opts.branch}': ${err?.message || err}`);
+        }
+      }
+      // Resolve agent id from "multica:<uuid>" model id
+      const agentId = modelId.split(":")[1];
+      multicaSession = await window.api.multicaEnsureSession({
+        serverUrl: mState.serverUrl,
+        token: mState.token,
+        workspaceSlug: mState.workspaceSlug,
+        agentId,
+        title: opts.title || opts.prompt?.slice(0, 60) || "RayLine chat",
+      });
+      // Persist on the conversation so resume works after restart
+      n._multica = {
+        serverUrl: mState.serverUrl,
+        workspaceSlug: mState.workspaceSlug,
+        workspaceId: mState.workspaceId,
+        agentId,
+        sessionId: multicaSession.id,
+      };
+    }
+
     setConvoList((p) => [n, ...p]);
     if (!opts.suppressActivate) {
       setActive(id);
@@ -2250,6 +2282,10 @@ export default function App() {
     let prompt = opts.prompt || "";
     if (opts.issueContext) {
       prompt = `${opts.issueContext}\n\n${prompt}`;
+    }
+
+    if (isMulticaModel && opts.branch) {
+      prompt = `Work on branch \`${opts.branch}\` — commit and push there. Your changes will be pulled down by the user locally.\n\n${prompt}`;
     }
 
     if (prompt) {

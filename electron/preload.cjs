@@ -110,4 +110,6 @@ contextBridge.exposeInMainWorld("api", {
   multicaVerifyCode: (args) => ipcRenderer.invoke("multica-verify-code", args),
   multicaListWorkspaces: (args) => ipcRenderer.invoke("multica-list-workspaces", args),
   multicaListAgents: (args) => ipcRenderer.invoke("multica-list-agents", args),
+  multicaEnsureSession: (args) => ipcRenderer.invoke("multica-ensure-session", args),
+  multicaSendMessage: (args) => ipcRenderer.invoke("multica-send-message", args),
 });
