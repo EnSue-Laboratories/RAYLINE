@@ -24,10 +24,19 @@ function rest({ serverUrl, method = "GET", path, token, workspaceSlug, body }) {
     const req = mod.request({ method, hostname: u.hostname, port: u.port, path: u.pathname + u.search, headers }, (res) => {
       const chunks = [];
       res.on("data", (c) => chunks.push(c));
+      res.on("error", reject);
       res.on("end", () => {
         const text = Buffer.concat(chunks).toString("utf8");
         const isJson = (res.headers["content-type"] || "").startsWith("application/json");
-        const data = text ? (isJson ? JSON.parse(text) : text) : null;
+        let data = null;
+        if (text) {
+          if (isJson) {
+            try { data = JSON.parse(text); }
+            catch (e) { return reject(new Error(`multica ${method} ${path}: invalid JSON response: ${e.message}`)); }
+          } else {
+            data = text;
+          }
+        }
         if (res.statusCode >= 400) {
           const err = new Error(`multica ${method} ${path} ${res.statusCode}: ${typeof data === "string" ? data : JSON.stringify(data)}`);
           err.status = res.statusCode;
@@ -38,6 +47,9 @@ function rest({ serverUrl, method = "GET", path, token, workspaceSlug, body }) {
       });
     });
     req.on("error", reject);
+    req.setTimeout(15000, () => {
+      req.destroy(new Error(`multica ${method} ${path} timed out after 15s`));
+    });
     if (payload) req.write(payload);
     req.end();
   });
