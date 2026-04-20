@@ -8,6 +8,7 @@ import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
+import MulticaSetupModal from "./components/MulticaSetupModal";
 import { DEFAULT_MODEL_ID, getM, MODELS, normalizeModelId } from "./data/models";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
@@ -855,6 +856,12 @@ export default function App() {
   const [draftsPath, setDraftsPath] = useState(null);
   const [showNewChatCard, setShowNewChatCard] = useState(false);
   const [showDispatchCard, setShowDispatchCard] = useState(false);
+  const [showMulticaSetup, setShowMulticaSetup] = useState(false);
+  useEffect(() => {
+    const h = () => setShowMulticaSetup(true);
+    window.addEventListener("open-multica-setup", h);
+    return () => window.removeEventListener("open-multica-setup", h);
+  }, []);
   const messageQueue = useRef([]);
   const queueInterruptRequestedRef = useRef(new Set());
   const activeConversationIdRef = useRef(null);
@@ -2752,6 +2759,11 @@ export default function App() {
           availableModels={MODELS}
         />
       )}
+
+      <MulticaSetupModal
+        open={showMulticaSetup}
+        onClose={() => setShowMulticaSetup(false)}
+      />
 
       {/* Terminal drawer */}
       <TerminalDrawer

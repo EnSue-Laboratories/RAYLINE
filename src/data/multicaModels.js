@@ -43,6 +43,12 @@ export function useMulticaModels() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  useEffect(() => {
+    const h = () => { void refresh(); };
+    window.addEventListener("multica-refresh", h);
+    return () => window.removeEventListener("multica-refresh", h);
+  }, [refresh]);
+
   return { models, loading, error, refresh, state };
 }
 
