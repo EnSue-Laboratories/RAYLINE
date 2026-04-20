@@ -1,5 +1,40 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { X, GitBranch, FileText } from "lucide-react";
+import { X, GitBranch, FileText, Check } from "lucide-react";
+
+function TransparentCheckbox({ checked, onChange, ariaLabel }) {
+  return (
+    <label style={{ display: "inline-flex", alignItems: "center", cursor: "pointer", flexShrink: 0 }}>
+      <input
+        type="checkbox"
+        checked={!!checked}
+        onChange={(e) => onChange(e.target.checked)}
+        aria-label={ariaLabel}
+        style={{ opacity: 0, width: 0, height: 0, margin: 0, pointerEvents: "none" }}
+      />
+      <span
+        aria-hidden
+        style={{
+          width: 16, height: 16, borderRadius: 4,
+          border: "1px solid rgba(255,255,255,0.18)",
+          background: checked ? "rgba(255,255,255,0.08)" : "transparent",
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          transition: "border-color .15s, background .15s",
+        }}
+      >
+        <Check
+          size={11}
+          strokeWidth={2.4}
+          color="rgba(255,255,255,0.86)"
+          style={{
+            opacity: checked ? 1 : 0,
+            transform: checked ? "scale(1)" : "scale(0.75)",
+            transition: "opacity .12s ease, transform .12s ease",
+          }}
+        />
+      </span>
+    </label>
+  );
+}
 
 function slugifyBranch(text, fallbackIndex) {
   const slug = (text || "")
@@ -292,8 +327,12 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
       )}
 
       {rows.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <input type="checkbox" checked={allChecked} onChange={(e) => toggleAll(e.target.checked)} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderBottom: "1px solid var(--pane-border)" }}>
+          <TransparentCheckbox
+            checked={allChecked}
+            onChange={toggleAll}
+            ariaLabel="Select all issues"
+          />
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
             Select all ({rows.filter((r) => r.enabled).length}/{rows.length})
           </span>
@@ -318,10 +357,10 @@ function IssueRow({ row, availableModels, error, onChange }) {
   return (
     <div style={{ ...rowStyle(!!error), flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <input
-          type="checkbox"
+        <TransparentCheckbox
           checked={row.enabled}
-          onChange={(e) => onChange({ enabled: e.target.checked })}
+          onChange={(v) => onChange({ enabled: v })}
+          ariaLabel={`Select issue #${issue.number}`}
         />
         <button
           onClick={() => onChange({ expanded: !row.expanded })}
@@ -472,7 +511,7 @@ function ModelDropdown({ value, onChange, models, label }) {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        style={{ background: "rgba(255,255,255,0.05)", color: "white", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, padding: "4px 6px" }}
+        style={{ ...selectStyle, fontSize: 12, padding: "5px 24px 5px 10px" }}
       >
         {models.map((m) => (
           <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
@@ -484,19 +523,23 @@ function ModelDropdown({ value, onChange, models, label }) {
 
 // Styles — mirror NewChatCard.jsx conventions
 const backdropStyle = {
-  position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)",
+  position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
   display: "flex", alignItems: "center", justifyContent: "center",
   zIndex: 1000, backdropFilter: "blur(6px)",
 };
 const cardStyle = {
   width: 820, maxWidth: "90vw", maxHeight: "85vh",
-  background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: 10, display: "flex", flexDirection: "column",
+  background: "var(--pane-elevated)",
+  backdropFilter: "blur(48px) saturate(1.2)",
+  WebkitBackdropFilter: "blur(48px) saturate(1.2)",
+  border: "1px solid var(--pane-border)",
+  borderRadius: 12, display: "flex", flexDirection: "column",
   color: "white", fontFamily: "system-ui, sans-serif", fontSize: 13,
+  boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
 };
 const headerStyle = {
   display: "flex", justifyContent: "space-between", alignItems: "center",
-  padding: "14px 18px", borderBottom: "1px solid rgba(255,255,255,0.06)",
+  padding: "14px 18px", borderBottom: "1px solid var(--pane-border)",
 };
 const titleStyle = { fontSize: 14, fontWeight: 500 };
 const closeBtnStyle = {
@@ -505,12 +548,12 @@ const closeBtnStyle = {
 };
 const tabsStyle = {
   display: "flex", gap: 4, padding: "10px 14px 0",
-  borderBottom: "1px solid rgba(255,255,255,0.06)",
+  borderBottom: "1px solid var(--pane-border)",
 };
 const tabBtnStyle = (active) => ({
   display: "flex", gap: 6, alignItems: "center",
   padding: "8px 12px", borderRadius: "6px 6px 0 0",
-  background: active ? "rgba(255,255,255,0.06)" : "transparent",
+  background: active ? "var(--pane-hover)" : "transparent",
   color: active ? "white" : "rgba(255,255,255,0.55)",
   border: "none", borderBottom: active ? "1px solid white" : "1px solid transparent",
   cursor: "pointer", fontSize: 12,
@@ -518,43 +561,52 @@ const tabBtnStyle = (active) => ({
 const bodyStyle = { flex: 1, overflow: "auto", padding: 0 };
 const footerStyle = {
   display: "flex", justifyContent: "space-between", alignItems: "center",
-  padding: "12px 18px", borderTop: "1px solid rgba(255,255,255,0.06)",
+  padding: "12px 18px", borderTop: "1px solid var(--pane-border)",
 };
 const primaryBtnStyle = (enabled) => ({
   padding: "8px 14px", borderRadius: 6, border: "none",
-  background: enabled ? "white" : "rgba(255,255,255,0.15)",
+  background: enabled ? "white" : "rgba(255,255,255,0.1)",
   color: enabled ? "black" : "rgba(255,255,255,0.4)",
   cursor: enabled ? "pointer" : "not-allowed",
   fontSize: 12, fontWeight: 500,
 });
 
 const noticeStyle = {
-  background: "rgba(255,200,150,0.08)", border: "1px solid rgba(255,200,150,0.25)",
+  background: "rgba(255,200,150,0.06)", border: "1px solid rgba(255,200,150,0.18)",
   color: "rgba(255,200,150,0.9)", borderRadius: 6, padding: "8px 10px",
   fontSize: 12, marginBottom: 10,
 };
 const rowStyle = (hasError) => ({
-  border: "1px solid " + (hasError ? "rgba(255,180,180,0.4)" : "rgba(255,255,255,0.08)"),
+  border: "1px solid " + (hasError ? "rgba(255,180,180,0.35)" : "var(--pane-border)"),
   borderRadius: 8, padding: 10, marginBottom: 10,
   display: "flex", flexDirection: "column", gap: 8,
-  background: "rgba(255,255,255,0.02)",
+  background: "rgba(255,255,255,0.015)",
 });
 const textareaStyle = {
   width: "100%", minHeight: 48, resize: "vertical",
-  background: "rgba(255,255,255,0.04)", color: "white",
-  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6,
+  background: "var(--pane-hover)", color: "rgba(255,255,255,0.85)",
+  border: "1px solid var(--pane-border)", borderRadius: 6,
   padding: "6px 8px", fontSize: 12, fontFamily: "inherit",
+  outline: "none",
 };
 const rowControlsStyle = { display: "flex", gap: 8, alignItems: "center" };
 const inputStyle = {
-  flex: 1, background: "rgba(255,255,255,0.04)", color: "white",
-  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6,
-  padding: "5px 8px", fontSize: 11, fontFamily: "monospace",
+  flex: 1, background: "var(--pane-hover)", color: "rgba(255,255,255,0.85)",
+  border: "1px solid var(--pane-border)", borderRadius: 6,
+  padding: "5px 8px", fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
+  outline: "none",
 };
 const selectStyle = {
-  background: "rgba(255,255,255,0.04)", color: "white",
-  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6,
-  padding: "5px 6px", fontSize: 11,
+  background: "var(--pane-hover)", color: "rgba(255,255,255,0.85)",
+  border: "1px solid var(--pane-border)", borderRadius: 6,
+  padding: "5px 24px 5px 8px", fontSize: 11,
+  WebkitAppearance: "none",
+  appearance: "none",
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 8px center",
+  outline: "none",
+  cursor: "pointer",
 };
 const removeBtnStyle = {
   background: "none", border: "none", color: "rgba(255,255,255,0.4)",
