@@ -76,31 +76,43 @@ function wsKey({ serverUrl, workspaceId }) {
 
 async function getOrOpenWS({ serverUrl, workspaceId, token }) {
   const key = wsKey({ serverUrl, workspaceId });
+  // Return any pooled entry (CONNECTING or OPEN); callers await entry.ready
+  // before using it. Re-entrancy matters: two chats can fire concurrently.
   const existing = wsPool.get(key);
-  if (existing && existing.ws.readyState === WebSocket.OPEN) return existing;
+  if (existing) { await existing.ready; return existing; }
 
   const wsURL = serverUrl.replace(/^http/, "ws") + `/ws?workspace_id=${workspaceId}`;
   const ws = new WebSocket(wsURL);
-  const entry = { ws, subscriptions: new Map() };
-  const ready = new Promise((resolve, reject) => {
+  const entry = { ws, subscriptions: new Map(), ready: null };
+  entry.ready = new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (err) => {
+      if (settled) return;
+      settled = true;
+      if (err) { try { ws.close(); } catch { /* already closed */ } reject(err); }
+      else resolve();
+    };
     ws.once("open", () => {
       ws.send(JSON.stringify({ type: "auth", payload: { token } }));
     });
     ws.on("message", (raw) => {
       let msg; try { msg = JSON.parse(raw.toString()); } catch { return; }
-      if (msg.type === "auth_ack") return resolve();
-      if (msg.error) return reject(new Error(msg.error));
+      if (!settled) {
+        if (msg.type === "auth_ack") return done();
+        if (msg.error) return done(new Error(msg.error));
+      }
       dispatchWSMessage(key, msg);
     });
-    ws.once("error", reject);
+    ws.once("error", (e) => done(e instanceof Error ? e : new Error(String(e))));
     ws.once("close", () => {
       wsPool.delete(key);
+      // Reject pending opens so concurrent awaiters don't hang forever.
+      done(new Error("multica ws closed before auth_ack"));
       // TODO: reconnect with backoff (Phase 5)
     });
   });
-  entry.ready = ready;
   wsPool.set(key, entry);
-  await ready;
+  await entry.ready;
   return entry;
 }
 
@@ -111,11 +123,9 @@ function dispatchWSMessage(key, msg) {
   // Events are workspace-scoped; fan out to all subs that match session_id
   for (const [conversationId, sub] of entry.subscriptions.entries()) {
     const sid = payload?.chat_session_id || payload?.session_id;
-    // Some events (agent:status, task:completed w/o chat_session_id) are
-    // relevant to all subs of this workspace; forward those too.
-    const isBroadcast = type === "agent:status"
-      || (type === "task:completed" && payload?.chat_session_id && payload.chat_session_id === sub.sessionId)
-      || sid === sub.sessionId;
+    // agent:status is workspace-scoped (fan out to all subs). Everything else
+    // is gated by session id match.
+    const isBroadcast = type === "agent:status" || sid === sub.sessionId;
     if (!isBroadcast) continue;
     try {
       sub.sender.send("agent-stream", { conversationId, event: { type: `multica:${type}`, payload } });
