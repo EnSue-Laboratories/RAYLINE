@@ -4,7 +4,7 @@ import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as Termina
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
-import { ModelPickerWithMultica } from "../data/multicaModels";
+import { ModelPickerWithMultica } from "../data/multicaModels.jsx";
 import BranchSelector from "./BranchSelector";
 import GitStatusPill from "./GitStatusPill";
 import ImagePreview from "./ImagePreview";

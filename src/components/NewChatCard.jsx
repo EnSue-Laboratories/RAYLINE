@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { Paperclip, X, GitBranch, GitFork, Link2 } from "lucide-react";
-import { ModelPickerWithMultica } from "../data/multicaModels";
+import { ModelPickerWithMultica } from "../data/multicaModels.jsx";
 import ProjectPicker from "./ProjectPicker";
 import { useFontScale } from "../contexts/FontSizeContext";
 
