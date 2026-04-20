@@ -11,6 +11,7 @@
 const { URL } = require("node:url");
 const https = require("node:https");
 const http = require("node:http");
+const WebSocket = require("ws");
 
 function rest({ serverUrl, method = "GET", path, token, workspaceSlug, body }) {
   return new Promise((resolve, reject) => {
@@ -66,10 +67,82 @@ module.exports = {
   multicaEnsureSession, // used by handleCreateChat to create a session + push branch
 };
 
-// eslint-disable-next-line no-unused-vars
-async function startMulticaAgent(opts, sender) { throw new Error("not implemented"); }
-// eslint-disable-next-line no-unused-vars
-function cancelMulticaAgent(conversationId) { throw new Error("not implemented"); }
+// Map<string, { ws, ready: Promise<void>, subscriptions: Map<conversationId, {sessionId, sender}> }>
+const wsPool = new Map();
+
+function wsKey({ serverUrl, workspaceId }) {
+  return `${serverUrl}#${workspaceId}`;
+}
+
+async function getOrOpenWS({ serverUrl, workspaceId, token }) {
+  const key = wsKey({ serverUrl, workspaceId });
+  const existing = wsPool.get(key);
+  if (existing && existing.ws.readyState === WebSocket.OPEN) return existing;
+
+  const wsURL = serverUrl.replace(/^http/, "ws") + `/ws?workspace_id=${workspaceId}`;
+  const ws = new WebSocket(wsURL);
+  const entry = { ws, subscriptions: new Map() };
+  const ready = new Promise((resolve, reject) => {
+    ws.once("open", () => {
+      ws.send(JSON.stringify({ type: "auth", payload: { token } }));
+    });
+    ws.on("message", (raw) => {
+      let msg; try { msg = JSON.parse(raw.toString()); } catch { return; }
+      if (msg.type === "auth_ack") return resolve();
+      if (msg.error) return reject(new Error(msg.error));
+      dispatchWSMessage(key, msg);
+    });
+    ws.once("error", reject);
+    ws.once("close", () => {
+      wsPool.delete(key);
+      // TODO: reconnect with backoff (Phase 5)
+    });
+  });
+  entry.ready = ready;
+  wsPool.set(key, entry);
+  await ready;
+  return entry;
+}
+
+function dispatchWSMessage(key, msg) {
+  const entry = wsPool.get(key);
+  if (!entry) return;
+  const { type, payload } = msg;
+  // Events are workspace-scoped; fan out to all subs that match session_id
+  for (const [conversationId, sub] of entry.subscriptions.entries()) {
+    const sid = payload?.chat_session_id || payload?.session_id;
+    // Some events (agent:status, task:completed w/o chat_session_id) are
+    // relevant to all subs of this workspace; forward those too.
+    const isBroadcast = type === "agent:status"
+      || (type === "task:completed" && payload?.chat_session_id && payload.chat_session_id === sub.sessionId)
+      || sid === sub.sessionId;
+    if (!isBroadcast) continue;
+    try {
+      sub.sender.send("agent-stream", { conversationId, event: { type: `multica:${type}`, payload } });
+    } catch { /* sender destroyed */ }
+  }
+}
+
+async function startMulticaAgent(opts, sender) {
+  const { conversationId, prompt, _multica } = opts;
+  if (!_multica) throw new Error("startMulticaAgent: missing _multica context");
+  const { serverUrl, workspaceId, workspaceSlug, sessionId } = _multica;
+  const token = opts._multicaToken; // passed by useAgent from store
+  if (!token) throw new Error("startMulticaAgent: missing token");
+
+  const entry = await getOrOpenWS({ serverUrl, workspaceId, token });
+  entry.subscriptions.set(conversationId, { sessionId, sender });
+
+  // Fire the message via REST — the actual content comes back over WS
+  await multicaSendMessage({ serverUrl, token, workspaceSlug, sessionId, content: prompt });
+}
+
+function cancelMulticaAgent(conversationId) {
+  for (const entry of wsPool.values()) {
+    entry.subscriptions.delete(conversationId);
+  }
+  // TODO (Phase 5): POST /api/tasks/{taskId}/cancel if we tracked the task id
+}
 
 async function multicaSendCode({ serverUrl, email }) {
   return rest({ serverUrl, method: "POST", path: "/auth/send-code", body: { email } });
