@@ -1,20 +1,20 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
-import { MODELS, getM } from "../data/models";
+import { MODELS, getMOrMulticaFallback } from "../data/models";
 import { useFontScale } from "../contexts/FontSizeContext";
 
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 const MIN_MENU_WIDTH = 220;
 
-export default function ModelPicker({ value, onChange }) {
+export default function ModelPicker({ value, onChange, extraModels = [], extraError = null }) {
   const s = useFontScale();
   const [open, set] = useState(false);
   const ref = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
-  const m = getM(value);
+  const m = getMOrMulticaFallback(value, extraModels);
 
   const updateMenuPosition = useCallback(() => {
     if (!ref.current) return;
@@ -106,41 +106,110 @@ export default function ModelPicker({ value, onChange }) {
             WebkitAppRegion: "no-drag",
           }}
         >
-          {["claude", "codex"].map((provider, gi) => (
-            <div key={provider}>
-              {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
-              <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
-                {provider.toUpperCase()}
-              </div>
-              {MODELS.filter(mm => mm.provider === provider).map((mm) => (
-                <button
-                  key={mm.id}
-                  onClick={() => { onChange(mm.id); setMenuStyle(null); set(false); }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    width: "100%",
-                    padding: "9px 13px",
-                    background: mm.id === value ? "rgba(255,255,255,0.04)" : "transparent",
-                    border: "none",
-                    borderRadius: 7,
-                    color: mm.id === value ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
-                    fontSize: s(11),
-                    fontFamily: "'JetBrains Mono',monospace",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "all .12s",
-                  }}
-                  onMouseEnter={(e) => { if (mm.id !== value) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-                  onMouseLeave={(e) => { if (mm.id !== value) e.currentTarget.style.background = "transparent"; }}
-                >
-                  {mm.name}
-                  <span style={{ fontSize: s(9), opacity: 0.4, letterSpacing: ".1em" }}>{mm.tag}</span>
-                </button>
-              ))}
-            </div>
-          ))}
+          {(() => {
+            const all = [...MODELS, ...extraModels];
+            return ["claude", "codex", "multica"].map((provider, gi) => {
+              const entries = all.filter((mm) => mm.provider === provider);
+              const isMulticaEmpty = provider === "multica" && entries.length === 0;
+              return (
+                <div key={provider}>
+                  {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
+                  <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
+                    {provider.toUpperCase()}
+                  </div>
+                  {isMulticaEmpty && extraError && (() => {
+                    const raw = (extraError.message || String(extraError)).split("\n")[0];
+                    const text = raw.length > 80 ? raw.slice(0, 79) + "\u2026" : raw;
+                    return (
+                      <button
+                        key="multica-error"
+                        disabled
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "flex-start",
+                          width: "100%",
+                          padding: "9px 13px",
+                          background: "transparent",
+                          border: "none",
+                          borderRadius: 7,
+                          color: "rgba(255,255,255,0.4)",
+                          fontSize: s(11),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          cursor: "not-allowed",
+                          textAlign: "left",
+                          opacity: 0.4,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                        title={extraError.message || String(extraError)}
+                      >
+                        {text}
+                      </button>
+                    );
+                  })()}
+                  {isMulticaEmpty && !extraError && (
+                    <button
+                      key="multica-connect"
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent("open-multica-setup"));
+                        setMenuStyle(null);
+                        set(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        padding: "9px 13px",
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: 7,
+                        color: "rgba(255,255,255,0.4)",
+                        fontSize: s(11),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "all .12s",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {"Connect Multica\u2026"}
+                    </button>
+                  )}
+                  {entries.map((mm) => (
+                    <button
+                      key={mm.id}
+                      onClick={() => { onChange(mm.id); setMenuStyle(null); set(false); }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        padding: "9px 13px",
+                        background: mm.id === value ? "rgba(255,255,255,0.04)" : "transparent",
+                        border: "none",
+                        borderRadius: 7,
+                        color: mm.id === value ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+                        fontSize: s(11),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "all .12s",
+                      }}
+                      onMouseEnter={(e) => { if (mm.id !== value) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                      onMouseLeave={(e) => { if (mm.id !== value) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {mm.name}
+                      <span style={{ fontSize: s(9), opacity: 0.4, letterSpacing: ".1em" }}>{mm.tag}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            });
+          })()}
         </div>,
         document.body
       )}

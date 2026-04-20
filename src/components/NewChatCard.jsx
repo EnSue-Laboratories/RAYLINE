@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { Paperclip, X, GitBranch, GitFork, Link2 } from "lucide-react";
-import ModelPicker from "./ModelPicker";
+import { ModelPickerWithMultica } from "../data/multicaModels";
 import ProjectPicker from "./ProjectPicker";
 import { useFontScale } from "../contexts/FontSizeContext";
 
@@ -546,7 +546,7 @@ export default function NewChatCard({
 
         {/* Toolbar row */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <ModelPicker value={model} onChange={setModel} />
+          <ModelPickerWithMultica value={model} onChange={setModel} />
 
           {/* Attach */}
           <button onClick={handleAttach} style={toolBtnStyle(false)}

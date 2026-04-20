@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { loadMulticaState, saveMulticaState } from "../multica/store";
+import ModelPicker from "../components/ModelPicker";
 
 export function multicaAgentToModel(agent, state) {
   return {
@@ -43,4 +44,9 @@ export function useMulticaModels() {
   useEffect(() => { void refresh(); }, [refresh]);
 
   return { models, loading, error, refresh, state };
+}
+
+export function ModelPickerWithMultica({ value, onChange }) {
+  const { models, error } = useMulticaModels();
+  return <ModelPicker value={value} onChange={onChange} extraModels={models} extraError={error} />;
 }

@@ -4,7 +4,7 @@ import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as Termina
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
-import ModelPicker from "./ModelPicker";
+import { ModelPickerWithMultica } from "../data/multicaModels";
 import BranchSelector from "./BranchSelector";
 import GitStatusPill from "./GitStatusPill";
 import ImagePreview from "./ImagePreview";
@@ -523,7 +523,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               onRefocusTerminal={onRefocusTerminal}
             />
           )}
-          {!showNewChatCard && <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
+          {!showNewChatCard && <ModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
           {!showNewChatCard && developerMode && onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
