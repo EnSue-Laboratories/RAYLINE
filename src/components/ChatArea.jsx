@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { memo, useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
 import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
@@ -13,6 +13,71 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import TabStrip from "./TabStrip";
+
+const EMPTY_MESSAGES = [];
+
+const ChatTranscript = memo(function ChatTranscript({
+  showNewChatCard,
+  convo,
+  defaultModel,
+  defaultPrBranch,
+  newChatDefaultCwd,
+  allCwdRoots,
+  projects,
+  onPickFolder,
+  onCreateChat,
+  onCancelNewChat,
+  developerMode,
+  onEdit,
+  onAnswer,
+  onControlChange,
+  canControlTarget,
+  wallpaper,
+  messageBodyRef,
+  endRef,
+}) {
+  const messages = convo?.msgs || EMPTY_MESSAGES;
+
+  if (showNewChatCard) {
+    return (
+      <NewChatCard
+        defaultCwd={newChatDefaultCwd}
+        defaultModel={convo?.model || defaultModel}
+        defaultBranch={defaultPrBranch}
+        allCwdRoots={allCwdRoots}
+        projects={projects}
+        onPickFolder={onPickFolder}
+        onCreateChat={onCreateChat}
+        onCancel={onCancelNewChat}
+        developerMode={developerMode}
+      />
+    );
+  }
+
+  if (!convo || messages.length === 0) {
+    return <EmptyState model={convo?.model || "sonnet"} />;
+  }
+
+  return (
+    <div ref={messageBodyRef} style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
+      {messages.map((msg, index) => (
+        <Message
+          key={msg.id}
+          msg={msg}
+          messageIndex={index}
+          modelId={convo?.model || defaultModel}
+          canEdit={msg.role === "user" && msg.mode !== "shell-command"}
+          onEdit={onEdit}
+          onAnswer={onAnswer}
+          onControlChange={onControlChange}
+          canControlTarget={canControlTarget}
+          wallpaper={wallpaper}
+        />
+      ))}
+      <div ref={endRef} />
+    </div>
+  );
+});
 
 export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
   const s = useFontScale();
@@ -219,6 +284,12 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const removeAttachment = (index) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const handleTranscriptAnswer = useCallback((text) => {
+    onSend(text);
+  }, [onSend]);
+
+  const handlePickFolder = useCallback(() => window.api?.pickFolder?.(), []);
 
   const startQueuedEdit = useCallback((item) => {
     if (!item?.id) return;
@@ -502,37 +573,26 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           flexDirection: "column",
         }}
       >
-        {showNewChatCard ? (
-          <NewChatCard
-            defaultCwd={newChatDefaultCwd}
-            defaultModel={convo?.model || defaultModel}
-            defaultBranch={defaultPrBranch}
-            allCwdRoots={allCwdRoots}
-            projects={projects}
-            onPickFolder={() => window.api?.pickFolder?.()}
-            onCreateChat={onCreateChat}
-            onCancel={onCancelNewChat}
-            developerMode={developerMode}
-          />
-        ) : !convo || convo.msgs.length === 0 ? (
-          <EmptyState model={convo?.model || "sonnet"} />
-        ) : (
-          <div ref={messageBodyRef} style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
-            {convo.msgs.map((m, i) => (
-              <Message
-                key={m.id}
-                msg={m}
-                modelId={convo?.model || defaultModel}
-                onEdit={m.role === "user" && m.mode !== "shell-command" ? (newText) => onEdit(i, newText) : undefined}
-                onAnswer={m.role === "assistant" ? (text) => onSend(text) : undefined}
-                onControlChange={m.role === "assistant" ? onControlChange : undefined}
-                canControlTarget={m.role === "assistant" ? canControlTarget : undefined}
-                wallpaper={wallpaper}
-              />
-            ))}
-            <div ref={endRef} />
-          </div>
-        )}
+        <ChatTranscript
+          showNewChatCard={showNewChatCard}
+          convo={convo}
+          defaultModel={defaultModel}
+          defaultPrBranch={defaultPrBranch}
+          newChatDefaultCwd={newChatDefaultCwd}
+          allCwdRoots={allCwdRoots}
+          projects={projects}
+          onPickFolder={handlePickFolder}
+          onCreateChat={onCreateChat}
+          onCancelNewChat={onCancelNewChat}
+          developerMode={developerMode}
+          onEdit={onEdit}
+          onAnswer={handleTranscriptAnswer}
+          onControlChange={onControlChange}
+          canControlTarget={canControlTarget}
+          wallpaper={wallpaper}
+          messageBodyRef={messageBodyRef}
+          endRef={endRef}
+        />
       </div>
 
       {!showNewChatCard && convo?.msgs?.length > 0 && (
