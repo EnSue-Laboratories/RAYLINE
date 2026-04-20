@@ -33,7 +33,7 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
             ? "rgba(255,255,255,0.04)"
             : "rgba(255,255,255,0.018)",
         border: "none",
-        borderRadius: 999,
+        borderRadius: 7,
         cursor: "pointer",
         flexShrink: 0,
         maxWidth: 190,
@@ -79,7 +79,7 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
           justifyContent: "center",
           width: 15,
           height: 15,
-          borderRadius: 999,
+          borderRadius: 5,
           background: "transparent",
           border: "none",
           color: active ? "rgba(255,255,255,0.48)" : "rgba(255,255,255,0.34)",
