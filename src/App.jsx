@@ -2269,7 +2269,10 @@ export default function App() {
         agentId,
         title: opts.title || opts.prompt?.slice(0, 60) || "RayLine chat",
       });
-      // Persist on the conversation so resume works after restart
+      // Persist on the conversation so resume works after restart.
+      // Survives round-trip via normalizeConversationState's `...conversation` spread
+      // and JSON.stringify in electron/main.cjs. If an allowlist is ever added to
+      // either path, `_multica` must be explicitly included.
       n._multica = {
         serverUrl: mState.serverUrl,
         workspaceSlug: mState.workspaceSlug,
