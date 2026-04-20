@@ -11,6 +11,7 @@ import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import "katex/dist/katex.min.css";
 import CopyBtn from "./CopyBtn";
 import CopyImageBtn from "./CopyImageBtn";
+import ExportMessageBtn from "./ExportMessageBtn";
 import ToolCallBlock from "./ToolCallBlock";
 import AskUserQuestionBlock from "./AskUserQuestionBlock";
 import MermaidBlock from "./MermaidBlock";
@@ -290,6 +291,12 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
     }
     return msg.text || "";
   }, [msg.parts, msg.text]);
+  const canExportAssistantMessage = !msg.isStreaming && Boolean(
+    assistantText
+    || msg.text
+    || msg.parts?.length
+    || msg.toolCalls?.length
+  );
 
   // Strip [Attached files/images: ...] prefix from display text and extract file names
   let displayText = msg.text || "";
@@ -726,9 +733,14 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
         ))}
       </div>
 
-      {!msg.isStreaming && assistantText && (
+      {canExportAssistantMessage && (
         <div data-copy-image-ignore="true" style={{ marginTop: 8, display: "flex", gap: 6 }}>
-          <CopyBtn text={assistantText} title="Copy markdown" />
+          <ExportMessageBtn
+            message={msg}
+            markdownText={assistantText}
+            modelId={modelId}
+            messageIndex={messageIndex}
+          />
           <CopyImageBtn targetRef={assistantCaptureRef} wallpaper={wallpaper} />
         </div>
       )}
