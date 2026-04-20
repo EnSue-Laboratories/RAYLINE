@@ -264,7 +264,7 @@ export default function DispatchCard({
             disabled={!canDispatch}
             style={primaryBtnStyle(canDispatch)}
           >
-            Dispatch {activeRows.length || 0} task{activeRows.length === 1 ? "" : "s"}
+            Dispatch {activeRows.length || 0} agent{activeRows.length === 1 ? "" : "s"}
           </button>
         </footer>
       </div>
