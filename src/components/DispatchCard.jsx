@@ -473,35 +473,34 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
 
 function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
   return (
-    <div style={rowStyle(!!error)}>
+    <div style={customRowStyle(!!error)}>
       <textarea
         placeholder={`Task ${index + 1} prompt…`}
         value={row.prompt}
         onChange={(e) => onChange({ prompt: e.target.value })}
         rows={3}
-        style={textareaStyle}
-        {...fieldHoverProps}
+        style={customTextareaStyle}
       />
-      <div style={rowControlsStyle}>
+      <div style={customControlsStyle}>
         <input
           type="text"
           value={row.branch}
           placeholder="branch name"
           onChange={(e) => onChange({ branch: e.target.value })}
-          style={inputStyle}
-          {...fieldHoverProps}
+          style={customBranchStyle}
         />
+        <span style={customDividerStyle} aria-hidden />
         <select
           value={row.model}
           onChange={(e) => onChange({ model: e.target.value })}
-          style={selectStyle}
-          {...fieldHoverProps}
+          style={customSelectStyle}
         >
           <option value="">(default)</option>
           {availableModels.map((m) => (
             <option key={m.id} value={m.id}>{m.label || m.tag || m.id}</option>
           ))}
         </select>
+        <span style={customDividerStyle} aria-hidden />
         <AttachmentPicker
           attachments={row.attachments}
           onChange={(a) => onChange({ attachments: a })}
@@ -510,7 +509,7 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
           <X size={14} />
         </button>
       </div>
-      {error && <div style={errorStyle}>{error}</div>}
+      {error && <div style={customErrorStyle}>{error}</div>}
     </div>
   );
 }
@@ -663,16 +662,83 @@ const removeBtnStyle = {
   cursor: "pointer", fontSize: 13, padding: "4px 6px",
 };
 const addBtnStyle = {
-  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-  background: "rgba(255,255,255,0.02)",
-  border: "1px dashed rgba(255,255,255,0.08)",
-  color: "rgba(255,255,255,0.55)",
-  borderRadius: 7, padding: "14px 10px",
+  display: "inline-flex", alignItems: "center", gap: 6,
+  background: "transparent",
+  border: "none",
+  color: "rgba(255,255,255,0.5)",
+  padding: "6px 0",
+  marginTop: 2,
   cursor: "pointer", fontSize: 11,
   fontFamily: "'JetBrains Mono', monospace",
   letterSpacing: ".06em",
+  transition: "color .15s",
+};
+
+const customRowStyle = (hasError) => ({
+  border: "1px solid " + (hasError ? "rgba(255,180,180,0.35)" : "var(--pane-border)"),
+  borderRadius: 8,
+  marginBottom: 10,
+  background: "rgba(255,255,255,0.015)",
+  overflow: "hidden",
+  transition: "border-color .2s",
+});
+const customTextareaStyle = {
   width: "100%",
-  transition: "border-color .2s, color .2s",
+  minHeight: 72,
+  resize: "vertical",
+  background: "transparent",
+  color: "rgba(255,255,255,0.85)",
+  border: "none",
+  padding: "12px 12px 8px",
+  fontSize: 12,
+  fontFamily: "inherit",
+  outline: "none",
+  boxSizing: "border-box",
+};
+const customControlsStyle = {
+  display: "flex",
+  gap: 8,
+  alignItems: "center",
+  padding: "6px 10px 6px 12px",
+  borderTop: "1px solid rgba(255,255,255,0.04)",
+  background: "rgba(255,255,255,0.01)",
+};
+const customBranchStyle = {
+  flex: 1,
+  minWidth: 0,
+  background: "transparent",
+  color: "rgba(255,255,255,0.65)",
+  border: "none",
+  padding: "4px 0",
+  fontSize: 10,
+  fontFamily: "'JetBrains Mono', monospace",
+  letterSpacing: ".06em",
+  outline: "none",
+};
+const customSelectStyle = {
+  background: "transparent",
+  color: "rgba(255,255,255,0.5)",
+  border: "none",
+  padding: "4px 18px 4px 0",
+  fontSize: 10,
+  fontFamily: "'JetBrains Mono', monospace",
+  letterSpacing: ".06em",
+  WebkitAppearance: "none",
+  appearance: "none",
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.35)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 2px center",
+  outline: "none",
+  cursor: "pointer",
+};
+const customDividerStyle = {
+  width: 1, height: 12,
+  background: "rgba(255,255,255,0.06)",
+  flexShrink: 0,
+};
+const customErrorStyle = {
+  color: "rgba(255,180,180,0.9)", fontSize: 11,
+  padding: "0 12px 8px",
 };
 const errorStyle = {
   color: "rgba(255,180,180,0.9)", fontSize: 11, marginTop: 2,
