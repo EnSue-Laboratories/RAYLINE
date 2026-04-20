@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight, Zap } from "lucide-react";
+import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow } from "lucide-react";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
 import { getM } from "../data/models";
@@ -181,7 +181,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
           onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
-          <Zap size={15} strokeWidth={1.5} />
+          <Workflow size={15} strokeWidth={1.5} />
           Dispatch
         </button>
         {developerMode && (
