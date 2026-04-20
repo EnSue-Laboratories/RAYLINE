@@ -189,6 +189,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
   const showConversationTitle = Boolean(convo && !showNewChatCard);
   const topTabsLeft = sidebarOpen ? 18 : 104;
+  const headerContentOffset = showHeaderTabs ? 8 : 0;
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -244,7 +245,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       onDragLeave={handleDragLeave}
     >
       {/* Drag region matching sidebar spacer */}
-      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0 }} />
+      <div
+        style={{
+          height: WINDOW_DRAG_HEIGHT,
+          WebkitAppRegion: "drag",
+          flexShrink: 0,
+        }}
+      />
 
       {showHeaderTabs && (
         <div
@@ -317,10 +324,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       {/* Top bar — aligns with sidebar header */}
       <div
         style={{
-          padding: "0 24px 12px",
+          padding: `${headerContentOffset}px 24px 12px`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          transition: "padding-top .16s ease",
         }}
       >
         <div style={{

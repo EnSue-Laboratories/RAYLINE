@@ -119,7 +119,14 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Drag region + collapse button */}
-      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0, position: "relative" }}>
+      <div
+        style={{
+          height: WINDOW_DRAG_HEIGHT,
+          WebkitAppRegion: "drag",
+          flexShrink: 0,
+          position: "relative",
+        }}
+      >
         <button
           onClick={onToggleSidebar}
           style={{
