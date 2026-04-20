@@ -1529,6 +1529,25 @@ export default function App() {
     if (active === id) setActive(nextConversations[0]?.id || null);
   };
 
+  const pinnedTabs = useMemo(() => {
+    return convoList
+      .filter((c) => c.tab?.pinned)
+      .sort((a, b) => {
+        const aPinnedAt = Number(a.tab?.pinnedAt) || 0;
+        const bPinnedAt = Number(b.tab?.pinnedAt) || 0;
+        if (aPinnedAt !== bPinnedAt) return aPinnedAt - bPinnedAt;
+        return (a.ts || 0) - (b.ts || 0);
+      })
+      .map((c) => {
+        const data = getConversation(c.id);
+        return {
+          id: c.id,
+          title: c.title || "Untitled",
+          state: computeTabState(c, { isStreaming: Boolean(data.isStreaming) }),
+        };
+      });
+  }, [convoList, getConversation]);
+
   const handleCloseTab = useCallback((id) => {
     const closingIndex = pinnedTabs.findIndex((tab) => tab.id === id);
     const nextActiveId = active === id
@@ -2309,25 +2328,6 @@ export default function App() {
   }).filter((conversation) => (
     conversation.id === active || hasConversationMessages(conversation, { messages: conversation.msgs })
   ));
-
-  const pinnedTabs = useMemo(() => {
-    return convoList
-      .filter((c) => c.tab?.pinned)
-      .sort((a, b) => {
-        const aPinnedAt = Number(a.tab?.pinnedAt) || 0;
-        const bPinnedAt = Number(b.tab?.pinnedAt) || 0;
-        if (aPinnedAt !== bPinnedAt) return aPinnedAt - bPinnedAt;
-        return (a.ts || 0) - (b.ts || 0);
-      })
-      .map((c) => {
-        const data = getConversation(c.id);
-        return {
-          id: c.id,
-          title: c.title || "Untitled",
-          state: computeTabState(c, { isStreaming: Boolean(data.isStreaming) }),
-        };
-      });
-  }, [convoList, getConversation]);
 
   const tabs = useMemo(
     () => (pinnedTabs.length > 1 ? pinnedTabs : []),

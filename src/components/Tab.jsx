@@ -25,8 +25,9 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
         display: "flex",
         alignItems: "center",
         gap: 7,
+        width: "100%",
         height: 28,
-        padding: "0 7px 0 10px",
+        padding: "0 9px 0 11px",
         background: active
           ? "rgba(255,255,255,0.07)"
           : hover
@@ -35,8 +36,7 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
         border: "none",
         borderRadius: 7,
         cursor: "pointer",
-        flexShrink: 0,
-        maxWidth: 190,
+        minWidth: 0,
         backdropFilter: active ? "blur(12px) saturate(1.1)" : "none",
         transition: "background .15s, color .15s, backdrop-filter .15s",
       }}
@@ -58,6 +58,7 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
       )}
       <span
         style={{
+          flex: 1,
           fontSize: s(11.5),
           color: active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.66)",
           fontFamily: "system-ui, sans-serif",
