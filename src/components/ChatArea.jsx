@@ -23,6 +23,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const [queueDraft, setQueueDraft] = useState("");
   const endRef  = useRef(null);
   const inRef   = useRef(null);
+  const queueEditRef = useRef(null);
   const messageBodyRef = useRef(null);
 
   // Scroll to bottom on new messages and during streaming
@@ -260,6 +261,18 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       saveQueuedEdit(queueId);
     }
   }, [cancelQueuedEdit, saveQueuedEdit]);
+
+  useEffect(() => {
+    if (editingQueueId === null) return;
+    queueEditRef.current?.focus();
+  }, [editingQueueId]);
+
+  useEffect(() => {
+    const el = queueEditRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, 24), 52)}px`;
+  }, [editingQueueId, queueDraft]);
 
   // Selection toolbar handlers
   const handleQuote = useCallback((text) => {
@@ -574,50 +587,47 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         <div style={{ width: "100%", maxWidth: 560 }}>
           {queuedMessages && queuedMessages.length > 0 && (
             <div style={{ marginBottom: 8 }}>
-              <div
-                style={{
-                  marginBottom: 4,
-                  fontSize: s(9),
-                  fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.22)",
-                  letterSpacing: ".08em",
-                }}
-              >
-                RELEASES AT NEXT TOOL OR TURN BOUNDARY
-              </div>
               {queuedMessages.map((q, i) => {
                 const isEditingQueueItem = editingQueueId === q.id;
                 const attachmentCount = Array.isArray(q.attachments) ? q.attachments.length : 0;
+                const queueActionButtonStyle = {
+                  height: 24,
+                  padding: "0 9px",
+                  borderRadius: 7,
+                  border: "1px solid rgba(255,255,255,0.04)",
+                  background: "transparent",
+                  color: "rgba(255,255,255,0.3)",
+                  cursor: "pointer",
+                  fontSize: s(9),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: ".05em",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                };
                 return (
                   <div
                     key={q.id || i}
                     style={{
                       display: "flex",
-                      alignItems: "flex-start",
+                      alignItems: "center",
                       gap: 8,
-                      padding: "8px 10px",
+                      padding: "6px 8px",
                       marginBottom: 4,
-                      background: "rgba(255,255,255,0.03)",
-                      border: "1px solid rgba(255,255,255,0.05)",
-                      borderRadius: 8,
+                      background: "rgba(255,255,255,0.014)",
+                      border: "1px solid rgba(255,255,255,0.035)",
+                      borderRadius: 12,
                       fontSize: s(12),
-                      color: "rgba(255,255,255,0.52)",
+                      color: "rgba(255,255,255,0.44)",
                       fontFamily: "system-ui,sans-serif",
                     }}
                   >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          marginBottom: isEditingQueueItem ? 6 : 2,
-                        }}
-                      >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                         <span style={{
                           fontSize: s(9),
                           fontFamily: "'JetBrains Mono',monospace",
-                          color: "rgba(255,255,255,0.2)",
+                          color: "rgba(255,255,255,0.14)",
                           letterSpacing: ".06em",
                           flexShrink: 0,
                         }}>
@@ -627,42 +637,53 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                           <span style={{
                             fontSize: s(9),
                             fontFamily: "'JetBrains Mono',monospace",
-                            color: "rgba(255,255,255,0.18)",
+                            color: "rgba(255,255,255,0.13)",
                             letterSpacing: ".06em",
                           }}>
                             {attachmentCount} ATTACHMENT{attachmentCount === 1 ? "" : "S"}
                           </span>
                         )}
                       </div>
-                      {isEditingQueueItem ? (
-                        <textarea
-                          value={queueDraft}
-                          onChange={(event) => setQueueDraft(event.target.value)}
-                          onKeyDown={(event) => handleQueuedDraftKeyDown(event, q.id)}
-                          rows={Math.min(6, Math.max(2, queueDraft.split("\n").length))}
-                          style={{
-                            width: "100%",
-                            background: "rgba(255,255,255,0.03)",
-                            border: "1px solid rgba(255,255,255,0.08)",
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                            color: "rgba(255,255,255,0.9)",
-                            fontSize: s(12),
-                            lineHeight: 1.45,
-                            fontFamily: "inherit",
-                            resize: "vertical",
-                            minHeight: 56,
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}>
-                          {q.text}
-                        </div>
-                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {isEditingQueueItem ? (
+                          <textarea
+                            ref={queueEditRef}
+                            value={queueDraft}
+                            onChange={(event) => setQueueDraft(event.target.value)}
+                            onKeyDown={(event) => handleQueuedDraftKeyDown(event, q.id)}
+                            rows={1}
+                            style={{
+                              width: "100%",
+                              background: "rgba(255,255,255,0.014)",
+                              border: "1px solid rgba(255,255,255,0.05)",
+                              borderRadius: 7,
+                              padding: "2px 8px",
+                              color: "rgba(255,255,255,0.82)",
+                              fontSize: s(12),
+                              lineHeight: "18px",
+                              fontFamily: "inherit",
+                              resize: "none",
+                              minHeight: 24,
+                              maxHeight: 52,
+                              overflowY: "auto",
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            minHeight: 24,
+                            display: "flex",
+                            alignItems: "center",
+                            padding: "2px 8px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            lineHeight: "18px",
+                            color: "rgba(255,255,255,0.62)",
+                          }}>
+                            {q.text}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div
                       style={{
@@ -677,32 +698,16 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                           <button
                             onClick={() => saveQueuedEdit(q.id)}
                             style={{
-                              padding: "4px 8px",
-                              borderRadius: 6,
-                              border: "1px solid rgba(255,255,255,0.08)",
-                              background: "rgba(255,255,255,0.12)",
-                              color: "rgba(255,255,255,0.8)",
-                              cursor: "pointer",
-                              fontSize: s(10),
-                              fontFamily: "'JetBrains Mono',monospace",
-                              letterSpacing: ".04em",
+                              ...queueActionButtonStyle,
+                              background: "rgba(255,255,255,0.06)",
+                              color: "rgba(255,255,255,0.54)",
                             }}
                           >
                             SAVE
                           </button>
                           <button
                             onClick={cancelQueuedEdit}
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 6,
-                              border: "1px solid rgba(255,255,255,0.05)",
-                              background: "transparent",
-                              color: "rgba(255,255,255,0.4)",
-                              cursor: "pointer",
-                              fontSize: s(10),
-                              fontFamily: "'JetBrains Mono',monospace",
-                              letterSpacing: ".04em",
-                            }}
+                            style={queueActionButtonStyle}
                           >
                             CANCEL
                           </button>
@@ -711,35 +716,15 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                         <>
                           <button
                             onClick={() => startQueuedEdit(q)}
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 6,
-                              border: "1px solid rgba(255,255,255,0.05)",
-                              background: "transparent",
-                              color: "rgba(255,255,255,0.45)",
-                              cursor: "pointer",
-                              fontSize: s(10),
-                              fontFamily: "'JetBrains Mono',monospace",
-                              letterSpacing: ".04em",
-                            }}
+                            style={queueActionButtonStyle}
                           >
                             EDIT
                           </button>
                           <button
                             onClick={() => removeQueuedItem(q.id)}
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: 6,
-                              border: "1px solid rgba(255,255,255,0.05)",
-                              background: "transparent",
-                              color: "rgba(255,255,255,0.35)",
-                              cursor: "pointer",
-                              fontSize: s(10),
-                              fontFamily: "'JetBrains Mono',monospace",
-                              letterSpacing: ".04em",
-                            }}
+                            style={queueActionButtonStyle}
                           >
-                            UNQUEUE
+                            DELETE
                           </button>
                         </>
                       )}
