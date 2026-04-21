@@ -142,7 +142,7 @@ export default function ProjectManager() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [authOk, setAuthOk] = useState(null);
   const [authUser, setAuthUser] = useState(null);
-  const [authModalMode, setAuthModalMode] = useState(null); // null | "signin" | "switch"
+  const [authModalMode, setAuthModalMode] = useState(null); // null | "signin" | "add"
   const [showAddRepo, setShowAddRepo] = useState(false);
   const [showAccountManager, setShowAccountManager] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
@@ -186,7 +186,7 @@ export default function ProjectManager() {
     if (stateLoaded) {
       window.ghApi.savePmState({ repos });
     }
-  }, [repos]);
+  }, [repos, stateLoaded]);
 
   const handleAddRepo = (repo) => {
     if (!repos.includes(repo)) {
@@ -564,9 +564,14 @@ export default function ProjectManager() {
       {showAccountManager && (
         <AccountManager
           currentUser={authUser}
-          onSwitchAccount={() => {
+          onAddAccount={() => {
             setShowAccountManager(false);
-            setAuthModalMode("switch");
+            setAuthModalMode("add");
+          }}
+          onAccountSwitched={async () => {
+            await refreshAuth();
+            setSelectedItem(null);
+            setRefreshSignal((k) => k + 1);
           }}
           onSignedOut={async () => {
             setShowAccountManager(false);

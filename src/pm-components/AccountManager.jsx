@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { X, LogOut, UserCog, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, LogOut, ChevronDown, Loader2, Check, Plus } from "lucide-react";
 
 function GitHubGlyph({ size = 18 }) {
   return (
@@ -9,9 +9,90 @@ function GitHubGlyph({ size = 18 }) {
   );
 }
 
-export default function AccountManager({ currentUser, onSwitchAccount, onSignedOut, onClose }) {
+function cleanError(err, fallback) {
+  const msg = (err && err.message) || fallback;
+  return String(msg)
+    .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+    .replace(/^Error:\s*/i, "");
+}
+
+export default function AccountManager({
+  currentUser,
+  onAddAccount,
+  onAccountSwitched,
+  onSignedOut,
+  onClose,
+}) {
+  const [accounts, setAccounts] = useState([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [switchingUser, setSwitchingUser] = useState(null);
+  const [hoveredUser, setHoveredUser] = useState(null);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState(null);
+
+  const activeUser = currentUser || accounts.find((account) => account.active)?.login || null;
+
+  const loadAccounts = async () => {
+    setLoadingAccounts(true);
+    try {
+      const res = await window.ghApi.listAuthAccounts();
+      if (res && res.ok === false) {
+        throw new Error(res.error || "Failed to load GitHub accounts");
+      }
+      const nextAccounts = Array.isArray(res?.accounts) ? res.accounts : [];
+      setAccounts(nextAccounts);
+    } catch (err) {
+      setError(cleanError(err, "Failed to load GitHub accounts"));
+      setAccounts(currentUser ? [{ login: currentUser, active: true }] : []);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAccounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    setAccounts((prev) => {
+      if (!prev.length) return [{ login: currentUser, active: true }];
+      return prev.map((account) => ({
+        ...account,
+        active: account.login === currentUser,
+      }));
+    });
+  }, [currentUser]);
+
+  const handleSwitchAccount = async (login) => {
+    if (!login || login === activeUser || switchingUser || signingOut) {
+      setMenuOpen(false);
+      return;
+    }
+
+    setSwitchingUser(login);
+    setError(null);
+    try {
+      const res = await window.ghApi.switchAccount(login);
+      if (res && res.ok === false) {
+        throw new Error(res.error || "Switch account failed");
+      }
+      setAccounts((prev) => prev.map((account) => ({
+        ...account,
+        active: account.login === login,
+      })));
+      setMenuOpen(false);
+      if (onAccountSwitched) {
+        await onAccountSwitched(login);
+      }
+    } catch (err) {
+      setError(cleanError(err, "Switch account failed"));
+    } finally {
+      setSwitchingUser(null);
+    }
+  };
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -25,11 +106,7 @@ export default function AccountManager({ currentUser, onSwitchAccount, onSignedO
       }
       onSignedOut && onSignedOut();
     } catch (err) {
-      const msg = (err && err.message) || "Sign out failed";
-      const cleaned = msg
-        .replace(/^Error invoking remote method '[^']+':\s*/i, "")
-        .replace(/^Error:\s*/i, "");
-      setError(cleaned);
+      setError(cleanError(err, "Sign out failed"));
       setSigningOut(false);
     }
   };
@@ -61,7 +138,6 @@ export default function AccountManager({ currentUser, onSwitchAccount, onSignedO
           fontFamily: "system-ui, sans-serif",
         }}
       >
-        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -101,71 +177,173 @@ export default function AccountManager({ currentUser, onSwitchAccount, onSignedO
           </button>
         </div>
 
-        {/* Current user card */}
         <div style={{ padding: "14px 16px 8px" }}>
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: currentUser ? "12px 14px" : "14px",
+              width: "100%",
               borderRadius: 8,
               border: "1px solid var(--pane-border)",
               background: "var(--pane-hover)",
+              overflow: "hidden",
             }}
           >
-            <div style={{ color: "rgba(255,255,255,0.6)", display: "flex" }}>
-              <GitHubGlyph size={18} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {currentUser ? (
-                <>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      color: "rgba(255,255,255,0.35)",
-                      letterSpacing: ".08em",
-                      marginBottom: 2,
-                    }}
-                  >
-                    SIGNED IN AS
-                  </div>
+            <button
+              onClick={() => setMenuOpen((open) => !open)}
+              disabled={loadingAccounts || signingOut}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: activeUser ? "12px 14px" : "14px",
+                border: "none",
+                background: "transparent",
+                color: "rgba(255,255,255,0.85)",
+                textAlign: "left",
+                cursor: loadingAccounts || signingOut ? "default" : "pointer",
+              }}
+            >
+              <div style={{ color: "rgba(255,255,255,0.6)", display: "flex" }}>
+                <GitHubGlyph size={18} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {activeUser ? (
+                  <>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        color: "rgba(255,255,255,0.35)",
+                        letterSpacing: ".08em",
+                        marginBottom: 2,
+                      }}
+                    >
+                      SIGNED IN AS
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        color: "rgba(255,255,255,0.85)",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      @{activeUser}
+                    </div>
+                  </>
+                ) : (
                   <div
                     style={{
                       fontSize: 13,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      color: "rgba(255,255,255,0.85)",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
+                      color: "rgba(255,255,255,0.75)",
                     }}
                   >
-                    @{currentUser}
+                    {loadingAccounts ? "Loading GitHub accounts…" : "Signed in to GitHub"}
                   </div>
-                </>
+                )}
+              </div>
+              {loadingAccounts ? (
+                <Loader2
+                  size={14}
+                  strokeWidth={1.5}
+                  style={{ animation: "spin 1s linear infinite", color: "rgba(255,255,255,0.45)" }}
+                />
               ) : (
-                <div
+                <ChevronDown
+                  size={15}
+                  strokeWidth={1.5}
                   style={{
-                    fontSize: 13,
-                    fontFamily: "system-ui, sans-serif",
-                    color: "rgba(255,255,255,0.75)",
+                    color: "rgba(255,255,255,0.4)",
+                    transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform .18s ease",
                   }}
-                >
-                  Signed in to GitHub
-                </div>
+                />
               )}
-            </div>
+            </button>
+
+            {menuOpen && (
+              <div
+                style={{
+                  borderTop: "1px solid rgba(255,255,255,0.05)",
+                  background: "var(--pane-hover)",
+                }}
+              >
+                {accounts.map((account) => {
+                  const isActive = account.login === activeUser;
+                  const isSwitching = switchingUser === account.login;
+                  const isHovered = hoveredUser === account.login;
+                  return (
+                    <button
+                      key={account.login}
+                      onClick={() => handleSwitchAccount(account.login)}
+                      onMouseEnter={() => setHoveredUser(account.login)}
+                      onMouseLeave={() => setHoveredUser(null)}
+                      disabled={isSwitching || signingOut}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 12px",
+                        border: "none",
+                        borderTop: "1px solid rgba(255,255,255,0.04)",
+                        background: !isSwitching && isHovered ? "rgba(255,255,255,0.05)" : "transparent",
+                        color: "rgba(255,255,255,0.82)",
+                        textAlign: "left",
+                        cursor: isActive || isSwitching || signingOut ? "default" : "pointer",
+                        opacity: isSwitching ? 0.8 : 1,
+                      }}
+                    >
+                      <span style={{ display: "flex", color: "rgba(255,255,255,0.45)" }}>
+                        <GitHubGlyph size={16} />
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: 13,
+                            fontFamily: "'JetBrains Mono', monospace",
+                            color: isActive ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.78)",
+                          }}
+                        >
+                          @{account.login}
+                        </span>
+                        <span
+                          style={{
+                            display: "block",
+                            marginTop: 2,
+                            fontSize: 11,
+                            color: "rgba(255,255,255,0.35)",
+                          }}
+                        >
+                          {isActive ? "Current account" : "Switch to this account"}
+                        </span>
+                      </span>
+                      {isSwitching ? (
+                        <Loader2
+                          size={14}
+                          strokeWidth={1.5}
+                          style={{ animation: "spin 1s linear infinite", color: "rgba(255,255,255,0.45)" }}
+                        />
+                      ) : isActive ? (
+                        <Check size={14} strokeWidth={1.8} style={{ color: "rgba(255,255,255,0.6)" }} />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Actions */}
         <div style={{ padding: "4px 12px 12px" }}>
           <ActionRow
-            icon={<UserCog size={15} strokeWidth={1.5} />}
-            title="Switch account"
-            subtitle="Sign in as a different GitHub user"
-            onClick={onSwitchAccount}
+            icon={<Plus size={15} strokeWidth={1.5} />}
+            title="Add account"
+            subtitle="Sign in as another GitHub user"
+            onClick={onAddAccount}
           />
           <ActionRow
             icon={
@@ -180,7 +358,7 @@ export default function AccountManager({ currentUser, onSwitchAccount, onSignedO
               )
             }
             title={signingOut ? "Signing out…" : "Sign out"}
-            subtitle="Log out of the GitHub CLI on this device"
+            subtitle="Log out of the active GitHub account on this device"
             onClick={signingOut ? null : handleSignOut}
             danger
           />
