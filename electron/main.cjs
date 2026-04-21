@@ -1173,6 +1173,22 @@ ipcMain.handle("gh-current-branch", () => ghManager.getCurrentBranch());
 ipcMain.handle("gh-repo-default-branch", (_e, repo) => ghManager.getRepoDefaultBranch(repo));
 ipcMain.handle("gh-upload-image", (_e, repo, base64Data, filename) => ghManager.uploadImage(repo, base64Data, filename));
 
+// GitHub auth flow — streams events back to the requesting window.
+ipcMain.handle("gh-auth-logout", () => ghManager.logout());
+ipcMain.handle("gh-auth-start", (event) => {
+  const sender = event.sender;
+  ghManager.startWebAuth((payload) => {
+    if (sender.isDestroyed()) return;
+    sender.send("gh-auth-event", payload);
+    // Auto-open the verification page in the default browser.
+    if (payload.type === "browser" && payload.url) {
+      shell.openExternal(payload.url);
+    }
+  });
+  return { started: true };
+});
+ipcMain.handle("gh-auth-cancel", () => { ghManager.cancelWebAuth(); return true; });
+
 ipcMain.handle("gh-load-pm-state", async () => {
   try {
     if (fs.existsSync(stateFilePath)) {

@@ -1,6 +1,15 @@
 const { execFile, spawn } = require("child_process");
 const { buildSpawnPath, isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
 
+// node-pty is a native module — load lazily so the manager still loads even
+// if the prebuild is missing for the current Electron version.
+let pty;
+try {
+  pty = require("node-pty");
+} catch (e) {
+  console.error("[github-manager] node-pty failed to load:", e.message);
+}
+
 function log(...args) {
   console.log("[github-manager]", ...args);
 }
@@ -100,9 +109,162 @@ function ghWithRawStdin(args, input) {
 
 async function checkAuth() {
   try {
-    await gh(["auth", "status"]);
+    const out = await gh(["auth", "status", "--hostname", "github.com"]);
+    const user = parseAuthStatusUser(out);
+    return { ok: true, user };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+function parseAuthStatusUser(text) {
+  if (!text) return null;
+  // Match both newer ("account USERNAME") and older ("as USERNAME") phrasings.
+  const m =
+    text.match(/Logged in to [^\s]+ account ([^\s(]+)/i) ||
+    text.match(/Logged in to [^\s]+ as ([^\s(]+)/i);
+  return m ? m[1] : null;
+}
+
+// --- Interactive auth flow -------------------------------------------------
+// Drives `gh auth login --web` in a PTY so we can watch for the one-time
+// code, auto-press Enter on prompts, and surface progress to the UI.
+
+let activeAuthSession = null;
+
+function stripAnsi(s) {
+  return s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "");
+}
+
+function startWebAuth(onEvent) {
+  if (!pty) {
+    onEvent({ type: "error", error: "node-pty is unavailable; cannot run interactive auth." });
+    return { cancel() {} };
+  }
+  if (activeAuthSession) {
+    onEvent({ type: "error", error: "An auth flow is already in progress." });
+    return { cancel() {} };
+  }
+
+  let bin;
+  try { bin = resolveGhBin(); } catch (err) {
+    onEvent({ type: "error", error: err.message });
+    return { cancel() {} };
+  }
+
+  const proc = pty.spawn(
+    bin,
+    ["auth", "login", "--hostname", "github.com", "--web", "--git-protocol", "https", "--skip-ssh-key"],
+    {
+      name: "xterm-256color",
+      cols: 120,
+      rows: 30,
+      cwd: process.env.HOME || process.cwd(),
+      env: ghEnv(),
+    },
+  );
+
+  let buffer = "";
+  let codeSeen = false;
+  let enterSent = false;
+  let browserEventSent = false;
+  let authenticated = false;
+  let finished = false;
+
+  const finish = (event) => {
+    if (finished) return;
+    finished = true;
+    if (activeAuthSession && activeAuthSession.proc === proc) activeAuthSession = null;
+    onEvent(event);
+  };
+
+  const handleChunk = (raw) => {
+    const text = stripAnsi(raw);
+    buffer += text;
+    // Cap buffer so we don't grow unbounded on long flows.
+    if (buffer.length > 32 * 1024) buffer = buffer.slice(-16 * 1024);
+
+    // Extract one-time code once.
+    if (!codeSeen) {
+      const codeMatch = buffer.match(/one-time code:\s*([A-Z0-9][A-Z0-9-]{3,})/i);
+      if (codeMatch) {
+        codeSeen = true;
+        onEvent({ type: "code", code: codeMatch[1] });
+      }
+    }
+
+    // Auto-press Enter when gh asks.
+    if (!enterSent && /Press Enter to open/i.test(buffer)) {
+      enterSent = true;
+      try { proc.write("\r"); } catch {}
+      if (!browserEventSent) {
+        browserEventSent = true;
+        onEvent({ type: "browser", url: "https://github.com/login/device" });
+      }
+    }
+
+    // Respond "y" to any "already logged in" / re-auth confirmation.
+    if (/already logged into.*re-authenticate/i.test(buffer) && /\(Y\/n\)/i.test(buffer)) {
+      try { proc.write("y\r"); } catch {}
+    }
+
+    // Success markers from gh. `Logged in as` is the most reliable one across
+    // gh versions; `Authentication complete` is printed just before it.
+    if (!authenticated) {
+      const userMatch =
+        buffer.match(/Logged in as ([^\s*!]+)/i) ||
+        buffer.match(/✓ Logged in as ([^\s*!]+)/i);
+      if (userMatch) {
+        authenticated = true;
+        finish({ type: "success", user: userMatch[1] });
+      }
+    }
+  };
+
+  proc.onData(handleChunk);
+  proc.onExit(({ exitCode }) => {
+    if (finished) return;
+    if (exitCode === 0 && authenticated) {
+      // Already handled by the success marker above.
+      return;
+    }
+    if (exitCode === 0) {
+      // Flow completed but we never saw the username — treat as success and
+      // let the caller re-query auth status to pick up the user.
+      finish({ type: "success", user: null });
+    } else {
+      finish({
+        type: "error",
+        error: `gh auth login exited with code ${exitCode}`,
+        output: buffer.trim().slice(-500),
+      });
+    }
+  });
+
+  const session = {
+    proc,
+    cancel() {
+      if (finished) return;
+      try { proc.kill(); } catch {}
+      finish({ type: "cancelled" });
+    },
+  };
+  activeAuthSession = session;
+  return session;
+}
+
+function cancelWebAuth() {
+  if (activeAuthSession) activeAuthSession.cancel();
+}
+
+async function logout() {
+  // `gh auth logout -h github.com` doesn't prompt when an account is
+  // unambiguous. Swallow the "not logged in" case so repeated clicks are safe.
+  try {
+    await gh(["auth", "logout", "--hostname", "github.com"]);
     return { ok: true };
   } catch (err) {
+    if (/not logged in/i.test(err.message || "")) return { ok: true };
     return { ok: false, error: err.message };
   }
 }
@@ -315,6 +477,9 @@ async function getLinkedPRs(repo, issueNumber) {
 
 module.exports = {
   checkAuth,
+  startWebAuth,
+  cancelWebAuth,
+  logout,
   listUserRepos,
   listIssues,
   listPRs,

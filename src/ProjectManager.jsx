@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, UserCog } from "lucide-react";
 
 function GitHubIcon({ size = 48 }) {
   return (
@@ -10,6 +10,7 @@ function GitHubIcon({ size = 48 }) {
 }
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain from "./components/Grain";
+import AuthModal from "./pm-components/AuthModal";
 import CreateForm from "./pm-components/CreateForm";
 import RepoManager from "./pm-components/RepoManager";
 import IssueList from "./pm-components/IssueList";
@@ -139,6 +140,8 @@ export default function ProjectManager() {
   const [repoFilter, setRepoFilter] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [authOk, setAuthOk] = useState(null);
+  const [authUser, setAuthUser] = useState(null);
+  const [authModalMode, setAuthModalMode] = useState(null); // null | "signin" | "switch"
   const [showAddRepo, setShowAddRepo] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
   const [wallpaper, setWallpaper] = useState(null);
@@ -148,8 +151,15 @@ export default function ProjectManager() {
   const [freshIssue, setFreshIssue] = useState(null);
   const [freshPR, setFreshPR] = useState(null);
 
+  const refreshAuth = () =>
+    window.ghApi.checkAuth().then(({ ok, user }) => {
+      setAuthOk(ok);
+      setAuthUser(ok ? user || null : null);
+      return ok;
+    });
+
   useEffect(() => {
-    window.ghApi.checkAuth().then(({ ok }) => setAuthOk(ok));
+    refreshAuth();
     window.ghApi.loadPmState().then(({ repos, wallpaper: wp }) => {
       setRepos(repos);
       if (wp?.path) {
@@ -161,6 +171,14 @@ export default function ProjectManager() {
       setStateLoaded(true);
     });
   }, []);
+
+  const handleAuthSuccess = async () => {
+    await refreshAuth();
+    setAuthModalMode(null);
+    // Force lists and repo pickers to refetch under the new account.
+    setSelectedItem(null);
+    setRefreshSignal((k) => k + 1);
+  };
 
   useEffect(() => {
     if (stateLoaded) {
@@ -218,21 +236,36 @@ export default function ProjectManager() {
         <div style={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }}>
           GitHub CLI not authenticated
         </div>
-        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)" }}>
-          Run{" "}
-          <code
-            style={{
-              background: "var(--pane-interaction-hover-fill, var(--pane-hover))",
-              backdropFilter: "var(--pane-interaction-hover-filter, none)",
-              boxShadow: "var(--pane-interaction-hover-shadow, none)",
-              padding: "2px 6px",
-              borderRadius: 4,
-            }}
-          >
-            gh auth login
-          </code>{" "}
-          in your terminal
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", maxWidth: 360, textAlign: "center" }}>
+          Sign in with GitHub to browse your repos, issues, and pull requests.
         </div>
+        <button
+          onClick={() => setAuthModalMode("signin")}
+          style={{
+            marginTop: 4,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 18px",
+            borderRadius: 8,
+            border: "1px solid var(--pane-border)",
+            background: "rgba(255,255,255,0.1)",
+            color: "rgba(255,255,255,0.9)",
+            fontSize: 13,
+            fontFamily: "system-ui, sans-serif",
+            cursor: "pointer",
+          }}
+        >
+          <GitHubIcon size={14} /> Sign in with GitHub
+        </button>
+        {authModalMode && (
+          <AuthModal
+            mode={authModalMode}
+            currentUser={authUser}
+            onClose={() => setAuthModalMode(null)}
+            onAuthSuccess={handleAuthSuccess}
+          />
+        )}
       </div>
     );
   }
@@ -369,6 +402,50 @@ export default function ProjectManager() {
             {removeMode ? "DONE" : "MANAGE REPOS"}
           </button>
         </div>
+
+        {/* Account footer: signed-in user + switch-account button */}
+        <div
+          style={{
+            padding: "10px 12px",
+            borderTop: "1px solid rgba(255,255,255,0.04)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flex: 1,
+              minWidth: 0,
+              color: "rgba(255,255,255,0.5)",
+            }}
+          >
+            <GitHubIcon size={13} />
+            <span
+              title={authUser ? `@${authUser}` : "Signed in"}
+              style={{
+                fontSize: 11,
+                fontFamily: "'JetBrains Mono', monospace",
+                color: "rgba(255,255,255,0.6)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {authUser ? `@${authUser}` : "signed in"}
+            </span>
+          </div>
+          <button
+            onClick={() => setAuthModalMode("switch")}
+            title="Switch GitHub account"
+            style={{ ...iconBtnStyle, width: 24, height: 24 }}
+          >
+            <UserCog size={12} strokeWidth={1.5} />
+          </button>
+        </div>
       </div>
 
       {/* Right content area */}
@@ -494,6 +571,16 @@ export default function ProjectManager() {
           repos={repos}
           onAdd={handleAddRepo}
           onClose={() => setShowAddRepo(false)}
+        />
+      )}
+
+      {/* Auth modal (sign in or switch account) */}
+      {authModalMode && (
+        <AuthModal
+          mode={authModalMode}
+          currentUser={authUser}
+          onClose={() => setAuthModalMode(null)}
+          onAuthSuccess={handleAuthSuccess}
         />
       )}
     </div>
