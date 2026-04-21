@@ -40,6 +40,21 @@
   "build": {
     "appId": "com.ensue.rayline",
     "productName": "RayLine",
+    "npmRebuild": false,
+    "win": {
+      "icon": "public/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    },
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "public/icon.png",
