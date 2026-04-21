@@ -9,6 +9,7 @@ import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
+import WindowControls from "./components/WindowControls";
 import { DEFAULT_MODEL_ID, getMOrMulticaFallback, isMulticaModelId, MODELS, normalizeModelId } from "./data/models";
 import { useMulticaModels } from "./data/multicaModels.jsx";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
@@ -3402,6 +3403,7 @@ export default function App() {
         wallpaper={wallpaper}
       />
       </div>
+      <WindowControls api={typeof window !== "undefined" ? window.api : null} />
     </div>
     </FontSizeContext.Provider>
   );

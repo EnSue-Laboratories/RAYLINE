@@ -10,6 +10,7 @@ function GitHubIcon({ size = 48 }) {
 }
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain from "./components/Grain";
+import WindowControls from "./components/WindowControls";
 import AuthModal from "./pm-components/AuthModal";
 import AccountManager from "./pm-components/AccountManager";
 import CreateForm from "./pm-components/CreateForm";
@@ -199,6 +200,8 @@ export default function ProjectManager() {
     if (repoFilter === repo) setRepoFilter(null);
   };
 
+  const pmApi = typeof window !== "undefined" ? window.ghApi : null;
+
   // Loading state
   if (authOk === null) {
     return (
@@ -214,6 +217,7 @@ export default function ProjectManager() {
           fontSize: 14,
         }}
       >
+        <WindowControls api={pmApi} />
         Checking authentication...
       </div>
     );
@@ -234,6 +238,7 @@ export default function ProjectManager() {
           fontFamily: "system-ui, sans-serif",
         }}
       >
+        <WindowControls api={pmApi} />
         <GitHubIcon size={48} />
         <div style={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }}>
           GitHub CLI not authenticated
@@ -591,6 +596,7 @@ export default function ProjectManager() {
           onAuthSuccess={handleAuthSuccess}
         />
       )}
+      <WindowControls api={pmApi} />
     </div>
   );
 }

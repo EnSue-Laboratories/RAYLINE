@@ -64,12 +64,7 @@ function getWindowChromeOptions() {
 
   if (isWindows) {
     return {
-      titleBarStyle: "hidden",
-      titleBarOverlay: {
-        color: WINDOW_BACKGROUND,
-        symbolColor: "#C8CBD3",
-        height: 52,
-      },
+      frame: false,
       autoHideMenuBar: true,
     };
   }
@@ -78,8 +73,9 @@ function getWindowChromeOptions() {
 }
 
 function applyWindowChromeTweaks(win) {
-  if (!win || !isWindows) return;
-  win.setMenuBarVisibility(false);
+  if (!win) return;
+  if (isWindows) win.setMenuBarVisibility(false);
+  wireWindowStateEvents(win);
 }
 
 function getWallpaperStorageDir() {
@@ -261,6 +257,44 @@ ipcMain.handle("set-window-opacity", (event, opacity) => {
   win.setOpacity(Math.max(0.2, Math.min(1, v)));
   return true;
 });
+
+// Custom window controls (frameless on Windows). Caller is whichever window owns the webContents.
+ipcMain.handle("window-minimize", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  win?.minimize();
+  return true;
+});
+
+ipcMain.handle("window-toggle-maximize", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return false;
+  if (win.isMaximized()) win.unmaximize();
+  else win.maximize();
+  return win.isMaximized();
+});
+
+ipcMain.handle("window-close", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  win?.close();
+  return true;
+});
+
+ipcMain.handle("window-is-maximized", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  return Boolean(win?.isMaximized());
+});
+
+function wireWindowStateEvents(win) {
+  if (!win) return;
+  const send = () => {
+    if (win.isDestroyed()) return;
+    win.webContents.send("window-state-changed", { isMaximized: win.isMaximized() });
+  };
+  win.on("maximize", send);
+  win.on("unmaximize", send);
+  win.on("enter-full-screen", send);
+  win.on("leave-full-screen", send);
+}
 
 ipcMain.handle("clipboard-write-image", (_event, dataUrl) => {
   if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {

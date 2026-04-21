@@ -105,6 +105,17 @@ contextBridge.exposeInMainWorld("api", {
   setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
   writeClipboardImage: (dataUrl) => ipcRenderer.invoke("clipboard-write-image", dataUrl),
 
+  // Window controls (frameless chrome)
+  windowMinimize: () => ipcRenderer.invoke("window-minimize"),
+  windowToggleMaximize: () => ipcRenderer.invoke("window-toggle-maximize"),
+  windowClose: () => ipcRenderer.invoke("window-close"),
+  windowIsMaximized: () => ipcRenderer.invoke("window-is-maximized"),
+  onWindowStateChanged: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("window-state-changed", handler);
+    return () => ipcRenderer.removeListener("window-state-changed", handler);
+  },
+
   // multica
   multicaSendCode: (args) => ipcRenderer.invoke("multica-send-code", args),
   multicaVerifyCode: (args) => ipcRenderer.invoke("multica-verify-code", args),

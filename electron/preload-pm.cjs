@@ -28,6 +28,15 @@ contextBridge.exposeInMainWorld("ghApi", {
   loadPmState: () => ipcRenderer.invoke("gh-load-pm-state"),
   savePmState: (state) => ipcRenderer.invoke("gh-save-pm-state", state),
   readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
+  windowMinimize: () => ipcRenderer.invoke("window-minimize"),
+  windowToggleMaximize: () => ipcRenderer.invoke("window-toggle-maximize"),
+  windowClose: () => ipcRenderer.invoke("window-close"),
+  windowIsMaximized: () => ipcRenderer.invoke("window-is-maximized"),
+  onWindowStateChanged: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("window-state-changed", handler);
+    return () => ipcRenderer.removeListener("window-state-changed", handler);
+  },
   authStart: () => ipcRenderer.invoke("gh-auth-start"),
   authCancel: () => ipcRenderer.invoke("gh-auth-cancel"),
   authLogout: () => ipcRenderer.invoke("gh-auth-logout"),
