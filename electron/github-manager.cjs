@@ -143,10 +143,6 @@ function stripAnsi(s) {
 }
 
 function startWebAuth(onEvent) {
-  if (!pty) {
-    onEvent({ type: "error", error: "node-pty is unavailable; cannot run interactive auth." });
-    return { cancel() {} };
-  }
   if (activeAuthSession) {
     onEvent({ type: "error", error: "An auth flow is already in progress." });
     return { cancel() {} };
@@ -158,17 +154,48 @@ function startWebAuth(onEvent) {
     return { cancel() {} };
   }
 
-  const proc = pty.spawn(
-    bin,
-    ["auth", "login", "--hostname", "github.com", "--web", "--git-protocol", "https", "--skip-ssh-key"],
-    {
-      name: "xterm-256color",
-      cols: 120,
-      rows: 30,
-      cwd: process.env.HOME || process.cwd(),
-      env: ghEnv(),
-    },
-  );
+  const authArgs = ["auth", "login", "--hostname", "github.com", "--web", "--git-protocol", "https", "--skip-ssh-key"];
+  const authEnv = ghEnv();
+  const authCwd = process.env.HOME || process.cwd();
+
+  // Try node-pty first, fall back to child_process.spawn if it fails
+  // (e.g. posix_spawnp errors due to Electron/native module incompatibility).
+  let proc;
+  let usePty = false;
+  if (pty) {
+    try {
+      proc = pty.spawn(bin, authArgs, {
+        name: "xterm-256color",
+        cols: 120,
+        rows: 30,
+        cwd: authCwd,
+        env: authEnv,
+      });
+      usePty = true;
+    } catch (ptyErr) {
+      log("node-pty spawn failed, falling back to child_process:", ptyErr.message);
+    }
+  }
+
+  if (!proc) {
+    proc = spawnCli(bin, authArgs, {
+      cwd: authCwd,
+      env: authEnv,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  }
+
+  // Unified interface so the rest of the code doesn't care which backend is
+  // driving the process.
+  const writeToProc = (data) => {
+    try {
+      if (usePty) proc.write(data);
+      else if (proc.stdin && !proc.stdin.destroyed) proc.stdin.write(data);
+    } catch {}
+  };
+  const killProc = () => {
+    try { proc.kill(); } catch {}
+  };
 
   let buffer = "";
   let codeSeen = false;
@@ -187,7 +214,7 @@ function startWebAuth(onEvent) {
   };
 
   const handleChunk = (raw) => {
-    const text = stripAnsi(raw);
+    const text = stripAnsi(typeof raw === "string" ? raw : raw.toString("utf-8"));
     buffer += text;
     // Cap buffer so we don't grow unbounded on long flows.
     if (buffer.length > 32 * 1024) buffer = buffer.slice(-16 * 1024);
@@ -207,7 +234,7 @@ function startWebAuth(onEvent) {
         }
         if (!enterSent) {
           enterSent = true;
-          try { proc.write("\r"); } catch {}
+          writeToProc("\r");
         }
       }
     }
@@ -215,7 +242,7 @@ function startWebAuth(onEvent) {
     // Auto-press Enter when gh asks.
     if (!enterSent && /Press Enter to open/i.test(buffer)) {
       enterSent = true;
-      try { proc.write("\r"); } catch {}
+      writeToProc("\r");
       if (!browserEventSent) {
         browserEventSent = true;
         onEvent({ type: "browser", url: "https://github.com/login/device" });
@@ -224,14 +251,14 @@ function startWebAuth(onEvent) {
 
     // Respond "y" to any "already logged in" / re-auth confirmation.
     if (/already logged into.*re-authenticate/i.test(buffer) && /\(Y\/n\)/i.test(buffer)) {
-      try { proc.write("y\r"); } catch {}
+      writeToProc("y\r");
     }
 
     // gh 2.89 still asks this before showing the one-time code. Default is
     // "Yes" — press Enter to accept.
     if (!gitCredPromptAnswered && /Authenticate Git with your GitHub credentials\??/i.test(buffer)) {
       gitCredPromptAnswered = true;
-      try { proc.write("\r"); } catch {}
+      writeToProc("\r");
     }
 
     // Success markers from gh. `Logged in as` is the most reliable one across
@@ -247,8 +274,7 @@ function startWebAuth(onEvent) {
     }
   };
 
-  proc.onData(handleChunk);
-  proc.onExit(({ exitCode }) => {
+  const handleExit = (exitCode) => {
     if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
     if (finished) return;
     if (exitCode === 0 && authenticated) {
@@ -266,14 +292,24 @@ function startWebAuth(onEvent) {
         output: buffer.trim().slice(-500),
       });
     }
-  });
+  };
+
+  if (usePty) {
+    proc.onData(handleChunk);
+    proc.onExit(({ exitCode }) => handleExit(exitCode));
+  } else {
+    proc.stdout.on("data", handleChunk);
+    proc.stderr.on("data", handleChunk);
+    proc.on("error", (err) => finish({ type: "error", error: err.message }));
+    proc.on("close", (code) => handleExit(code));
+  }
 
   // If 20s pass with no one-time code shown, something is blocking the flow.
   // Kill the process and surface the captured output so the user (and us)
   // can see which prompt gh was stuck on.
   stallTimer = setTimeout(() => {
     if (finished || codeSeen) return;
-    try { proc.kill(); } catch {}
+    killProc();
     finish({
       type: "error",
       error: "Timed out waiting for GitHub. gh may be stuck on a prompt.",
@@ -285,7 +321,7 @@ function startWebAuth(onEvent) {
     proc,
     cancel() {
       if (finished) return;
-      try { proc.kill(); } catch {}
+      killProc();
       finish({ type: "cancelled" });
     },
   };
