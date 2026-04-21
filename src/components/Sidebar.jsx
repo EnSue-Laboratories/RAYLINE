@@ -1,9 +1,9 @@
 import { useState, useMemo, useRef } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight } from "lucide-react";
+import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow } from "lucide-react";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
-import { getM } from "../data/models";
+import { getMOrMulticaFallback } from "../data/models";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 
 function getMainRepoRoot(dir) {
@@ -77,7 +77,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [] }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
@@ -119,7 +119,14 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Drag region + collapse button */}
-      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0, position: "relative" }}>
+      <div
+        style={{
+          height: WINDOW_DRAG_HEIGHT,
+          WebkitAppRegion: "drag",
+          flexShrink: 0,
+          position: "relative",
+        }}
+      >
         <button
           onClick={onToggleSidebar}
           style={{
@@ -167,6 +174,22 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
         >
           <Plus size={15} strokeWidth={1.5} />
           New Chat
+        </button>
+        <button
+          onClick={onOpenDispatch}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 10px", borderRadius: 7,
+            background: "none", border: "none", cursor: "pointer",
+            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            fontFamily: "system-ui, sans-serif", transition: "all .15s",
+            textAlign: "left",
+          }}
+          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
+          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+        >
+          <Workflow size={15} strokeWidth={1.5} />
+          Dispatch
         </button>
         {developerMode && (
           <button
@@ -286,6 +309,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             onToggleCollapse={onToggleProjectCollapse}
             onHideProject={onHideProject}
             searchActive={searchActive}
+            multicaModels={multicaModels}
           />
         ))
         }
@@ -336,7 +360,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             {/* Draft conversation rows */}
             {(searchActive || !draftsCollapsed) && drafts.map((c, i) => {
               const isActive = c.id === active;
-              const cm = getM(c.model);
+              const cm = getMOrMulticaFallback(c.model, multicaModels);
 
               return (
                 <div
@@ -366,16 +390,33 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: s(12.5),
-                          color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          fontFamily: "system-ui,sans-serif",
                           marginBottom: 4,
+                          display: "flex",
+                          alignItems: "center",
+                          minWidth: 0,
                         }}
                       >
-                        {c.title}
+                        <span
+                          style={{
+                            fontSize: s(12.5),
+                            color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            fontFamily: "system-ui,sans-serif",
+                            flex: 1,
+                            minWidth: 0,
+                          }}
+                        >
+                          {c.title}
+                        </span>
+                        {(c.tags || []).slice(0, 2).map((t) => (
+                          <span key={t} style={{
+                            fontSize: 9, padding: "1px 5px", borderRadius: 4, marginLeft: 4,
+                            background: "rgba(180,220,255,0.12)", color: "rgba(180,220,255,0.85)",
+                            fontFamily: "monospace", flexShrink: 0,
+                          }}>{t}</span>
+                        ))}
                       </div>
                       <div
                         style={{

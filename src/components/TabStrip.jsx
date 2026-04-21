@@ -4,6 +4,7 @@ import Tab from "./Tab";
 export default function TabStrip({ tabs, activeId, onSelect, onClose }) {
   const scrollRef = useRef(null);
   const activeRef = useRef(null);
+  const stretchTabs = tabs.length > 0 && tabs.length <= 6;
 
   useEffect(() => {
     const el = activeRef.current;
@@ -29,7 +30,15 @@ export default function TabStrip({ tabs, activeId, onSelect, onClose }) {
       className="tab-strip-scroll"
     >
       {tabs.map((t) => (
-        <div key={t.id} ref={t.id === activeId ? activeRef : null}>
+        <div
+          key={t.id}
+          ref={t.id === activeId ? activeRef : null}
+          style={{
+            flex: stretchTabs ? "1 0 0" : "0 0 auto",
+            minWidth: stretchTabs ? 132 : 176,
+            maxWidth: stretchTabs ? "none" : 240,
+          }}
+        >
           <Tab
             title={t.title}
             state={t.state}

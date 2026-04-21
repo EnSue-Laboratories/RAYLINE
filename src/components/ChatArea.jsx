@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { memo, useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
 import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
-import ModelPicker from "./ModelPicker";
+import { ModelPickerWithMultica } from "../data/multicaModels.jsx";
 import BranchSelector from "./BranchSelector";
 import GitStatusPill from "./GitStatusPill";
 import ImagePreview from "./ImagePreview";
@@ -12,15 +12,87 @@ import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
+import { clipboardItemsToAttachments, dataTransferHasFiles, fileListToAttachments } from "../utils/attachments";
 import TabStrip from "./TabStrip";
+import useGitStatus from "../hooks/useGitStatus";
+import { isMulticaModelId } from "../data/models";
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
+const EMPTY_MESSAGES = [];
+
+const ChatTranscript = memo(function ChatTranscript({
+  showNewChatCard,
+  convo,
+  defaultModel,
+  defaultPrBranch,
+  newChatDefaultCwd,
+  allCwdRoots,
+  projects,
+  onPickFolder,
+  onCreateChat,
+  onCancelNewChat,
+  developerMode,
+  onEdit,
+  onAnswer,
+  onControlChange,
+  canControlTarget,
+  wallpaper,
+  messageBodyRef,
+  endRef,
+}) {
+  const messages = convo?.msgs || EMPTY_MESSAGES;
+
+  if (showNewChatCard) {
+    return (
+      <NewChatCard
+        defaultCwd={newChatDefaultCwd}
+        defaultModel={convo?.model || defaultModel}
+        defaultBranch={defaultPrBranch}
+        allCwdRoots={allCwdRoots}
+        projects={projects}
+        onPickFolder={onPickFolder}
+        onCreateChat={onCreateChat}
+        onCancel={onCancelNewChat}
+        developerMode={developerMode}
+      />
+    );
+  }
+
+  if (!convo || messages.length === 0) {
+    return <EmptyState model={convo?.model || "sonnet"} />;
+  }
+
+  return (
+    <div ref={messageBodyRef} style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
+      {messages.map((msg, index) => (
+        <Message
+          key={msg.id}
+          msg={msg}
+          messageIndex={index}
+          modelId={convo?.model || defaultModel}
+          canEdit={msg.role === "user" && msg.mode !== "shell-command"}
+          onEdit={onEdit}
+          onAnswer={onAnswer}
+          onControlChange={onControlChange}
+          canControlTarget={canControlTarget}
+          wallpaper={wallpaper}
+        />
+      ))}
+      <div ref={endRef} />
+    </div>
+  );
+});
+
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
+  const [editingQueueId, setEditingQueueId] = useState(null);
+  const [queueDraft, setQueueDraft] = useState("");
   const endRef  = useRef(null);
   const inRef   = useRef(null);
+  const queueEditRef = useRef(null);
+  const dragDepthRef = useRef(0);
   // Callback ref so the ResizeObserver re-attaches when the message body
   // re-mounts (e.g. showNewChatCard toggling). Keep the ref object too so
   // SelectionToolbar can still read .current.
@@ -163,6 +235,21 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     return parts.slice(-2).join("/") || parts[parts.length - 1] || cwd;
   })() : "current workspace";
 
+  const activeModelId = convo?.model || defaultModel;
+  const isMulticaModel = isMulticaModelId(activeModelId);
+  const { status: gitStatus } = useGitStatus(cwd);
+  const hasDirtyWorktree = (gitStatus?.files?.length || 0) > 0;
+  const hasNoUpstream = Boolean(gitStatus?.branch) && !gitStatus?.upstream && !gitStatus?.detached;
+  const branchNeedsAttention = hasDirtyWorktree || hasNoUpstream;
+  const [branchHintDismissed, setBranchHintDismissed] = useState(false);
+  useEffect(() => { setBranchHintDismissed(false); }, [convo?.id]);
+  const showBranchHint = isMulticaModel && !showNewChatCard && branchNeedsAttention && !branchHintDismissed && !shellMode;
+  const branchHintText = (() => {
+    if (hasDirtyWorktree && hasNoUpstream) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES + NOT PUBLISHED";
+    if (hasDirtyWorktree) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES";
+    return "BRANCH MAY NEED UPDATING  //  NOT PUBLISHED TO ORIGIN";
+  })();
+
   const send = useCallback(() => {
     if (!canSend) return;
     const nextInput = trimmedInput;
@@ -173,8 +260,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       setSelectedCmd(0);
     });
     if (inRef.current) inRef.current.style.height = "20px";
+    if (isMulticaModel && !shellMode) setBranchHintDismissed(true);
     onSend(nextInput, nextAttachments);
-  }, [attachments, canSend, onSend, shellMode, trimmedInput]);
+  }, [attachments, canSend, isMulticaModel, onSend, shellMode, trimmedInput]);
 
   const handleInput = (e) => {
     setInput(e.target.value);
@@ -215,63 +303,77 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     }
   };
 
-  // Paste handler for images
-  const handlePaste = (e) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of items) {
-      if (item.type.startsWith("image/")) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          setAttachments((prev) => [...prev, { type: "image", dataUrl: ev.target.result, name: file.name || "image" }]);
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-  };
+  const handlePaste = useCallback((e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    if (!items.some((item) => item?.kind === "file")) return;
 
-  // Drop handler for files and images
-  const handleDrop = (e) => {
+    e.preventDefault();
+    void clipboardItemsToAttachments(items).then((nextAttachments) => {
+      if (nextAttachments.length === 0) return;
+      setAttachments((prev) => [...prev, ...nextAttachments]);
+    });
+  }, []);
+
+  const resetDragState = useCallback(() => {
+    dragDepthRef.current = 0;
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
+
     e.preventDefault();
     e.stopPropagation();
-    const files = e.dataTransfer?.files;
-    if (!files) return;
-    for (const file of files) {
-      // Get file path via Electron's webUtils (works with context isolation)
-      const filePath = window.api?.getFilePath?.(file) || file.path || null;
+    resetDragState();
 
-      if (file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          setAttachments((prev) => [...prev, { type: "image", dataUrl: ev.target.result, name: file.name, path: filePath }]);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // Any file (PDF, code, docs, etc.) — pass the path to the agent
-        setAttachments((prev) => [...prev, { type: "file", name: file.name, path: filePath || file.name }]);
-      }
-    }
-  };
+    void fileListToAttachments(e.dataTransfer?.files).then((nextAttachments) => {
+      if (nextAttachments.length === 0) return;
+      setAttachments((prev) => [...prev, ...nextAttachments]);
+    });
+  }, [resetDragState]);
 
   const [dragOver, setDragOver] = useState(false);
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
   const showConversationTitle = Boolean(convo && !showNewChatCard);
   const topTabsLeft = sidebarOpen ? 18 : 104;
+  const headerContentOffset = showHeaderTabs ? 8 : 0;
 
-  const handleDragOver = (e) => {
+  const handleDragEnter = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
     e.preventDefault();
     e.stopPropagation();
+    dragDepthRef.current += 1;
     setDragOver(true);
-  };
+  }, []);
 
-  const handleDragLeave = (e) => {
+  const handleDragOver = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
     e.preventDefault();
-    setDragOver(false);
-  };
+    e.stopPropagation();
+    if (!dragOver) setDragOver(true);
+  }, [dragOver]);
 
-  // Prevent Electron from navigating to dropped files (on window, not our drop zone)
+  const handleDragLeave = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setDragOver(false);
+  }, []);
+
+  useEffect(() => {
+    const handleWindowDrop = () => resetDragState();
+    const handleWindowDragEnd = () => resetDragState();
+
+    window.addEventListener("drop", handleWindowDrop);
+    window.addEventListener("dragend", handleWindowDragEnd);
+
+    return () => {
+      window.removeEventListener("drop", handleWindowDrop);
+      window.removeEventListener("dragend", handleWindowDragEnd);
+    };
+  }, [resetDragState]);
+
   useEffect(() => {
     const preventNav = (e) => { e.preventDefault(); };
     window.addEventListener("dragover", preventNav);
@@ -285,6 +387,67 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const removeAttachment = (index) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const handleTranscriptAnswer = useCallback((text) => {
+    onSend(text);
+  }, [onSend]);
+
+  const handlePickFolder = useCallback(() => window.api?.pickFolder?.(), []);
+
+  const startQueuedEdit = useCallback((item) => {
+    if (!item?.id) return;
+    setEditingQueueId(item.id);
+    setQueueDraft(item.text || "");
+  }, []);
+
+  const cancelQueuedEdit = useCallback(() => {
+    setEditingQueueId(null);
+    setQueueDraft("");
+  }, []);
+
+  const saveQueuedEdit = useCallback((queueId) => {
+    const trimmed = queueDraft.trim();
+    if (!trimmed) {
+      onRemoveQueuedMessage?.(queueId);
+    } else {
+      onUpdateQueuedMessage?.(queueId, trimmed);
+    }
+    setEditingQueueId(null);
+    setQueueDraft("");
+  }, [onRemoveQueuedMessage, onUpdateQueuedMessage, queueDraft]);
+
+  const removeQueuedItem = useCallback((queueId) => {
+    if (editingQueueId === queueId) {
+      setEditingQueueId(null);
+      setQueueDraft("");
+    }
+    onRemoveQueuedMessage?.(queueId);
+  }, [editingQueueId, onRemoveQueuedMessage]);
+
+  const handleQueuedDraftKeyDown = useCallback((event, queueId) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelQueuedEdit();
+      return;
+    }
+
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      saveQueuedEdit(queueId);
+    }
+  }, [cancelQueuedEdit, saveQueuedEdit]);
+
+  useEffect(() => {
+    if (editingQueueId === null) return;
+    queueEditRef.current?.focus();
+  }, [editingQueueId]);
+
+  useEffect(() => {
+    const el = queueEditRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, 24), 52)}px`;
+  }, [editingQueueId, queueDraft]);
 
   // Selection toolbar handlers
   const handleQuote = useCallback((text) => {
@@ -306,15 +469,20 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       style={{
         flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10,
         ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
-        boxShadow: dragOver ? "inset 0 0 0 1px rgba(153,214,255,0.18)" : "none",
-        transition: "box-shadow .2s ease",
       }}
       onDrop={(e) => { e.stopPropagation(); handleDrop(e); setDragOver(false); }}
+      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
       {/* Drag region matching sidebar spacer */}
-      <div style={{ height: WINDOW_DRAG_HEIGHT, WebkitAppRegion: "drag", flexShrink: 0 }} />
+      <div
+        style={{
+          height: WINDOW_DRAG_HEIGHT,
+          WebkitAppRegion: "drag",
+          flexShrink: 0,
+        }}
+      />
 
       {showHeaderTabs && (
         <div
@@ -387,10 +555,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       {/* Top bar — aligns with sidebar header */}
       <div
         style={{
-          padding: "0 24px 12px",
+          padding: `${headerContentOffset}px 24px 12px`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          transition: "padding-top .16s ease",
         }}
       >
         <div style={{
@@ -456,7 +625,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               onRefocusTerminal={onRefocusTerminal}
             />
           )}
-          {!showNewChatCard && <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
+          {!showNewChatCard && <ModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
           {!showNewChatCard && developerMode && onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
@@ -506,37 +675,26 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           flexDirection: "column",
         }}
       >
-        {showNewChatCard ? (
-          <NewChatCard
-            defaultCwd={newChatDefaultCwd}
-            defaultModel={convo?.model || defaultModel}
-            defaultBranch={defaultPrBranch}
-            allCwdRoots={allCwdRoots}
-            projects={projects}
-            onPickFolder={() => window.api?.pickFolder?.()}
-            onCreateChat={onCreateChat}
-            onCancel={onCancelNewChat}
-            developerMode={developerMode}
-          />
-        ) : !convo || convo.msgs.length === 0 ? (
-          <EmptyState model={convo?.model || "sonnet"} />
-        ) : (
-          <div ref={setMessageBodyNode} style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
-            {convo.msgs.map((m, i) => (
-              <Message
-                key={m.id}
-                msg={m}
-                modelId={convo?.model || defaultModel}
-                onEdit={m.role === "user" && m.mode !== "shell-command" ? (newText) => onEdit(i, newText) : undefined}
-                onAnswer={m.role === "assistant" ? (text) => onSend(text) : undefined}
-                onControlChange={m.role === "assistant" ? onControlChange : undefined}
-                canControlTarget={m.role === "assistant" ? canControlTarget : undefined}
-                wallpaper={wallpaper}
-              />
-            ))}
-            <div ref={endRef} />
-          </div>
-        )}
+        <ChatTranscript
+          showNewChatCard={showNewChatCard}
+          convo={convo}
+          defaultModel={defaultModel}
+          defaultPrBranch={defaultPrBranch}
+          newChatDefaultCwd={newChatDefaultCwd}
+          allCwdRoots={allCwdRoots}
+          projects={projects}
+          onPickFolder={handlePickFolder}
+          onCreateChat={onCreateChat}
+          onCancelNewChat={onCancelNewChat}
+          developerMode={developerMode}
+          onEdit={onEdit}
+          onAnswer={handleTranscriptAnswer}
+          onControlChange={onControlChange}
+          canControlTarget={canControlTarget}
+          wallpaper={wallpaper}
+          messageBodyRef={setMessageBodyNode}
+          endRef={endRef}
+        />
       </div>
 
       {!showNewChatCard && convo?.msgs?.length > 0 && (
@@ -599,34 +757,152 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         <div style={{ width: "100%", maxWidth: 560 }}>
           {queuedMessages && queuedMessages.length > 0 && (
             <div style={{ marginBottom: 8 }}>
-              {queuedMessages.map((q, i) => (
-                <div key={i} style={{
-                  display: "flex",
+              {queuedMessages.map((q, i) => {
+                const isEditingQueueItem = editingQueueId === q.id;
+                const attachmentCount = Array.isArray(q.attachments) ? q.attachments.length : 0;
+                const queueActionButtonStyle = {
+                  height: 24,
+                  padding: "0 9px",
+                  borderRadius: 7,
+                  border: "1px solid rgba(255,255,255,0.04)",
+                  background: "transparent",
+                  color: "rgba(255,255,255,0.3)",
+                  cursor: "pointer",
+                  fontSize: s(9),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: ".05em",
+                  display: "inline-flex",
                   alignItems: "center",
-                  gap: 6,
-                  padding: "5px 10px",
-                  marginBottom: 4,
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.05)",
-                  borderRadius: 8,
-                  fontSize: s(12),
-                  color: "rgba(255,255,255,0.35)",
-                  fontFamily: "system-ui,sans-serif",
-                }}>
-                  <span style={{
-                    fontSize: s(9),
-                    fontFamily: "'JetBrains Mono',monospace",
-                    color: "rgba(255,255,255,0.2)",
-                    letterSpacing: ".06em",
-                    flexShrink: 0,
-                  }}>QUEUED</span>
-                  <span style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}>{q.text}</span>
-                </div>
-              ))}
+                  justifyContent: "center",
+                };
+                return (
+                  <div
+                    key={q.id || i}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 8px",
+                      marginBottom: 4,
+                      background: "rgba(255,255,255,0.014)",
+                      border: "1px solid rgba(255,255,255,0.035)",
+                      borderRadius: 12,
+                      fontSize: s(12),
+                      color: "rgba(255,255,255,0.44)",
+                      fontFamily: "system-ui,sans-serif",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        <span style={{
+                          fontSize: s(9),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          color: "rgba(255,255,255,0.14)",
+                          letterSpacing: ".06em",
+                          flexShrink: 0,
+                        }}>
+                          {i === 0 ? "QUEUED NEXT" : "QUEUED"}
+                        </span>
+                        {attachmentCount > 0 && (
+                          <span style={{
+                            fontSize: s(9),
+                            fontFamily: "'JetBrains Mono',monospace",
+                            color: "rgba(255,255,255,0.13)",
+                            letterSpacing: ".06em",
+                          }}>
+                            {attachmentCount} ATTACHMENT{attachmentCount === 1 ? "" : "S"}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {isEditingQueueItem ? (
+                          <textarea
+                            ref={queueEditRef}
+                            value={queueDraft}
+                            onChange={(event) => setQueueDraft(event.target.value)}
+                            onKeyDown={(event) => handleQueuedDraftKeyDown(event, q.id)}
+                            rows={1}
+                            style={{
+                              width: "100%",
+                              background: "rgba(255,255,255,0.014)",
+                              border: "1px solid rgba(255,255,255,0.05)",
+                              borderRadius: 7,
+                              padding: "2px 8px",
+                              color: "rgba(255,255,255,0.82)",
+                              fontSize: s(12),
+                              lineHeight: "18px",
+                              fontFamily: "inherit",
+                              resize: "none",
+                              minHeight: 24,
+                              maxHeight: 52,
+                              overflowY: "auto",
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            minHeight: 24,
+                            display: "flex",
+                            alignItems: "center",
+                            padding: "2px 8px",
+                            transform: "translateY(-1.5px)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            lineHeight: "18px",
+                            color: "rgba(255,255,255,0.62)",
+                          }}>
+                            {q.text}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isEditingQueueItem ? (
+                        <>
+                          <button
+                            onClick={() => saveQueuedEdit(q.id)}
+                            style={{
+                              ...queueActionButtonStyle,
+                              background: "rgba(255,255,255,0.06)",
+                              color: "rgba(255,255,255,0.54)",
+                            }}
+                          >
+                            SAVE
+                          </button>
+                          <button
+                            onClick={cancelQueuedEdit}
+                            style={queueActionButtonStyle}
+                          >
+                            CANCEL
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => startQueuedEdit(q)}
+                            style={queueActionButtonStyle}
+                          >
+                            EDIT
+                          </button>
+                          <button
+                            onClick={() => removeQueuedItem(q.id)}
+                            style={queueActionButtonStyle}
+                          >
+                            DELETE
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
           {/* Slash command palette */}
@@ -686,18 +962,38 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 : "SHELL MODE  //  TYPE A COMMAND AFTER !"}
             </div>
           )}
+          {showBranchHint && (
+            <div
+              style={{
+                marginBottom: 6,
+                fontSize: s(10),
+                fontFamily: "'JetBrains Mono',monospace",
+                letterSpacing: ".1em",
+                color: "rgba(255,210,140,0.55)",
+              }}
+            >
+              {branchHintText}
+            </div>
+          )}
 
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 10,
-              background: inputFocused ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
-              border: (shellMode ? "2px solid " : "1px solid ") + (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)"),
+              background: dragOver
+                ? "rgba(180,220,255,0.06)"
+                : (inputFocused ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)"),
+              border: (shellMode ? "2px solid " : "1px solid ") + (
+                dragOver
+                  ? "rgba(153,214,255,0.28)"
+                  : (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)")
+              ),
               borderRadius: 12,
               padding: shellMode ? "8px 13px" : "9px 14px",
               backdropFilter: "blur(20px)",
-              transition: "border-color .25s, background .25s",
+              boxShadow: dragOver ? "0 0 0 1px rgba(153,214,255,0.08)" : "none",
+              transition: "border-color .25s, background .25s, box-shadow .25s",
             }}
           >
             <textarea

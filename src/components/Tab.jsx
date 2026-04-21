@@ -25,37 +25,40 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
         display: "flex",
         alignItems: "center",
         gap: 7,
+        width: "100%",
         height: 28,
-        padding: "0 7px 0 10px",
+        padding: "0 9px 0 11px",
         background: active
           ? "rgba(255,255,255,0.07)"
           : hover
             ? "rgba(255,255,255,0.04)"
             : "rgba(255,255,255,0.018)",
         border: "none",
-        borderRadius: 999,
+        borderRadius: 7,
         cursor: "pointer",
-        flexShrink: 0,
-        maxWidth: 190,
+        minWidth: 0,
         backdropFilter: active ? "blur(12px) saturate(1.1)" : "none",
         transition: "background .15s, color .15s, backdrop-filter .15s",
       }}
     >
+      {!active && (
+        <span
+          aria-hidden
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: "50%",
+            background: dotColor,
+            flexShrink: 0,
+            animation: pulse ? "tabDotPulse 1.4s ease-in-out infinite" : "none",
+            boxShadow: state === "seen" ? "none" : `0 0 14px ${dotColor}`,
+            transition: "background .25s, box-shadow .25s",
+          }}
+        />
+      )}
       <span
-        aria-hidden
         style={{
-          width: 5,
-          height: 5,
-          borderRadius: "50%",
-          background: dotColor,
-          flexShrink: 0,
-          animation: pulse ? "tabDotPulse 1.4s ease-in-out infinite" : "none",
-          boxShadow: state === "seen" ? "none" : `0 0 14px ${dotColor}`,
-          transition: "background .25s, box-shadow .25s",
-        }}
-      />
-      <span
-        style={{
+          flex: 1,
           fontSize: s(11.5),
           color: active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.66)",
           fontFamily: "system-ui, sans-serif",
@@ -79,7 +82,7 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
           justifyContent: "center",
           width: 15,
           height: 15,
-          borderRadius: 999,
+          borderRadius: 5,
           background: "transparent",
           border: "none",
           color: active ? "rgba(255,255,255,0.48)" : "rgba(255,255,255,0.34)",

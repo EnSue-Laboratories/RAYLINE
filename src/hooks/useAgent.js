@@ -30,6 +30,20 @@ function freezeElapsed(msg) {
   return { ...rest, _elapsedMs: Date.now() - rest._startedAt };
 }
 
+function mapMulticaTaskMessage(p) {
+  // Target the `{type: "tool"}` part shape that Message.jsx renders via
+  // ToolCallBlock. Multica task:message events carry no tool_use_id, so we
+  // can't merge use/result into a single part like Claude does — emit them
+  // as two adjacent tool parts.
+  switch (p.type) {
+    case "text": return { type: "text", text: p.content || "" };
+    case "tool_use": return { type: "tool", name: p.tool, args: p.input || {} };
+    case "tool_result": return { type: "tool", name: p.tool, result: p.output || "" };
+    case "error": return { type: "text", text: `_${p.content || "error"}_` };
+    default: return null;
+  }
+}
+
 function mergeUsage(prev, incoming) {
   if (!incoming) return prev || null;
   const base = prev || {};
@@ -268,6 +282,64 @@ export default function useAgent() {
           }
           return lastMsg;
         };
+
+        if (typeof event.type === "string" && event.type.startsWith("multica:")) {
+          const inner = event.type.slice("multica:".length);
+          const p = event.payload || {};
+          // transient — resets per-session; stripped in buildPersistedConversationSnapshot
+          const connectedPatch = convo.multicaConnected ? null : { multicaConnected: true };
+
+          // No-op branches return early WITHOUT running ensureAssistant — we
+          // don't want a stray empty assistant bubble if a user echo arrives
+          // before any task:message.
+          if (inner === "chat:message" && p.role === "user") {
+            if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
+            return next;
+          }
+          if (inner === "agent:status") {
+            window.dispatchEvent(new CustomEvent("multica-agent-status", { detail: p.agent }));
+            if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
+            return next;
+          }
+
+          const assistant = ensureAssistant();
+
+          if (inner === "task:message") {
+            const part = mapMulticaTaskMessage(p);
+            if (!part) {
+              if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
+              return next;
+            }
+            const parts = [...(assistant.parts || []), part];
+            msgs[msgs.length - 1] = { ...assistant, parts, isStreaming: true };
+            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: true });
+            return next;
+          }
+
+          if (inner === "chat:done" || inner === "task:completed") {
+            msgs[msgs.length - 1] = freezeElapsed({ ...assistant, isStreaming: false });
+            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false });
+            return next;
+          }
+
+          if (inner === "task:cancelled") {
+            msgs[msgs.length - 1] = freezeElapsed({ ...assistant, isStreaming: false });
+            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false, error: null });
+            return next;
+          }
+
+          if (inner === "task:failed" || inner === "error") {
+            msgs[msgs.length - 1] = freezeElapsed({
+              ...assistant, isStreaming: false,
+              parts: [...(assistant.parts || []), { type: "text", text: `_Multica ${inner}: ${p.message || p.reason || ""}_` }],
+            });
+            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false, error: p.message || inner });
+            return next;
+          }
+
+          if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
+          return next;
+        }
 
         if (event.type === "stream_event") {
           const inner = event.event;
@@ -813,7 +885,7 @@ export default function useAgent() {
     });
   }, []);
 
-  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession }) => {
+  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
     const expectedPendingId = pendingStartsRef.current.get(conversationId);
     if (pendingId && expectedPendingId !== pendingId) {
       console.log("[useAgent] Skipping stale or cancelled pending start", { conversationId, pendingId, expectedPendingId });
@@ -821,7 +893,12 @@ export default function useAgent() {
     }
     if (pendingId) pendingStartsRef.current.delete(conversationId);
     if (window.api) {
-      window.api.agentStart({ conversationId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession });
+      const payload = { conversationId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession };
+      if (provider === "multica") {
+        payload._multica = multicaContext;
+        payload._multicaToken = multicaToken;
+      }
+      window.api.agentStart(payload);
     }
     return true;
   }, []);
@@ -848,7 +925,7 @@ export default function useAgent() {
     }
   }, []);
 
-  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, cwd }) => {
+  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, cwd, multicaContext, multicaToken }) => {
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId);
@@ -862,6 +939,19 @@ export default function useAgent() {
     });
 
     if (window.api) {
+      if (provider === "multica") {
+        window.api.agentStart({
+          conversationId,
+          prompt: wirePrompt ?? newText,
+          model,
+          provider,
+          effort,
+          cwd,
+          _multica: multicaContext,
+          _multicaToken: multicaToken,
+        });
+        return true;
+      }
       window.api.agentEditAndResend({
         conversationId,
         resumeSessionId: sessionId,
@@ -888,9 +978,43 @@ export default function useAgent() {
     });
   }, []);
 
+  const replaceMessages = useCallback((conversationId, messages) => {
+    if (!conversationId) return;
+    const nextMessages = Array.isArray(messages)
+      ? messages.map((message) => ({
+          id: message.id || uid(),
+          ...message,
+        }))
+      : [];
+
+    setConversations((prev) => {
+      const next = new Map(prev);
+      const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
+      next.set(conversationId, {
+        ...convo,
+        messages: nextMessages,
+        isStreaming: false,
+        error: null,
+      });
+      return next;
+    });
+  }, []);
+
   const getConversation = useCallback((id) => {
     return conversations.get(id) || { messages: [], isStreaming: false, error: null };
   }, [conversations]);
+
+  const markMulticaConnected = useCallback((conversationId) => {
+    if (!conversationId) return;
+    setConversations((prev) => {
+      const next = new Map(prev);
+      const convo = next.get(conversationId) || { messages: [], isStreaming: false, error: null };
+      if (convo.multicaConnected) return prev;
+      // transient — resets per-session; stripped in buildPersistedConversationSnapshot
+      next.set(conversationId, { ...convo, multicaConnected: true });
+      return next;
+    });
+  }, []);
 
   return {
     conversations,
@@ -901,5 +1025,7 @@ export default function useAgent() {
     cancelMessage,
     editAndResend,
     loadMessages,
+    replaceMessages,
+    markMulticaConnected,
   };
 }

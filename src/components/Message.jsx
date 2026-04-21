@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { memo, useState, useMemo, useRef } from "react";
 import { Pencil, FileText, PauseCircle, Terminal } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -271,7 +271,7 @@ function renderControlAwareMarkdown({
   });
 }
 
-export default function Message({ msg, modelId, onEdit, onAnswer, onControlChange, canControlTarget, wallpaper }) {
+function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer, onControlChange, canControlTarget, wallpaper }) {
   const s = useFontScale();
   const scaledMdStatic = useMemo(() => makeMdComponents(false, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
   const scaledMdStreaming = useMemo(() => makeMdComponents(true, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
@@ -312,8 +312,8 @@ export default function Message({ msg, modelId, onEdit, onAnswer, onControlChang
   const editChanged = editText.trim() && editText.trim() !== displayText.trim();
 
   const handleSubmitEdit = () => {
-    if (editChanged) {
-      onEdit?.(editText.trim());
+    if (canEdit && editChanged) {
+      onEdit?.(messageIndex, editText.trim());
     }
     setEditing(false);
   };
@@ -325,7 +325,7 @@ export default function Message({ msg, modelId, onEdit, onAnswer, onControlChang
     }
     if (e.key === "Escape") {
       setEditing(false);
-      setEditText(msg.text);
+      setEditText(displayText);
     }
   };
 
@@ -490,7 +490,7 @@ export default function Message({ msg, modelId, onEdit, onAnswer, onControlChang
         {!editing && (
           <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "flex-end" }}>
             <CopyBtn text={displayText} />
-            {onEdit && (
+            {canEdit && onEdit && (
               <MsgBtn icon={<Pencil size={10} strokeWidth={1.5} />} onClick={() => setEditing(true)} />
             )}
           </div>
@@ -735,6 +735,8 @@ export default function Message({ msg, modelId, onEdit, onAnswer, onControlChang
     </div>
   );
 }
+
+export default memo(Message);
 
 function MsgBtn({ icon, onClick }) {
   return (

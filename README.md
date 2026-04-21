@@ -31,6 +31,8 @@ Before running the app locally, make sure you have:
 - Node.js and npm installed
 - the `claude` CLI installed and available on your `PATH`
 - an authenticated Claude Code environment
+- if you need PTY-backed terminal sessions on Windows, Python and Visual Studio
+  Build Tools available for `node-gyp`
 
 The Electron packaging config in `package.json` is currently set up for macOS
 distribution, but the development workflow is the standard Electron + Vite loop.
@@ -48,6 +50,11 @@ If Electron or `node-pty` was updated, rebuild the native dependency:
 ```bash
 npm run rebuild
 ```
+
+On Windows, `npm run rebuild` compiles `node-pty` with `node-gyp`, so Python
+and the Visual Studio C++ build tools need to be installed first. If you are
+only working on the main UI, you can start the app without rebuilding and
+terminal sessions will remain unavailable until the rebuild succeeds.
 
 Start the desktop app in development mode:
 

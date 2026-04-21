@@ -4,6 +4,18 @@ const fs = require("fs");
 const os = require("os");
 const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
 const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
+const {
+  startMulticaAgent,
+  cancelMulticaAgent,
+  multicaSendCode,
+  multicaVerifyCode,
+  multicaListWorkspaces,
+  multicaListAgents,
+  multicaEnsureSession,
+  multicaSendMessage,
+  multicaListMessages,
+  subscribeMulticaAgent,
+} = require("./multica-manager.cjs");
 const { buildSpawnPath, resolveCliBin } = require("./cli-bin-resolver.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
@@ -290,7 +302,15 @@ ipcMain.handle("read-image", async (_event, filePath) => {
 
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
-  if (opts.provider === "codex") {
+  if (opts.provider === "multica") {
+    startMulticaAgent(opts, event.sender).catch((err) => {
+      event.sender.send("agent-stream", {
+        conversationId: opts.conversationId,
+        event: { type: "multica:error", payload: { message: err?.message || String(err) } },
+      });
+      event.sender.send("agent-done", { conversationId: opts.conversationId });
+    });
+  } else if (opts.provider === "codex") {
     startCodexAgent(opts, event.sender);
   } else {
     startAgent(opts, event.sender);
@@ -300,6 +320,9 @@ ipcMain.on("agent-start", (event, opts) => {
 ipcMain.on("agent-cancel", (_event, { conversationId }) => {
   cancelAgent(conversationId);
   cancelCodexAgent(conversationId);
+  cancelMulticaAgent(conversationId).catch((err) => {
+    console.error("[multica] cancel failed", { conversationId, error: err?.message || String(err) });
+  });
 });
 
 ipcMain.on("agent-edit-resend", (event, opts) => {
@@ -309,6 +332,16 @@ ipcMain.on("agent-edit-resend", (event, opts) => {
     startAgent({ ...opts, forkSession: true }, event.sender);
   }
 });
+
+// IPC: multica
+ipcMain.handle("multica-send-code", (_e, args) => multicaSendCode(args));
+ipcMain.handle("multica-verify-code", (_e, args) => multicaVerifyCode(args));
+ipcMain.handle("multica-list-workspaces", (_e, args) => multicaListWorkspaces(args));
+ipcMain.handle("multica-list-agents", (_e, args) => multicaListAgents(args));
+ipcMain.handle("multica-ensure-session", (_e, args) => multicaEnsureSession(args));
+ipcMain.handle("multica-send-message", (_e, args) => multicaSendMessage(args));
+ipcMain.handle("multica-list-messages", (_e, args) => multicaListMessages(args));
+ipcMain.handle("multica-subscribe", (event, args) => subscribeMulticaAgent(args, event.sender));
 
 ipcMain.handle("rewind-files", async (_event, opts) => {
   return rewindFiles(opts);
@@ -850,6 +883,18 @@ ipcMain.handle("git-status", async (_event, cwd) => {
       }
     }
     return out;
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle("git-remote-slug", async (_event, cwd) => {
+  if (!cwd) return null;
+  try {
+    const raw = await git(["remote", "get-url", "origin"], cwd);
+    // Match "git@github.com:owner/repo.git" or "https://github.com/owner/repo(.git)?"
+    const m = raw.trim().match(/github\.com[:/]([^/]+)\/([^/.\s]+?)(?:\.git)?$/);
+    return m ? `${m[1]}/${m[2]}` : null;
   } catch {
     return null;
   }
