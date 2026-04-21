@@ -12,6 +12,7 @@ import SelectionToolbar from "./SelectionToolbar";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
+import { clipboardItemsToAttachments, dataTransferHasFiles, fileListToAttachments } from "../utils/attachments";
 import TabStrip from "./TabStrip";
 import useGitStatus from "../hooks/useGitStatus";
 import { isMulticaModelId } from "../data/models";
@@ -92,6 +93,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const inRef   = useRef(null);
   const queueEditRef = useRef(null);
   const messageBodyRef = useRef(null);
+  const dragDepthRef = useRef(0);
 
   // Scroll to bottom on new messages and during streaming
   const scrollRef = useRef(null);
@@ -231,45 +233,34 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     }
   };
 
-  // Paste handler for images
-  const handlePaste = (e) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of items) {
-      if (item.type.startsWith("image/")) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          setAttachments((prev) => [...prev, { type: "image", dataUrl: ev.target.result, name: file.name || "image" }]);
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-  };
+  const handlePaste = useCallback((e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    if (!items.some((item) => item?.kind === "file")) return;
 
-  // Drop handler for files and images
-  const handleDrop = (e) => {
+    e.preventDefault();
+    void clipboardItemsToAttachments(items).then((nextAttachments) => {
+      if (nextAttachments.length === 0) return;
+      setAttachments((prev) => [...prev, ...nextAttachments]);
+    });
+  }, []);
+
+  const resetDragState = useCallback(() => {
+    dragDepthRef.current = 0;
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
+
     e.preventDefault();
     e.stopPropagation();
-    const files = e.dataTransfer?.files;
-    if (!files) return;
-    for (const file of files) {
-      // Get file path via Electron's webUtils (works with context isolation)
-      const filePath = window.api?.getFilePath?.(file) || file.path || null;
+    resetDragState();
 
-      if (file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          setAttachments((prev) => [...prev, { type: "image", dataUrl: ev.target.result, name: file.name, path: filePath }]);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // Any file (PDF, code, docs, etc.) — pass the path to the agent
-        setAttachments((prev) => [...prev, { type: "file", name: file.name, path: filePath || file.name }]);
-      }
-    }
-  };
+    void fileListToAttachments(e.dataTransfer?.files).then((nextAttachments) => {
+      if (nextAttachments.length === 0) return;
+      setAttachments((prev) => [...prev, ...nextAttachments]);
+    });
+  }, [resetDragState]);
 
   const [dragOver, setDragOver] = useState(false);
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
@@ -277,18 +268,42 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const topTabsLeft = sidebarOpen ? 18 : 104;
   const headerContentOffset = showHeaderTabs ? 8 : 0;
 
-  const handleDragOver = (e) => {
+  const handleDragEnter = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
     e.preventDefault();
     e.stopPropagation();
+    dragDepthRef.current += 1;
     setDragOver(true);
-  };
+  }, []);
 
-  const handleDragLeave = (e) => {
+  const handleDragOver = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
     e.preventDefault();
-    setDragOver(false);
-  };
+    e.stopPropagation();
+    if (!dragOver) setDragOver(true);
+  }, [dragOver]);
 
-  // Prevent Electron from navigating to dropped files (on window, not our drop zone)
+  const handleDragLeave = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setDragOver(false);
+  }, []);
+
+  useEffect(() => {
+    const handleWindowDrop = () => resetDragState();
+    const handleWindowDragEnd = () => resetDragState();
+
+    window.addEventListener("drop", handleWindowDrop);
+    window.addEventListener("dragend", handleWindowDragEnd);
+
+    return () => {
+      window.removeEventListener("drop", handleWindowDrop);
+      window.removeEventListener("dragend", handleWindowDragEnd);
+    };
+  }, [resetDragState]);
+
   useEffect(() => {
     const preventNav = (e) => { e.preventDefault(); };
     window.addEventListener("dragover", preventNav);
@@ -384,10 +399,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       style={{
         flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10,
         ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
-        boxShadow: dragOver ? "inset 0 0 0 1px rgba(153,214,255,0.18)" : "none",
-        transition: "box-shadow .2s ease",
       }}
       onDrop={(e) => { e.stopPropagation(); handleDrop(e); setDragOver(false); }}
+      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
@@ -897,12 +911,19 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               display: "flex",
               alignItems: "center",
               gap: 10,
-              background: inputFocused ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
-              border: (shellMode ? "2px solid " : "1px solid ") + (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)"),
+              background: dragOver
+                ? "rgba(180,220,255,0.06)"
+                : (inputFocused ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)"),
+              border: (shellMode ? "2px solid " : "1px solid ") + (
+                dragOver
+                  ? "rgba(153,214,255,0.28)"
+                  : (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)")
+              ),
               borderRadius: 12,
               padding: shellMode ? "8px 13px" : "9px 14px",
               backdropFilter: "blur(20px)",
-              transition: "border-color .25s, background .25s",
+              boxShadow: dragOver ? "0 0 0 1px rgba(153,214,255,0.08)" : "none",
+              transition: "border-color .25s, background .25s, box-shadow .25s",
             }}
           >
             <textarea
