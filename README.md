@@ -5,7 +5,7 @@
 
   <p><strong>Mission control for parallel coding agents</strong></p>
 
-  <p>A desktop client for Claude Code and GPT-5.4 Codex. Fan out N agents<br/>into N git worktrees with one click, then supervise streaming tool calls,<br/>git-backed checkpoints, and live terminals from a single chat surface.</p>
+  <p>A desktop client for Claude Code, Codex, and Multica. Fan out N agents<br/>into N git worktrees with one click, then supervise streaming tool calls,<br/>git-backed checkpoints, and live terminals from a single chat surface.</p>
 
   <p>
     <img src="https://img.shields.io/badge/Electron-41-47848F?style=flat-square&logo=electron&logoColor=white" alt="Electron 41" />
