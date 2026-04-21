@@ -1,6 +1,15 @@
 const isCi = String(process.env.CI || "").toLowerCase() === "true";
-const explicitCiMacIdentity =
-  process.env.APPLE_SIGNING_IDENTITY || process.env.CSC_NAME || null;
+
+function normalizeMacIdentity(identity) {
+  if (!identity) return null;
+  return String(identity)
+    .replace(/^Developer ID Application:\s*/i, "")
+    .trim();
+}
+
+const explicitCiMacIdentity = normalizeMacIdentity(
+  process.env.APPLE_SIGNING_IDENTITY || process.env.CSC_NAME || null
+);
 const hasCiMacCodesign = Boolean(process.env.CSC_LINK || explicitCiMacIdentity);
 const hasCiMacNotary =
   Boolean(process.env.APPLE_ID) &&
