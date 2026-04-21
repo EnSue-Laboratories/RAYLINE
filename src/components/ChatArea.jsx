@@ -92,8 +92,16 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const endRef  = useRef(null);
   const inRef   = useRef(null);
   const queueEditRef = useRef(null);
-  const messageBodyRef = useRef(null);
   const dragDepthRef = useRef(0);
+  // Callback ref so the ResizeObserver re-attaches when the message body
+  // re-mounts (e.g. showNewChatCard toggling). Keep the ref object too so
+  // SelectionToolbar can still read .current.
+  const messageBodyRef = useRef(null);
+  const [messageBodyEl, setMessageBodyEl] = useState(null);
+  const setMessageBodyNode = useCallback((node) => {
+    messageBodyRef.current = node;
+    setMessageBodyEl(node);
+  }, []);
 
   // Scroll to bottom on new messages and during streaming
   const scrollRef = useRef(null);
@@ -102,40 +110,102 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const lastParts = lastMsg?.parts;
   const lastPartText = lastParts?.[lastParts.length - 1]?.text || lastMsg?.text;
   const prevMsgCount = useRef(0);
+  // Sticky follow-mode: true until the user actively scrolls up, flips back
+  // on when they return to the bottom. Ref (not state) so rapid streaming
+  // updates don't trigger re-renders and stay in sync with scroll events.
+  const followingRef = useRef(true);
+
+  // Reset follow state on conversation switch so chat B doesn't inherit
+  // chat A's "user scrolled up" state.
+  useEffect(() => {
+    followingRef.current = true;
+    prevMsgCount.current = 0;
+  }, [convo?.id]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
-    // Always scroll on new messages (count changed)
-    if (msgCount !== prevMsgCount.current) {
+    // New message (count INCREASED) → force follow on and smooth-scroll to bottom
+    if (msgCount > prevMsgCount.current) {
       prevMsgCount.current = msgCount;
+      followingRef.current = true;
       endRef.current?.scrollIntoView({ behavior: "smooth" });
       return;
     }
 
-    // During streaming, only scroll if near bottom
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 300;
-    if (nearBottom) {
-      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Count decreased (edit rewind, /clear, /compact) → track the new count
+    // but don't hijack the user's scroll position.
+    if (msgCount < prevMsgCount.current) {
+      prevMsgCount.current = msgCount;
+      return;
+    }
+
+    // Streaming update → pin to bottom instantly so chunks can't outrun us
+    if (followingRef.current) {
+      el.scrollTop = el.scrollHeight;
     }
   }, [msgCount, convo?.isStreaming, lastPartText]);
 
-  // Track whether the user is near the bottom to toggle the scroll-to-bottom button
+  // Pin to bottom whenever content height changes while following. Catches
+  // renders that don't trigger the text-diff effect above — LoadingStatus
+  // growing an extra line when usage arrives, thinking blocks expanding,
+  // mermaid/katex rendering in late, etc.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !messageBodyEl || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (followingRef.current) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+    ro.observe(messageBodyEl);
+    return () => ro.disconnect();
+  }, [messageBodyEl]);
+
+  // Track whether the user is near the bottom to toggle the scroll-to-bottom
+  // button, and maintain follow-mode based on user scroll direction.
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    let lastScrollTop = el.scrollTop;
+    // Gate "user scrolled up" detection behind recent real user input.
+    // Otherwise content shrink (thinking block collapses, images clamping
+    // scrollTop) and trackpad momentum bounce silently kill follow-mode.
+    let userIntentUntil = 0;
+    const markIntent = () => { userIntentUntil = Date.now() + 500; };
+
     const handleScroll = () => {
       const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      // Require both a meaningful delta and recent user input to disable follow.
+      if (el.scrollTop < lastScrollTop - 8 && Date.now() < userIntentUntil) {
+        followingRef.current = false;
+      }
+      // Reached the bottom again → resume following
+      if (distanceFromBottom < 40) {
+        followingRef.current = true;
+      }
+      lastScrollTop = el.scrollTop;
       setShowScrollToBottom(distanceFromBottom > 120);
     };
     handleScroll();
     el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
+    el.addEventListener("wheel", markIntent, { passive: true });
+    el.addEventListener("touchstart", markIntent, { passive: true });
+    el.addEventListener("pointerdown", markIntent, { passive: true });
+    el.addEventListener("keydown", markIntent);
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      el.removeEventListener("wheel", markIntent);
+      el.removeEventListener("touchstart", markIntent);
+      el.removeEventListener("pointerdown", markIntent);
+      el.removeEventListener("keydown", markIntent);
+    };
   }, [convo?.id, msgCount]);
 
   const scrollToBottom = useCallback(() => {
+    followingRef.current = true;
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
@@ -622,7 +692,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           onControlChange={onControlChange}
           canControlTarget={canControlTarget}
           wallpaper={wallpaper}
-          messageBodyRef={messageBodyRef}
+          messageBodyRef={setMessageBodyNode}
           endRef={endRef}
         />
       </div>
