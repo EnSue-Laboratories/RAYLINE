@@ -2203,6 +2203,10 @@ export default function App() {
           conversationHasInjectedPromptMetadata(normalizedConversation.archivedMessages) ||
           conversationHasInjectedPromptMetadata(thisConvoData.messages)
         );
+      const previousMulticaContext =
+        currentProvider === "multica"
+          ? (normalizedConversation?._multica || conversation?._multica || null)
+          : null;
       let multicaContext, multicaToken;
       if (m.provider === "multica") {
         ({ context: multicaContext, token: multicaToken } = await ensureMulticaContextForConversation({
@@ -2223,14 +2227,42 @@ export default function App() {
       );
       const providerSwitched =
         !isFirstMessage && prevProvider && prevProvider !== currentProvider;
+      const multicaModelSwitched =
+        currentProvider === "multica" &&
+        !isFirstMessage &&
+        prevProvider === "multica" &&
+        Boolean(previousMulticaContext?.agentId) &&
+        Boolean(multicaContext?.agentId) &&
+        previousMulticaContext.agentId !== multicaContext.agentId;
+      const handoffSwitched = providerSwitched || multicaModelSwitched;
+      const multicaSessionReused =
+        currentProvider === "multica" &&
+        !isFirstMessage &&
+        prevProvider === "multica" &&
+        Boolean(previousMulticaContext?.sessionId) &&
+        Boolean(multicaContext?.sessionId) &&
+        previousMulticaContext.sessionId === multicaContext.sessionId &&
+        previousMulticaContext.agentId === multicaContext.agentId;
       const canResumeExistingSession =
         !isFirstMessage &&
-        prevProvider === currentProvider &&
-        Boolean(currentProviderSession?.nativeSessionId) &&
-        currentProviderSession.syncedThroughMessageCount === syncedMessageCount;
+        (
+          multicaSessionReused ||
+          (
+            prevProvider === currentProvider &&
+            Boolean(currentProviderSession?.nativeSessionId) &&
+            currentProviderSession.syncedThroughMessageCount === syncedMessageCount
+          )
+        );
       const needsHistoryPrimeFallback =
-        !isFirstMessage && !providerSwitched && !canResumeExistingSession;
-      const needsFreshSession = isFirstMessage || providerSwitched || needsHistoryPrimeFallback;
+        !isFirstMessage &&
+        currentProvider !== "multica" &&
+        !handoffSwitched &&
+        !canResumeExistingSession;
+      const needsFreshSession =
+        isFirstMessage ||
+        handoffSwitched ||
+        needsHistoryPrimeFallback ||
+        (currentProvider === "multica" && !canResumeExistingSession);
       const seededSession =
         needsFreshSession
           ? (
@@ -2244,12 +2276,12 @@ export default function App() {
                     model: normalizedConversation.model,
                     syncedThroughMessageCount: syncedMessageCount,
                     updatedAt: Date.now(),
-                    origin: isFirstMessage ? "initial-send" : (providerSwitched ? "handoff" : "resync"),
+                    origin: isFirstMessage ? "initial-send" : (handoffSwitched ? "handoff" : "resync"),
                   }
                 : createSeedSession(normalizedConversation, currentProvider, {
                     model: normalizedConversation.model,
                     syncedThroughMessageCount: syncedMessageCount,
-                    origin: isFirstMessage ? "initial-send" : (providerSwitched ? "handoff" : "resync"),
+                    origin: isFirstMessage ? "initial-send" : (handoffSwitched ? "handoff" : "resync"),
                   })
             )
           : null;
@@ -2257,8 +2289,9 @@ export default function App() {
         needsFreshSession && currentProvider === "claude"
           ? seededSession?.nativeSessionId || undefined
           : undefined;
+      const resumeSessionId = currentProviderSession?.nativeSessionId || undefined;
       const prime =
-        providerSwitched
+        handoffSwitched
           ? buildCrossProviderPrime(thisConvoData.messages)
           : needsHistoryPrimeFallback
             ? buildConversationPrime(thisConvoData.messages)
@@ -2286,6 +2319,8 @@ export default function App() {
         currentProvider,
         prevProvider: prevProvider || null,
         providerSwitched,
+        multicaModelSwitched,
+        handoffSwitched,
         sessionId: normalizedConversation.sessionId || null,
         sessionProvider: normalizedConversation.sessionProvider || null,
         providerSessions: normalizedConversation.providerSessions || null,
@@ -2293,8 +2328,13 @@ export default function App() {
         activeSession,
         currentProviderSession,
         initialSessionId: initialSessionId || null,
-        resumeSessionId: canResumeExistingSession ? currentProviderSession.nativeSessionId : null,
-        primeMode: providerSwitched ? "cross-provider" : (needsHistoryPrimeFallback ? "history-fallback" : null),
+        resumeSessionId: canResumeExistingSession ? (resumeSessionId || null) : null,
+        primeMode:
+          providerSwitched
+            ? "cross-provider"
+            : multicaModelSwitched
+              ? "multica-model-handoff"
+              : (needsHistoryPrimeFallback ? "history-fallback" : null),
         multicaSessionPolluted,
       });
 
@@ -2352,7 +2392,7 @@ export default function App() {
         conversationId,
         pendingId,
         sessionId: initialSessionId,
-        resumeSessionId: canResumeExistingSession ? currentProviderSession.nativeSessionId : undefined,
+        resumeSessionId: canResumeExistingSession ? resumeSessionId : undefined,
         prompt: wirePrompt,
         model: m.cliFlag,
         provider: m.provider || "claude",
