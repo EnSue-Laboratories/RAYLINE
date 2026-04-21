@@ -49,9 +49,26 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
     // Streaming update → pin to bottom instantly so chunks can't outrun us
     if (followingRef.current) {
-      endRef.current?.scrollIntoView({ behavior: "auto" });
+      el.scrollTop = el.scrollHeight;
     }
   }, [msgCount, convo?.isStreaming, lastPartText]);
+
+  // Pin to bottom whenever content height changes while following. Catches
+  // renders that don't trigger the text-diff effect above — LoadingStatus
+  // growing an extra line when usage arrives, thinking blocks expanding,
+  // mermaid/katex rendering in late, etc.
+  useEffect(() => {
+    const el = scrollRef.current;
+    const inner = messageBodyRef.current;
+    if (!el || !inner || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (followingRef.current) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [convo?.id, msgCount > 0]);
 
   // Track whether the user is near the bottom to toggle the scroll-to-bottom
   // button, and maintain follow-mode based on user scroll direction.
