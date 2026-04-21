@@ -8,10 +8,14 @@ const MAX_MESSAGES = 50; // max user+assistant message pairs to load
 const CODEX_USER_PROMPT_MARKER = "--- USER PROMPT ---";
 
 function projectDirName(cwd) {
-  // Claude CLI encodes both POSIX and Windows paths by replacing path
-  // separators and the Windows drive colon with `-`. For `C:\Users\kira\Documents`
-  // this yields `C--Users-kira-Documents`, matching what the CLI writes.
-  return cwd.replace(/[\\/:]/g, "-");
+  // Windows: the Claude CLI encodes `C:\Users\kira\Documents` as
+  // `C--Users-kira-Documents` — we must replace backslash and drive colon
+  // too, or the path gets pasted verbatim into `~/.claude/projects/` and
+  // produces an illegal nested drive letter.
+  // Other platforms: keep the original `/` → `-` rule untouched to preserve
+  // bug-compatible behavior for existing session files.
+  if (process.platform === "win32") return cwd.replace(/[\\/:]/g, "-");
+  return cwd.replace(/\//g, "-");
 }
 
 function extractSessionCwdFromFile(filePath) {

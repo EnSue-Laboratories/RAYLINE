@@ -1,4 +1,4 @@
-const { spawnSync } = require("child_process");
+const { execFile, spawn, spawnSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -27,7 +27,12 @@ function getPathExtensions() {
     .split(";")
     .map((e) => e.trim())
     .filter(Boolean);
-  return ["", ...exts];
+  // On Windows, PATHEXT matches must be tried FIRST. npm's global bin
+  // (`%APPDATA%\npm`) installs three files per command — `codex`,
+  // `codex.cmd`, `codex.ps1` — and only the `.cmd` is directly spawnable.
+  // Trying the bare name first would return the extension-less bash shim,
+  // which `child_process.spawn` can't execute.
+  return [...exts, ""];
 }
 
 function hasKnownExtension(candidate) {
@@ -195,9 +200,51 @@ function resolveCliBin(commandName, { envVarName, extraDirs = [] } = {}) {
   return resolveWithLoginShell(commandName, searchPath);
 }
 
+function escapeCmdArg(arg) {
+  const s = String(arg);
+  if (!s) return '""';
+  // No quoting needed if arg has no whitespace or cmd.exe metacharacters.
+  if (!/[\s"&|<>()^!%,;=]/.test(s)) return s;
+  // CreateProcess parse rules: escape embedded quotes and any trailing
+  // backslash runs that would otherwise eat the closing quote.
+  const inner = s
+    .replace(/(\\*)"/g, (_, bs) => bs + bs + '\\"')
+    .replace(/(\\+)$/, (_, bs) => bs + bs);
+  return `"${inner}"`;
+}
+
+function needsCmdWrapping(binPath) {
+  return IS_WINDOWS && /\.(cmd|bat)$/i.test(binPath);
+}
+
+function buildCmdWrappedArgs(binPath, args) {
+  const line = [binPath, ...args].map(escapeCmdArg).join(" ");
+  return { command: process.env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c", line] };
+}
+
+function spawnCli(binPath, args, options = {}) {
+  if (needsCmdWrapping(binPath)) {
+    const { command, args: wrapped } = buildCmdWrappedArgs(binPath, args);
+    return spawn(command, wrapped, { ...options, windowsVerbatimArguments: true });
+  }
+  return spawn(binPath, args, options);
+}
+
+function execFileCli(binPath, args, options, callback) {
+  if (typeof options === "function") { callback = options; options = {}; }
+  options = options || {};
+  if (needsCmdWrapping(binPath)) {
+    const { command, args: wrapped } = buildCmdWrappedArgs(binPath, args);
+    return execFile(command, wrapped, { ...options, windowsVerbatimArguments: true }, callback);
+  }
+  return execFile(binPath, args, options, callback);
+}
+
 module.exports = {
   COMMON_EXTRA_PATH_DIRS,
   buildSpawnPath,
   isExecutable,
   resolveCliBin,
+  spawnCli,
+  execFileCli,
 };

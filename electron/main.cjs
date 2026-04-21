@@ -16,7 +16,7 @@ const {
   multicaListMessages,
   subscribeMulticaAgent,
 } = require("./multica-manager.cjs");
-const { buildSpawnPath, resolveCliBin } = require("./cli-bin-resolver.cjs");
+const { buildSpawnPath, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
@@ -481,7 +481,6 @@ ipcMain.handle("system-info", () => ({
 
 // IPC: quick explain (one-shot, not in chat history)
 ipcMain.handle("quick-explain", async (_event, { text, model }) => {
-  const { spawn } = require("child_process");
   return new Promise((resolve) => {
     const claudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
     if (!claudeBin) {
@@ -498,7 +497,7 @@ ipcMain.handle("quick-explain", async (_event, { text, model }) => {
       "--system-prompt", "You are a concise explainer. Give 1-3 sentence explanations. Use markdown for formatting.",
       `Explain this briefly:\n\n${text}`,
     ];
-    const child = spawn(claudeBin, args, {
+    const child = spawnCli(claudeBin, args, {
       env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -1109,8 +1108,7 @@ ipcMain.handle("git-gen-commit-message", async (_e, cwd) => {
     ];
 
     return await new Promise((resolve) => {
-      const { spawn } = require("child_process");
-      const child = spawn(claudeBin, args, {
+      const child = spawnCli(claudeBin, args, {
         cwd,
         env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
         stdio: ["ignore", "pipe", "pipe"],
