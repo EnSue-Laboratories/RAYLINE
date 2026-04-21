@@ -47,7 +47,9 @@ RayLine wraps Claude Code (and Codex) in a native desktop chat, adding the workf
 
 ## Screenshots
 
-<p align="center"><em>Screenshots and a short demo GIF are on the way.</em></p>
+<p align="center">
+  <img src="docs/screenshots/hero.png" alt="RayLine — Dispatch modal fanning agents into parallel worktrees" width="900" />
+</p>
 
 ## Quick Start
 
