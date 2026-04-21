@@ -285,7 +285,7 @@ function DispatchLoadingDots() {
     width: 5,
     height: 5,
     borderRadius: "50%",
-    background: "currentColor",
+    background: "rgba(0,0,0,0.45)",
     display: "inline-block",
     animation: `dotPulse 1.2s ease-in-out ${delay} infinite`,
   });
