@@ -195,12 +195,11 @@ function startWebAuth(onEvent) {
         stdio: ["pipe", "pipe", "pipe"],
       });
     } else {
-      // Windows or other platforms — plain spawn (no TTY wrapper available).
-      proc = spawnCli(bin, authArgs, {
-        cwd: authCwd,
-        env: authEnv,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
+      // No PTY wrapper available on this platform — fail explicitly rather
+      // than running a non-interactive auth that silently skips git credential
+      // setup and scope configuration.
+      onEvent({ type: "error", error: "node-pty is required for GitHub auth on this platform but failed to spawn. Reinstall or rebuild node-pty for your Electron version." });
+      return { cancel() {} };
     }
   }
 
