@@ -409,6 +409,10 @@ function makeEphemeralId(prefix = "id") {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function makeConversationId() {
+  return makeEphemeralId("c");
+}
+
 function normalizeQueuedAttachment(attachment) {
   if (!attachment || typeof attachment !== "object") return null;
 
@@ -1876,7 +1880,7 @@ export default function App() {
   };
 
   const handleNewInProject = (cwdRoot) => {
-    const id = "c" + Date.now();
+    const id = makeConversationId();
     const n = createConversationDraft({
       id,
       title: "New chat",
@@ -2482,7 +2486,7 @@ export default function App() {
 
       // Auto-create conversation if none exists
       if (!convo) {
-        const id = "c" + Date.now();
+        const id = makeConversationId();
         convo = createConversationDraft({
           id,
           title: deriveConversationTitle(text, attachments),
@@ -2602,7 +2606,7 @@ export default function App() {
   }, [active, activeData.isStreaming, handleSend, syncQueuedMessages]);
 
   const handleCreateChat = useCallback(async (opts) => {
-    const id = opts.id || ("c" + Date.now());
+    const id = opts.id || makeConversationId();
     const effectiveCwd = opts.cwd !== undefined ? opts.cwd : (getMainRepoRoot(cwd) || undefined);
     const modelId = opts.model || defaultModel;
     const n = createConversationDraft({

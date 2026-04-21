@@ -371,6 +371,16 @@ function emitMulticaDone(sub, conversationId) {
   } catch { /* sender destroyed */ }
 }
 
+function clearMulticaSubscription(entry, conversationId) {
+  if (!entry?.subscriptions) return;
+  entry.subscriptions.delete(conversationId);
+}
+
+function clearMatchedSubscription(entry, conversationId, sub) {
+  if (entry?.subscriptions?.get(conversationId) !== sub) return;
+  clearMulticaSubscription(entry, conversationId);
+}
+
 async function multicaGetPendingTask({ serverUrl, token, workspaceId, workspaceSlug, sessionId }) {
   return rest({
     serverUrl,
@@ -477,6 +487,7 @@ function dispatchWSMessage(key, msg) {
     }
     if (type === "task:completed" || type === "task:failed" || type === "task:cancelled") {
       emitMulticaDone(sub, conversationId);
+      clearMatchedSubscription(entry, conversationId, sub);
     }
   }
 }
@@ -500,30 +511,35 @@ async function startMulticaAgent(opts, sender) {
     doneEmitted: false,
   });
 
-  const attachments = await uploadMulticaAttachments({
-    serverUrl,
-    token,
-    workspaceId,
-    workspaceSlug,
-    images,
-    files,
-  });
-  const content = buildMulticaAttachmentPrompt(prompt, attachments);
+  try {
+    const attachments = await uploadMulticaAttachments({
+      serverUrl,
+      token,
+      workspaceId,
+      workspaceSlug,
+      images,
+      files,
+    });
+    const content = buildMulticaAttachmentPrompt(prompt, attachments);
 
-  // Fire the message via REST — the actual content comes back over WS
-  const sendResult = await multicaSendMessage({ serverUrl, token, workspaceId, workspaceSlug, sessionId, content });
-  const sub = entry.subscriptions.get(conversationId);
-  if (sub) {
-    sub.startRequestComplete = true;
-    sub.taskId = sendResult?.task_id || sub.taskId || null;
-    if (sub.cancelRequested) {
-      requestTaskCancel(entry, sub).catch((err) => {
-        emitMulticaStream(sub, conversationId, {
-          type: "multica:error",
-          payload: { message: err?.message || String(err) },
+    // Fire the message via REST — the actual content comes back over WS
+    const sendResult = await multicaSendMessage({ serverUrl, token, workspaceId, workspaceSlug, sessionId, content });
+    const sub = entry.subscriptions.get(conversationId);
+    if (sub) {
+      sub.startRequestComplete = true;
+      sub.taskId = sendResult?.task_id || sub.taskId || null;
+      if (sub.cancelRequested) {
+        requestTaskCancel(entry, sub).catch((err) => {
+          emitMulticaStream(sub, conversationId, {
+            type: "multica:error",
+            payload: { message: err?.message || String(err) },
+          });
         });
-      });
+      }
     }
+  } catch (err) {
+    clearMulticaSubscription(entry, conversationId);
+    throw err;
   }
 }
 
@@ -538,13 +554,17 @@ async function cancelMulticaAgent(conversationId) {
   await Promise.all(matches.map(async ({ entry, sub }) => {
     try {
       const didCancel = await requestTaskCancel(entry, sub);
-      if (!didCancel && sub.startRequestComplete) emitMulticaDone(sub, conversationId);
+      if (!didCancel && sub.startRequestComplete) {
+        emitMulticaDone(sub, conversationId);
+        clearMatchedSubscription(entry, conversationId, sub);
+      }
     } catch (err) {
       emitMulticaStream(sub, conversationId, {
         type: "multica:error",
         payload: { message: err?.message || String(err) },
       });
       emitMulticaDone(sub, conversationId);
+      clearMatchedSubscription(entry, conversationId, sub);
     }
   }));
 }
