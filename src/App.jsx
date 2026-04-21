@@ -63,6 +63,7 @@ function stripInjectedPromptMetadata(text) {
   let next = typeof text === "string" ? text : String(text ?? "");
   if (!next) return "";
 
+  const multicaAttachmentBlock = /^\s*<rayline-multica-attachments>[\s\S]*?<\/rayline-multica-attachments>\s*/;
   const multicaSetupBlock = /^\s*<rayline-multica-setup>[\s\S]*?<\/rayline-multica-setup>\s*/;
   const reminderBlock = /^\s*<system-reminder>[\s\S]*?<\/system-reminder>\s*/;
   const primeBlock = /^\s*\[(?:Prior conversation context|Prior conversation with a different model)[^\]]*\][\s\S]*?\[End of prior conversation\]\s*(?:---\s*)?/;
@@ -70,6 +71,11 @@ function stripInjectedPromptMetadata(text) {
   let changed = true;
   while (changed) {
     changed = false;
+    const withoutMulticaAttachments = next.replace(multicaAttachmentBlock, "");
+    if (withoutMulticaAttachments !== next) {
+      next = withoutMulticaAttachments;
+      changed = true;
+    }
     const withoutMulticaSetup = next.replace(multicaSetupBlock, "");
     if (withoutMulticaSetup !== next) {
       next = withoutMulticaSetup;
@@ -100,7 +106,10 @@ function sanitizeArchivedMessage(message) {
 function isNonEmptyArchivedMessage(message) {
   if (!message) return false;
   if (message.role !== "user") return true;
-  return typeof message.text !== "string" || message.text.trim().length > 0;
+  if (typeof message.text !== "string" || message.text.trim().length > 0) return true;
+  if (Array.isArray(message.images) && message.images.length > 0) return true;
+  if (Array.isArray(message.files) && message.files.length > 0) return true;
+  return false;
 }
 
 function conversationHasInjectedPromptMetadata(messages) {
@@ -921,6 +930,39 @@ function mergeArchivedMessages(existingMessages, loadedMessages) {
   }
 
   return loaded.length > existing.length ? loaded : existing;
+}
+
+function hydrateArchivedAttachmentMetadata(existingMessages, loadedMessages) {
+  const existing = Array.isArray(existingMessages) ? existingMessages : [];
+  const loaded = Array.isArray(loadedMessages) ? loadedMessages : [];
+  if (existing.length === 0 || loaded.length === 0) return loaded;
+
+  return loaded.map((message, index) => {
+    if (!message || message.role !== "user") return message;
+    const local = existing[index];
+    if (!local || local.role !== "user") return message;
+
+    const remoteText = getArchivedMessageText(message);
+    const localText = getArchivedMessageText(local);
+    if (remoteText && localText && remoteText !== localText) return message;
+
+    const next = { ...message };
+    if (
+      (!Array.isArray(message.images) || message.images.length === 0)
+      && Array.isArray(local.images)
+      && local.images.length > 0
+    ) {
+      next.images = local.images;
+    }
+    if (
+      (!Array.isArray(message.files) || message.files.length === 0)
+      && Array.isArray(local.files)
+      && local.files.length > 0
+    ) {
+      next.files = local.files;
+    }
+    return next;
+  });
 }
 
 function areArchivedMessageListsEqual(a, b) {
@@ -2136,7 +2178,14 @@ export default function App() {
       const isFirstMessage = thisConvoData.messages.length === 0;
       const messageIndex = thisConvoData.messages.length;
       const syncedMessageCount = thisConvoData.messages.length;
-      const images = attachments?.filter((a) => a.type === "image").map((a) => a.dataUrl);
+      const imageAttachments = attachments
+        ?.filter((a) => a.type === "image" && typeof a.dataUrl === "string")
+        .map((a) => ({
+          dataUrl: a.dataUrl,
+          ...(typeof a.name === "string" ? { name: a.name } : {}),
+          ...(typeof a.path === "string" ? { path: a.path } : {}),
+        }));
+      const images = imageAttachments?.map((a) => a.dataUrl);
       const files = attachments?.filter((a) => a.type === "file");
       const m = getMOrMulticaFallback(normalizedConversation.model);
       const currentProvider = m.provider || "claude";
@@ -2308,7 +2357,10 @@ export default function App() {
         provider: m.provider || "claude",
         effort: m.effort,
         cwd: effectiveCwd,
-        images: images?.length ? images : undefined,
+        images:
+          currentProvider === "multica"
+            ? (imageAttachments?.length ? imageAttachments : undefined)
+            : (images?.length ? images : undefined),
         files: files?.length ? files : undefined,
         multicaContext,
         multicaToken,
@@ -2669,19 +2721,19 @@ export default function App() {
           const role = m.role === "user" ? "user" : "assistant";
           const rawText = typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? "");
           const text = role === "user" ? stripInjectedPromptMetadata(rawText) : rawText;
-          if (role === "user" && !text) return null;
           if (role === "user") return { role, text, _multicaId: m.id };
           return { role, parts: [{ type: "text", text }], _multicaId: m.id };
         })
-        .filter(Boolean);
+        .filter((message) => message && isNonEmptyArchivedMessage(message));
       if (mapped.length > 0) {
         const liveMessages = getConversation(conversationId).messages || [];
         const persistedMessages =
           normalizeConversationState(convoList.find((conversation) => conversation.id === conversationId))
             ?.archivedMessages || [];
         const baseMessages = liveMessages.length > 0 ? liveMessages : persistedMessages;
-        const repairedBaseMessages = collapseRepeatedRemoteBackfill(baseMessages, mapped);
-        const merged = mergeArchivedMessages(repairedBaseMessages, mapped);
+        const hydratedMapped = hydrateArchivedAttachmentMetadata(baseMessages, mapped);
+        const repairedBaseMessages = collapseRepeatedRemoteBackfill(baseMessages, hydratedMapped);
+        const merged = mergeArchivedMessages(repairedBaseMessages, hydratedMapped);
 
         if (areArchivedMessageListsEqual(liveMessages, merged)) {
           return;

@@ -8,6 +8,9 @@
 // Delivers events through `window.api.onAgentStream` so useAgent.js can handle
 // them identically to Claude/Codex after a thin mapping step.
 
+const fs = require("node:fs/promises");
+const path = require("node:path");
+const crypto = require("node:crypto");
 const { URL } = require("node:url");
 const https = require("node:https");
 const http = require("node:http");
@@ -55,6 +58,235 @@ function rest({ serverUrl, method = "GET", path, token, workspaceId, workspaceSl
     if (payload) req.write(payload);
     req.end();
   });
+}
+
+function restMultipart({ serverUrl, method = "POST", path: requestPath, token, workspaceId, workspaceSlug, file }) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(requestPath, serverUrl);
+    const mod = u.protocol === "http:" ? http : https;
+    const safeFilename = String(file?.filename || "attachment")
+      .replace(/[\r\n"]/g, "_")
+      .slice(0, 240) || "attachment";
+    const contentType = file?.contentType || "application/octet-stream";
+    const data = Buffer.isBuffer(file?.data) ? file.data : Buffer.from(file?.data || "");
+    const boundary = `----rayline-multica-${crypto.randomUUID()}`;
+    const preamble = Buffer.from(
+      `--${boundary}\r\n`
+      + `Content-Disposition: form-data; name="file"; filename="${safeFilename}"\r\n`
+      + `Content-Type: ${contentType}\r\n\r\n`,
+      "utf8"
+    );
+    const epilogue = Buffer.from(`\r\n--${boundary}--\r\n`, "utf8");
+    const payload = Buffer.concat([preamble, data, epilogue]);
+    const headers = {
+      "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      "Content-Length": payload.length,
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (workspaceId) headers["X-Workspace-ID"] = workspaceId;
+    if (workspaceSlug) headers["X-Workspace-Slug"] = workspaceSlug;
+
+    const req = mod.request(
+      { method, hostname: u.hostname, port: u.port, path: u.pathname + u.search, headers },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("error", reject);
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          const isJson = (res.headers["content-type"] || "").startsWith("application/json");
+          let parsed = null;
+          if (text) {
+            if (isJson) {
+              try { parsed = JSON.parse(text); }
+              catch (e) { return reject(new Error(`multica ${method} ${requestPath}: invalid JSON response: ${e.message}`)); }
+            } else {
+              parsed = text;
+            }
+          }
+          if (res.statusCode >= 400) {
+            const err = new Error(`multica ${method} ${requestPath} ${res.statusCode}: ${typeof parsed === "string" ? parsed : JSON.stringify(parsed)}`);
+            err.status = res.statusCode;
+            err.body = parsed;
+            return reject(err);
+          }
+          resolve(parsed);
+        });
+      }
+    );
+    req.on("error", reject);
+    req.setTimeout(15000, () => {
+      req.destroy(new Error(`multica ${method} ${requestPath} timed out after 15s`));
+    });
+    req.write(payload);
+    req.end();
+  });
+}
+
+function guessExtension(contentType) {
+  const normalized = String(contentType || "").toLowerCase();
+  switch (normalized) {
+    case "image/jpeg": return "jpg";
+    case "image/png": return "png";
+    case "image/gif": return "gif";
+    case "image/webp": return "webp";
+    case "image/svg+xml": return "svg";
+    case "application/pdf": return "pdf";
+    case "text/plain": return "txt";
+    case "application/json": return "json";
+    default: {
+      const [, subtype = "bin"] = normalized.match(/^[^/]+\/(.+)$/) || [];
+      return subtype.replace(/[^a-z0-9.+-]+/gi, "").split("+")[0] || "bin";
+    }
+  }
+}
+
+function parseDataUrl(dataUrl) {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) {
+    throw new Error("expected a data URL");
+  }
+  const commaIndex = dataUrl.indexOf(",");
+  if (commaIndex === -1) throw new Error("invalid data URL");
+  const meta = dataUrl.slice(5, commaIndex);
+  const payload = dataUrl.slice(commaIndex + 1);
+  const parts = meta.split(";");
+  const contentType = parts[0] || "application/octet-stream";
+  const isBase64 = parts.includes("base64");
+  const data = isBase64
+    ? Buffer.from(payload, "base64")
+    : Buffer.from(decodeURIComponent(payload), "utf8");
+  return { contentType, data };
+}
+
+function normalizeAttachmentFilename(filename, fallbackPrefix, contentType, index) {
+  const raw = typeof filename === "string" ? filename.trim() : "";
+  if (raw) return path.basename(raw);
+  return `${fallbackPrefix}-${index + 1}.${guessExtension(contentType)}`;
+}
+
+async function loadMulticaUpload(entry, index, kind) {
+  if (kind === "image") {
+    if (entry && typeof entry === "object" && typeof entry.path === "string" && entry.path) {
+      const data = await fs.readFile(entry.path);
+      const ext = path.extname(entry.path).toLowerCase();
+      const contentType =
+        ext === ".png" ? "image/png"
+          : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg"
+            : ext === ".gif" ? "image/gif"
+              : ext === ".webp" ? "image/webp"
+                : ext === ".svg" ? "image/svg+xml"
+                  : "application/octet-stream";
+      return {
+        filename: normalizeAttachmentFilename(entry.name || entry.path, "image", contentType, index),
+        contentType,
+        data,
+      };
+    }
+    const dataUrl =
+      typeof entry === "string"
+        ? entry
+        : (typeof entry?.dataUrl === "string" ? entry.dataUrl : "");
+    if (!dataUrl) {
+      throw new Error(`attached image ${index + 1} is missing data`);
+    }
+    const parsed = parseDataUrl(dataUrl);
+    return {
+      filename: normalizeAttachmentFilename(entry?.name, "image", parsed.contentType, index),
+      contentType: parsed.contentType,
+      data: parsed.data,
+    };
+  }
+
+  const filePath = typeof entry?.path === "string" ? entry.path : "";
+  if (!filePath) {
+    throw new Error(`attached file ${index + 1} is missing a readable path`);
+  }
+  const data = await fs.readFile(filePath);
+  const ext = path.extname(filePath).toLowerCase();
+  const contentType =
+    ext === ".png" ? "image/png"
+      : ext === ".jpg" || ext === ".jpeg" ? "image/jpeg"
+        : ext === ".gif" ? "image/gif"
+          : ext === ".webp" ? "image/webp"
+            : ext === ".svg" ? "image/svg+xml"
+              : ext === ".pdf" ? "application/pdf"
+                : ext === ".json" ? "application/json"
+                  : ext === ".txt" || ext === ".md" ? "text/plain"
+                    : "application/octet-stream";
+  return {
+    filename: normalizeAttachmentFilename(entry?.name || filePath, "file", contentType, index),
+    contentType,
+    data,
+  };
+}
+
+async function uploadMulticaAttachment({ serverUrl, token, workspaceId, workspaceSlug, upload }) {
+  return restMultipart({
+    serverUrl,
+    method: "POST",
+    path: "/api/upload-file",
+    token,
+    workspaceId,
+    workspaceSlug,
+    file: upload,
+  });
+}
+
+async function uploadMulticaAttachments({ serverUrl, token, workspaceId, workspaceSlug, images, files }) {
+  const uploaded = [];
+
+  for (let i = 0; i < (Array.isArray(images) ? images.length : 0); i += 1) {
+    const upload = await loadMulticaUpload(images[i], i, "image");
+    const response = await uploadMulticaAttachment({ serverUrl, token, workspaceId, workspaceSlug, upload });
+    if (!response?.id) {
+      throw new Error(`Multica uploaded image '${upload.filename}' but did not return an attachment id`);
+    }
+    uploaded.push({
+      kind: "image",
+      id: response.id,
+      filename: response?.filename || upload.filename,
+      contentType: response?.content_type || upload.contentType,
+      sizeBytes: Number.isFinite(response?.size_bytes) ? response.size_bytes : upload.data.length,
+    });
+  }
+
+  for (let i = 0; i < (Array.isArray(files) ? files.length : 0); i += 1) {
+    const upload = await loadMulticaUpload(files[i], i, "file");
+    const response = await uploadMulticaAttachment({ serverUrl, token, workspaceId, workspaceSlug, upload });
+    if (!response?.id) {
+      throw new Error(`Multica uploaded file '${upload.filename}' but did not return an attachment id`);
+    }
+    uploaded.push({
+      kind: "file",
+      id: response.id,
+      filename: response?.filename || upload.filename,
+      contentType: response?.content_type || upload.contentType,
+      sizeBytes: Number.isFinite(response?.size_bytes) ? response.size_bytes : upload.data.length,
+    });
+  }
+
+  return uploaded;
+}
+
+function buildMulticaAttachmentPrompt(prompt, attachments) {
+  const usable = Array.isArray(attachments) ? attachments.filter((item) => item?.id) : [];
+  if (usable.length === 0) return prompt;
+
+  const lines = [
+    "<rayline-multica-attachments>",
+    "RayLine uploaded attachments for this user message.",
+    "These files are available as Multica workspace attachments.",
+    "Use `multica attachment download <attachment-id>` to fetch one locally before answering if you need to inspect it.",
+    "Do not claim you inspected an attachment unless you actually downloaded or opened it in the runtime.",
+    "Attachments:",
+    ...usable.map((item) => (
+      `- ${item.kind}: ${item.filename} (attachment_id: ${item.id}${item.contentType ? `, content_type: ${item.contentType}` : ""}${Number.isFinite(item.sizeBytes) ? `, size_bytes: ${item.sizeBytes}` : ""})`
+    )),
+    "Do not quote this block back unless the user explicitly asks.",
+    "</rayline-multica-attachments>",
+  ];
+
+  return `${lines.join("\n")}\n\n${prompt || ""}`.trim();
 }
 
 module.exports = {
@@ -144,7 +376,7 @@ function dispatchWSMessage(key, msg) {
 }
 
 async function startMulticaAgent(opts, sender) {
-  const { conversationId, prompt, _multica } = opts;
+  const { conversationId, prompt, images, files, _multica } = opts;
   if (!_multica) throw new Error("startMulticaAgent: missing _multica context");
   const { serverUrl, workspaceId, workspaceSlug, sessionId } = _multica;
   const token = opts._multicaToken; // passed by useAgent from store
@@ -153,8 +385,18 @@ async function startMulticaAgent(opts, sender) {
   const entry = await getOrOpenWS({ serverUrl, workspaceId, token });
   entry.subscriptions.set(conversationId, { sessionId, sender, taskId: null });
 
+  const attachments = await uploadMulticaAttachments({
+    serverUrl,
+    token,
+    workspaceId,
+    workspaceSlug,
+    images,
+    files,
+  });
+  const content = buildMulticaAttachmentPrompt(prompt, attachments);
+
   // Fire the message via REST — the actual content comes back over WS
-  const sendResult = await multicaSendMessage({ serverUrl, token, workspaceId, workspaceSlug, sessionId, content: prompt });
+  const sendResult = await multicaSendMessage({ serverUrl, token, workspaceId, workspaceSlug, sessionId, content });
   const sub = entry.subscriptions.get(conversationId);
   if (sub) sub.taskId = sendResult?.task_id || null;
 }
