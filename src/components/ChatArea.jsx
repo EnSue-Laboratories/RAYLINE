@@ -9,6 +9,7 @@ import BranchSelector from "./BranchSelector";
 import GitStatusPill from "./GitStatusPill";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
+import ExportConversationBtn from "./ExportConversationBtn";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
@@ -524,6 +525,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             />
           )}
           {!showNewChatCard && <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
+          {!showNewChatCard && convo?.msgs?.length > 0 && (
+            <ExportConversationBtn convo={convo} />
+          )}
           {!showNewChatCard && developerMode && onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
