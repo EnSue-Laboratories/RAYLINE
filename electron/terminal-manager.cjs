@@ -167,7 +167,7 @@ function createSession({ name, command, cwd } = {}) {
   }
   if (userZdotdir) cleanEnv.ZDOTDIR = userZdotdir;
   cleanEnv.PROMPT_EOL_MARK = "";
-  cleanEnv.TERM_PROGRAM = "Claudi";
+  cleanEnv.TERM_PROGRAM = "RayLine";
 
   let ptyProcess;
   try {
