@@ -41,6 +41,12 @@
   "build": {
     "appId": "com.ensue.rayline",
     "productName": "RayLine",
+    "publish": {
+      "provider": "github",
+      "owner": "EnSue-Laboratories",
+      "repo": "RAYLINE",
+      "releaseType": "draft"
+    },
     "win": {
       "icon": "public/icon.png",
       "target": [
