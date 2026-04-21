@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { loadMulticaState, saveMulticaState } from "../multica/store";
-
-const DEFAULT_SERVER_URL = "https://srv1309901.tail96f1f.ts.net";
+import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
 
 export default function MulticaSetupModal({ open, onClose }) {
   const [step, setStep] = useState("connect"); // "connect" | "verify" | "workspace"
-  const [serverUrl, setServerUrl] = useState(DEFAULT_SERVER_URL);
+  const [serverUrl, setServerUrl] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [token, setToken] = useState("");
@@ -30,7 +28,7 @@ export default function MulticaSetupModal({ open, onClose }) {
       setStep("workspace");
       setWorkspaces(null);
     } else {
-      setServerUrl(existing.serverUrl || DEFAULT_SERVER_URL);
+      setServerUrl(existing.serverUrl || "");
       setEmail(existing.email || "");
       setToken("");
       setStep("connect");
@@ -55,14 +53,7 @@ export default function MulticaSetupModal({ open, onClose }) {
       const res = await window.api.multicaListWorkspaces({ serverUrl: srvUrl, token: tkn });
       const list = Array.isArray(res) ? res : (res?.workspaces || []);
       setWorkspaces(list);
-      if (list.length === 1) {
-        const ws = list[0];
-        saveMulticaState({ workspaceId: ws.id, workspaceSlug: ws.slug });
-        window.dispatchEvent(new CustomEvent("multica-refresh"));
-        onClose?.();
-        return;
-      }
-      if (list.length > 1) {
+      if (list.length > 0) {
         setSelectedWorkspaceId(list[0].id);
       }
     } catch (err) {
@@ -70,7 +61,7 @@ export default function MulticaSetupModal({ open, onClose }) {
     } finally {
       setBusy(false);
     }
-  }, [onClose]);
+  }, []);
 
   // When we land on step "workspace", fetch the list.
   useEffect(() => {
@@ -84,11 +75,12 @@ export default function MulticaSetupModal({ open, onClose }) {
   if (!open) return null;
 
   const handleSendCode = async () => {
-    if (!serverUrl.trim() || !email.trim() || busy) return;
+    const normalizedServerUrl = normalizeMulticaServerUrl(serverUrl);
+    if (!normalizedServerUrl || !email.trim() || busy) return;
     setBusy(true);
     setError("");
     try {
-      await window.api.multicaSendCode({ serverUrl: serverUrl.trim(), email: email.trim() });
+      await window.api.multicaSendCode({ serverUrl: normalizedServerUrl, email: email.trim() });
       setStep("verify");
     } catch (err) {
       setError(err?.message || String(err));
@@ -98,12 +90,13 @@ export default function MulticaSetupModal({ open, onClose }) {
   };
 
   const handleVerifyCode = async () => {
-    if (!code.trim() || busy) return;
+    const normalizedServerUrl = normalizeMulticaServerUrl(serverUrl);
+    if (!normalizedServerUrl || !code.trim() || busy) return;
     setBusy(true);
     setError("");
     try {
       const res = await window.api.multicaVerifyCode({
-        serverUrl: serverUrl.trim(),
+        serverUrl: normalizedServerUrl,
         email: email.trim(),
         code: code.trim(),
       });
@@ -113,7 +106,7 @@ export default function MulticaSetupModal({ open, onClose }) {
         return;
       }
       saveMulticaState({
-        serverUrl: serverUrl.trim(),
+        serverUrl: normalizedServerUrl,
         email: email.trim(),
         token: tkn,
         tokenIssuedAt: Date.now(),
@@ -236,9 +229,11 @@ export default function MulticaSetupModal({ open, onClose }) {
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "10px 12px",
                   borderRadius: 6,
-                  border: `1px solid ${selected ? "rgba(255,255,255,0.35)" : "var(--pane-border)"}`,
-                  background: selected ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
+                  border: `1px solid ${selected ? "rgba(255,255,255,0.16)" : "var(--pane-border)"}`,
+                  background: selected ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
+                  boxShadow: selected ? "inset 0 0 0 1px rgba(255,255,255,0.04)" : "none",
                   cursor: "pointer",
+                  transition: "background .16s ease, border-color .16s ease, box-shadow .16s ease",
                 }}
               >
                 <input
@@ -326,7 +321,7 @@ export default function MulticaSetupModal({ open, onClose }) {
         </div>
       );
     }
-    if (workspaces && workspaces.length > 1) {
+    if (workspaces && workspaces.length > 0) {
       const canContinue = Boolean(selectedWorkspaceId) && !busy;
       return (
         <div style={footerStyle}>
@@ -344,7 +339,7 @@ export default function MulticaSetupModal({ open, onClose }) {
         </div>
       );
     }
-    // loading or single-workspace auto-save in progress
+    // loading state
     return (
       <div style={footerStyle}>
         <button type="button" style={secondaryBtnStyle} onClick={onClose} disabled={busy}>
@@ -355,8 +350,12 @@ export default function MulticaSetupModal({ open, onClose }) {
   };
 
   return createPortal(
-    <div style={backdropStyle} onClick={onClose}>
-      <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
+    <div style={backdropStyle} onPointerDown={onClose}>
+      <div
+        style={cardStyle}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={headerStyle}>
           <div style={titleStyle}>{title}</div>
           <button
