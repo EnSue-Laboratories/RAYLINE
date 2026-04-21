@@ -51,6 +51,9 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
+  const cwdRef = useRef(cwd);
+
+  useEffect(() => { cwdRef.current = cwd; }, [cwd]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -61,6 +64,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   useEffect(() => {
     setMessage("");
     setError(null);
+    setGenerating(false);
   }, [cwd]);
 
   useEffect(() => {
@@ -209,17 +213,19 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
 
   const handleGenerateMessage = async () => {
     if (generating || !window.api?.gitGenCommitMessage) return;
+    const requestCwd = cwd;
     setGenerating(true);
     setError(null);
     try {
-      const r = await window.api.gitGenCommitMessage(cwd);
+      const r = await window.api.gitGenCommitMessage(requestCwd);
+      if (cwdRef.current !== requestCwd) return;
       if (!r.ok) {
         setError(r.stderr || "Failed to generate commit message");
         return;
       }
       setMessage(r.message || "");
     } finally {
-      setGenerating(false);
+      if (cwdRef.current === requestCwd) setGenerating(false);
     }
   };
 
