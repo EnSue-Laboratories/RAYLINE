@@ -4,6 +4,7 @@ import { Paperclip, X, GitBranch, GitFork, Link2 } from "lucide-react";
 import ModelPicker from "./ModelPicker";
 import ProjectPicker from "./ProjectPicker";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { clipboardItemsToAttachments, dataTransferHasFiles, fileListToAttachments } from "../utils/attachments";
 
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
@@ -53,6 +54,7 @@ export default function NewChatCard({
 }) {
   const s = useFontScale();
   const textareaRef = useRef(null);
+  const dragDepthRef = useRef(0);
 
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(defaultModel || "sonnet");
@@ -348,45 +350,71 @@ export default function NewChatCard({
     setShowTreeInput(false);
   }, []);
 
-  // Paste handler for images
-  const handlePaste = (e) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of items) {
-      if (item.type.startsWith("image/")) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          setAttachments((prev) => [...prev, { type: "image", dataUrl: ev.target.result, name: file.name || "image" }]);
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-  };
+  const handlePaste = useCallback((e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    if (!items.some((item) => item?.kind === "file")) return;
 
-  // Drop handler for files and images
-  const handleDrop = (e) => {
     e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-    const files = e.dataTransfer?.files;
-    if (!files) return;
-    for (const file of files) {
-      const filePath = window.api?.getFilePath?.(file) || file.path || null;
-      if (file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          setAttachments((prev) => [...prev, { type: "image", dataUrl: ev.target.result, name: file.name, path: filePath }]);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        setAttachments((prev) => [...prev, { type: "file", name: file.name, path: filePath || file.name }]);
-      }
-    }
-  };
+    void clipboardItemsToAttachments(items).then((nextAttachments) => {
+      if (nextAttachments.length === 0) return;
+      setAttachments((prev) => [...prev, ...nextAttachments]);
+    });
+  }, []);
 
   const [dragOver, setDragOver] = useState(false);
+  const resetDragState = useCallback(() => {
+    dragDepthRef.current = 0;
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    resetDragState();
+
+    void fileListToAttachments(e.dataTransfer?.files).then((nextAttachments) => {
+      if (nextAttachments.length === 0) return;
+      setAttachments((prev) => [...prev, ...nextAttachments]);
+    });
+  }, [resetDragState]);
+
+  const handleDragEnter = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current += 1;
+    setDragOver(true);
+  }, []);
+
+  const handleDragOver = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dragOver) setDragOver(true);
+  }, [dragOver]);
+
+  const handleDragLeave = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setDragOver(false);
+  }, []);
+
+  useEffect(() => {
+    const handleWindowDrop = () => resetDragState();
+    const handleWindowDragEnd = () => resetDragState();
+
+    window.addEventListener("drop", handleWindowDrop);
+    window.addEventListener("dragend", handleWindowDragEnd);
+
+    return () => {
+      window.removeEventListener("drop", handleWindowDrop);
+      window.removeEventListener("dragend", handleWindowDragEnd);
+    };
+  }, [resetDragState]);
 
   const selectIssue = useCallback(async (issue) => {
     setIssueContext(`Issue #${issue.number}: ${issue.title}\n\n${issue.body || ""}`);
@@ -455,8 +483,9 @@ export default function NewChatCard({
         minHeight: 0,
       }}
       onDrop={handleDrop}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
     >
       <div style={{
         maxWidth: 600,
