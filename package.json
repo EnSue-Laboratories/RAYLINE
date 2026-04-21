@@ -2,7 +2,11 @@
   "name": "ensue",
   "productName": "RayLine",
   "description": "RayLine — a desktop client for Claude Code",
-  "author": "Ensue Laboratories",
+  "author": {
+    "name": "Ensue Laboratories",
+    "email": "contact@ensue.dev"
+  },
+  "homepage": "https://github.com/EnSue-Laboratories/RAYLINE",
   "private": true,
   "version": "0.1.1",
   "type": "module",
@@ -41,6 +45,12 @@
   "build": {
     "appId": "com.ensue.rayline",
     "productName": "RayLine",
+    "publish": {
+      "provider": "github",
+      "owner": "EnSue-Laboratories",
+      "repo": "RAYLINE",
+      "releaseType": "draft"
+    },
     "win": {
       "icon": "public/icon.png",
       "target": [
@@ -80,6 +90,16 @@
           "type": "link",
           "path": "/Applications"
         }
+      ]
+    },
+    "linux": {
+      "category": "Development",
+      "icon": "public/icon.png",
+      "maintainer": "Ensue Laboratories <contact@ensue.dev>",
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
       ]
     },
     "files": [
