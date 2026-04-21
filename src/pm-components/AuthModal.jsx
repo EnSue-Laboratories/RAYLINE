@@ -137,9 +137,9 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
+        background: "var(--pm-modal-backdrop)",
+        backdropFilter: "blur(var(--pm-modal-backdrop-blur))",
+        WebkitBackdropFilter: "blur(var(--pm-modal-backdrop-blur))",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

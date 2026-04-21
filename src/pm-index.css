@@ -9,6 +9,8 @@
   --pane-active-overlay: rgba(9, 9, 11, var(--pane-overlay-alpha));
   --pane-elevated-rgb: 16, 16, 18;
   --pane-elevated: rgba(var(--pane-elevated-rgb), 0.5);
+  --pm-modal-backdrop: rgba(0,0,0,0.7);
+  --pm-modal-backdrop-blur: 8px;
   --pane-hover: #121214;
   --pane-active: #141416;
   --pane-interaction-hover-fill: var(--pane-hover);
