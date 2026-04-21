@@ -86,10 +86,31 @@ If you're only working on the main UI, you can skip the rebuild — terminal ses
 | `npm run dev:electron` | Vite + Electron together (default dev flow) |
 | `npm run build` | Production renderer bundle |
 | `npm run build:electron` | Renderer build plus a packaged desktop app |
+| `npm run build:electron:mac` | macOS DMG build |
 | `npm run build:electron:win` | Windows NSIS build (skips `npm rebuild`) |
 | `npm run lint` | ESLint |
 | `npm run preview` | Preview the production renderer |
 | `npm run rebuild` | Rebuild `node-pty` for the active Electron version |
+
+## Release Automation
+
+GitHub Actions packages the desktop app for **Windows** and **macOS** only. It runs on:
+
+- manual dispatch via the **Package Desktop App** workflow
+- published GitHub releases
+
+Manual runs upload the build output as workflow artifacts. Release runs upload the same files to the GitHub release. Linux packaging is intentionally left out for now because this repo does not have a reliable Linux app validation path yet.
+
+For signed and notarized macOS builds in CI, configure these repository secrets:
+
+- `CSC_LINK`
+- `CSC_KEY_PASSWORD`
+- `APPLE_SIGNING_IDENTITY` or `CSC_NAME` if the certificate name should be pinned explicitly
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
+
+If the macOS signing secrets are not present, CI falls back to an unsigned DMG so manual packaging still succeeds.
 
 ## Architecture
 
