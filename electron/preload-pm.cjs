@@ -26,4 +26,12 @@ contextBridge.exposeInMainWorld("ghApi", {
   loadPmState: () => ipcRenderer.invoke("gh-load-pm-state"),
   savePmState: (state) => ipcRenderer.invoke("gh-save-pm-state", state),
   readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
+  authStart: () => ipcRenderer.invoke("gh-auth-start"),
+  authCancel: () => ipcRenderer.invoke("gh-auth-cancel"),
+  authLogout: () => ipcRenderer.invoke("gh-auth-logout"),
+  onAuthEvent: (handler) => {
+    const listener = (_e, payload) => handler(payload);
+    ipcRenderer.on("gh-auth-event", listener);
+    return () => ipcRenderer.removeListener("gh-auth-event", listener);
+  },
 });
