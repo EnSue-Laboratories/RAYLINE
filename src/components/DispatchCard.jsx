@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, GitBranch, FileText, Check, ChevronRight, ChevronDown, Paperclip, Plus } from "lucide-react";
+import ImagePreview from "./ImagePreview";
 
 function TransparentCheckbox({ checked, onChange, ariaLabel }) {
   return (
@@ -262,13 +263,36 @@ export default function DispatchCard({
           <button
             onClick={handleSubmit}
             disabled={!canDispatch}
-            style={primaryBtnStyle(canDispatch)}
+            style={primaryBtnStyle(canDispatch, submitting)}
           >
-            Dispatch {activeRows.length || 0} agent{activeRows.length === 1 ? "" : "s"}
+            {submitting
+              ? <DispatchLoadingDots />
+              : <>Dispatch {activeRows.length || 0} agent{activeRows.length === 1 ? "" : "s"}</>}
           </button>
         </footer>
       </div>
     </div>
+  );
+}
+
+function DispatchLoadingDots() {
+  const dot = (delay) => ({
+    width: 5,
+    height: 5,
+    borderRadius: "50%",
+    background: "currentColor",
+    display: "inline-block",
+    animation: `dotPulse 1.2s ease-in-out ${delay} infinite`,
+  });
+  return (
+    <span
+      aria-label="Dispatching"
+      style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "0 2px" }}
+    >
+      <span style={dot("0s")} />
+      <span style={dot("0.16s")} />
+      <span style={dot("0.32s")} />
+    </span>
   );
 }
 
@@ -477,15 +501,48 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
 }
 
 function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
+  const attachments = row.attachments || [];
+
+  const addAttachments = (items) => {
+    if (!items.length) return;
+    onChange({ attachments: [...attachments, ...items] });
+  };
+
+  const removeAttachment = (i) => {
+    onChange({ attachments: attachments.filter((_, idx) => idx !== i) });
+  };
+
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageItems = Array.from(items).filter((it) => it.type.startsWith("image/"));
+    if (imageItems.length === 0) return;
+    e.preventDefault();
+    Promise.all(imageItems.map((it) => new Promise((resolve) => {
+      const file = it.getAsFile();
+      if (!file) { resolve(null); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve({ type: "image", dataUrl: ev.target.result, name: file.name || "image" });
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    }))).then((added) => addAttachments(added.filter(Boolean)));
+  };
+
   return (
     <div style={customRowStyle(!!error)}>
       <textarea
         placeholder={`Task ${index + 1} prompt…`}
         value={row.prompt}
         onChange={(e) => onChange({ prompt: e.target.value })}
+        onPaste={handlePaste}
         rows={3}
         style={customTextareaStyle}
       />
+      {attachments.length > 0 && (
+        <div style={{ padding: "0 12px 8px" }}>
+          <ImagePreview items={attachments} onRemove={removeAttachment} />
+        </div>
+      )}
       <div style={customControlsStyle}>
         <input
           type="text"
@@ -783,12 +840,14 @@ const footerStyle = {
   display: "flex", justifyContent: "space-between", alignItems: "center",
   padding: "12px 18px", borderTop: "1px solid var(--pane-border)",
 };
-const primaryBtnStyle = (enabled) => ({
+const primaryBtnStyle = (enabled, loading) => ({
   padding: "8px 14px", borderRadius: 6, border: "none",
-  background: enabled ? "white" : "rgba(255,255,255,0.1)",
-  color: enabled ? "black" : "rgba(255,255,255,0.4)",
-  cursor: enabled ? "pointer" : "not-allowed",
+  background: loading ? "rgba(255,255,255,0.85)" : (enabled ? "white" : "rgba(255,255,255,0.1)"),
+  color: loading ? "black" : (enabled ? "black" : "rgba(255,255,255,0.4)"),
+  cursor: loading ? "progress" : (enabled ? "pointer" : "not-allowed"),
   fontSize: 12, fontWeight: 500,
+  minWidth: loading ? 120 : undefined,
+  display: "inline-flex", alignItems: "center", justifyContent: "center",
 });
 
 const noticeStyle = {

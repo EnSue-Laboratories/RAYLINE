@@ -20,3 +20,16 @@ export const getM = (id) =>
   MODELS.find((m) => m.id === normalizeModelId(id)) ||
   MODELS.find((m) => m.id === DEFAULT_MODEL_ID) ||
   MODELS[0];
+
+export function isMulticaModelId(id) {
+  return typeof id === "string" && id.startsWith("multica:");
+}
+
+export function getMOrMulticaFallback(id, multicaModels) {
+  if (isMulticaModelId(id)) {
+    const hit = multicaModels?.find((m) => m.id === id);
+    if (hit) return hit;
+    return { id, name: "Multica agent", tag: "MULTICA", provider: "multica" };
+  }
+  return getM(id);
+}

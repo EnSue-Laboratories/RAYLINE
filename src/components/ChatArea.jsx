@@ -4,7 +4,7 @@ import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as Termina
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
-import ModelPicker from "./ModelPicker";
+import { ModelPickerWithMultica } from "../data/multicaModels.jsx";
 import BranchSelector from "./BranchSelector";
 import GitStatusPill from "./GitStatusPill";
 import ImagePreview from "./ImagePreview";
@@ -13,6 +13,8 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import TabStrip from "./TabStrip";
+import useGitStatus from "../hooks/useGitStatus";
+import { isMulticaModelId } from "../data/models";
 
 const EMPTY_MESSAGES = [];
 
@@ -161,6 +163,21 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     return parts.slice(-2).join("/") || parts[parts.length - 1] || cwd;
   })() : "current workspace";
 
+  const activeModelId = convo?.model || defaultModel;
+  const isMulticaModel = isMulticaModelId(activeModelId);
+  const { status: gitStatus } = useGitStatus(cwd);
+  const hasDirtyWorktree = (gitStatus?.files?.length || 0) > 0;
+  const hasNoUpstream = Boolean(gitStatus?.branch) && !gitStatus?.upstream && !gitStatus?.detached;
+  const branchNeedsAttention = hasDirtyWorktree || hasNoUpstream;
+  const [branchHintDismissed, setBranchHintDismissed] = useState(false);
+  useEffect(() => { setBranchHintDismissed(false); }, [convo?.id]);
+  const showBranchHint = isMulticaModel && !showNewChatCard && branchNeedsAttention && !branchHintDismissed && !shellMode;
+  const branchHintText = (() => {
+    if (hasDirtyWorktree && hasNoUpstream) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES + NOT PUBLISHED";
+    if (hasDirtyWorktree) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES";
+    return "BRANCH MAY NEED UPDATING  //  NOT PUBLISHED TO ORIGIN";
+  })();
+
   const send = useCallback(() => {
     if (!canSend) return;
     const nextInput = trimmedInput;
@@ -171,8 +188,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       setSelectedCmd(0);
     });
     if (inRef.current) inRef.current.style.height = "20px";
+    if (isMulticaModel && !shellMode) setBranchHintDismissed(true);
     onSend(nextInput, nextAttachments);
-  }, [attachments, canSend, onSend, shellMode, trimmedInput]);
+  }, [attachments, canSend, isMulticaModel, onSend, shellMode, trimmedInput]);
 
   const handleInput = (e) => {
     setInput(e.target.value);
@@ -523,7 +541,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               onRefocusTerminal={onRefocusTerminal}
             />
           )}
-          {!showNewChatCard && <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
+          {!showNewChatCard && <ModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
           {!showNewChatCard && developerMode && onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
@@ -858,6 +876,19 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               {canRunShell
                 ? `SHELL MODE  //  RUNS IN ${shellLocation.toUpperCase()}`
                 : "SHELL MODE  //  TYPE A COMMAND AFTER !"}
+            </div>
+          )}
+          {showBranchHint && (
+            <div
+              style={{
+                marginBottom: 6,
+                fontSize: s(10),
+                fontFamily: "'JetBrains Mono',monospace",
+                letterSpacing: ".1em",
+                color: "rgba(255,210,140,0.55)",
+              }}
+            >
+              {branchHintText}
             </div>
           )}
 
