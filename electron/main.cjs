@@ -43,8 +43,8 @@ if (isDev && process.platform === "darwin") {
   const { execSync } = require("child_process");
   try {
     const plist = path.join(path.dirname(process.execPath), "..", "Info.plist");
-    execSync(`/usr/libexec/PlistBuddy -c "Set :CFBundleName Claudi" "${plist}" 2>/dev/null || true`);
-    execSync(`/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Claudi" "${plist}" 2>/dev/null || true`);
+    execSync(`/usr/libexec/PlistBuddy -c "Set :CFBundleName RayLine" "${plist}" 2>/dev/null || true`);
+    execSync(`/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName RayLine" "${plist}" 2>/dev/null || true`);
   } catch {}
 }
 

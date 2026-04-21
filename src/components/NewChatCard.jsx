@@ -92,8 +92,8 @@ export default function NewChatCard({
 
   const makeClaudiBranchName = useCallback((baseBranch) => {
     const suffix = Math.random().toString(36).slice(2, 8);
-    const base = (baseBranch || "claudi").trim();
-    return `${base}-claudi-${suffix}`;
+    const base = (baseBranch || "rayline").trim();
+    return `${base}-rayline-${suffix}`;
   }, []);
 
   // Auto-focus textarea on mount
