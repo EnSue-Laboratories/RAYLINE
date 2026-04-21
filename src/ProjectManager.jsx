@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, X, UserCog } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
 function GitHubIcon({ size = 48 }) {
   return (
@@ -11,6 +11,7 @@ function GitHubIcon({ size = 48 }) {
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain from "./components/Grain";
 import AuthModal from "./pm-components/AuthModal";
+import AccountManager from "./pm-components/AccountManager";
 import CreateForm from "./pm-components/CreateForm";
 import RepoManager from "./pm-components/RepoManager";
 import IssueList from "./pm-components/IssueList";
@@ -18,6 +19,21 @@ import PRList from "./pm-components/PRList";
 import ItemDetail from "./pm-components/ItemDetail";
 import { getPaneInteractionStyle, getPaneSurfaceStyle } from "./utils/paneSurface";
 import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
+
+const manageLinkStyle = (variant) => ({
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  fontSize: 10,
+  fontFamily: "'JetBrains Mono', monospace",
+  color: variant === "danger"
+    ? "rgba(200,80,80,0.6)"
+    : "rgba(255,255,255,0.3)",
+  letterSpacing: ".08em",
+  padding: 0,
+  textAlign: "left",
+  transition: "color .2s",
+});
 
 const iconBtnStyle = {
   width: 28,
@@ -143,6 +159,7 @@ export default function ProjectManager() {
   const [authUser, setAuthUser] = useState(null);
   const [authModalMode, setAuthModalMode] = useState(null); // null | "signin" | "switch"
   const [showAddRepo, setShowAddRepo] = useState(false);
+  const [showAccountManager, setShowAccountManager] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
   const [wallpaper, setWallpaper] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
@@ -376,74 +393,28 @@ export default function ProjectManager() {
           ))}
         </div>
 
-        {/* Manage repos button */}
+        {/* Manage footer: stacked repos + account links */}
         <div
           style={{
             padding: "12px 16px",
             borderTop: "1px solid rgba(255,255,255,0.04)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: 8,
           }}
         >
           <button
             onClick={() => setRemoveMode(!removeMode)}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 10,
-              fontFamily: "'JetBrains Mono', monospace",
-              color: removeMode
-                ? "rgba(200,80,80,0.6)"
-                : "rgba(255,255,255,0.3)",
-              letterSpacing: ".08em",
-              padding: 0,
-              transition: "color .2s",
-            }}
+            style={manageLinkStyle(removeMode ? "danger" : "idle")}
           >
             {removeMode ? "DONE" : "MANAGE REPOS"}
           </button>
-        </div>
-
-        {/* Account footer: signed-in user + switch-account button */}
-        <div
-          style={{
-            padding: "10px 12px",
-            borderTop: "1px solid rgba(255,255,255,0.04)",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              flex: 1,
-              minWidth: 0,
-              color: "rgba(255,255,255,0.5)",
-            }}
-          >
-            <GitHubIcon size={13} />
-            <span
-              title={authUser ? `@${authUser}` : "Signed in"}
-              style={{
-                fontSize: 11,
-                fontFamily: "'JetBrains Mono', monospace",
-                color: "rgba(255,255,255,0.6)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {authUser ? `@${authUser}` : "signed in"}
-            </span>
-          </div>
           <button
-            onClick={() => setAuthModalMode("switch")}
-            title="Switch GitHub account"
-            style={{ ...iconBtnStyle, width: 24, height: 24 }}
+            onClick={() => setShowAccountManager(true)}
+            style={manageLinkStyle("idle")}
           >
-            <UserCog size={12} strokeWidth={1.5} />
+            MANAGE ACCOUNT
           </button>
         </div>
       </div>
@@ -571,6 +542,23 @@ export default function ProjectManager() {
           repos={repos}
           onAdd={handleAddRepo}
           onClose={() => setShowAddRepo(false)}
+        />
+      )}
+
+      {/* Account manager modal */}
+      {showAccountManager && (
+        <AccountManager
+          currentUser={authUser}
+          onSwitchAccount={() => {
+            setShowAccountManager(false);
+            setAuthModalMode("switch");
+          }}
+          onSignedOut={async () => {
+            setShowAccountManager(false);
+            setSelectedItem(null);
+            await refreshAuth();
+          }}
+          onClose={() => setShowAccountManager(false)}
         />
       )}
 

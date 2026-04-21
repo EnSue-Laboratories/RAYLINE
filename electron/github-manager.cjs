@@ -110,7 +110,13 @@ function ghWithRawStdin(args, input) {
 async function checkAuth() {
   try {
     const out = await gh(["auth", "status", "--hostname", "github.com"]);
-    const user = parseAuthStatusUser(out);
+    let user = parseAuthStatusUser(out);
+    if (!user) {
+      // Authoritative fallback — works across all gh output variants.
+      try {
+        user = (await gh(["api", "user", "-q", ".login"])) || null;
+      } catch { /* leave user null */ }
+    }
     return { ok: true, user };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -170,6 +176,8 @@ function startWebAuth(onEvent) {
   let browserEventSent = false;
   let authenticated = false;
   let finished = false;
+  let gitCredPromptAnswered = false;
+  let stallTimer = null;
 
   const finish = (event) => {
     if (finished) return;
@@ -183,6 +191,7 @@ function startWebAuth(onEvent) {
     buffer += text;
     // Cap buffer so we don't grow unbounded on long flows.
     if (buffer.length > 32 * 1024) buffer = buffer.slice(-16 * 1024);
+    log("auth buffer tail:", buffer.slice(-200).replace(/\n/g, "\\n"));
 
     // Extract one-time code once.
     if (!codeSeen) {
@@ -190,6 +199,16 @@ function startWebAuth(onEvent) {
       if (codeMatch) {
         codeSeen = true;
         onEvent({ type: "code", code: codeMatch[1] });
+        // Open the device page and advance gh immediately once the code is
+        // visible instead of relying on exact prompt wording.
+        if (!browserEventSent) {
+          browserEventSent = true;
+          onEvent({ type: "browser", url: "https://github.com/login/device" });
+        }
+        if (!enterSent) {
+          enterSent = true;
+          try { proc.write("\r"); } catch {}
+        }
       }
     }
 
@@ -208,6 +227,13 @@ function startWebAuth(onEvent) {
       try { proc.write("y\r"); } catch {}
     }
 
+    // gh 2.89 still asks this before showing the one-time code. Default is
+    // "Yes" — press Enter to accept.
+    if (!gitCredPromptAnswered && /Authenticate Git with your GitHub credentials\??/i.test(buffer)) {
+      gitCredPromptAnswered = true;
+      try { proc.write("\r"); } catch {}
+    }
+
     // Success markers from gh. `Logged in as` is the most reliable one across
     // gh versions; `Authentication complete` is printed just before it.
     if (!authenticated) {
@@ -223,6 +249,7 @@ function startWebAuth(onEvent) {
 
   proc.onData(handleChunk);
   proc.onExit(({ exitCode }) => {
+    if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
     if (finished) return;
     if (exitCode === 0 && authenticated) {
       // Already handled by the success marker above.
@@ -240,6 +267,19 @@ function startWebAuth(onEvent) {
       });
     }
   });
+
+  // If 20s pass with no one-time code shown, something is blocking the flow.
+  // Kill the process and surface the captured output so the user (and us)
+  // can see which prompt gh was stuck on.
+  stallTimer = setTimeout(() => {
+    if (finished || codeSeen) return;
+    try { proc.kill(); } catch {}
+    finish({
+      type: "error",
+      error: "Timed out waiting for GitHub. gh may be stuck on a prompt.",
+      output: buffer.trim().slice(-500) || "(no output)",
+    });
+  }, 20000);
 
   const session = {
     proc,

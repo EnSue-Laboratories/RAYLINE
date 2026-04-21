@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Loader2, Check, Copy, ExternalLink } from "lucide-react";
+import { X, Loader2, Check, Copy, ExternalLink, AlertCircle } from "lucide-react";
+
+function cleanError(msg) {
+  if (!msg) return "Unknown error";
+  return String(msg)
+    .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+    .replace(/^Error:\s*/i, "")
+    .trim();
+}
 
 function GitHubGlyph({ size = 28 }) {
   return (
@@ -15,52 +23,79 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
   const [code, setCode] = useState(null);
   const [user, setUser] = useState(null);
   const [error, setError] = useState(null);
+  const [errorOutput, setErrorOutput] = useState(null);
   const [copied, setCopied] = useState(false);
   const unsubRef = useRef(null);
-  const startedRef = useRef(false);
+  const startTimerRef = useRef(null);
+  const flowStartedRef = useRef(false);
+
+  const clearAuthListener = () => {
+    if (unsubRef.current) {
+      unsubRef.current();
+      unsubRef.current = null;
+    }
+  };
 
   const start = async () => {
+    clearAuthListener();
+    flowStartedRef.current = true;
     setPhase("starting");
     setCode(null);
     setUser(null);
     setError(null);
+    setErrorOutput(null);
 
     const unsub = window.ghApi.onAuthEvent((event) => {
       if (event.type === "code") {
         setCode(event.code);
         setPhase("code");
       } else if (event.type === "success") {
+        flowStartedRef.current = false;
         setUser(event.user || null);
         setPhase("success");
       } else if (event.type === "error") {
-        setError(event.error || "Authentication failed");
+        flowStartedRef.current = false;
+        setError(cleanError(event.error) || "Authentication failed");
+        setErrorOutput(event.output || null);
         setPhase("error");
       } else if (event.type === "cancelled") {
+        flowStartedRef.current = false;
         setPhase("cancelled");
       }
     });
     unsubRef.current = unsub;
 
     try {
-      if (mode === "switch") {
-        await window.ghApi.authLogout();
-      }
+      // `gh auth login --web` handles the already-signed-in case by asking
+      // for re-auth confirmation, which we auto-accept in github-manager.
+      // No explicit pre-logout is needed for `switch`.
       await window.ghApi.authStart();
     } catch (err) {
-      setError(err.message || "Failed to start auth flow");
+      flowStartedRef.current = false;
+      setError(cleanError(err && err.message) || "Failed to start auth flow");
       setPhase("error");
     }
   };
 
   useEffect(() => {
-    if (!startedRef.current) {
-      startedRef.current = true;
+    // Defer startup one tick so React StrictMode's mount probe doesn't start
+    // and immediately cancel the interactive gh session in development.
+    startTimerRef.current = setTimeout(() => {
+      startTimerRef.current = null;
       start();
-    }
+    }, 0);
+
     return () => {
-      if (unsubRef.current) unsubRef.current();
+      if (startTimerRef.current) {
+        clearTimeout(startTimerRef.current);
+        startTimerRef.current = null;
+      }
+      clearAuthListener();
       // Best-effort: if the user closes the modal mid-flow, kill the gh process.
-      window.ghApi.authCancel().catch(() => {});
+      if (flowStartedRef.current) {
+        flowStartedRef.current = false;
+        window.ghApi.authCancel().catch(() => {});
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -83,11 +118,17 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
     } catch { /* clipboard may be unavailable; user can copy manually */ }
   };
 
-  const retry = () => {
-    if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
-    startedRef.current = false;
+  const retry = async () => {
+    if (startTimerRef.current) {
+      clearTimeout(startTimerRef.current);
+      startTimerRef.current = null;
+    }
+    clearAuthListener();
+    if (flowStartedRef.current) {
+      flowStartedRef.current = false;
+      await window.ghApi.authCancel().catch(() => {});
+    }
     start();
-    startedRef.current = true;
   };
 
   return (
@@ -285,17 +326,43 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
 
           {phase === "error" && (
             <>
-              <Label style={{ color: "rgba(220,120,120,0.85)" }}>Authentication failed</Label>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    background: "rgba(220,120,120,0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "rgba(230,140,140,0.9)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <AlertCircle size={15} strokeWidth={1.8} />
+                </div>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "rgba(255,255,255,0.85)",
+                  }}
+                >
+                  Authentication failed
+                </div>
+              </div>
               <div
                 style={{
-                  marginTop: 8,
+                  marginTop: 10,
                   padding: "10px 12px",
                   borderRadius: 7,
-                  border: "1px solid rgba(220,120,120,0.25)",
-                  background: "rgba(220,120,120,0.08)",
+                  border: "1px solid rgba(255,255,255,0.05)",
+                  background: "rgba(255,255,255,0.025)",
                   fontSize: 12,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  color: "rgba(255,200,200,0.75)",
+                  fontFamily: "system-ui, sans-serif",
+                  color: "rgba(255,255,255,0.55)",
+                  lineHeight: 1.45,
                   maxHeight: 140,
                   overflow: "auto",
                   whiteSpace: "pre-wrap",
@@ -304,6 +371,38 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
               >
                 {error || "Unknown error"}
               </div>
+              {errorOutput && (
+                <details
+                  style={{
+                    marginTop: 8,
+                    fontSize: 11,
+                    color: "rgba(255,255,255,0.4)",
+                    fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  <summary style={{ cursor: "pointer", userSelect: "none" }}>
+                    Show gh output
+                  </summary>
+                  <pre
+                    style={{
+                      marginTop: 6,
+                      padding: "8px 10px",
+                      borderRadius: 6,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      background: "rgba(0,0,0,0.25)",
+                      fontSize: 11,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      color: "rgba(255,255,255,0.55)",
+                      maxHeight: 160,
+                      overflow: "auto",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {errorOutput}
+                  </pre>
+                </details>
+              )}
               <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
                 <button onClick={retry} style={primaryBtn}>Try again</button>
                 <button onClick={onClose} style={secondaryBtn}>Close</button>
@@ -360,11 +459,12 @@ function Label({ children, style }) {
 }
 
 const primaryBtn = {
-  background: "rgba(255,255,255,0.12)",
-  border: "1px solid var(--pane-border)",
+  background: "rgba(255,255,255,0.18)",
+  border: "1px solid rgba(255,255,255,0.12)",
   borderRadius: 6,
-  color: "rgba(255,255,255,0.85)",
+  color: "rgba(255,255,255,0.95)",
   fontSize: 12,
+  fontWeight: 500,
   fontFamily: "system-ui, sans-serif",
   padding: "7px 14px",
   cursor: "pointer",
@@ -374,7 +474,7 @@ const secondaryBtn = {
   background: "transparent",
   border: "1px solid var(--pane-border)",
   borderRadius: 6,
-  color: "rgba(255,255,255,0.55)",
+  color: "rgba(255,255,255,0.5)",
   fontSize: 12,
   fontFamily: "system-ui, sans-serif",
   padding: "7px 14px",
