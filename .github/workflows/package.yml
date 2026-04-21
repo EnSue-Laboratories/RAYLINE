@@ -42,7 +42,7 @@ jobs:
 
       - name: Package Windows app
         if: matrix.platform == 'windows'
-        run: npx electron-builder --win --publish never --config.npmRebuild=false
+        run: npx electron-builder --config electron-builder.config.cjs --win --publish never --config.npmRebuild=false
 
       - name: Package macOS app
         if: matrix.platform == 'macos'
@@ -54,7 +54,7 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_NAME: ${{ secrets.CSC_NAME }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-        run: npx electron-builder --mac --publish never
+        run: npx electron-builder --config electron-builder.config.cjs --mac --publish never
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
