@@ -10,6 +10,7 @@ import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
 import { DEFAULT_MODEL_ID, getMOrMulticaFallback, isMulticaModelId, MODELS, normalizeModelId } from "./data/models";
+import { useMulticaModels } from "./data/multicaModels.jsx";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
@@ -1024,6 +1025,7 @@ export default function App() {
     markMulticaConnected,
   } = useAgent();
   const terminal = useTerminal();
+  const { models: multicaModels } = useMulticaModels();
 
   // convos: array of { id, sessionId, title, model, ts }
   const [convoList, setConvoList] = useState([]);
@@ -1078,6 +1080,10 @@ export default function App() {
         : persistableConversations[0]?.id || null
     ),
     [active, persistableConversations]
+  );
+  const dispatchAvailableModels = useMemo(
+    () => [...MODELS, ...multicaModels],
+    [multicaModels]
   );
   const persistStatePayload = useMemo(() => ({
     convos: persistableConversations,
@@ -2956,9 +2962,14 @@ export default function App() {
   const handleModelChange = (modelId) => {
     const nextProvider = getMOrMulticaFallback(modelId).provider || "claude";
     const normalizedActiveConvo = activeConvo ? normalizeConversationState(activeConvo) : null;
+    const currentProvider =
+      getMOrMulticaFallback(normalizedActiveConvo?.model).provider
+      || normalizedActiveConvo?.lastProvider
+      || "claude";
     logSessionState("handleModelChange", {
       conversationId: active || null,
       modelId,
+      currentProvider,
       nextProvider,
       lastProvider: normalizedActiveConvo?.lastProvider || null,
       sessionId: normalizedActiveConvo?.sessionId || null,
@@ -2966,6 +2977,14 @@ export default function App() {
       providerSessions: normalizedActiveConvo?.providerSessions || null,
       activeSessionId: normalizedActiveConvo?.activeSessionId || null,
     });
+    if (
+      active
+      && activeData.isStreaming
+      && currentProvider === "multica"
+      && modelId !== normalizedActiveConvo?.model
+    ) {
+      cancelMessage(active);
+    }
     if (active) {
       setConvoList((p) =>
         p.map((c) => (c.id === active ? { ...c, model: modelId } : c))
@@ -3294,7 +3313,7 @@ export default function App() {
           currentCwd={newChatDefaultCwd || undefined}
           projects={projects}
           defaultModel={defaultModel}
-          availableModels={MODELS}
+          availableModels={dispatchAvailableModels}
         />
       )}
 

@@ -322,7 +322,13 @@ export default function useAgent() {
             return next;
           }
 
-          if (inner === "task:failed" || inner === "task:cancelled" || inner === "error") {
+          if (inner === "task:cancelled") {
+            msgs[msgs.length - 1] = freezeElapsed({ ...assistant, isStreaming: false });
+            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false, error: null });
+            return next;
+          }
+
+          if (inner === "task:failed" || inner === "error") {
             msgs[msgs.length - 1] = freezeElapsed({
               ...assistant, isStreaming: false,
               parts: [...(assistant.parts || []), { type: "text", text: `_Multica ${inner}: ${p.message || p.reason || ""}_` }],

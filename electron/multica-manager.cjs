@@ -314,11 +314,17 @@ async function getOrOpenWS({ serverUrl, workspaceId, token }) {
   // Return any pooled entry (CONNECTING or OPEN); callers await entry.ready
   // before using it. Re-entrancy matters: two chats can fire concurrently.
   const existing = wsPool.get(key);
-  if (existing) { await existing.ready; return existing; }
+  if (existing) {
+    existing.serverUrl = serverUrl || existing.serverUrl;
+    existing.workspaceId = workspaceId || existing.workspaceId;
+    existing.token = token || existing.token;
+    await existing.ready;
+    return existing;
+  }
 
   const wsURL = serverUrl.replace(/^http/, "ws") + `/ws?workspace_id=${workspaceId}`;
   const ws = new WebSocket(wsURL);
-  const entry = { ws, subscriptions: new Map(), ready: null };
+  const entry = { ws, subscriptions: new Map(), ready: null, serverUrl, workspaceId, token };
   entry.ready = new Promise((resolve, reject) => {
     let settled = false;
     const done = (err) => {
@@ -351,6 +357,91 @@ async function getOrOpenWS({ serverUrl, workspaceId, token }) {
   return entry;
 }
 
+function emitMulticaStream(sub, conversationId, event) {
+  try {
+    sub.sender.send("agent-stream", { conversationId, event });
+  } catch { /* sender destroyed */ }
+}
+
+function emitMulticaDone(sub, conversationId) {
+  if (sub.doneEmitted) return;
+  sub.doneEmitted = true;
+  try {
+    sub.sender.send("agent-done", { conversationId, provider: "multica" });
+  } catch { /* sender destroyed */ }
+}
+
+async function multicaGetPendingTask({ serverUrl, token, workspaceId, workspaceSlug, sessionId }) {
+  return rest({
+    serverUrl,
+    method: "GET",
+    path: `/api/chat/sessions/${sessionId}/pending-task`,
+    token,
+    workspaceId,
+    workspaceSlug,
+  });
+}
+
+async function multicaCancelTask({ serverUrl, token, workspaceId, workspaceSlug, taskId }) {
+  return rest({
+    serverUrl,
+    method: "POST",
+    path: `/api/tasks/${taskId}/cancel`,
+    token,
+    workspaceId,
+    workspaceSlug,
+  });
+}
+
+async function ensureMulticaTaskId(entry, sub) {
+  if (sub.taskId) return sub.taskId;
+  if (!sub.sessionId) return null;
+  try {
+    const pending = await multicaGetPendingTask({
+      serverUrl: entry.serverUrl,
+      token: entry.token,
+      workspaceId: entry.workspaceId,
+      workspaceSlug: sub.workspaceSlug,
+      sessionId: sub.sessionId,
+    });
+    if (pending?.task_id) {
+      sub.taskId = pending.task_id;
+      return sub.taskId;
+    }
+    return null;
+  } catch (err) {
+    if (err?.status === 404) return null;
+    throw err;
+  }
+}
+
+async function requestTaskCancel(entry, sub) {
+  sub.cancelRequested = true;
+  if (sub.cancelPromise) return sub.cancelPromise;
+
+  sub.cancelPromise = (async () => {
+    const taskId = await ensureMulticaTaskId(entry, sub);
+    if (!taskId) return false;
+    try {
+      await multicaCancelTask({
+        serverUrl: entry.serverUrl,
+        token: entry.token,
+        workspaceId: entry.workspaceId,
+        workspaceSlug: sub.workspaceSlug,
+        taskId,
+      });
+      return true;
+    } catch (err) {
+      if (err?.status === 404 || err?.status === 409) return false;
+      throw err;
+    } finally {
+      sub.cancelPromise = null;
+    }
+  })();
+
+  return sub.cancelPromise;
+}
+
 function dispatchWSMessage(key, msg) {
   const entry = wsPool.get(key);
   if (!entry) return;
@@ -359,18 +450,33 @@ function dispatchWSMessage(key, msg) {
   for (const [conversationId, sub] of entry.subscriptions.entries()) {
     const sid = payload?.chat_session_id || payload?.session_id;
     const taskId = payload?.task_id;
+    const sessionMatches = sid === sub.sessionId;
+    if (taskId && sessionMatches) {
+      sub.taskId = taskId;
+      if (sub.cancelRequested && !sub.cancelPromise) {
+        requestTaskCancel(entry, sub).catch((err) => {
+          emitMulticaStream(sub, conversationId, {
+            type: "multica:error",
+            payload: { message: err?.message || String(err) },
+          });
+        });
+      }
+    }
     // agent:status is workspace-scoped (fan out to all subs). Everything else
     // is gated by session id or current task id match.
     const isBroadcast =
       type === "agent:status" ||
-      sid === sub.sessionId ||
+      sessionMatches ||
       Boolean(taskId && sub.taskId && taskId === sub.taskId);
     if (!isBroadcast) continue;
-    try {
-      sub.sender.send("agent-stream", { conversationId, event: { type: `multica:${type}`, payload } });
-    } catch { /* sender destroyed */ }
+    emitMulticaStream(sub, conversationId, { type: `multica:${type}`, payload });
     if (type === "chat:done" || type === "task:completed" || type === "task:failed" || type === "task:cancelled") {
       sub.taskId = null;
+      sub.cancelRequested = false;
+      sub.cancelPromise = null;
+    }
+    if (type === "task:completed" || type === "task:failed" || type === "task:cancelled") {
+      emitMulticaDone(sub, conversationId);
     }
   }
 }
@@ -383,7 +489,16 @@ async function startMulticaAgent(opts, sender) {
   if (!token) throw new Error("startMulticaAgent: missing token");
 
   const entry = await getOrOpenWS({ serverUrl, workspaceId, token });
-  entry.subscriptions.set(conversationId, { sessionId, sender, taskId: null });
+  entry.subscriptions.set(conversationId, {
+    sessionId,
+    sender,
+    taskId: null,
+    workspaceSlug,
+    startRequestComplete: false,
+    cancelRequested: false,
+    cancelPromise: null,
+    doneEmitted: false,
+  });
 
   const attachments = await uploadMulticaAttachments({
     serverUrl,
@@ -398,14 +513,40 @@ async function startMulticaAgent(opts, sender) {
   // Fire the message via REST — the actual content comes back over WS
   const sendResult = await multicaSendMessage({ serverUrl, token, workspaceId, workspaceSlug, sessionId, content });
   const sub = entry.subscriptions.get(conversationId);
-  if (sub) sub.taskId = sendResult?.task_id || null;
+  if (sub) {
+    sub.startRequestComplete = true;
+    sub.taskId = sendResult?.task_id || sub.taskId || null;
+    if (sub.cancelRequested) {
+      requestTaskCancel(entry, sub).catch((err) => {
+        emitMulticaStream(sub, conversationId, {
+          type: "multica:error",
+          payload: { message: err?.message || String(err) },
+        });
+      });
+    }
+  }
 }
 
-function cancelMulticaAgent(conversationId) {
+async function cancelMulticaAgent(conversationId) {
+  const matches = [];
   for (const entry of wsPool.values()) {
-    entry.subscriptions.delete(conversationId);
+    const sub = entry.subscriptions.get(conversationId);
+    if (sub) matches.push({ entry, sub });
   }
-  // TODO (Phase 5): POST /api/tasks/{taskId}/cancel if we tracked the task id
+  if (matches.length === 0) return;
+
+  await Promise.all(matches.map(async ({ entry, sub }) => {
+    try {
+      const didCancel = await requestTaskCancel(entry, sub);
+      if (!didCancel && sub.startRequestComplete) emitMulticaDone(sub, conversationId);
+    } catch (err) {
+      emitMulticaStream(sub, conversationId, {
+        type: "multica:error",
+        payload: { message: err?.message || String(err) },
+      });
+      emitMulticaDone(sub, conversationId);
+    }
+  }));
 }
 
 async function multicaSendCode({ serverUrl, email }) {
@@ -454,9 +595,18 @@ async function multicaListMessages({ serverUrl, token, workspaceId, workspaceSlu
 async function subscribeMulticaAgent({ conversationId, _multica, token }, sender) {
   if (!_multica) throw new Error("subscribeMulticaAgent: missing _multica context");
   if (!token) throw new Error("subscribeMulticaAgent: missing token");
-  const { serverUrl, workspaceId, sessionId } = _multica;
+  const { serverUrl, workspaceId, workspaceSlug, sessionId } = _multica;
   const entry = await getOrOpenWS({ serverUrl, workspaceId, token });
-  entry.subscriptions.set(conversationId, { sessionId, sender, taskId: null });
+  entry.subscriptions.set(conversationId, {
+    sessionId,
+    sender,
+    taskId: null,
+    workspaceSlug,
+    startRequestComplete: true,
+    cancelRequested: false,
+    cancelPromise: null,
+    doneEmitted: false,
+  });
 }
 
 // Expose sendMessage for startMulticaAgent (added later)

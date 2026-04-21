@@ -320,7 +320,9 @@ ipcMain.on("agent-start", (event, opts) => {
 ipcMain.on("agent-cancel", (_event, { conversationId }) => {
   cancelAgent(conversationId);
   cancelCodexAgent(conversationId);
-  cancelMulticaAgent(conversationId);
+  cancelMulticaAgent(conversationId).catch((err) => {
+    console.error("[multica] cancel failed", { conversationId, error: err?.message || String(err) });
+  });
 });
 
 ipcMain.on("agent-edit-resend", (event, opts) => {
