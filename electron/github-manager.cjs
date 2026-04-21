@@ -1,4 +1,4 @@
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli, execFileCli } = require("./cli-bin-resolver.cjs");
 
 // node-pty is a native module — load lazily so the manager still loads even
@@ -178,11 +178,30 @@ function startWebAuth(onEvent) {
   }
 
   if (!proc) {
-    proc = spawnCli(bin, authArgs, {
-      cwd: authCwd,
-      env: authEnv,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    // Wrap with `script` to provide a real PTY so `gh` enables interactive
+    // mode (git credential setup, workflow scope, etc.).  Without TTY
+    // semantics, `gh` skips post-login credential configuration.
+    if (process.platform === "darwin") {
+      proc = spawn("script", ["-q", "/dev/null", bin, ...authArgs], {
+        cwd: authCwd,
+        env: authEnv,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } else if (process.platform === "linux") {
+      const cmdLine = [bin, ...authArgs].map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
+      proc = spawn("script", ["-qc", cmdLine, "/dev/null"], {
+        cwd: authCwd,
+        env: authEnv,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } else {
+      // Windows or other platforms — plain spawn (no TTY wrapper available).
+      proc = spawnCli(bin, authArgs, {
+        cwd: authCwd,
+        env: authEnv,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    }
   }
 
   // Unified interface so the rest of the code doesn't care which backend is
