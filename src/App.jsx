@@ -2257,22 +2257,17 @@ export default function App() {
         needsFreshSession && currentProvider === "claude"
           ? seededSession?.nativeSessionId || undefined
           : undefined;
-      const shouldDecoratePrompt = currentProvider !== "multica";
-      const prime = shouldDecoratePrompt
-        ? (
-            providerSwitched
-              ? buildCrossProviderPrime(thisConvoData.messages)
-              : needsHistoryPrimeFallback
-                ? buildConversationPrime(thisConvoData.messages)
-                : null
-          )
-        : null;
+      const prime =
+        providerSwitched
+          ? buildCrossProviderPrime(thisConvoData.messages)
+          : needsHistoryPrimeFallback
+            ? buildConversationPrime(thisConvoData.messages)
+            : null;
       const primedPrompt = prime ? decoratePromptWithPrime(text, prime) : text;
-      let wirePrompt = shouldDecoratePrompt
-        ? decoratePromptWithReminder(primedPrompt, missingCwdReminder)
-        : text;
+      const decoratedPrompt = decoratePromptWithReminder(primedPrompt, missingCwdReminder);
+      let wirePrompt = decoratedPrompt;
       if (currentProvider === "multica" && needsFreshSession) {
-        wirePrompt = await buildMulticaBootstrapPrompt(effectiveCwd, text);
+        wirePrompt = await buildMulticaBootstrapPrompt(effectiveCwd, decoratedPrompt);
       }
       const sendStartedAt = Date.now();
 
@@ -2911,7 +2906,7 @@ export default function App() {
       }
 
       const wirePrompt = currentProvider === "multica"
-        ? await buildMulticaBootstrapPrompt(convoCwd, newText)
+        ? await buildMulticaBootstrapPrompt(convoCwd, primedPrompt)
         : primedPrompt;
 
       const started = editAndResend({
