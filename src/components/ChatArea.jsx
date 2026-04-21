@@ -21,7 +21,15 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const [attachments, setAttachments]   = useState([]);
   const endRef  = useRef(null);
   const inRef   = useRef(null);
+  // Callback ref so the ResizeObserver re-attaches when the message body
+  // re-mounts (e.g. showNewChatCard toggling). Keep the ref object too so
+  // SelectionToolbar can still read .current.
   const messageBodyRef = useRef(null);
+  const [messageBodyEl, setMessageBodyEl] = useState(null);
+  const setMessageBodyNode = useCallback((node) => {
+    messageBodyRef.current = node;
+    setMessageBodyEl(node);
+  }, []);
 
   // Scroll to bottom on new messages and during streaming
   const scrollRef = useRef(null);
@@ -35,15 +43,29 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   // updates don't trigger re-renders and stay in sync with scroll events.
   const followingRef = useRef(true);
 
+  // Reset follow state on conversation switch so chat B doesn't inherit
+  // chat A's "user scrolled up" state.
+  useEffect(() => {
+    followingRef.current = true;
+    prevMsgCount.current = 0;
+  }, [convo?.id]);
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
-    // New message → force follow on and smooth-scroll to bottom
-    if (msgCount !== prevMsgCount.current) {
+    // New message (count INCREASED) → force follow on and smooth-scroll to bottom
+    if (msgCount > prevMsgCount.current) {
       prevMsgCount.current = msgCount;
       followingRef.current = true;
       endRef.current?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    // Count decreased (edit rewind, /clear, /compact) → track the new count
+    // but don't hijack the user's scroll position.
+    if (msgCount < prevMsgCount.current) {
+      prevMsgCount.current = msgCount;
       return;
     }
 
@@ -59,16 +81,15 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   // mermaid/katex rendering in late, etc.
   useEffect(() => {
     const el = scrollRef.current;
-    const inner = messageBodyRef.current;
-    if (!el || !inner || typeof ResizeObserver === "undefined") return;
+    if (!el || !messageBodyEl || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => {
       if (followingRef.current) {
         el.scrollTop = el.scrollHeight;
       }
     });
-    ro.observe(inner);
+    ro.observe(messageBodyEl);
     return () => ro.disconnect();
-  }, [convo?.id, msgCount > 0]);
+  }, [messageBodyEl]);
 
   // Track whether the user is near the bottom to toggle the scroll-to-bottom
   // button, and maintain follow-mode based on user scroll direction.
@@ -77,10 +98,16 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     const el = scrollRef.current;
     if (!el) return;
     let lastScrollTop = el.scrollTop;
+    // Gate "user scrolled up" detection behind recent real user input.
+    // Otherwise content shrink (thinking block collapses, images clamping
+    // scrollTop) and trackpad momentum bounce silently kill follow-mode.
+    let userIntentUntil = 0;
+    const markIntent = () => { userIntentUntil = Date.now() + 500; };
+
     const handleScroll = () => {
       const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      // scrollTop dropping means the user (or momentum) scrolled up
-      if (el.scrollTop < lastScrollTop - 2) {
+      // Require both a meaningful delta and recent user input to disable follow.
+      if (el.scrollTop < lastScrollTop - 8 && Date.now() < userIntentUntil) {
         followingRef.current = false;
       }
       // Reached the bottom again → resume following
@@ -92,7 +119,17 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     };
     handleScroll();
     el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
+    el.addEventListener("wheel", markIntent, { passive: true });
+    el.addEventListener("touchstart", markIntent, { passive: true });
+    el.addEventListener("pointerdown", markIntent, { passive: true });
+    el.addEventListener("keydown", markIntent);
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      el.removeEventListener("wheel", markIntent);
+      el.removeEventListener("touchstart", markIntent);
+      el.removeEventListener("pointerdown", markIntent);
+      el.removeEventListener("keydown", markIntent);
+    };
   }, [convo?.id, msgCount]);
 
   const scrollToBottom = useCallback(() => {
@@ -484,7 +521,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         ) : !convo || convo.msgs.length === 0 ? (
           <EmptyState model={convo?.model || "sonnet"} />
         ) : (
-          <div ref={messageBodyRef} style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
+          <div ref={setMessageBodyNode} style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
             {convo.msgs.map((m, i) => (
               <Message
                 key={m.id}
