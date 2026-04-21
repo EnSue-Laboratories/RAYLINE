@@ -283,21 +283,27 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                 >
                   github.com/login/device
                 </span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginLeft: 4 }}>
-                  opened automatically
-                </span>
               </div>
-              <Label style={{ marginTop: 16 }}>
-                3. Waiting for authorization…
-              </Label>
-              <Loader2
-                size={16}
+              <div
                 style={{
-                  animation: "spin 1s linear infinite",
-                  color: "rgba(255,255,255,0.35)",
-                  marginTop: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: 16,
                 }}
-              />
+              >
+                <Label style={{ marginTop: 0 }}>
+                  3. Waiting for authorization…
+                </Label>
+                <Loader2
+                  size={16}
+                  style={{
+                    animation: "spin 1s linear infinite",
+                    color: "rgba(255,255,255,0.35)",
+                    flexShrink: 0,
+                  }}
+                />
+              </div>
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </>
           )}

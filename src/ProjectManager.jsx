@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, X } from "lucide-react";
+import { Check, Pencil, Plus, X } from "lucide-react";
 
 function GitHubIcon({ size = 48 }) {
   return (
@@ -20,25 +20,10 @@ import ItemDetail from "./pm-components/ItemDetail";
 import { getPaneInteractionStyle, getPaneSurfaceStyle } from "./utils/paneSurface";
 import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
-const manageLinkStyle = (variant) => ({
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-  fontSize: 10,
-  fontFamily: "'JetBrains Mono', monospace",
-  color: variant === "danger"
-    ? "rgba(200,80,80,0.6)"
-    : "rgba(255,255,255,0.3)",
-  letterSpacing: ".08em",
-  padding: 0,
-  textAlign: "left",
-  transition: "color .2s",
-});
-
 const iconBtnStyle = {
-  width: 28,
-  height: 28,
-  borderRadius: 7,
+  width: 24,
+  height: 24,
+  borderRadius: 6,
   border: "1px solid var(--pane-border)",
   background: "var(--pane-interaction-hover-fill, var(--pane-hover))",
   backdropFilter: "var(--pane-interaction-hover-filter, none)",
@@ -349,7 +334,7 @@ export default function ProjectManager() {
         {/* Spacer for traffic lights */}
         <div style={{ height: 52, flexShrink: 0 }} />
 
-        {/* Header: title + add button */}
+        {/* Header: title + repo actions */}
         <div
           style={{
             padding: "0 16px 16px",
@@ -368,9 +353,39 @@ export default function ProjectManager() {
           >
             REPOS
           </span>
-          <button onClick={() => setShowAddRepo(true)} style={iconBtnStyle}>
-            <Plus size={14} strokeWidth={1.5} />
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              onClick={() => setRemoveMode(!removeMode)}
+              title={removeMode ? "Done editing repositories" : "Edit repositories"}
+              aria-label={removeMode ? "Done editing repositories" : "Edit repositories"}
+              style={{
+                ...iconBtnStyle,
+                ...(removeMode
+                  ? {
+                    border: "1px solid rgba(120,230,150,0.22)",
+                    background: "rgba(120,230,150,0.12)",
+                    boxShadow: "0 0 0 1px rgba(120,230,150,0.06) inset",
+                    color: "rgba(120,230,150,0.9)",
+                  }
+                  : {}),
+              }}
+            >
+              {removeMode
+                ? <Check size={12} strokeWidth={1.8} />
+                : <Pencil size={12} strokeWidth={1.6} />}
+            </button>
+            <button
+              onClick={() => {
+                setRemoveMode(false);
+                setShowAddRepo(true);
+              }}
+              title="Add repository"
+              aria-label="Add repository"
+              style={iconBtnStyle}
+            >
+              <Plus size={12} strokeWidth={1.5} />
+            </button>
+          </div>
         </div>
 
         {/* Repo filter list */}
@@ -393,26 +408,26 @@ export default function ProjectManager() {
           ))}
         </div>
 
-        {/* Manage footer: stacked repos + account links */}
+        {/* Footer: account management */}
         <div
           style={{
             padding: "12px 16px",
-            borderTop: "1px solid rgba(255,255,255,0.04)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: 8,
           }}
         >
           <button
-            onClick={() => setRemoveMode(!removeMode)}
-            style={manageLinkStyle(removeMode ? "danger" : "idle")}
-          >
-            {removeMode ? "DONE" : "MANAGE REPOS"}
-          </button>
-          <button
             onClick={() => setShowAccountManager(true)}
-            style={manageLinkStyle("idle")}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 10,
+              fontFamily: "'JetBrains Mono', monospace",
+              color: "rgba(255,255,255,0.3)",
+              letterSpacing: ".08em",
+              padding: 0,
+              textAlign: "left",
+              transition: "color .2s",
+            }}
           >
             MANAGE ACCOUNT
           </button>
