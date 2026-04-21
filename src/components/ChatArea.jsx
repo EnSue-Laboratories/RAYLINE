@@ -19,6 +19,13 @@ import useGitStatus from "../hooks/useGitStatus";
 import { isMulticaModelId } from "../data/models";
 
 const EMPTY_MESSAGES = [];
+const MemoBranchSelector = memo(BranchSelector);
+const MemoExportConversationBtn = memo(ExportConversationBtn);
+const MemoGitStatusPill = memo(GitStatusPill);
+const MemoImagePreview = memo(ImagePreview);
+const MemoModelPickerWithMultica = memo(ModelPickerWithMultica);
+const MemoSelectionToolbar = memo(SelectionToolbar);
+const MemoTabStrip = memo(TabStrip);
 
 const ChatTranscript = memo(function ChatTranscript({
   showNewChatCard,
@@ -394,9 +401,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     };
   }, []);
 
-  const removeAttachment = (index) => {
+  const removeAttachment = useCallback((index) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
   const handleTranscriptAnswer = useCallback((text) => {
     onSend(text);
@@ -516,7 +523,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               pointerEvents: "auto",
             }}
           >
-            <TabStrip
+            <MemoTabStrip
               tabs={tabs}
               activeId={activeTabId}
               onSelect={onSelectTab}
@@ -620,7 +627,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
           {!showNewChatCard && developerMode && (
-            <GitStatusPill
+            <MemoGitStatusPill
               cwd={cwd}
               defaultPrBranch={defaultPrBranch}
               coauthorEnabled={coauthorEnabled}
@@ -628,16 +635,16 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             />
           )}
           {!showNewChatCard && developerMode && (
-            <BranchSelector
+            <MemoBranchSelector
               cwd={cwd}
               onCwdChange={onCwdChange}
               hasMessages={convo?.msgs?.length > 0}
               onRefocusTerminal={onRefocusTerminal}
             />
           )}
-          {!showNewChatCard && <ModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
+          {!showNewChatCard && <MemoModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
           {!showNewChatCard && convo?.msgs?.length > 0 && (
-            <ExportConversationBtn convo={convo} />
+            <MemoExportConversationBtn convo={convo} />
           )}
           {!showNewChatCard && developerMode && onToggleTerminal && (
             <button
@@ -711,7 +718,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       </div>
 
       {!showNewChatCard && convo?.msgs?.length > 0 && (
-        <SelectionToolbar
+        <MemoSelectionToolbar
           onQuote={handleQuote}
           model={convo?.model || defaultModel || "sonnet"}
           selectionRootRef={messageBodyRef}
@@ -959,7 +966,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               ))}
             </div>
           )}
-          <ImagePreview items={attachments} onRemove={removeAttachment} />
+          <MemoImagePreview items={attachments} onRemove={removeAttachment} />
           {shellMode && (
             <div
               style={{
