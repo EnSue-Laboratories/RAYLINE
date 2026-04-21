@@ -1904,7 +1904,22 @@ export default function App() {
       tabPinRoundStateRef.current = "dismissed";
     }
     setConvoList(nextConversations);
-    if (active === id) setActive(nextConversations[0]?.id || null);
+    if (active === id) {
+      // Prefer an adjacent pinned tab so deleting from the tab strip stays in
+      // tab context; otherwise fall back to the most recent conversation.
+      const closingTabIndex = pinnedTabs.findIndex((tab) => tab.id === id);
+      const nextActiveId =
+        (closingTabIndex !== -1
+          ? pinnedTabs[closingTabIndex - 1]?.id || pinnedTabs[closingTabIndex + 1]?.id
+          : null) || nextConversations[0]?.id || null;
+      if (nextActiveId) {
+        // Route through handleSelect so the new chat's history actually loads
+        // from disk instead of showing an empty pane.
+        handleSelect(nextActiveId);
+      } else {
+        setActive(null);
+      }
+    }
   };
 
   const pinnedTabs = useMemo(() => {
