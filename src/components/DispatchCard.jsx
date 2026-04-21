@@ -265,9 +265,14 @@ export default function DispatchCard({
             disabled={!canDispatch}
             style={primaryBtnStyle(canDispatch, submitting)}
           >
-            {submitting
-              ? <DispatchLoadingDots />
-              : <>Dispatch {activeRows.length || 0} agent{activeRows.length === 1 ? "" : "s"}</>}
+            <span style={{ visibility: submitting ? "hidden" : "visible" }}>
+              Dispatch {activeRows.length || 0} agent{activeRows.length === 1 ? "" : "s"}
+            </span>
+            {submitting && (
+              <span style={{ position: "absolute", inset: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                <DispatchLoadingDots />
+              </span>
+            )}
           </button>
         </footer>
       </div>
@@ -841,12 +846,12 @@ const footerStyle = {
   padding: "12px 18px", borderTop: "1px solid var(--pane-border)",
 };
 const primaryBtnStyle = (enabled, loading) => ({
+  position: "relative",
   padding: "8px 14px", borderRadius: 6, border: "none",
   background: loading ? "rgba(255,255,255,0.85)" : (enabled ? "white" : "rgba(255,255,255,0.1)"),
   color: loading ? "black" : (enabled ? "black" : "rgba(255,255,255,0.4)"),
   cursor: loading ? "progress" : (enabled ? "pointer" : "not-allowed"),
   fontSize: 12, fontWeight: 500,
-  minWidth: loading ? 120 : undefined,
   display: "inline-flex", alignItems: "center", justifyContent: "center",
 });
 
