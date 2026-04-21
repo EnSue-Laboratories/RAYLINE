@@ -53,6 +53,9 @@ export default function AccountManager({ currentUser, onSwitchAccount, onSignedO
         style={{
           width: 400,
           background: "var(--pane-elevated)",
+          backdropFilter: "blur(48px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(48px) saturate(1.2)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
           borderRadius: 12,
           border: "1px solid var(--pane-border)",
           display: "flex",

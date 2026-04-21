@@ -733,7 +733,7 @@ function DispatchDropdown({
             left: menuStyle.left,
             width: menuStyle.width,
             zIndex: 1200,
-            background: "rgba(16,16,18,0.82)",
+            background: "var(--pane-elevated)",
             backdropFilter: "blur(48px) saturate(1.2)",
             WebkitBackdropFilter: "blur(48px) saturate(1.2)",
             border: "1px solid var(--pane-border)",
