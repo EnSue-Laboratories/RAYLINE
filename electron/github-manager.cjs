@@ -189,7 +189,7 @@ function startWebAuth(onEvent) {
       });
     } else if (process.platform === "linux") {
       const cmdLine = [bin, ...authArgs].map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ");
-      proc = spawn("script", ["-qc", cmdLine, "/dev/null"], {
+      proc = spawn("script", ["-qec", cmdLine, "/dev/null"], {
         cwd: authCwd,
         env: authEnv,
         stdio: ["pipe", "pipe", "pipe"],
