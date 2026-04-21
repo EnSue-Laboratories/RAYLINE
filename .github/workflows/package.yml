@@ -20,9 +20,11 @@ jobs:
           - os: windows-latest
             label: Windows
             platform: windows
+            binary_glob: "*.exe"
           - os: macos-latest
             label: macOS
             platform: macos
+            binary_glob: "*.dmg"
 
     steps:
       - name: Check out repository
@@ -63,10 +65,10 @@ jobs:
           mkdir -p artifact
           while IFS= read -r -d '' file; do
             cp "$file" artifact/
-          done < <(find release -maxdepth 1 -type f -print0)
+          done < <(find release -maxdepth 1 -type f -name '${{ matrix.binary_glob }}' -print0)
           count=$(find artifact -maxdepth 1 -type f | wc -l | tr -d ' ')
           if [ "$count" -eq 0 ]; then
-            echo "No packaged files found in release/"
+            echo "No packaged binaries matching ${{ matrix.binary_glob }} were found in release/"
             exit 1
           fi
           find artifact -maxdepth 1 -type f -print
@@ -87,9 +89,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          mapfile -d '' files < <(find release -maxdepth 1 -type f -print0)
+          mapfile -d '' files < <(find artifact -maxdepth 1 -type f -print0)
           if [ "${#files[@]}" -eq 0 ]; then
-            echo "No files found in release/"
+            echo "No binary files found in artifact/"
             exit 1
           fi
           gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
