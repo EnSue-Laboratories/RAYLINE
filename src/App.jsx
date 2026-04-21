@@ -2505,23 +2505,41 @@ export default function App() {
         const isFirstMessage = currentMessageCount === 0;
         let result;
 
-        if (window.api?.shellRun) {
-          result = await window.api.shellRun({ command, cwd: effectiveCwd });
-        } else if (window.api?.terminalCreate && window.api?.terminalSend && window.api?.terminalRead && window.api?.terminalKill) {
-          result = await runShellViaTerminalApi({ command, cwd: effectiveCwd });
-        } else {
-          result = {
-            ok: false,
-            command,
-            cwd: effectiveCwd,
-            error: "Shell mode is not available in this environment.",
-          };
-        }
-
         if (isFirstMessage) {
           setConvoList((p) =>
             p.map((c) => c.id === convoId ? { ...c, title: trimmed.slice(0, 50) } : c)
           );
+        }
+
+        appendLocalMessages(convoId, [
+          {
+            role: "user",
+            text: command,
+            mode: "shell-command",
+            localOnly: true,
+          },
+        ]);
+
+        try {
+          if (window.api?.shellRun) {
+            result = await window.api.shellRun({ command, cwd: effectiveCwd });
+          } else if (window.api?.terminalCreate && window.api?.terminalSend && window.api?.terminalRead && window.api?.terminalKill) {
+            result = await runShellViaTerminalApi({ command, cwd: effectiveCwd });
+          } else {
+            result = {
+              ok: false,
+              command,
+              cwd: effectiveCwd,
+              error: "Shell mode is not available in this environment.",
+            };
+          }
+        } catch (error) {
+          result = {
+            ok: false,
+            command,
+            cwd: effectiveCwd,
+            error: error?.message || String(error),
+          };
         }
 
         setConvoList((p) =>
@@ -2549,12 +2567,6 @@ export default function App() {
         );
 
         appendLocalMessages(convoId, [
-          {
-            role: "user",
-            text: command,
-            mode: "shell-command",
-            localOnly: true,
-          },
           {
             role: "system",
             text: formatShellResult(result),
