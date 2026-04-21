@@ -4,10 +4,13 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
+import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, coauthorTrailer = "", onCoauthorTrailerChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, onClose }) {
   const s = useFontScale();
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
+  const [multica, setMultica] = useState(() => loadMulticaState());
+  const [multicaServerDraft, setMulticaServerDraft] = useState(() => loadMulticaState().serverUrl || "");
 
   // Sync from parent when wallpaper prop changes externally
   useEffect(() => {
@@ -70,6 +73,79 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     local.path
       ? local.path.split(/[/\\]/).slice(-2).join("/")
       : null;
+  const normalizedMulticaServerDraft = normalizeMulticaServerUrl(multicaServerDraft);
+  const multicaConnected = Boolean(multica.token && multica.serverUrl && (multica.workspaceId || multica.workspaceSlug));
+  const multicaStatus = multicaConnected
+    ? "Connected"
+    : multica.token && multica.serverUrl
+      ? "Authenticated, workspace not selected"
+      : multica.serverUrl
+        ? "Server configured"
+        : "Not configured";
+  const multicaServerDirty = normalizedMulticaServerDraft !== (multica.serverUrl || "");
+
+  const refreshMultica = useCallback(() => {
+    const next = loadMulticaState();
+    setMultica(next);
+    setMulticaServerDraft(next.serverUrl || "");
+  }, []);
+
+  useEffect(() => {
+    const handleRefresh = () => refreshMultica();
+    window.addEventListener("multica-refresh", handleRefresh);
+    return () => window.removeEventListener("multica-refresh", handleRefresh);
+  }, [refreshMultica]);
+
+  const handleSaveMulticaServer = useCallback(() => {
+    if (!multicaServerDirty) {
+      setMulticaServerDraft(normalizedMulticaServerDraft);
+      return;
+    }
+    const next = saveMulticaState({
+      serverUrl: normalizedMulticaServerDraft,
+      token: "",
+      tokenIssuedAt: 0,
+      workspaceId: "",
+      workspaceSlug: "",
+      agentsCache: [],
+      agentsCachedAt: 0,
+    });
+    setMultica(next);
+    setMulticaServerDraft(next.serverUrl || "");
+    window.dispatchEvent(new CustomEvent("multica-refresh"));
+  }, [multicaServerDirty, normalizedMulticaServerDraft]);
+
+  const handleDisconnectMultica = useCallback(() => {
+    const next = saveMulticaState({
+      token: "",
+      tokenIssuedAt: 0,
+      workspaceId: "",
+      workspaceSlug: "",
+      agentsCache: [],
+      agentsCachedAt: 0,
+    });
+    setMultica(next);
+    setMulticaServerDraft(next.serverUrl || "");
+    window.dispatchEvent(new CustomEvent("multica-refresh"));
+  }, []);
+
+  const handleOpenMulticaSetup = useCallback(() => {
+    if (multicaServerDirty) {
+      const next = saveMulticaState({
+        serverUrl: normalizedMulticaServerDraft,
+        token: "",
+        tokenIssuedAt: 0,
+        workspaceId: "",
+        workspaceSlug: "",
+        agentsCache: [],
+        agentsCachedAt: 0,
+      });
+      setMultica(next);
+      setMulticaServerDraft(next.serverUrl || "");
+      window.dispatchEvent(new CustomEvent("multica-refresh"));
+    }
+    window.dispatchEvent(new CustomEvent("open-multica-setup"));
+  }, [multicaServerDirty, normalizedMulticaServerDraft]);
 
   const sliderPct = (value, min, max) => ((value - min) / (max - min)) * 100;
   const imgBlurPct = sliderPct(local.imgBlur || 0, 0, 32);
@@ -451,6 +527,174 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               onChange={(e) => onFontSizeChange(Number(e.target.value))}
               style={sliderStyle(((fontSize - 12) / 10) * 100)}
             />
+          </div>
+
+          {/* INTEGRATIONS section label */}
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: s(10),
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.25)",
+              letterSpacing: ".12em",
+              textTransform: "uppercase",
+              marginBottom: 20,
+              marginTop: 12,
+            }}
+          >
+            INTEGRATIONS
+          </div>
+
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 2,
+              }}
+            >
+              Multica
+            </div>
+            <div
+              style={{
+                fontSize: s(11),
+                color: "rgba(255,255,255,0.3)",
+                marginBottom: 12,
+              }}
+            >
+              Configure the default Multica server used for setup and agent discovery.
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <div
+                style={{
+                  fontSize: s(12),
+                  color: multicaConnected ? "rgba(205,255,214,0.88)" : "rgba(255,255,255,0.72)",
+                  marginBottom: 4,
+                }}
+              >
+                {multicaStatus}
+              </div>
+              {multica.email && (
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: "rgba(255,255,255,0.42)",
+                    marginBottom: 2,
+                  }}
+                >
+                  Email: {multica.email}
+                </div>
+              )}
+              {(multica.workspaceSlug || multica.workspaceId) && (
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: "rgba(255,255,255,0.42)",
+                  }}
+                >
+                  Workspace: {multica.workspaceSlug || multica.workspaceId}
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: s(13),
+                  color: "rgba(255,255,255,0.8)",
+                  marginBottom: 2,
+                }}
+              >
+                Server URL
+              </div>
+              <div
+                style={{
+                  fontSize: s(11),
+                  color: "rgba(255,255,255,0.3)",
+                  marginBottom: 10,
+                }}
+              >
+                Changing the server clears the current Multica auth and workspace selection.
+              </div>
+              <input
+                type="text"
+                value={multicaServerDraft}
+                placeholder="https://your-multica-server"
+                onChange={(e) => setMulticaServerDraft(e.target.value)}
+                spellCheck={false}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  height: 32,
+                  padding: "0 10px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 7,
+                  color: "rgba(255,255,255,0.9)",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: s(12),
+                  outline: "none",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={handleSaveMulticaServer}
+                disabled={!multicaServerDirty}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 7,
+                  background: multicaServerDirty ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  color: multicaServerDirty ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.38)",
+                  fontSize: s(12),
+                  cursor: multicaServerDirty ? "pointer" : "not-allowed",
+                  transition: "all .2s",
+                  fontFamily: "system-ui, sans-serif",
+                }}
+              >
+                {normalizedMulticaServerDraft ? "Save Server" : "Clear Server"}
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenMulticaSetup}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 7,
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  color: "rgba(255,255,255,0.75)",
+                  fontSize: s(12),
+                  cursor: "pointer",
+                  transition: "all .2s",
+                  fontFamily: "system-ui, sans-serif",
+                }}
+              >
+                {multicaConnected ? "Manage Connection" : "Open Setup"}
+              </button>
+              {(multica.token || multica.workspaceId || multica.workspaceSlug) && (
+                <button
+                  type="button"
+                  onClick={handleDisconnectMultica}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 7,
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.65)",
+                    fontSize: s(12),
+                    cursor: "pointer",
+                    transition: "all .2s",
+                    fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  Disconnect
+                </button>
+              )}
+            </div>
           </div>
 
           {/* ADVANCED section label */}

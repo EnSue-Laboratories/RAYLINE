@@ -3,7 +3,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow } from "lucide-react";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
-import { getM } from "../data/models";
+import { getMOrMulticaFallback } from "../data/models";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 
 function getMainRepoRoot(dir) {
@@ -77,7 +77,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [] }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
@@ -309,6 +309,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             onToggleCollapse={onToggleProjectCollapse}
             onHideProject={onHideProject}
             searchActive={searchActive}
+            multicaModels={multicaModels}
           />
         ))
         }
@@ -359,7 +360,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             {/* Draft conversation rows */}
             {(searchActive || !draftsCollapsed) && drafts.map((c, i) => {
               const isActive = c.id === active;
-              const cm = getM(c.model);
+              const cm = getMOrMulticaFallback(c.model, multicaModels);
 
               return (
                 <div

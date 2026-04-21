@@ -33,6 +33,7 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
   const [explanation, setExplanation] = useState(null); // { text, loading }
   const [explaining, setExplaining] = useState(false);
   const toolbarRef = useRef(null);
+  const selectionRangeRef = useRef(null);
 
   const dismiss = useCallback(() => {
     setSel(null);
@@ -46,8 +47,19 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
       && root.contains(getContainerNode(selection.focusNode));
   }, [selectionRootRef]);
 
-  const clearSelection = useCallback(() => {
-    window.getSelection()?.removeAllRanges();
+  const restoreSelection = useCallback(() => {
+    const range = selectionRangeRef.current;
+    if (!range) return;
+
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    try {
+      selection.removeAllRanges();
+      selection.addRange(range.cloneRange());
+    } catch {
+      selectionRangeRef.current = null;
+    }
   }, []);
 
   const handleMouseUp = useCallback((e) => {
@@ -63,6 +75,7 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
       }
 
       const range = selection.getRangeAt(0);
+      selectionRangeRef.current = range.cloneRange();
       const rect = range.getBoundingClientRect();
       setSel({
         text,
@@ -101,6 +114,7 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
 
   const handleExplain = async () => {
     if (explaining) return;
+    restoreSelection();
     setExplaining(true);
     setExplanation({ text: "", loading: true });
     try {
@@ -114,8 +128,8 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
 
   const handleQuote = () => {
     onQuote?.(sel.text);
+    window.setTimeout(() => restoreSelection(), 0);
     dismiss();
-    clearSelection();
   };
 
   const handleCopy = async () => {
@@ -125,8 +139,8 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
       // Keep the toolbar open if copying fails so the user can retry.
       return;
     }
+    restoreSelection();
     dismiss();
-    clearSelection();
   };
 
   // Clamp position and decide if toolbar goes above or below selection
@@ -207,7 +221,9 @@ function ToolbarBtn({ label, onClick, active }) {
   const [hovered, setHovered] = useState(false);
   return (
     <button
+      type="button"
       onClick={onClick}
+      onMouseDown={(e) => e.preventDefault()}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
