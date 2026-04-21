@@ -12,7 +12,6 @@
     <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
     <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite 8" />
     <img src="https://img.shields.io/badge/node--pty-1.x-339933?style=flat-square&logo=gnometerminal&logoColor=white" alt="node-pty" />
-    <img src="https://img.shields.io/badge/MCP-ready-6e56cf?style=flat-square" alt="MCP ready" />
     <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-1a1a1a?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/status-alpha-f25f3a?style=flat-square" alt="Alpha" />
   </p>
@@ -29,7 +28,7 @@
 
 ## About
 
-RayLine wraps Claude Code (and GPT-5.4 Codex) in a native desktop chat, adding the workflow glue a plain terminal session can't give you: persistent conversations, tool-call visibility, image and file attachments, checkpoint-based undo, and an embedded terminal the agent can drive through MCP.
+RayLine wraps Claude Code (and GPT-5.4 Codex) in a native desktop chat, adding the workflow glue a plain terminal session can't give you: persistent conversations, tool-call visibility, image and file attachments, checkpoint-based undo, and an embedded terminal drawer alongside the chat.
 
 > This repository is published as `Ensue-Chat`. The packaged app and product name are `RayLine`.
 
@@ -41,7 +40,7 @@ RayLine wraps Claude Code (and GPT-5.4 Codex) in a native desktop chat, adding t
 | **Streaming chat** | Live tool calls, partial messages, and expandable thinking blocks |
 | **Multi-agent** | Switch between Claude and GPT-5.4 Codex per conversation |
 | **Checkpoints** | Rewind files to their pre-prompt state using lightweight git snapshots |
-| **Terminal drawer** | Persistent PTY sessions (`node-pty` + `xterm.js`), exposed to the agent via MCP |
+| **Terminal drawer** | Persistent PTY sessions (`node-pty` + `xterm.js`) that live alongside the chat |
 | **Project Manager** | Built-in GitHub window for issues, PRs, and comments (`gh` CLI under the hood) |
 | **Rich rendering** | Markdown, Mermaid diagrams, KaTeX math, syntax highlighting, live HTML blocks |
 | **Workspace aware** | Folder picker, branch and worktree selector, per-project session history |
@@ -91,7 +90,6 @@ flowchart LR
   M -- "spawn" --> C["claude CLI<br/>JSONL stream"]
   M -- "spawn" --> G["gh CLI"]
   M -- "node-pty" --> T["PTY sessions"]
-  T <-- "WebSocket · MCP" --> C
   M -- "git" --> K["Checkpoints"]
   M -- "fs" --> S["~/.claude sessions"]
 ```
@@ -124,7 +122,6 @@ scripts/      Dev launchers and shell-facing helpers
 - `electron/agent-manager.cjs` — Claude process spawning and stream handling
 - `electron/codex-agent-manager.cjs` — GPT-5.4 Codex via the OpenAI API
 - `electron/terminal-manager.cjs` — PTY-backed terminal sessions
-- `electron/mcp-terminal-server.cjs` — Terminal tools exposed over MCP
 - `electron/checkpoint.cjs` — Git-based file checkpoints for edit rewind
 - `electron/github-manager.cjs` — `gh` CLI wrapper powering the Project Manager
 - `src/App.jsx` — Top-level chat state and interaction flow
@@ -143,7 +140,6 @@ scripts/      Dev launchers and shell-facing helpers
 
 ## Notes
 
-- The repo currently contains both the active UI in `src/` and a backup snapshot in `src-ui-backup/`.
 - External links are opened in the system browser from the Electron shell.
 - App state persists to the Electron user-data directory as `rayline-state.json`.
 
