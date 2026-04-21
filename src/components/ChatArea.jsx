@@ -94,6 +94,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const inRef   = useRef(null);
   const queueEditRef = useRef(null);
   const dragDepthRef = useRef(0);
+  const composingRef = useRef(false);
   // Callback ref so the ResizeObserver re-attaches when the message body
   // re-mounts (e.g. showNewChatCard toggling). Keep the ref object too so
   // SelectionToolbar can still read .current.
@@ -273,6 +274,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   };
 
   const handleKeyDown = (e) => {
+    const isComposing =
+      composingRef.current
+      || e.nativeEvent?.isComposing
+      || e.isComposing
+      || e.keyCode === 229;
+    if (isComposing) return;
+
     // Command palette navigation
     if (filteredCommands.length > 0) {
       if (e.key === "ArrowDown") {
@@ -315,6 +323,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     });
   }, []);
 
+  const [dragOver, setDragOver] = useState(false);
+
   const resetDragState = useCallback(() => {
     dragDepthRef.current = 0;
     setDragOver(false);
@@ -333,7 +343,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     });
   }, [resetDragState]);
 
-  const [dragOver, setDragOver] = useState(false);
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
   const showConversationTitle = Boolean(convo && !showNewChatCard);
   const topTabsLeft = sidebarOpen ? 18 : 104;
@@ -1005,9 +1014,14 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               value={input}
               onChange={handleInput}
               onKeyDown={handleKeyDown}
+              onCompositionStart={() => { composingRef.current = true; }}
+              onCompositionEnd={() => { composingRef.current = false; }}
               onPaste={handlePaste}
               onFocus={() => setInputFocused(true)}
-              onBlur={() => setInputFocused(false)}
+              onBlur={() => {
+                composingRef.current = false;
+                setInputFocused(false);
+              }}
               placeholder={shellMode ? "Run a shell command locally..." : "Ask anything..."}
               rows={1}
               style={{
