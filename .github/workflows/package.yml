@@ -2,6 +2,11 @@ name: Package Desktop App
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to upload built binaries to
+        required: false
+        type: string
   release:
     types: [published]
 
@@ -83,11 +88,11 @@ jobs:
           retention-days: 3
 
       - name: Upload assets to GitHub release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event.inputs.release_tag != ''
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.release_tag }}
         run: |
           files=()
           while IFS= read -r -d '' file; do
