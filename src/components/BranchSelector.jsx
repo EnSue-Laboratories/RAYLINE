@@ -8,8 +8,7 @@ const VIEWPORT_PADDING = 8;
 
 export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocusTerminal }) {
   const s = useFontScale();
-  const worktreeLocked = hasMessages;
-  const worktreeLockMessage = "Start a new chat to create or switch worktrees.";
+  const worktreeCreationLocked = hasMessages;
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(null);
   const [branches, setBranches] = useState([]);
@@ -104,10 +103,6 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
   const handleCreate = async () => {
     const name = newName.trim();
     if (!name || !cwd) return;
-    if (mode === "worktree" && worktreeLocked) {
-      setError(worktreeLockMessage);
-      return;
-    }
     setError(null);
     try {
       if (mode === "worktree") {
@@ -137,10 +132,6 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
 
   const handleModeChange = (nextMode) => {
     if (nextMode === mode) return;
-    if (nextMode === "worktree" && worktreeLocked) {
-      setError(worktreeLockMessage);
-      return;
-    }
     setMode(nextMode);
     setSearchQuery("");
     setConfirmDelete(null);
@@ -516,22 +507,11 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
           {/* Worktree list */}
           {mode === "worktree" && (
             <div style={{ maxHeight: 240, overflowY: "auto" }}>
-              {worktreeLocked && (
-                <div style={{
-                  padding: "6px 12px",
-                  fontSize: s(9),
-                  fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.25)",
-                  letterSpacing: ".04em",
-                }}>
-                  Start a new chat to create or switch worktrees
-                </div>
-              )}
               {/* None option — use main repo directly */}
               {mainWorktree && (
                 <button
                   onClick={() => {
-                    if (worktreeLocked || !isInWorktree) return;
+                    if (!isInWorktree) return;
                     onCwdChange?.(mainWorktree.path);
                     closeMenu();
                     refresh();
@@ -545,14 +525,14 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     background: !isInWorktree ? "rgba(255,255,255,0.04)" : "transparent",
                     border: "none",
                     borderRadius: 7,
-                    color: !isInWorktree ? "rgba(255,255,255,0.9)" : worktreeLocked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
+                    color: !isInWorktree ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
                     fontSize: s(11),
                     fontFamily: "'JetBrains Mono',monospace",
-                    cursor: worktreeLocked && isInWorktree ? "default" : "pointer",
+                    cursor: "pointer",
                     textAlign: "left",
                     transition: "all .12s",
                   }}
-                  onMouseEnter={(e) => { if (!worktreeLocked && isInWorktree) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                  onMouseEnter={(e) => { if (isInWorktree) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
                   onMouseLeave={(e) => { if (isInWorktree) e.currentTarget.style.background = "transparent"; }}
                 >
                   <span>None</span>
@@ -718,7 +698,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     onMouseLeave={() => setHoveredRow(null)}
                   >
                     <button
-                      onClick={() => !worktreeLocked && handleWorktreeSwitch(wt)}
+                      onClick={() => handleWorktreeSwitch(wt)}
                       style={{
                         display: "flex",
                         flexDirection: "column",
@@ -727,10 +707,10 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                         minWidth: 0,
                         background: "none",
                         border: "none",
-                        color: isActive ? "rgba(255,255,255,0.9)" : worktreeLocked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
+                        color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
                         fontSize: s(11),
                         fontFamily: "'JetBrains Mono',monospace",
-                        cursor: worktreeLocked && !isActive ? "default" : "pointer",
+                        cursor: "pointer",
                         textAlign: "left",
                         padding: 0,
                         gap: 2,
@@ -815,8 +795,10 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
             </div>
           )}
 
-          {/* Divider + create */}
-          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "3px 6px" }} />
+          {/* Divider + create — hidden when worktree creation is locked mid-chat */}
+          {(creating || !(mode === "worktree" && worktreeCreationLocked)) && (
+            <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "3px 6px" }} />
+          )}
 
           {creating ? (
             <div style={{ padding: "6px 8px" }}>
@@ -829,14 +811,11 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     background: "rgba(255,255,255,0.04)",
                     border: "1px solid rgba(255,255,255,0.06)",
                     borderRadius: 5,
-                    color:
-                      worktreeLocked && mode !== "worktree"
-                        ? "rgba(255,255,255,0.18)"
-                        : "rgba(255,255,255,0.4)",
+                    color: "rgba(255,255,255,0.4)",
                     fontSize: s(8),
                     fontFamily: "'JetBrains Mono',monospace",
                     letterSpacing: ".06em",
-                    cursor: worktreeLocked && mode !== "worktree" ? "default" : "pointer",
+                    cursor: "pointer",
                     flexShrink: 0,
                   }}
                 >
@@ -873,19 +852,10 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     width: 24,
                     height: 24,
                     borderRadius: 6,
-                    background:
-                      newName.trim() && !(mode === "worktree" && worktreeLocked)
-                        ? "rgba(180,255,200,0.12)"
-                        : "rgba(255,255,255,0.02)",
+                    background: newName.trim() ? "rgba(180,255,200,0.12)" : "rgba(255,255,255,0.02)",
                     border: "none",
-                    color:
-                      newName.trim() && !(mode === "worktree" && worktreeLocked)
-                        ? "rgba(180,255,200,0.7)"
-                        : "rgba(255,255,255,0.15)",
-                    cursor:
-                      newName.trim() && !(mode === "worktree" && worktreeLocked)
-                        ? "pointer"
-                        : "default",
+                    color: newName.trim() ? "rgba(180,255,200,0.7)" : "rgba(255,255,255,0.15)",
+                    cursor: newName.trim() ? "pointer" : "default",
                     flexShrink: 0,
                   }}
                 >
@@ -921,13 +891,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                 </div>
               )}
             </div>
-          ) : (
+          ) : mode === "worktree" && worktreeCreationLocked ? null : (
             <button
               onClick={() => {
-                if (mode === "worktree" && worktreeLocked) {
-                  setError(worktreeLockMessage);
-                  return;
-                }
                 setCreating(true);
                 setError(null);
                 setSearchQuery("");
@@ -941,26 +907,19 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                 background: "transparent",
                 border: "none",
                 borderRadius: 7,
-                color:
-                  mode === "worktree" && worktreeLocked
-                    ? "rgba(255,255,255,0.16)"
-                    : "rgba(255,255,255,0.3)",
+                color: "rgba(255,255,255,0.3)",
                 fontSize: s(10),
                 fontFamily: "'JetBrains Mono',monospace",
-                cursor: mode === "worktree" && worktreeLocked ? "default" : "pointer",
+                cursor: "pointer",
                 transition: "all .12s",
               }}
               onMouseEnter={(e) => {
-                if (mode === "worktree" && worktreeLocked) return;
                 e.currentTarget.style.background = "rgba(255,255,255,0.025)";
                 e.currentTarget.style.color = "rgba(255,255,255,0.5)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.color =
-                  mode === "worktree" && worktreeLocked
-                    ? "rgba(255,255,255,0.16)"
-                    : "rgba(255,255,255,0.3)";
+                e.currentTarget.style.color = "rgba(255,255,255,0.3)";
               }}
             >
               <Plus size={12} strokeWidth={2} />
