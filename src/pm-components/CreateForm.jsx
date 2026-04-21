@@ -136,13 +136,18 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 200,
-        background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
+        background: "var(--pm-modal-backdrop)",
+        backdropFilter: "blur(var(--pm-modal-backdrop-blur))",
+        WebkitBackdropFilter: "blur(var(--pm-modal-backdrop-blur))",
         display: "flex", alignItems: "center", justifyContent: "center",
       }}
     >
       <div
         style={{
           width: 440, background: "var(--pane-elevated)",
+          backdropFilter: "blur(48px) saturate(1.2)",
+          WebkitBackdropFilter: "blur(48px) saturate(1.2)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
           border: "1px solid var(--pane-border)", borderRadius: 12,
           padding: "20px", fontFamily: "system-ui, sans-serif",
         }}
