@@ -8,7 +8,10 @@ const MAX_MESSAGES = 50; // max user+assistant message pairs to load
 const CODEX_USER_PROMPT_MARKER = "--- USER PROMPT ---";
 
 function projectDirName(cwd) {
-  return cwd.replace(/\//g, "-");
+  // Claude CLI encodes both POSIX and Windows paths by replacing path
+  // separators and the Windows drive colon with `-`. For `C:\Users\kira\Documents`
+  // this yields `C--Users-kira-Documents`, matching what the CLI writes.
+  return cwd.replace(/[\\/:]/g, "-");
 }
 
 function extractSessionCwdFromFile(filePath) {
