@@ -107,16 +107,34 @@ function ghWithRawStdin(args, input) {
   });
 }
 
-async function checkAuth() {
+async function resolveAuthUser() {
+  let statusErr = null;
   try {
     const out = await gh(["auth", "status", "--hostname", "github.com"]);
-    let user = parseAuthStatusUser(out);
-    if (!user) {
-      // Authoritative fallback — works across all gh output variants.
-      try {
-        user = (await gh(["api", "user", "-q", ".login"])) || null;
-      } catch { /* leave user null */ }
+    const user = parseAuthStatusUser(out);
+    if (user) return { loggedIn: true, user };
+  } catch (err) {
+    statusErr = err;
+    if (/not logged in/i.test(err.message || "")) {
+      return { loggedIn: false, user: null };
     }
+  }
+
+  try {
+    // Authoritative fallback — works across auth status output variants.
+    const user = (await gh(["api", "user", "-q", ".login"])) || null;
+    return { loggedIn: Boolean(user), user };
+  } catch (err) {
+    if (/not logged in|authentication required/i.test(err.message || "")) {
+      return { loggedIn: false, user: null };
+    }
+    throw statusErr || err;
+  }
+}
+
+async function checkAuth() {
+  try {
+    const { user } = await resolveAuthUser();
     return { ok: true, user };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -352,10 +370,13 @@ function cancelWebAuth() {
 }
 
 async function logout() {
-  // `gh auth logout -h github.com` doesn't prompt when an account is
-  // unambiguous. Swallow the "not logged in" case so repeated clicks are safe.
   try {
-    await gh(["auth", "logout", "--hostname", "github.com"]);
+    const { loggedIn, user } = await resolveAuthUser();
+    if (!loggedIn) return { ok: true };
+    if (!user) {
+      return { ok: false, error: "Unable to determine the active GitHub account to sign out." };
+    }
+    await gh(["auth", "logout", "--hostname", "github.com", "--user", user]);
     return { ok: true };
   } catch (err) {
     if (/not logged in/i.test(err.message || "")) return { ok: true };
