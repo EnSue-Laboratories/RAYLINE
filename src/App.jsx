@@ -3229,6 +3229,7 @@ export default function App() {
           draftsCollapsed={draftsCollapsed}
           onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
           developerMode={developerMode}
+          multicaModels={multicaModels}
         />
       </div>
 
