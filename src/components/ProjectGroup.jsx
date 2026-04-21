@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, FolderClosed, Plus, MoreHorizontal, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { getM } from "../data/models";
+import { getMOrMulticaFallback } from "../data/models";
 import { relativeTime } from "../utils/time";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 
@@ -15,6 +15,7 @@ export default function ProjectGroup({
   onToggleCollapse,
   onHideProject,
   searchActive,
+  multicaModels = [],
 }) {
   const s = useFontScale();
   const [headerHovered, setHeaderHovered] = useState(false);
@@ -211,7 +212,7 @@ export default function ProjectGroup({
       >
       {project.convos.map((c) => {
         const isActive = c.id === active;
-        const cm = getM(c.model);
+        const cm = getMOrMulticaFallback(c.model, multicaModels);
 
         return (
           <div
