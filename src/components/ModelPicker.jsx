@@ -7,6 +7,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 const MIN_MENU_WIDTH = 220;
+const PREFERRED_MAX_HEIGHT = 420;
 
 function extractMulticaErrorStatus(err) {
   if (!err) return null;
@@ -27,15 +28,21 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
   const updateMenuPosition = useCallback(() => {
     if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
     const menuWidth = Math.max(MIN_MENU_WIDTH, rect.width);
     const left = Math.max(
       VIEWPORT_PADDING,
       Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - VIEWPORT_PADDING)
     );
+    const spaceBelow = viewportHeight - rect.bottom - MENU_GAP - VIEWPORT_PADDING;
+    const spaceAbove = rect.top - MENU_GAP - VIEWPORT_PADDING;
+    const placeAbove = spaceBelow < Math.min(PREFERRED_MAX_HEIGHT, 220) && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(120, Math.min(PREFERRED_MAX_HEIGHT, placeAbove ? spaceAbove : spaceBelow));
     setMenuStyle({
-      top: rect.bottom + MENU_GAP,
+      top: placeAbove ? rect.top - MENU_GAP - maxHeight : rect.bottom + MENU_GAP,
       left,
       width: menuWidth,
+      maxHeight,
     });
   }, []);
 
@@ -104,6 +111,8 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
             left: menuStyle.left,
             zIndex: 400,
             width: menuStyle.width,
+            maxHeight: menuStyle.maxHeight,
+            overflowY: "auto",
             background: "rgba(8,8,12,0.55)",
             backdropFilter: "blur(48px) saturate(1.2)",
             border: "1px solid rgba(255,255,255,0.06)",
