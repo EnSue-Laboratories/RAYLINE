@@ -1,8 +1,7 @@
-const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { buildSpawnPath, isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
+const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { loadSessionMessages } = require("./session-reader.cjs");
 
 const activeAgents = new Map();
@@ -305,7 +304,7 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
   log("Full args:", args.filter(a => a !== fullPrompt).join(" "));
   log("Prompt:", fullPrompt.slice(0, 100));
 
-  const child = spawn(codexBin, args, {
+  const child = spawnCli(codexBin, args, {
     cwd: launchCwd,
     env: {
       ...process.env,

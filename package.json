@@ -2,7 +2,11 @@
   "name": "ensue",
   "productName": "RayLine",
   "description": "RayLine — a desktop client for Claude Code",
-  "author": "Ensue Laboratories",
+  "author": {
+    "name": "Ensue Laboratories",
+    "email": "contact@ensue.dev"
+  },
+  "homepage": "https://github.com/EnSue-Laboratories/RAYLINE",
   "private": true,
   "version": "0.1.1",
   "type": "module",
@@ -12,6 +16,7 @@
     "dev:electron": "concurrently \"vite --port 5199 --strictPort\" \"wait-on http://localhost:5199 && node scripts/dev-electron.cjs 5199\"",
     "build": "vite build",
     "build:electron": "vite build && electron-builder",
+    "build:electron:win": "vite build && electron-builder --win --config.npmRebuild=false",
     "lint": "eslint .",
     "preview": "vite preview",
     "rebuild": "electron-rebuild -f -w node-pty"
@@ -40,6 +45,26 @@
   "build": {
     "appId": "com.ensue.rayline",
     "productName": "RayLine",
+    "publish": {
+      "provider": "github",
+      "owner": "EnSue-Laboratories",
+      "repo": "RAYLINE",
+      "releaseType": "draft"
+    },
+    "win": {
+      "icon": "public/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false
+    },
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "public/icon.png",
@@ -65,6 +90,16 @@
           "type": "link",
           "path": "/Applications"
         }
+      ]
+    },
+    "linux": {
+      "category": "Development",
+      "icon": "public/icon.png",
+      "maintainer": "Ensue Laboratories <contact@ensue.dev>",
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
       ]
     },
     "files": [

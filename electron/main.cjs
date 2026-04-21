@@ -16,15 +16,18 @@ const {
   multicaListMessages,
   subscribeMulticaAgent,
 } = require("./multica-manager.cjs");
-const { buildSpawnPath, resolveCliBin } = require("./cli-bin-resolver.cjs");
+const { buildSpawnPath, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
 const ghManager = require("./github-manager.cjs");
 
 const isDev = !app.isPackaged;
+const isMac = process.platform === "darwin";
+const isWindows = process.platform === "win32";
 const SHELL_COMMAND_TIMEOUT_MS = 15000;
 const SHELL_OUTPUT_LIMIT = 128 * 1024;
+const WINDOW_BACKGROUND = "#0D0D10";
 const WALLPAPER_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
 const WALLPAPER_MIME_TYPES = {
   png: "image/png",
@@ -38,7 +41,7 @@ const WALLPAPER_MIME_TYPES = {
 
 // Override app name (in dev, Electron uses its own binary name)
 app.setName("RayLine");
-if (isDev && process.platform === "darwin") {
+if (isDev && isMac) {
   // Patch the dock name in dev mode
   const { execSync } = require("child_process");
   try {
@@ -50,6 +53,34 @@ if (isDev && process.platform === "darwin") {
 
 let mainWindow;
 let pmWindow;
+
+function getWindowChromeOptions() {
+  if (isMac) {
+    return {
+      titleBarStyle: "hiddenInset",
+      trafficLightPosition: { x: 16, y: 18 },
+    };
+  }
+
+  if (isWindows) {
+    return {
+      titleBarStyle: "hidden",
+      titleBarOverlay: {
+        color: WINDOW_BACKGROUND,
+        symbolColor: "#C8CBD3",
+        height: 52,
+      },
+      autoHideMenuBar: true,
+    };
+  }
+
+  return {};
+}
+
+function applyWindowChromeTweaks(win) {
+  if (!win || !isWindows) return;
+  win.setMenuBarVisibility(false);
+}
 
 function getWallpaperStorageDir() {
   const dir = path.join(app.getPath("userData"), "wallpapers");
@@ -97,16 +128,16 @@ function createWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: "#0D0D10",
+    backgroundColor: WINDOW_BACKGROUND,
     icon: path.join(__dirname, "../public/icon.png"),
+    ...getWindowChromeOptions(),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+  applyWindowChromeTweaks(mainWindow);
 
   // Open external links in system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -140,16 +171,16 @@ function createProjectManagerWindow() {
     height: 700,
     minWidth: 700,
     minHeight: 500,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: "#0D0D10",
+    backgroundColor: WINDOW_BACKGROUND,
     icon: path.join(__dirname, "../public/icon.png"),
+    ...getWindowChromeOptions(),
     webPreferences: {
       preload: path.join(__dirname, "preload-pm.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+  applyWindowChromeTweaks(pmWindow);
 
   pmWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -170,7 +201,7 @@ app.setName("RayLine");
 
 app.whenReady().then(() => {
   // Set dock icon on macOS
-  if (process.platform === "darwin") {
+  if (isMac) {
     const iconPath = path.join(__dirname, "../public/icon.png");
     const icon = nativeImage.createFromPath(iconPath);
     if (!icon.isEmpty()) app.dock.setIcon(icon);
@@ -203,7 +234,7 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  if (!isMac) app.quit();
 });
 
 app.on("activate", () => {
@@ -481,7 +512,6 @@ ipcMain.handle("system-info", () => ({
 
 // IPC: quick explain (one-shot, not in chat history)
 ipcMain.handle("quick-explain", async (_event, { text, model }) => {
-  const { spawn } = require("child_process");
   return new Promise((resolve) => {
     const claudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
     if (!claudeBin) {
@@ -498,7 +528,7 @@ ipcMain.handle("quick-explain", async (_event, { text, model }) => {
       "--system-prompt", "You are a concise explainer. Give 1-3 sentence explanations. Use markdown for formatting.",
       `Explain this briefly:\n\n${text}`,
     ];
-    const child = spawn(claudeBin, args, {
+    const child = spawnCli(claudeBin, args, {
       env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -533,7 +563,6 @@ ipcMain.handle("shell-run", async (_event, { command, cwd }) => {
       return;
     }
 
-    const isWindows = process.platform === "win32";
     const shellBin = isWindows ? (process.env.ComSpec || "cmd.exe") : "/bin/sh";
     const shellArgs = isWindows
       ? ["/d", "/s", "/c", shellCommand]
@@ -1109,8 +1138,7 @@ ipcMain.handle("git-gen-commit-message", async (_e, cwd) => {
     ];
 
     return await new Promise((resolve) => {
-      const { spawn } = require("child_process");
-      const child = spawn(claudeBin, args, {
+      const child = spawnCli(claudeBin, args, {
         cwd,
         env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
         stdio: ["ignore", "pipe", "pipe"],

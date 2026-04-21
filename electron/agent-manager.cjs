@@ -1,8 +1,7 @@
-const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { buildSpawnPath, isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
+const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { findSessionCwd, moveSession } = require("./session-reader.cjs");
 const { fetchClaudeUsage } = require("./claude-usage-fetcher.cjs");
 
@@ -302,7 +301,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     log("Full args:", args.filter((arg) => arg !== runPrompt).join(" "));
     log("Prompt:", runPrompt.slice(0, 100));
 
-    const child = spawn(claudeBin, args, {
+    const child = spawnCli(claudeBin, args, {
       cwd: launchCwd,
       env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
       stdio: ["ignore", "pipe", "pipe"],
@@ -537,7 +536,7 @@ function rewindFiles({ sessionId, messageUuid, cwd }) {
       return;
     }
 
-    const child = spawn(claudeBin, args, {
+    const child = spawnCli(claudeBin, args, {
       cwd: launchCwd,
       env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
       stdio: ["ignore", "pipe", "pipe"],

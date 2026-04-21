@@ -1,5 +1,5 @@
-const { execFile, spawn } = require("child_process");
-const { buildSpawnPath, isExecutable, resolveCliBin } = require("./cli-bin-resolver.cjs");
+const { execFile } = require("child_process");
+const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli, execFileCli } = require("./cli-bin-resolver.cjs");
 
 // node-pty is a native module — load lazily so the manager still loads even
 // if the prebuild is missing for the current Electron version.
@@ -36,7 +36,7 @@ function gh(args) {
   return new Promise((resolve, reject) => {
     let bin;
     try { bin = resolveGhBin(); } catch (err) { reject(err); return; }
-    execFile(bin, args, {
+    execFileCli(bin, args, {
       env: ghEnv(),
       timeout: 15000,
       maxBuffer: 5 * 1024 * 1024,
@@ -54,7 +54,7 @@ function ghWithStdin(args, jsonBody) {
   return new Promise((resolve, reject) => {
     let bin;
     try { bin = resolveGhBin(); } catch (err) { reject(err); return; }
-    const child = spawn(bin, args, {
+    const child = spawnCli(bin, args, {
       env: ghEnv(),
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 15000,
@@ -84,7 +84,7 @@ function ghWithRawStdin(args, input) {
   return new Promise((resolve, reject) => {
     let bin;
     try { bin = resolveGhBin(); } catch (err) { reject(err); return; }
-    const child = spawn(bin, args, {
+    const child = spawnCli(bin, args, {
       env: ghEnv(),
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 15000,
