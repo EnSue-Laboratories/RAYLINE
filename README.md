@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
     <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite 8" />
     <img src="https://img.shields.io/badge/node--pty-1.x-339933?style=flat-square&logo=gnometerminal&logoColor=white" alt="node-pty" />
-    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-1a1a1a?style=flat-square" alt="Platforms" />
+    <img src="https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%26%20Linux%20(experimental)-1a1a1a?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/status-alpha-f25f3a?style=flat-square" alt="Alpha" />
   </p>
 
@@ -166,11 +166,13 @@ scripts/      Dev launchers and shell-facing helpers
 
 ## Platform Support
 
+RayLine is developed and tested primarily on **macOS**. Windows and Linux builds are **experimental** — they compile and launch, but may have rough edges around native integrations (window chrome, PTY behavior, signing, auto-update). Bug reports from those platforms are welcome.
+
 | Platform | Status | Notes |
 |---|---|---|
-| macOS | First-class | Signed + notarized DMG |
-| Windows | Supported | NSIS installer; `node-pty` needs Python + VS Build Tools |
-| Linux | Supported | AppImage, `deb`, and `tar.gz` targets |
+| macOS | First-class | Signed + notarized DMG; primary development target |
+| Windows | Experimental | NSIS installer; `node-pty` needs Python + VS Build Tools. Not all features verified |
+| Linux | Experimental | AppImage, `deb`, and `tar.gz` targets. Built but not part of CI validation |
 
 ## Contributing & Issues
 
