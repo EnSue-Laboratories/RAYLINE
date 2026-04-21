@@ -111,7 +111,8 @@ async function resolveAuthUser() {
   let statusErr = null;
   try {
     const out = await gh(["auth", "status", "--hostname", "github.com"]);
-    const user = parseAuthStatusUser(out);
+    const accounts = parseAuthStatusAccounts(out);
+    const user = accounts.find((account) => account.active)?.login || parseAuthStatusUser(out);
     if (user) return { loggedIn: true, user };
   } catch (err) {
     statusErr = err;
@@ -148,6 +149,61 @@ function parseAuthStatusUser(text) {
     text.match(/Logged in to [^\s]+ account ([^\s(]+)/i) ||
     text.match(/Logged in to [^\s]+ as ([^\s(]+)/i);
   return m ? m[1] : null;
+}
+
+function parseAuthStatusAccounts(text) {
+  if (!text) return [];
+  const lines = String(text).split(/\r?\n/);
+  const accounts = [];
+  let current = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const accountMatch =
+      line.match(/^✓ Logged in to [^\s]+ account ([^\s(]+)/i) ||
+      line.match(/^✓ Logged in to [^\s]+ as ([^\s(]+)/i);
+    if (accountMatch) {
+      current = { login: accountMatch[1], active: false };
+      accounts.push(current);
+      continue;
+    }
+
+    if (current && /^- Active account:\s*true$/i.test(line)) {
+      current.active = true;
+    }
+  }
+
+  if (accounts.length === 1 && !accounts[0].active) {
+    accounts[0].active = true;
+  }
+
+  return accounts;
+}
+
+async function listAuthAccounts() {
+  try {
+    const out = await gh(["auth", "status", "--hostname", "github.com"]);
+    let accounts = parseAuthStatusAccounts(out);
+    if (!accounts.length) {
+      const { user } = await resolveAuthUser();
+      if (user) accounts = [{ login: user, active: true }];
+    }
+    return { ok: true, accounts };
+  } catch (err) {
+    if (/not logged in/i.test(err.message || "")) return { ok: true, accounts: [] };
+    return { ok: false, error: err.message };
+  }
+}
+
+async function switchAccount(user) {
+  try {
+    await gh(["auth", "switch", "--hostname", "github.com", "--user", user]);
+    return { ok: true, user };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
 }
 
 // --- Interactive auth flow -------------------------------------------------
@@ -592,6 +648,8 @@ async function getLinkedPRs(repo, issueNumber) {
 
 module.exports = {
   checkAuth,
+  listAuthAccounts,
+  switchAccount,
   startWebAuth,
   cancelWebAuth,
   logout,

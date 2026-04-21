@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("ghApi", {
   checkAuth: () => ipcRenderer.invoke("gh-check-auth"),
+  listAuthAccounts: () => ipcRenderer.invoke("gh-list-auth-accounts"),
+  switchAccount: (user) => ipcRenderer.invoke("gh-switch-account", user),
   listUserRepos: (limit) => ipcRenderer.invoke("gh-list-user-repos", limit),
   listIssues: (repo, state) => ipcRenderer.invoke("gh-list-issues", repo, state),
   listPRs: (repo, state) => ipcRenderer.invoke("gh-list-prs", repo, state),

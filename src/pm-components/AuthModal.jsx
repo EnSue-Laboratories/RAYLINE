@@ -19,6 +19,7 @@ function GitHubGlyph({ size = 28 }) {
 
 // phases: idle | starting | code | success | error | cancelled
 export default function AuthModal({ mode = "signin", currentUser, onClose, onAuthSuccess }) {
+  const isAddAccount = mode === "add" || mode === "switch";
   const [phase, setPhase] = useState("idle");
   const [code, setCode] = useState(null);
   const [user, setUser] = useState(null);
@@ -66,9 +67,9 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
     unsubRef.current = unsub;
 
     try {
-      // `gh auth login --web` handles the already-signed-in case by asking
-      // for re-auth confirmation, which we auto-accept in github-manager.
-      // No explicit pre-logout is needed for `switch`.
+      // `gh auth login --web` handles adding another account while already
+      // signed in by asking for re-auth confirmation, which github-manager
+      // auto-accepts when needed.
       await window.ghApi.authStart();
     } catch (err) {
       flowStartedRef.current = false;
@@ -171,7 +172,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
           <div style={{ display: "flex", alignItems: "center", gap: 10, color: "rgba(255,255,255,0.85)" }}>
             <GitHubGlyph size={18} />
             <span style={{ fontSize: 14, fontWeight: 500 }}>
-              {mode === "switch" ? "Switch GitHub account" : "Sign in to GitHub"}
+              {isAddAccount ? "Add GitHub account" : "Sign in to GitHub"}
             </span>
           </div>
           <button
@@ -196,7 +197,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
 
         {/* Body */}
         <div style={{ padding: "20px 22px", minHeight: 180 }}>
-          {mode === "switch" && currentUser && phase !== "success" && (
+          {isAddAccount && currentUser && phase !== "success" && (
             <div
               style={{
                 fontSize: 12,

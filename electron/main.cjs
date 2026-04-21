@@ -1179,6 +1179,8 @@ ipcMain.handle("gh-get-repo-name", async (_e, cwd) => {
 
 // IPC: GitHub Project Manager
 ipcMain.handle("gh-check-auth", () => ghManager.checkAuth());
+ipcMain.handle("gh-list-auth-accounts", () => ghManager.listAuthAccounts());
+ipcMain.handle("gh-switch-account", (_e, user) => ghManager.switchAccount(user));
 ipcMain.handle("gh-list-user-repos", (_e, limit) => ghManager.listUserRepos(limit));
 ipcMain.handle("gh-list-issues", (_e, repo, state) => ghManager.listIssues(repo, state));
 ipcMain.handle("gh-list-prs", (_e, repo, state) => ghManager.listPRs(repo, state));
