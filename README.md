@@ -20,7 +20,7 @@
     <a href="#quick-start">Quick Start</a> ·
     <a href="#highlights">Highlights</a> ·
     <a href="#architecture">Architecture</a> ·
-    <a href="ARCH.md">Deep Dive</a>
+    <a href="docs/architecture.md">Deep Dive</a>
   </p>
 </div>
 
@@ -28,7 +28,7 @@
 
 ## About
 
-RayLine wraps Claude Code (and Codex) in a native desktop chat, adding the workflow glue a plain terminal session can't give you: persistent conversations, tool-call visibility, image and file attachments, checkpoint-based undo, and an embedded terminal drawer alongside the chat.
+RayLine wraps Claude Code, Codex, and connected Multica agents in a native desktop chat, adding the workflow glue a plain terminal session can't give you: persistent conversations, tool-call visibility, image and file attachments, checkpoint-based undo, and an embedded terminal drawer alongside the chat.
 
 
 ## Highlights
@@ -37,7 +37,7 @@ RayLine wraps Claude Code (and Codex) in a native desktop chat, adding the workf
 |---|---|
 | **Dispatch** | Fan out N agents in parallel, each in its own git worktree and branch — from a list of GitHub issues or your own prompts |
 | **Streaming chat** | Live tool calls, partial messages, and expandable thinking blocks |
-| **Multi-agent** | Switch between Claude and GPT-5.4 Codex per conversation |
+| **Multi-agent** | Switch between Claude, GPT-5.4 Codex, and connected Multica agents per conversation |
 | **Checkpoints** | Rewind files to their pre-prompt state using lightweight git snapshots |
 | **Terminal drawer** | Persistent PTY sessions (`node-pty` + `xterm.js`) that live alongside the chat |
 | **Project Manager** | Built-in GitHub window for issues, PRs, and comments (`gh` CLI under the hood) |
@@ -53,7 +53,13 @@ RayLine wraps Claude Code (and Codex) in a native desktop chat, adding the workf
 
 ## Quick Start
 
-You'll need Node.js, the `claude` CLI available on your `PATH`, and an authenticated Claude Code environment. On Windows, the `node-pty` rebuild also needs Python and the Visual Studio C++ build tools.
+You'll need Node.js. The rest depends on which RayLine features you plan to use:
+
+- `claude` on your `PATH` plus an authenticated Claude Code environment for Claude chats and Claude session history
+- `codex` on your `PATH` for Codex chats
+- `gh` on your `PATH` plus `gh auth login` for the GitHub Project Manager
+- a reachable Multica server plus email verification in Settings for Multica chats
+- on Windows, Python and the Visual Studio C++ build tools for the `node-pty` rebuild
 
 ```bash
 npm install
@@ -61,6 +67,8 @@ npm run dev:electron
 ```
 
 That starts the Vite renderer on port `5199` and launches Electron against it.
+
+Claude and Codex are available as soon as their CLIs resolve on your `PATH`. Use **Settings** to connect Multica, and open **GitHub Projects** to finish `gh` authentication if you want the built-in repo/issue/PR tooling.
 
 If Electron or `node-pty` was updated, rebuild the native module first:
 
@@ -87,23 +95,25 @@ If you're only working on the main UI, you can skip the rebuild — terminal ses
 
 ```mermaid
 flowchart LR
-  R["Renderer<br/>React + Vite"] <-- "IPC · window.api" --> M["Main Process<br/>Node.js"]
+  R["Renderer<br/>React + Vite"] <-- "IPC · window.api" --> M["Main Process<br/>Electron + Node.js"]
   M -- "spawn" --> C["claude CLI<br/>JSONL stream"]
+  M -- "spawn" --> X["codex CLI<br/>event stream"]
+  M -- "HTTPS + WebSocket" --> U["Multica runtime"]
   M -- "spawn" --> G["gh CLI"]
   M -- "node-pty" --> T["PTY sessions"]
-  M -- "git" --> K["Checkpoints"]
-  M -- "fs" --> S["~/.claude sessions"]
+  M -- "git" --> K["Checkpoints + worktrees"]
+  M -- "fs" --> S["~/.claude + ~/.codex sessions"]
 ```
 
 What happens when you hit **Send**:
 
-1. The renderer calls `window.api.agentStart` with the prompt and attachments.
-2. The main process spawns `claude --print --output-format=stream-json --include-partial-messages …`.
-3. JSONL events stream back to the renderer as `agent-stream` IPC events.
-4. `useAgent.js` assembles partial deltas into renderable message parts.
-5. A git checkpoint is captured per message so later edits can roll files back.
+1. The renderer calls `window.api.agentStart` with the active provider, model, prompt, `cwd`, and attachments.
+2. RayLine captures a git checkpoint for the current worktree before the request starts, so later edits can roll files back.
+3. The main process routes the request to the Claude CLI, Codex CLI, or Multica bridge.
+4. Provider events stream back to the renderer as normalized `agent-stream` IPC events.
+5. `useAgent.js` assembles partial deltas into renderable message parts, and session readers can later rehydrate Claude or Codex history from disk.
 
-Full walkthrough lives in [`ARCH.md`](ARCH.md).
+Full walkthrough lives in [`docs/architecture.md`](docs/architecture.md).
 
 ## Project Structure
 
@@ -121,10 +131,12 @@ scripts/      Dev launchers and shell-facing helpers
 
 - `electron/main.cjs` — Electron bootstrap and the IPC surface
 - `electron/agent-manager.cjs` — Claude process spawning and stream handling
-- `electron/codex-agent-manager.cjs` — GPT-5.4 Codex via the OpenAI API
+- `electron/codex-agent-manager.cjs` — Codex CLI spawning and stream handling
+- `electron/multica-manager.cjs` — Multica HTTP/WebSocket bridge
 - `electron/terminal-manager.cjs` — PTY-backed terminal sessions
 - `electron/checkpoint.cjs` — Git-based file checkpoints for edit rewind
 - `electron/github-manager.cjs` — `gh` CLI wrapper powering the Project Manager
+- `electron/session-reader.cjs` — Claude + Codex session rehydration
 - `src/App.jsx` — Top-level chat state and interaction flow
 - `src/hooks/useAgent.js` — Streamed message assembly in the renderer
 - `src/ProjectManager.jsx` — GitHub Project Manager window
