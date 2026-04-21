@@ -222,7 +222,46 @@ function buildCmdWrappedArgs(binPath, args) {
   return { command: process.env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c", line] };
 }
 
+// npm's generated .cmd shims on Windows have a fixed shape that ends with
+//   "%_prog%"  "%dp0%\path\to\script.js" %*
+// If we dispatch through cmd.exe, multi-line args (e.g. a whole system-context
+// prompt) are truncated at the first newline because cmd.exe parses them as
+// separate commands. Extracting the underlying JS entrypoint lets us spawn
+// `node script.js ...args` directly — no cmd.exe, no arg-length or newline
+// limits, no percent-expansion. For non-npm `.cmd` shims we fall back to the
+// cmd.exe wrapper which preserves single-line behavior.
+function resolveNpmShimTarget(cmdPath) {
+  if (!IS_WINDOWS) return null;
+  try {
+    const content = fs.readFileSync(cmdPath, "utf-8");
+    const match = content.match(/"%_prog%"\s+"%dp0%[\\/]([^"]+)"\s+%\*/);
+    if (!match) return null;
+    const scriptPath = path.join(path.dirname(cmdPath), match[1]);
+    return fs.existsSync(scriptPath) ? scriptPath : null;
+  } catch {
+    return null;
+  }
+}
+
+let cachedNodeBin = null;
+function resolveNodeBin() {
+  if (cachedNodeBin && isExecutable(cachedNodeBin)) return cachedNodeBin;
+  cachedNodeBin = resolveCliBin("node", { envVarName: "NODE_BIN" });
+  return cachedNodeBin;
+}
+
+function maybeDirectNodeInvocation(binPath) {
+  if (!needsCmdWrapping(binPath)) return null;
+  const shimTarget = resolveNpmShimTarget(binPath);
+  if (!shimTarget) return null;
+  const nodeBin = resolveNodeBin();
+  if (!nodeBin) return null;
+  return { command: nodeBin, prefixArgs: [shimTarget] };
+}
+
 function spawnCli(binPath, args, options = {}) {
+  const direct = maybeDirectNodeInvocation(binPath);
+  if (direct) return spawn(direct.command, [...direct.prefixArgs, ...args], options);
   if (needsCmdWrapping(binPath)) {
     const { command, args: wrapped } = buildCmdWrappedArgs(binPath, args);
     return spawn(command, wrapped, { ...options, windowsVerbatimArguments: true });
@@ -233,6 +272,8 @@ function spawnCli(binPath, args, options = {}) {
 function execFileCli(binPath, args, options, callback) {
   if (typeof options === "function") { callback = options; options = {}; }
   options = options || {};
+  const direct = maybeDirectNodeInvocation(binPath);
+  if (direct) return execFile(direct.command, [...direct.prefixArgs, ...args], options, callback);
   if (needsCmdWrapping(binPath)) {
     const { command, args: wrapped } = buildCmdWrappedArgs(binPath, args);
     return execFile(command, wrapped, { ...options, windowsVerbatimArguments: true }, callback);
