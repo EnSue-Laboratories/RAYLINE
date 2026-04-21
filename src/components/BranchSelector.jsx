@@ -900,7 +900,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                 </div>
               )}
             </div>
-          ) : (
+          ) : (mode === "worktree" && hasMessages) ? null : (
             <button
               onClick={() => { setCreating(true); setError(null); setSearchQuery(""); }}
               style={{

@@ -4,15 +4,19 @@ import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as Termina
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
-import ModelPicker from "./ModelPicker";
+import { ModelPickerWithMultica } from "../data/multicaModels.jsx";
 import BranchSelector from "./BranchSelector";
 import GitStatusPill from "./GitStatusPill";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
+import ExportConversationBtn from "./ExportConversationBtn";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
+import { clipboardItemsToAttachments, dataTransferHasFiles, fileListToAttachments } from "../utils/attachments";
 import TabStrip from "./TabStrip";
+import useGitStatus from "../hooks/useGitStatus";
+import { isMulticaModelId } from "../data/models";
 
 const EMPTY_MESSAGES = [];
 
@@ -89,7 +93,16 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const endRef  = useRef(null);
   const inRef   = useRef(null);
   const queueEditRef = useRef(null);
+  const dragDepthRef = useRef(0);
+  // Callback ref so the ResizeObserver re-attaches when the message body
+  // re-mounts (e.g. showNewChatCard toggling). Keep the ref object too so
+  // SelectionToolbar can still read .current.
   const messageBodyRef = useRef(null);
+  const [messageBodyEl, setMessageBodyEl] = useState(null);
+  const setMessageBodyNode = useCallback((node) => {
+    messageBodyRef.current = node;
+    setMessageBodyEl(node);
+  }, []);
 
   // Scroll to bottom on new messages and during streaming
   const scrollRef = useRef(null);
@@ -98,40 +111,102 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const lastParts = lastMsg?.parts;
   const lastPartText = lastParts?.[lastParts.length - 1]?.text || lastMsg?.text;
   const prevMsgCount = useRef(0);
+  // Sticky follow-mode: true until the user actively scrolls up, flips back
+  // on when they return to the bottom. Ref (not state) so rapid streaming
+  // updates don't trigger re-renders and stay in sync with scroll events.
+  const followingRef = useRef(true);
+
+  // Reset follow state on conversation switch so chat B doesn't inherit
+  // chat A's "user scrolled up" state.
+  useEffect(() => {
+    followingRef.current = true;
+    prevMsgCount.current = 0;
+  }, [convo?.id]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
-    // Always scroll on new messages (count changed)
-    if (msgCount !== prevMsgCount.current) {
+    // New message (count INCREASED) → force follow on and smooth-scroll to bottom
+    if (msgCount > prevMsgCount.current) {
       prevMsgCount.current = msgCount;
+      followingRef.current = true;
       endRef.current?.scrollIntoView({ behavior: "smooth" });
       return;
     }
 
-    // During streaming, only scroll if near bottom
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 300;
-    if (nearBottom) {
-      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Count decreased (edit rewind, /clear, /compact) → track the new count
+    // but don't hijack the user's scroll position.
+    if (msgCount < prevMsgCount.current) {
+      prevMsgCount.current = msgCount;
+      return;
+    }
+
+    // Streaming update → pin to bottom instantly so chunks can't outrun us
+    if (followingRef.current) {
+      el.scrollTop = el.scrollHeight;
     }
   }, [msgCount, convo?.isStreaming, lastPartText]);
 
-  // Track whether the user is near the bottom to toggle the scroll-to-bottom button
+  // Pin to bottom whenever content height changes while following. Catches
+  // renders that don't trigger the text-diff effect above — LoadingStatus
+  // growing an extra line when usage arrives, thinking blocks expanding,
+  // mermaid/katex rendering in late, etc.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !messageBodyEl || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (followingRef.current) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+    ro.observe(messageBodyEl);
+    return () => ro.disconnect();
+  }, [messageBodyEl]);
+
+  // Track whether the user is near the bottom to toggle the scroll-to-bottom
+  // button, and maintain follow-mode based on user scroll direction.
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    let lastScrollTop = el.scrollTop;
+    // Gate "user scrolled up" detection behind recent real user input.
+    // Otherwise content shrink (thinking block collapses, images clamping
+    // scrollTop) and trackpad momentum bounce silently kill follow-mode.
+    let userIntentUntil = 0;
+    const markIntent = () => { userIntentUntil = Date.now() + 500; };
+
     const handleScroll = () => {
       const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      // Require both a meaningful delta and recent user input to disable follow.
+      if (el.scrollTop < lastScrollTop - 8 && Date.now() < userIntentUntil) {
+        followingRef.current = false;
+      }
+      // Reached the bottom again → resume following
+      if (distanceFromBottom < 40) {
+        followingRef.current = true;
+      }
+      lastScrollTop = el.scrollTop;
       setShowScrollToBottom(distanceFromBottom > 120);
     };
     handleScroll();
     el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
+    el.addEventListener("wheel", markIntent, { passive: true });
+    el.addEventListener("touchstart", markIntent, { passive: true });
+    el.addEventListener("pointerdown", markIntent, { passive: true });
+    el.addEventListener("keydown", markIntent);
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      el.removeEventListener("wheel", markIntent);
+      el.removeEventListener("touchstart", markIntent);
+      el.removeEventListener("pointerdown", markIntent);
+      el.removeEventListener("keydown", markIntent);
+    };
   }, [convo?.id, msgCount]);
 
   const scrollToBottom = useCallback(() => {
+    followingRef.current = true;
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
@@ -161,6 +236,21 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     return parts.slice(-2).join("/") || parts[parts.length - 1] || cwd;
   })() : "current workspace";
 
+  const activeModelId = convo?.model || defaultModel;
+  const isMulticaModel = isMulticaModelId(activeModelId);
+  const { status: gitStatus } = useGitStatus(cwd);
+  const hasDirtyWorktree = (gitStatus?.files?.length || 0) > 0;
+  const hasNoUpstream = Boolean(gitStatus?.branch) && !gitStatus?.upstream && !gitStatus?.detached;
+  const branchNeedsAttention = hasDirtyWorktree || hasNoUpstream;
+  const [branchHintDismissed, setBranchHintDismissed] = useState(false);
+  useEffect(() => { setBranchHintDismissed(false); }, [convo?.id]);
+  const showBranchHint = isMulticaModel && !showNewChatCard && branchNeedsAttention && !branchHintDismissed && !shellMode;
+  const branchHintText = (() => {
+    if (hasDirtyWorktree && hasNoUpstream) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES + NOT PUBLISHED";
+    if (hasDirtyWorktree) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES";
+    return "BRANCH MAY NEED UPDATING  //  NOT PUBLISHED TO ORIGIN";
+  })();
+
   const send = useCallback(() => {
     if (!canSend) return;
     const nextInput = trimmedInput;
@@ -171,8 +261,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       setSelectedCmd(0);
     });
     if (inRef.current) inRef.current.style.height = "20px";
+    if (isMulticaModel && !shellMode) setBranchHintDismissed(true);
     onSend(nextInput, nextAttachments);
-  }, [attachments, canSend, onSend, shellMode, trimmedInput]);
+  }, [attachments, canSend, isMulticaModel, onSend, shellMode, trimmedInput]);
 
   const handleInput = (e) => {
     setInput(e.target.value);
@@ -213,45 +304,34 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
     }
   };
 
-  // Paste handler for images
-  const handlePaste = (e) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of items) {
-      if (item.type.startsWith("image/")) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          setAttachments((prev) => [...prev, { type: "image", dataUrl: ev.target.result, name: file.name || "image" }]);
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-  };
+  const handlePaste = useCallback((e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    if (!items.some((item) => item?.kind === "file")) return;
 
-  // Drop handler for files and images
-  const handleDrop = (e) => {
+    e.preventDefault();
+    void clipboardItemsToAttachments(items).then((nextAttachments) => {
+      if (nextAttachments.length === 0) return;
+      setAttachments((prev) => [...prev, ...nextAttachments]);
+    });
+  }, []);
+
+  const resetDragState = useCallback(() => {
+    dragDepthRef.current = 0;
+    setDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
+
     e.preventDefault();
     e.stopPropagation();
-    const files = e.dataTransfer?.files;
-    if (!files) return;
-    for (const file of files) {
-      // Get file path via Electron's webUtils (works with context isolation)
-      const filePath = window.api?.getFilePath?.(file) || file.path || null;
+    resetDragState();
 
-      if (file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          setAttachments((prev) => [...prev, { type: "image", dataUrl: ev.target.result, name: file.name, path: filePath }]);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // Any file (PDF, code, docs, etc.) — pass the path to the agent
-        setAttachments((prev) => [...prev, { type: "file", name: file.name, path: filePath || file.name }]);
-      }
-    }
-  };
+    void fileListToAttachments(e.dataTransfer?.files).then((nextAttachments) => {
+      if (nextAttachments.length === 0) return;
+      setAttachments((prev) => [...prev, ...nextAttachments]);
+    });
+  }, [resetDragState]);
 
   const [dragOver, setDragOver] = useState(false);
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
@@ -259,18 +339,42 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const topTabsLeft = sidebarOpen ? 18 : 104;
   const headerContentOffset = showHeaderTabs ? 8 : 0;
 
-  const handleDragOver = (e) => {
+  const handleDragEnter = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
     e.preventDefault();
     e.stopPropagation();
+    dragDepthRef.current += 1;
     setDragOver(true);
-  };
+  }, []);
 
-  const handleDragLeave = (e) => {
+  const handleDragOver = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
     e.preventDefault();
-    setDragOver(false);
-  };
+    e.stopPropagation();
+    if (!dragOver) setDragOver(true);
+  }, [dragOver]);
 
-  // Prevent Electron from navigating to dropped files (on window, not our drop zone)
+  const handleDragLeave = useCallback((e) => {
+    if (!dataTransferHasFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setDragOver(false);
+  }, []);
+
+  useEffect(() => {
+    const handleWindowDrop = () => resetDragState();
+    const handleWindowDragEnd = () => resetDragState();
+
+    window.addEventListener("drop", handleWindowDrop);
+    window.addEventListener("dragend", handleWindowDragEnd);
+
+    return () => {
+      window.removeEventListener("drop", handleWindowDrop);
+      window.removeEventListener("dragend", handleWindowDragEnd);
+    };
+  }, [resetDragState]);
+
   useEffect(() => {
     const preventNav = (e) => { e.preventDefault(); };
     window.addEventListener("dragover", preventNav);
@@ -366,10 +470,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       style={{
         flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10,
         ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
-        boxShadow: dragOver ? "inset 0 0 0 1px rgba(153,214,255,0.18)" : "none",
-        transition: "box-shadow .2s ease",
       }}
       onDrop={(e) => { e.stopPropagation(); handleDrop(e); setDragOver(false); }}
+      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
@@ -523,7 +626,10 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               onRefocusTerminal={onRefocusTerminal}
             />
           )}
-          {!showNewChatCard && <ModelPicker value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
+          {!showNewChatCard && <ModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
+          {!showNewChatCard && convo?.msgs?.length > 0 && (
+            <ExportConversationBtn convo={convo} />
+          )}
           {!showNewChatCard && developerMode && onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
@@ -590,7 +696,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           onControlChange={onControlChange}
           canControlTarget={canControlTarget}
           wallpaper={wallpaper}
-          messageBodyRef={messageBodyRef}
+          messageBodyRef={setMessageBodyNode}
           endRef={endRef}
         />
       </div>
@@ -860,18 +966,38 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 : "SHELL MODE  //  TYPE A COMMAND AFTER !"}
             </div>
           )}
+          {showBranchHint && (
+            <div
+              style={{
+                marginBottom: 6,
+                fontSize: s(10),
+                fontFamily: "'JetBrains Mono',monospace",
+                letterSpacing: ".1em",
+                color: "rgba(255,210,140,0.55)",
+              }}
+            >
+              {branchHintText}
+            </div>
+          )}
 
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 10,
-              background: inputFocused ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
-              border: (shellMode ? "2px solid " : "1px solid ") + (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)"),
+              background: dragOver
+                ? "rgba(180,220,255,0.06)"
+                : (inputFocused ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)"),
+              border: (shellMode ? "2px solid " : "1px solid ") + (
+                dragOver
+                  ? "rgba(153,214,255,0.28)"
+                  : (inputFocused ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.10)")
+              ),
               borderRadius: 12,
               padding: shellMode ? "8px 13px" : "9px 14px",
               backdropFilter: "blur(20px)",
-              transition: "border-color .25s, background .25s",
+              boxShadow: dragOver ? "0 0 0 1px rgba(153,214,255,0.08)" : "none",
+              transition: "border-color .25s, background .25s, box-shadow .25s",
             }}
           >
             <textarea

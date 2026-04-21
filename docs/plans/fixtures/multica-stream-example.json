@@ -1,0 +1,9 @@
+[
+  { "type": "chat:message", "payload": { "chat_session_id": "ff210145-a15f-4aa5-92c9-a0621327262e", "message_id": "4fd94ce5-d593-4cae-8487-66f2abc4cf1a", "role": "user", "content": "Reply in one short sentence. No tools.", "task_id": "3813c2ee-825a-4138-9ed4-a57b9d619d31", "created_at": "2026-04-20T19:00:42Z" } },
+  { "type": "agent:status", "payload": { "agent": { "id": "a2ecb1a6-d216-4e71-9c16-bba408190418", "name": "Claude", "status": "working", "workspace_id": "4f1e09a3-9252-4b49-b455-73163ff633df" } } },
+  { "type": "task:dispatch", "payload": { "task_id": "3813c2ee-825a-4138-9ed4-a57b9d619d31" } },
+  { "type": "task:message", "payload": { "task_id": "3813c2ee-825a-4138-9ed4-a57b9d619d31", "seq": 1, "type": "text", "content": "Got it, ready when you are." } },
+  { "type": "chat:done", "payload": { "chat_session_id": "ff210145-a15f-4aa5-92c9-a0621327262e", "task_id": "3813c2ee-825a-4138-9ed4-a57b9d619d31", "content": "" } },
+  { "type": "agent:status", "payload": { "agent": { "id": "a2ecb1a6-d216-4e71-9c16-bba408190418", "name": "Claude", "status": "idle", "workspace_id": "4f1e09a3-9252-4b49-b455-73163ff633df" } } },
+  { "type": "task:completed", "payload": { "agent_id": "a2ecb1a6-d216-4e71-9c16-bba408190418", "chat_session_id": "ff210145-a15f-4aa5-92c9-a0621327262e", "issue_id": "", "status": "completed", "task_id": "3813c2ee-825a-4138-9ed4-a57b9d619d31" } }
+]
