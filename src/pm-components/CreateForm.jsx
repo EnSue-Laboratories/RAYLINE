@@ -136,7 +136,7 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 200,
-        background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
+        background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
         display: "flex", alignItems: "center", justifyContent: "center",
       }}
     >

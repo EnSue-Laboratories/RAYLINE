@@ -807,7 +807,7 @@ function modelOptionsWithDefault(availableModels) {
 const backdropStyle = {
   position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
   display: "flex", alignItems: "center", justifyContent: "center",
-  zIndex: 1000, backdropFilter: "blur(6px)",
+  zIndex: 1000, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
 };
 const cardStyle = {
   width: 820, maxWidth: "90vw", maxHeight: "85vh",
