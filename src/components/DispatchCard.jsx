@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, GitBranch, FileText, Check, ChevronRight, ChevronDown, Paperclip, Plus } from "lucide-react";
+import ImagePreview from "./ImagePreview";
 
 function TransparentCheckbox({ checked, onChange, ariaLabel }) {
   return (
@@ -477,15 +478,48 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
 }
 
 function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
+  const attachments = row.attachments || [];
+
+  const addAttachments = (items) => {
+    if (!items.length) return;
+    onChange({ attachments: [...attachments, ...items] });
+  };
+
+  const removeAttachment = (i) => {
+    onChange({ attachments: attachments.filter((_, idx) => idx !== i) });
+  };
+
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageItems = Array.from(items).filter((it) => it.type.startsWith("image/"));
+    if (imageItems.length === 0) return;
+    e.preventDefault();
+    Promise.all(imageItems.map((it) => new Promise((resolve) => {
+      const file = it.getAsFile();
+      if (!file) { resolve(null); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve({ type: "image", dataUrl: ev.target.result, name: file.name || "image" });
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    }))).then((added) => addAttachments(added.filter(Boolean)));
+  };
+
   return (
     <div style={customRowStyle(!!error)}>
       <textarea
         placeholder={`Task ${index + 1} prompt…`}
         value={row.prompt}
         onChange={(e) => onChange({ prompt: e.target.value })}
+        onPaste={handlePaste}
         rows={3}
         style={customTextareaStyle}
       />
+      {attachments.length > 0 && (
+        <div style={{ padding: "0 12px 8px" }}>
+          <ImagePreview items={attachments} onRemove={removeAttachment} />
+        </div>
+      )}
       <div style={customControlsStyle}>
         <input
           type="text"
