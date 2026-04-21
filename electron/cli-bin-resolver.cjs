@@ -3,20 +3,39 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const COMMON_EXTRA_PATH_DIRS = [
-  "/opt/homebrew/bin",
-  "/usr/local/bin",
-  "/usr/bin",
-  "/bin",
-];
+const IS_WINDOWS = process.platform === "win32";
+
+const COMMON_EXTRA_PATH_DIRS = IS_WINDOWS
+  ? []
+  : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"];
 
 function isExecutable(filePath) {
   try {
-    fs.accessSync(filePath, fs.constants.X_OK);
-    return fs.statSync(filePath).isFile();
+    if (!fs.statSync(filePath).isFile()) return false;
+    // X_OK is not meaningful on Windows — existence + PATHEXT match is enough.
+    if (!IS_WINDOWS) fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
   } catch {
     return false;
   }
+}
+
+function getPathExtensions() {
+  if (!IS_WINDOWS) return [""];
+  const raw = process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD";
+  const exts = raw
+    .split(";")
+    .map((e) => e.trim())
+    .filter(Boolean);
+  return ["", ...exts];
+}
+
+function hasKnownExtension(candidate) {
+  if (!IS_WINDOWS) return true;
+  const lower = candidate.toLowerCase();
+  return getPathExtensions()
+    .filter(Boolean)
+    .some((ext) => lower.endsWith(ext.toLowerCase()));
 }
 
 function expandHome(inputPath) {
@@ -37,7 +56,7 @@ function getUserBinDirs() {
   const home = os.homedir();
   if (!home) return [];
 
-  return [
+  const shared = [
     path.join(home, "bin"),
     path.join(home, ".local", "bin"),
     path.join(home, ".npm-global", "bin"),
@@ -51,6 +70,29 @@ function getUserBinDirs() {
     path.join(home, ".local", "share", "mise", "shims"),
     path.join(home, ".cargo", "bin"),
   ];
+
+  if (!IS_WINDOWS) return shared;
+
+  const appData = process.env.APPDATA;
+  const localAppData = process.env.LOCALAPPDATA;
+  const programFiles = process.env.ProgramFiles;
+  const programFilesX86 = process.env["ProgramFiles(x86)"];
+
+  const windowsDirs = [
+    appData && path.join(appData, "npm"),
+    localAppData && path.join(localAppData, "Programs", "claude"),
+    localAppData && path.join(localAppData, "Volta", "bin"),
+    localAppData && path.join(localAppData, "fnm"),
+    localAppData && path.join(localAppData, "Microsoft", "WindowsApps"),
+    path.join(home, "scoop", "shims"),
+    path.join(home, ".bun", "bin"),
+    programFiles && path.join(programFiles, "nodejs"),
+    programFiles && path.join(programFiles, "Git", "bin"),
+    programFiles && path.join(programFiles, "Git", "cmd"),
+    programFilesX86 && path.join(programFilesX86, "nodejs"),
+  ].filter(Boolean);
+
+  return [...shared, ...windowsDirs];
 }
 
 function buildSpawnPath(extraDirs = []) {
@@ -62,28 +104,37 @@ function buildSpawnPath(extraDirs = []) {
   ])].join(path.delimiter);
 }
 
+function tryWithExtensions(basePath) {
+  for (const ext of getPathExtensions()) {
+    const candidate = basePath + ext;
+    if (isExecutable(candidate)) return candidate;
+  }
+  if (IS_WINDOWS && !hasKnownExtension(basePath) && isExecutable(basePath)) {
+    return basePath;
+  }
+  return null;
+}
+
 function resolvePathCandidate(candidate, searchPath) {
   if (!candidate || typeof candidate !== "string") return null;
 
   const normalized = expandHome(candidate.trim());
   if (!normalized) return null;
 
-  if (path.isAbsolute(normalized) && isExecutable(normalized)) {
-    return normalized;
+  if (path.isAbsolute(normalized)) {
+    const resolved = tryWithExtensions(normalized);
+    if (resolved) return resolved;
   }
 
-  if (normalized.includes(path.sep)) {
+  if (normalized.includes(path.sep) || (IS_WINDOWS && normalized.includes("/"))) {
     const absoluteCandidate = path.resolve(normalized);
-    if (isExecutable(absoluteCandidate)) {
-      return absoluteCandidate;
-    }
+    const resolved = tryWithExtensions(absoluteCandidate);
+    if (resolved) return resolved;
   }
 
   for (const dir of splitPath(searchPath)) {
-    const fullPath = path.join(dir, normalized);
-    if (isExecutable(fullPath)) {
-      return fullPath;
-    }
+    const resolved = tryWithExtensions(path.join(dir, normalized));
+    if (resolved) return resolved;
   }
 
   return null;
