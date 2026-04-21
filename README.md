@@ -28,9 +28,8 @@
 
 ## About
 
-RayLine wraps Claude Code (and GPT-5.4 Codex) in a native desktop chat, adding the workflow glue a plain terminal session can't give you: persistent conversations, tool-call visibility, image and file attachments, checkpoint-based undo, and an embedded terminal drawer alongside the chat.
+RayLine wraps Claude Code (and Codex) in a native desktop chat, adding the workflow glue a plain terminal session can't give you: persistent conversations, tool-call visibility, image and file attachments, checkpoint-based undo, and an embedded terminal drawer alongside the chat.
 
-> This repository is published as `Ensue-Chat`. The packaged app and product name are `RayLine`.
 
 ## Highlights
 
@@ -137,11 +136,6 @@ scripts/      Dev launchers and shell-facing helpers
 | macOS | First-class | Signed + notarized DMG |
 | Windows | Supported | NSIS installer; `node-pty` needs Python + VS Build Tools |
 | Linux | Supported | AppImage, `deb`, and `tar.gz` targets |
-
-## Notes
-
-- External links are opened in the system browser from the Electron shell.
-- App state persists to the Electron user-data directory as `rayline-state.json`.
 
 ## Contributing & Issues
 
