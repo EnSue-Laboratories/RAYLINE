@@ -56,13 +56,29 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: npx electron-builder --config electron-builder.config.cjs --mac --publish never
 
+      - name: Collect packaged files
+        shell: bash
+        run: |
+          rm -rf artifact
+          mkdir -p artifact
+          while IFS= read -r -d '' file; do
+            cp "$file" artifact/
+          done < <(find release -maxdepth 1 -type f -print0)
+          count=$(find artifact -maxdepth 1 -type f | wc -l | tr -d ' ')
+          if [ "$count" -eq 0 ]; then
+            echo "No packaged files found in release/"
+            exit 1
+          fi
+          find artifact -maxdepth 1 -type f -print
+
       - name: Upload workflow artifacts
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: rayline-${{ matrix.platform }}
-          path: release/**
+          path: artifact/*
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3
 
       - name: Upload assets to GitHub release
         if: github.event_name == 'release'
