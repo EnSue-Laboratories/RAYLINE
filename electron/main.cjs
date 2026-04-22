@@ -65,11 +65,6 @@ function getWindowChromeOptions() {
   if (isWindows) {
     return {
       titleBarStyle: "hidden",
-      titleBarOverlay: {
-        color: WINDOW_BACKGROUND,
-        symbolColor: "#C8CBD3",
-        height: 52,
-      },
       autoHideMenuBar: true,
     };
   }
@@ -80,6 +75,10 @@ function getWindowChromeOptions() {
 function applyWindowChromeTweaks(win) {
   if (!win || !isWindows) return;
   win.setMenuBarVisibility(false);
+}
+
+function getEventWindow(event) {
+  return BrowserWindow.fromWebContents(event.sender) || mainWindow || pmWindow || null;
 }
 
 function getWallpaperStorageDir() {
@@ -254,11 +253,36 @@ ipcMain.on("open-project-manager", () => {
 });
 
 ipcMain.handle("set-window-opacity", (event, opacity) => {
-  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  const win = getEventWindow(event);
   if (!win) return false;
   const v = Number(opacity);
   if (!Number.isFinite(v)) return false;
   win.setOpacity(Math.max(0.2, Math.min(1, v)));
+  return true;
+});
+
+ipcMain.handle("window-minimize", (event) => {
+  const win = getEventWindow(event);
+  if (!win) return false;
+  win.minimize();
+  return true;
+});
+
+ipcMain.handle("window-toggle-maximize", (event) => {
+  const win = getEventWindow(event);
+  if (!win) return false;
+  if (win.isMaximized()) {
+    win.unmaximize();
+    return false;
+  }
+  win.maximize();
+  return true;
+});
+
+ipcMain.handle("window-close", (event) => {
+  const win = getEventWindow(event);
+  if (!win) return false;
+  win.close();
   return true;
 });
 

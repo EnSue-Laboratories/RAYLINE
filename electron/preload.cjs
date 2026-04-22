@@ -107,6 +107,9 @@ contextBridge.exposeInMainWorld("api", {
 
   // Window appearance
   setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
+  windowMinimize: () => ipcRenderer.invoke("window-minimize"),
+  windowToggleMaximize: () => ipcRenderer.invoke("window-toggle-maximize"),
+  windowClose: () => ipcRenderer.invoke("window-close"),
   writeClipboardImage: (dataUrl) => ipcRenderer.invoke("clipboard-write-image", dataUrl),
 
   // multica
