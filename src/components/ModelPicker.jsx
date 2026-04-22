@@ -8,6 +8,13 @@ const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 const MIN_MENU_WIDTH = 220;
 const PREFERRED_MAX_HEIGHT = 420;
+const CLI_RECHECK_INTERVAL_MS = 5000;
+const DEFAULT_CLI_INSTALL_STATUS = { claude: true, codex: true };
+
+const PROVIDER_INSTALL_GUIDES = {
+  claude: { url: "https://docs.claude.com/en/docs/claude-code/setup", label: "Install Claude Code\u2026" },
+  codex:  { url: "https://developers.openai.com/codex/cli",           label: "Install Codex CLI\u2026"   },
+};
 
 function extractMulticaErrorStatus(err) {
   if (!err) return null;
@@ -23,7 +30,90 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
   const ref = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
+  const [cliInstalled, setCliInstalled] = useState(null);
+  const cliCheckedAtRef = useRef(0);
+  const cliProbePromiseRef = useRef(null);
   const m = getMOrMulticaFallback(value, extraModels);
+
+  const probeCliInstalled = useCallback(async ({ force = false } = {}) => {
+    if (cliProbePromiseRef.current) return cliProbePromiseRef.current;
+
+    if (!window.api?.checkCliInstalled) {
+      setCliInstalled(DEFAULT_CLI_INSTALL_STATUS);
+      cliCheckedAtRef.current = Date.now();
+      return DEFAULT_CLI_INSTALL_STATUS;
+    }
+
+    if (force) {
+      setCliInstalled(null);
+    }
+
+    const probePromise = (async () => {
+      try {
+        const result = await window.api.checkCliInstalled({ force });
+        if (result) {
+          setCliInstalled(result);
+          cliCheckedAtRef.current = Date.now();
+          return result;
+        }
+      } catch {
+        setCliInstalled(DEFAULT_CLI_INSTALL_STATUS);
+        cliCheckedAtRef.current = Date.now();
+        return DEFAULT_CLI_INSTALL_STATUS;
+      }
+
+      return null;
+    })();
+
+    cliProbePromiseRef.current = probePromise;
+    try {
+      return await probePromise;
+    } finally {
+      if (cliProbePromiseRef.current === probePromise) {
+        cliProbePromiseRef.current = null;
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      void probeCliInstalled();
+    }, 0);
+    return () => window.clearTimeout(timerId);
+  }, [probeCliInstalled]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!cliInstalled) {
+      const timerId = window.setTimeout(() => {
+        void probeCliInstalled();
+      }, 0);
+      return () => window.clearTimeout(timerId);
+    }
+    if ((Date.now() - cliCheckedAtRef.current) > CLI_RECHECK_INTERVAL_MS) {
+      const timerId = window.setTimeout(() => {
+        void probeCliInstalled({ force: true });
+      }, 0);
+      return () => window.clearTimeout(timerId);
+    }
+  }, [cliInstalled, open, probeCliInstalled]);
+
+  useEffect(() => {
+    if (!cliInstalled || !onChange) return;
+
+    const currentProvider = m.provider;
+    if (!PROVIDER_INSTALL_GUIDES[currentProvider] || cliInstalled[currentProvider] !== false) return;
+
+    const fallback = [...MODELS, ...extraModels].find((candidate) => {
+      if (candidate.id === value) return false;
+      const guide = PROVIDER_INSTALL_GUIDES[candidate.provider];
+      return !guide || cliInstalled[candidate.provider] !== false;
+    });
+
+    if (fallback && fallback.id !== value) {
+      onChange(fallback.id);
+    }
+  }, [cliInstalled, extraModels, m.provider, onChange, value]);
 
   const updateMenuPosition = useCallback(() => {
     if (!ref.current) return;
@@ -128,12 +218,70 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
             return ["claude", "codex", "multica"].map((provider, gi) => {
               const entries = all.filter((mm) => mm.provider === provider);
               const isMulticaEmpty = provider === "multica" && entries.length === 0;
+              const guide = PROVIDER_INSTALL_GUIDES[provider];
+              const cliKnown = !guide || Object.prototype.hasOwnProperty.call(cliInstalled || {}, provider);
+              const cliUnknown = Boolean(guide) && !cliKnown;
+              const cliMissing = Boolean(guide) && cliKnown && cliInstalled[provider] === false;
               return (
                 <div key={provider}>
                   {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
                   <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
                     {provider.toUpperCase()}
                   </div>
+                  {cliUnknown && (
+                    <button
+                      key={`${provider}-checking`}
+                      disabled
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "flex-start",
+                        width: "100%",
+                        padding: "9px 13px",
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: 7,
+                        color: "rgba(255,255,255,0.4)",
+                        fontSize: s(11),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        cursor: "default",
+                        textAlign: "left",
+                        opacity: 0.5,
+                      }}
+                    >
+                      {`Checking ${provider.toUpperCase()} CLI\u2026`}
+                    </button>
+                  )}
+                  {cliMissing && (
+                    <button
+                      key={`${provider}-install`}
+                      onClick={() => {
+                        window.open(guide.url, "_blank", "noopener,noreferrer");
+                        setMenuStyle(null);
+                        set(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "flex-start",
+                        width: "100%",
+                        padding: "9px 13px",
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: 7,
+                        color: "rgba(255,255,255,0.4)",
+                        fontSize: s(11),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "all .12s",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {guide.label}
+                    </button>
+                  )}
                   {isMulticaEmpty && (() => {
                     const status = extractMulticaErrorStatus(extraError);
                     if (extraLoading && !extraError) {
@@ -289,7 +437,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                       </button>
                     );
                   })()}
-                  {entries.map((mm) => (
+                  {!cliUnknown && !cliMissing && entries.map((mm) => (
                     <button
                       key={mm.id}
                       onClick={() => { onChange(mm.id); setMenuStyle(null); set(false); }}
