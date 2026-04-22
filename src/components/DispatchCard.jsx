@@ -307,12 +307,15 @@ function DispatchLoadingDots() {
 }
 
 function TabBtn({ active, onClick, children }) {
+  const [hovered, setHovered] = useState(false);
   return (
     <button
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      style={tabBtnStyle(active)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={tabBtnStyle(active, hovered)}
     >
       {children}
     </button>
@@ -659,6 +662,7 @@ function DispatchDropdown({
   ariaLabel,
 }) {
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const ref = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
@@ -715,15 +719,17 @@ function DispatchDropdown({
   const triggerStyle = compact
     ? {
         display: "inline-flex", alignItems: "center", gap: 6,
-        padding: "4px 0",
+        padding: "3px 6px",
         background: "transparent",
-        border: "none",
+        border: "1px solid " + (hovered ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)"),
+        borderRadius: 6,
         color: selected ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.45)",
         fontSize: 10,
         fontFamily: "'JetBrains Mono',monospace",
         letterSpacing: ".06em",
         cursor: "pointer",
         outline: "none",
+        transition: "border-color .2s",
       }
     : {
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -758,8 +764,12 @@ function DispatchDropdown({
         onClick={toggle}
         aria-label={ariaLabel}
         style={triggerStyle}
-        onMouseEnter={compact ? undefined : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
-        onMouseLeave={compact ? undefined : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
+        onMouseEnter={compact
+          ? () => setHovered(true)
+          : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+        onMouseLeave={compact
+          ? () => setHovered(false)
+          : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: fullWidth ? 1 : undefined, textAlign: "left" }}>
           {triggerText}
@@ -882,13 +892,16 @@ const tabsStyle = {
   display: "flex", gap: 4, padding: "10px 14px 0",
   borderBottom: "1px solid var(--pane-border)",
 };
-const tabBtnStyle = (active) => ({
+const tabBtnStyle = (active, hovered) => ({
   display: "flex", gap: 6, alignItems: "center",
   padding: "8px 12px", borderRadius: "6px 6px 0 0",
   background: active ? "var(--pane-hover)" : "transparent",
-  color: active ? "white" : "rgba(255,255,255,0.55)",
+  color: active
+    ? "white"
+    : hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.55)",
   border: "none", borderBottom: active ? "1px solid white" : "1px solid transparent",
   cursor: "pointer", fontSize: 12,
+  transition: "color .2s",
 });
 const bodyStyle = { flex: 1, overflow: "auto", padding: 0 };
 const footerStyle = {
