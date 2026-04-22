@@ -755,6 +755,37 @@ function gitLong(args, cwd) {
   });
 }
 
+function ghRepo(args, cwd, { timeout = 15000, maxBuffer = 10 * 1024 * 1024 } = {}) {
+  return new Promise((resolve, reject) => {
+    execFile("gh", args, {
+      cwd,
+      env: { ...process.env, PATH: buildSpawnPath() },
+      timeout,
+      maxBuffer,
+    }, (err, stdout, stderr) => {
+      if (err) reject(new Error((stderr || "").trim() || err.message));
+      else resolve(stdout.trim());
+    });
+  });
+}
+
+function extractPrNumber(value) {
+  const match = String(value || "").match(/\/pull\/(\d+)(?:\D|$)/);
+  return match ? Number(match[1]) : null;
+}
+
+async function getCurrentBranchOpenPr(cwd) {
+  const raw = await ghRepo([
+    "pr",
+    "view",
+    "--json",
+    "number,title,url,state,headRefName,baseRefName,isDraft",
+  ], cwd);
+  const pr = JSON.parse(raw);
+  if (!pr || pr.state !== "OPEN") return null;
+  return pr;
+}
+
 ipcMain.handle("git-branches", async (_event, cwd) => {
   if (!cwd) return { current: null, branches: [] };
   try {
@@ -1086,12 +1117,42 @@ ipcMain.handle("git-pull", async (_event, cwd) => {
   }
 });
 
+ipcMain.handle("git-pr-status", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+    if (branch === "HEAD") return { ok: true, branch: null, openPr: null };
+    try {
+      const openPr = await getCurrentBranchOpenPr(cwd);
+      if (openPr?.headRefName && openPr.headRefName !== branch) {
+        return { ok: true, branch, openPr: null };
+      }
+      return { ok: true, branch, openPr };
+    } catch (err) {
+      const msg = err.message || String(err);
+      if (/no pull requests found for branch/i.test(msg)) {
+        return { ok: true, branch, openPr: null };
+      }
+      return { ok: false, stderr: msg };
+    }
+  } catch (err) {
+    return { ok: false, stderr: err.message || String(err) };
+  }
+});
+
 ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
   if (!cwd) return { ok: false, stderr: "no cwd" };
   try {
     const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
     if (branch === "HEAD") return { ok: false, stderr: "detached HEAD" };
     if (base && branch === base) return { ok: false, stderr: `already on base branch "${base}"` };
+    let openPr = null;
+    try {
+      openPr = await getCurrentBranchOpenPr(cwd);
+    } catch (err) {
+      const msg = err.message || String(err);
+      if (!/no pull requests found for branch/i.test(msg)) throw err;
+    }
     // Ensure upstream exists and is current.
     let pushArgs;
     try {
@@ -1101,26 +1162,38 @@ ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
       pushArgs = ["push", "-u", "origin", branch];
     }
     await gitLong(pushArgs, cwd);
+    if (openPr) {
+      return {
+        ok: true,
+        action: "updated",
+        number: openPr.number,
+        title: openPr.title,
+        url: openPr.url,
+      };
+    }
     const ghArgs = ["pr", "create", "--fill"];
     if (base) ghArgs.push("--base", base);
-    const stdout = await new Promise((resolve, reject) => {
-      execFile("gh", ghArgs, {
-        cwd,
-        env: { ...process.env, PATH: buildSpawnPath() },
-        timeout: 60000,
-      }, (err, out, stderr) => {
-        if (err) reject(new Error((stderr || "").trim() || err.message));
-        else resolve(out.trim());
-      });
-    });
+    const stdout = await ghRepo(ghArgs, cwd, { timeout: 60000 });
     const urlMatch = stdout.match(/https?:\/\/\S+/);
     const url = urlMatch ? urlMatch[0] : null;
-    return { ok: true, url, stdout };
+    return {
+      ok: true,
+      action: "created",
+      number: extractPrNumber(url),
+      url,
+      stdout,
+    };
   } catch (err) {
     const msg = err.message || String(err);
     const existing = msg.match(/https?:\/\/github\.com\/\S+\/pull\/\d+/);
     if (existing) {
-      return { ok: true, url: existing[0], stdout: msg };
+      return {
+        ok: true,
+        action: "existing",
+        number: extractPrNumber(existing[0]),
+        url: existing[0],
+        stdout: msg,
+      };
     }
     return { ok: false, stderr: msg };
   }

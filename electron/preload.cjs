@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld("api", {
   gitCommit: (cwd, message, coauthor) => ipcRenderer.invoke("git-commit", cwd, message, coauthor),
   gitPush: (cwd) => ipcRenderer.invoke("git-push", cwd),
   gitPull: (cwd) => ipcRenderer.invoke("git-pull", cwd),
+  gitPrStatus: (cwd) => ipcRenderer.invoke("git-pr-status", cwd),
   gitCreatePr: (cwd, base) => ipcRenderer.invoke("git-create-pr", cwd, base),
   gitGenCommitMessage: (cwd) => ipcRenderer.invoke("git-gen-commit-message", cwd),
 
