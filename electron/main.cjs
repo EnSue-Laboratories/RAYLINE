@@ -755,6 +755,79 @@ function gitLong(args, cwd) {
   });
 }
 
+function ghRepo(args, cwd, { timeout = 15000, maxBuffer = 10 * 1024 * 1024 } = {}) {
+  return new Promise((resolve, reject) => {
+    execFile("gh", args, {
+      cwd,
+      env: { ...process.env, PATH: buildSpawnPath() },
+      timeout,
+      maxBuffer,
+    }, (err, stdout, stderr) => {
+      if (err) reject(new Error((stderr || "").trim() || err.message));
+      else resolve(stdout.trim());
+    });
+  });
+}
+
+function extractPrNumber(value) {
+  const match = String(value || "").match(/\/pull\/(\d+)(?:\D|$)/);
+  return match ? Number(match[1]) : null;
+}
+
+async function getRepoPrContext(cwd) {
+  const raw = await ghRepo(["repo", "view", "--json", "nameWithOwner,parent"], cwd);
+  const repo = JSON.parse(raw);
+  const currentRepo = repo?.nameWithOwner || null;
+  const baseRepo = repo?.parent?.nameWithOwner || currentRepo;
+  const headOwner = currentRepo?.split("/")[0] || null;
+  return { currentRepo, baseRepo, headOwner };
+}
+
+function normalizeOpenPr(pr) {
+  if (!pr) return null;
+  return {
+    number: pr.number,
+    title: pr.title,
+    url: pr.html_url || pr.url || null,
+    state: String(pr.state || "").toUpperCase(),
+    headRefName: pr.head?.ref || pr.headRefName || null,
+    baseRefName: pr.base?.ref || pr.baseRefName || null,
+    isDraft: Boolean(pr.draft ?? pr.isDraft),
+  };
+}
+
+async function getCurrentBranchOpenPr(cwd, branch) {
+  const { baseRepo, headOwner } = await getRepoPrContext(cwd);
+  if (!baseRepo || !headOwner || !branch) return null;
+  const raw = await ghRepo([
+    "api",
+    "--method",
+    "GET",
+    `/repos/${baseRepo}/pulls`,
+    "-f",
+    "state=open",
+    "-f",
+    `head=${headOwner}:${branch}`,
+  ], cwd);
+  const prs = JSON.parse(raw);
+  if (!Array.isArray(prs) || prs.length === 0) return null;
+  return normalizeOpenPr(prs[0]);
+}
+
+async function mergeCurrentBranchOpenPr(cwd, branch) {
+  const { baseRepo } = await getRepoPrContext(cwd);
+  const openPr = await getCurrentBranchOpenPr(cwd, branch);
+  if (!baseRepo || !openPr) return null;
+  const raw = await ghRepo([
+    "api",
+    "--method",
+    "PUT",
+    `/repos/${baseRepo}/pulls/${openPr.number}/merge`,
+  ], cwd, { timeout: 60000 });
+  const result = JSON.parse(raw);
+  return { openPr, result };
+}
+
 ipcMain.handle("git-branches", async (_event, cwd) => {
   if (!cwd) return { current: null, branches: [] };
   try {
@@ -1086,12 +1159,36 @@ ipcMain.handle("git-pull", async (_event, cwd) => {
   }
 });
 
+ipcMain.handle("git-pr-status", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+    if (branch === "HEAD") return { ok: true, branch: null, openPr: null };
+    try {
+      const openPr = await getCurrentBranchOpenPr(cwd, branch);
+      return { ok: true, branch, openPr };
+    } catch (err) {
+      const msg = err.message || String(err);
+      return { ok: false, stderr: msg };
+    }
+  } catch (err) {
+    return { ok: false, stderr: err.message || String(err) };
+  }
+});
+
 ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
   if (!cwd) return { ok: false, stderr: "no cwd" };
   try {
     const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
     if (branch === "HEAD") return { ok: false, stderr: "detached HEAD" };
     if (base && branch === base) return { ok: false, stderr: `already on base branch "${base}"` };
+    const openPr = await getCurrentBranchOpenPr(cwd, branch);
+    if (openPr) {
+      return {
+        ok: false,
+        stderr: `Open PR #${openPr.number} already exists\n${openPr.url || ""}`.trim(),
+      };
+    }
     // Ensure upstream exists and is current.
     let pushArgs;
     try {
@@ -1103,26 +1200,47 @@ ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
     await gitLong(pushArgs, cwd);
     const ghArgs = ["pr", "create", "--fill"];
     if (base) ghArgs.push("--base", base);
-    const stdout = await new Promise((resolve, reject) => {
-      execFile("gh", ghArgs, {
-        cwd,
-        env: { ...process.env, PATH: buildSpawnPath() },
-        timeout: 60000,
-      }, (err, out, stderr) => {
-        if (err) reject(new Error((stderr || "").trim() || err.message));
-        else resolve(out.trim());
-      });
-    });
+    const stdout = await ghRepo(ghArgs, cwd, { timeout: 60000 });
     const urlMatch = stdout.match(/https?:\/\/\S+/);
     const url = urlMatch ? urlMatch[0] : null;
-    return { ok: true, url, stdout };
+    return {
+      ok: true,
+      action: "created",
+      number: extractPrNumber(url),
+      url,
+      stdout,
+    };
   } catch (err) {
     const msg = err.message || String(err);
     const existing = msg.match(/https?:\/\/github\.com\/\S+\/pull\/\d+/);
     if (existing) {
-      return { ok: true, url: existing[0], stdout: msg };
+      return {
+        ok: false,
+        stderr: `Open PR #${extractPrNumber(existing[0]) || "?"} already exists\n${existing[0]}`,
+      };
     }
     return { ok: false, stderr: msg };
+  }
+});
+
+ipcMain.handle("git-merge-pr", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+    if (branch === "HEAD") return { ok: false, stderr: "detached HEAD" };
+    const merged = await mergeCurrentBranchOpenPr(cwd, branch);
+    if (!merged?.openPr) return { ok: false, stderr: "No open upstream PR for this branch" };
+    if (merged.result?.merged === false) {
+      return { ok: false, stderr: merged.result.message || `Failed to merge PR #${merged.openPr.number}` };
+    }
+    return {
+      ok: true,
+      number: merged.openPr.number,
+      url: merged.openPr.url,
+      stdout: merged.result?.message || "Pull request merged",
+    };
+  } catch (err) {
+    return { ok: false, stderr: err.message || String(err) };
   }
 });
 
