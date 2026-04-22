@@ -1,5 +1,6 @@
 # RayLine shell bootstrap for zsh terminals.
 
+RAYLINE_BOOTSTRAP_ZDOTDIR="${ZDOTDIR:-}"
 export ZDOTDIR="${RAYLINE_ORIG_ZDOTDIR:-$HOME}"
 export CLICOLOR=1
 export CLICOLOR_FORCE=1
@@ -45,6 +46,10 @@ rayline_source_first_existing \
   /usr/local/opt/fzf/shell/key-bindings.zsh
 
 : "${FZF_DEFAULT_OPTS:=--height=40% --layout=reverse --border=rounded --color=bg+:#111318,bg:#0d0d10,spinner:#8fd6c2,hl:#89b4fa,fg:#e6edf3,header:#7ed7b9,info:#f5c97a,pointer:#8fd6c2,marker:#f38ba8,fg+:#f5f7fb,hl+:#a6c9ff,prompt:#8fd6c2}"
+
+if [[ -n "${RAYLINE_BOOTSTRAP_ZDOTDIR:-}" && -f "${RAYLINE_BOOTSTRAP_ZDOTDIR:h}/common/smart-cd.sh" ]]; then
+  source "${RAYLINE_BOOTSTRAP_ZDOTDIR:h}/common/smart-cd.sh"
+fi
 
 rayline_git_segment() {
   local branch
