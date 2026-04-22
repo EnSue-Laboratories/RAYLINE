@@ -181,18 +181,16 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   const openPr = prInfo.openPr?.headRefName === branch ? prInfo.openPr : null;
   const hasOpenPr = !!openPr;
   const isCheckingPr = !prInfo.unavailable && prInfo.loading && !prInfo.checked;
-  const canPr = !detached && !!branch && branch !== prBase && !busy && !!upstream && !isCheckingPr && (!hasOpenPr || ahead > 0);
+  const canPr = !detached && !!branch && branch !== prBase && !busy && !!upstream && !isCheckingPr && !hasOpenPr;
   const canPublish = !detached && !!branch && !upstream && !busy;
   const prTitle = prSuccess || (isCheckingPr
     ? "Checking PR status..."
     : canPr
-      ? hasOpenPr
-        ? `Push updates to PR #${openPr.number}`
-        : `Create PR → ${prBase}`
+      ? `Create PR → ${prBase}`
       : branch === prBase
         ? `On base branch "${prBase}"`
         : hasOpenPr
-          ? `Open PR #${openPr.number} already exists`
+          ? `Upstream PR #${openPr.number} already exists`
           : "Cannot create PR");
 
   const handleCommitAndPush = async () => {
@@ -277,9 +275,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
       if (!r.ok) { setError(r.stderr || "Failed to create PR"); return; }
       await refresh();
       await refreshPrInfo();
-      if (r.action === "updated") flashPrSuccess("PR updated");
-      else if (r.action === "existing") flashPrSuccess("PR already open");
-      else flashPrSuccess("PR created");
+      flashPrSuccess("PR created");
     } finally {
       setBusy(false);
     }
@@ -463,7 +459,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
           <span>
             {isCheckingPr
               ? "CHECKING PR STATUS"
-              : `OPEN PR #${openPr.number} → ${openPr.baseRefName}${ahead > 0 ? " · UPDATES READY" : ""}`}
+              : `UPSTREAM PR #${openPr.number} → ${openPr.baseRefName}`}
           </span>
         </div>
       )}

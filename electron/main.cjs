@@ -774,16 +774,44 @@ function extractPrNumber(value) {
   return match ? Number(match[1]) : null;
 }
 
-async function getCurrentBranchOpenPr(cwd) {
+async function getRepoPrContext(cwd) {
+  const raw = await ghRepo(["repo", "view", "--json", "nameWithOwner,parent"], cwd);
+  const repo = JSON.parse(raw);
+  const currentRepo = repo?.nameWithOwner || null;
+  const baseRepo = repo?.parent?.nameWithOwner || currentRepo;
+  const headOwner = currentRepo?.split("/")[0] || null;
+  return { currentRepo, baseRepo, headOwner };
+}
+
+function normalizeOpenPr(pr) {
+  if (!pr) return null;
+  return {
+    number: pr.number,
+    title: pr.title,
+    url: pr.html_url || pr.url || null,
+    state: String(pr.state || "").toUpperCase(),
+    headRefName: pr.head?.ref || pr.headRefName || null,
+    baseRefName: pr.base?.ref || pr.baseRefName || null,
+    isDraft: Boolean(pr.draft ?? pr.isDraft),
+  };
+}
+
+async function getCurrentBranchOpenPr(cwd, branch) {
+  const { baseRepo, headOwner } = await getRepoPrContext(cwd);
+  if (!baseRepo || !headOwner || !branch) return null;
   const raw = await ghRepo([
-    "pr",
-    "view",
-    "--json",
-    "number,title,url,state,headRefName,baseRefName,isDraft",
+    "api",
+    "--method",
+    "GET",
+    `/repos/${baseRepo}/pulls`,
+    "-f",
+    "state=open",
+    "-f",
+    `head=${headOwner}:${branch}`,
   ], cwd);
-  const pr = JSON.parse(raw);
-  if (!pr || pr.state !== "OPEN") return null;
-  return pr;
+  const prs = JSON.parse(raw);
+  if (!Array.isArray(prs) || prs.length === 0) return null;
+  return normalizeOpenPr(prs[0]);
 }
 
 ipcMain.handle("git-branches", async (_event, cwd) => {
@@ -1123,16 +1151,10 @@ ipcMain.handle("git-pr-status", async (_event, cwd) => {
     const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
     if (branch === "HEAD") return { ok: true, branch: null, openPr: null };
     try {
-      const openPr = await getCurrentBranchOpenPr(cwd);
-      if (openPr?.headRefName && openPr.headRefName !== branch) {
-        return { ok: true, branch, openPr: null };
-      }
+      const openPr = await getCurrentBranchOpenPr(cwd, branch);
       return { ok: true, branch, openPr };
     } catch (err) {
       const msg = err.message || String(err);
-      if (/no pull requests found for branch/i.test(msg)) {
-        return { ok: true, branch, openPr: null };
-      }
       return { ok: false, stderr: msg };
     }
   } catch (err) {
@@ -1146,12 +1168,12 @@ ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
     const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
     if (branch === "HEAD") return { ok: false, stderr: "detached HEAD" };
     if (base && branch === base) return { ok: false, stderr: `already on base branch "${base}"` };
-    let openPr = null;
-    try {
-      openPr = await getCurrentBranchOpenPr(cwd);
-    } catch (err) {
-      const msg = err.message || String(err);
-      if (!/no pull requests found for branch/i.test(msg)) throw err;
+    const openPr = await getCurrentBranchOpenPr(cwd, branch);
+    if (openPr) {
+      return {
+        ok: false,
+        stderr: `Open PR #${openPr.number} already exists\n${openPr.url || ""}`.trim(),
+      };
     }
     // Ensure upstream exists and is current.
     let pushArgs;
@@ -1162,15 +1184,6 @@ ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
       pushArgs = ["push", "-u", "origin", branch];
     }
     await gitLong(pushArgs, cwd);
-    if (openPr) {
-      return {
-        ok: true,
-        action: "updated",
-        number: openPr.number,
-        title: openPr.title,
-        url: openPr.url,
-      };
-    }
     const ghArgs = ["pr", "create", "--fill"];
     if (base) ghArgs.push("--base", base);
     const stdout = await ghRepo(ghArgs, cwd, { timeout: 60000 });
@@ -1188,11 +1201,8 @@ ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
     const existing = msg.match(/https?:\/\/github\.com\/\S+\/pull\/\d+/);
     if (existing) {
       return {
-        ok: true,
-        action: "existing",
-        number: extractPrNumber(existing[0]),
-        url: existing[0],
-        stdout: msg,
+        ok: false,
+        stderr: `Open PR #${extractPrNumber(existing[0]) || "?"} already exists\n${existing[0]}`,
       };
     }
     return { ok: false, stderr: msg };
