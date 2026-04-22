@@ -7,6 +7,30 @@ import { getPaneSurfaceStyle } from "../utils/paneSurface";
 
 const FONT_FAMILY = "'JetBrains Mono','Fira Code',monospace";
 const XTERM_TRANSPARENT = "rgba(0,0,0,0)";
+const TERMINAL_THEME = {
+  background: XTERM_TRANSPARENT,
+  foreground: "rgba(244,247,250,0.88)",
+  cursor: "#8fd6c2",
+  cursorAccent: XTERM_TRANSPARENT,
+  selectionBackground: "rgba(120,182,255,0.18)",
+  selectionInactiveBackground: "rgba(120,182,255,0.1)",
+  black: "#0f1116",
+  red: "#f38ba8",
+  green: "#7ed7b9",
+  yellow: "#f5c97a",
+  blue: "#89b4fa",
+  magenta: "#cba6f7",
+  cyan: "#74c7ec",
+  white: "#bac2de",
+  brightBlack: "#585b70",
+  brightRed: "#f7a6bc",
+  brightGreen: "#9ce8cf",
+  brightYellow: "#f8d99c",
+  brightBlue: "#a6c9ff",
+  brightMagenta: "#d9b8fb",
+  brightCyan: "#98dbf3",
+  brightWhite: "#f5f7fb",
+};
 
 const iconBtnStyle = {
   display: "flex",
@@ -129,40 +153,29 @@ function TerminalViewport({
 
       // Create a fresh mount point
       const el = document.createElement("div");
+      el.className = "rayline-terminal-host";
       el.style.cssText = "width:100%;height:100%;background:transparent;";
       xtermElRef.current = el;
       containerRef.current.appendChild(el);
 
       const term = new Terminal({
-        theme: {
-          background:          XTERM_TRANSPARENT,
-          foreground:          "rgba(255,255,255,0.82)",
-          cursor:              "rgba(255,255,255,0.5)",
-          cursorAccent:        XTERM_TRANSPARENT,
-          selectionBackground: "rgba(255,255,255,0.12)",
-          // ANSI colors — muted palette matching RayLine's dark theme
-          black:               "#1a1a1a",
-          red:                 "#e06c75",
-          green:               "#98c379",
-          yellow:              "#e5c07b",
-          blue:                "#7eaee0",
-          magenta:             "#c678dd",
-          cyan:                "#56b6c2",
-          white:               "rgba(255,255,255,0.75)",
-          brightBlack:         "#5c6370",
-          brightRed:           "#f2777a",
-          brightGreen:         "#addb67",
-          brightYellow:        "#ffd580",
-          brightBlue:          "#82aaff",
-          brightMagenta:       "#d19aff",
-          brightCyan:          "#7fdbca",
-          brightWhite:         "rgba(255,255,255,0.92)",
-        },
-        fontFamily:   FONT_FAMILY,
-        fontSize:     13,
-        lineHeight:   1.4,
-        cursorBlink:  true,
-        cursorStyle:  "bar",
+        theme: TERMINAL_THEME,
+        fontFamily: FONT_FAMILY,
+        fontSize: 13,
+        fontWeight: "400",
+        fontWeightBold: "600",
+        lineHeight: 1.28,
+        letterSpacing: 0,
+        cursorBlink: true,
+        cursorStyle: "bar",
+        cursorWidth: 2,
+        customGlyphs: true,
+        drawBoldTextInBrightColors: false,
+        fastScrollSensitivity: 3,
+        minimumContrastRatio: 1.2,
+        rescaleOverlappingGlyphs: true,
+        scrollback: 5000,
+        smoothScrollDuration: 90,
         allowTransparency: true,
         allowProposedApi: true,
       });
@@ -226,7 +239,7 @@ function TerminalViewport({
       style={{
         flex: 1,
         overflow: "hidden",
-        padding: "8px 4px",
+        padding: "10px 6px 8px",
         boxSizing: "border-box",
         minHeight: 0,
       }}

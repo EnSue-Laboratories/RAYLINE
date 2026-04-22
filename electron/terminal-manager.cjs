@@ -18,6 +18,8 @@
  */
 
 const os = require("os");
+const path = require("path");
+const fs = require("fs");
 const { WebSocketServer } = require("ws");
 
 // node-pty is a native module — require lazily so syntax-check passes even
@@ -39,7 +41,12 @@ const SCROLLBACK_LIMIT = 5000;
 // Default shells per platform
 const DEFAULT_SHELL =
   process.env.SHELL ||
-  (process.platform === "win32" ? "cmd.exe" : "/bin/sh");
+  (process.platform === "win32"
+    ? "cmd.exe"
+    : process.platform === "darwin"
+      ? "/bin/zsh"
+      : "/bin/bash");
+const SHELL_INIT_ROOT = path.join(__dirname, "shell-init");
 
 // Environment variables to strip from the PTY.  When the Electron app is
 // launched from VS Code (or another IDE), variables like TERM_PROGRAM,
@@ -79,6 +86,58 @@ let outputCallback = null;
 
 function log(...args) {
   console.log("[terminal-manager]", ...args);
+}
+
+function withTerminalUxEnv(env, sessionName) {
+  return {
+    ...env,
+    TERM: "xterm-256color",
+    COLORTERM: "truecolor",
+    CLICOLOR: "1",
+    CLICOLOR_FORCE: "1",
+    FORCE_COLOR: "1",
+    TERM_PROGRAM: "RayLine",
+    TERM_PROGRAM_VERSION: process.env.npm_package_version || "0.1.2",
+    PROMPT_EOL_MARK: "",
+    CONDA_CHANGEPS1: "false",
+    VIRTUAL_ENV_DISABLE_PROMPT: "1",
+    DISABLE_AUTO_TITLE: "true",
+    RAYLINE_TERMINAL: "1",
+    RAYLINE_PROMPT_MODE: sessionName?.startsWith("shell-run-") ? "minimal" : "compact",
+  };
+}
+
+function resolveShellLaunch(shellPath, env) {
+  const shellName = path.basename(shellPath || "").toLowerCase();
+  const zshInitDir = path.join(SHELL_INIT_ROOT, "zsh");
+  const bashInitFile = path.join(SHELL_INIT_ROOT, "bash", "bashrc");
+
+  if ((shellName === "zsh" || shellName === "zsh.exe") && fs.existsSync(zshInitDir)) {
+    const originalZdotdir = env.ZDOTDIR || os.homedir();
+    return {
+      shell: shellPath,
+      args: ["-i"],
+      env: {
+        ...env,
+        RAYLINE_ORIG_ZDOTDIR: originalZdotdir,
+        RAYLINE_ORIG_ZSHRC: path.join(originalZdotdir, ".zshrc"),
+        ZDOTDIR: zshInitDir,
+      },
+    };
+  }
+
+  if ((shellName === "bash" || shellName === "bash.exe") && fs.existsSync(bashInitFile)) {
+    return {
+      shell: shellPath,
+      args: ["--init-file", bashInitFile, "-i"],
+      env: {
+        ...env,
+        RAYLINE_ORIG_BASHRC: path.join(os.homedir(), ".bashrc"),
+      },
+    };
+  }
+
+  return { shell: shellPath, args: [], env };
 }
 
 /**
@@ -166,17 +225,18 @@ function createSession({ name, command, cwd } = {}) {
     cleanEnv[k] = v;
   }
   if (userZdotdir) cleanEnv.ZDOTDIR = userZdotdir;
-  cleanEnv.PROMPT_EOL_MARK = "";
-  cleanEnv.TERM_PROGRAM = "RayLine";
+
+  const styledEnv = withTerminalUxEnv(cleanEnv, name);
+  const launch = resolveShellLaunch(shell, styledEnv);
 
   let ptyProcess;
   try {
-    ptyProcess = pty.spawn(shell, [], {
+    ptyProcess = pty.spawn(launch.shell, launch.args, {
       name: "xterm-256color",
       cols: 80,
       rows: 24,
       cwd: workDir,
-      env: cleanEnv,
+      env: launch.env,
     });
   } catch (err) {
     log("spawn error:", err.message);
@@ -186,7 +246,7 @@ function createSession({ name, command, cwd } = {}) {
   const session = {
     name,
     pty: ptyProcess,
-    command: shell,
+    command: launch.shell,
     cwd: workDir,
     buffer: [],
     exitCode: null,

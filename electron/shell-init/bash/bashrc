@@ -1,0 +1,39 @@
+# RayLine shell bootstrap for bash terminals.
+
+export CLICOLOR=1
+export CLICOLOR_FORCE=1
+export COLORTERM=truecolor
+export FORCE_COLOR=1
+export TERM_PROGRAM="RayLine"
+export CONDA_CHANGEPS1=false
+export VIRTUAL_ENV_DISABLE_PROMPT=1
+export PROMPT_DIRTRIM=1
+export DISABLE_AUTO_TITLE=true
+
+if [ -n "${RAYLINE_ORIG_BASHRC:-}" ] && [ -f "${RAYLINE_ORIG_BASHRC}" ]; then
+  . "${RAYLINE_ORIG_BASHRC}"
+elif [ -f "${HOME}/.bashrc" ]; then
+  . "${HOME}/.bashrc"
+fi
+
+rayline_git_segment() {
+  local branch
+  local branch_display
+  branch=$(command git branch --show-current 2>/dev/null)
+  if [ -z "$branch" ]; then
+    branch=$(command git rev-parse --short HEAD 2>/dev/null)
+  fi
+  branch_display="${branch##*/}"
+  if [ ${#branch_display} -gt 18 ]; then
+    branch_display="${branch_display:0:15}..."
+  fi
+  if [ -n "$branch_display" ]; then
+    printf ' \[\e[38;5;244m\][%s]\[\e[0m\]' "$branch_display"
+  fi
+}
+
+if [ "${RAYLINE_PROMPT_MODE:-compact}" = "minimal" ]; then
+  PS1='\[\e[1;38;5;117m\]\W\[\e[0m\] \[\e[38;5;110m\]›\[\e[0m\] '
+else
+  PS1='\[\e[38;5;250m\]ray\[\e[0m\] \[\e[1;38;5;117m\]\W\[\e[0m\]$(rayline_git_segment) \[\e[38;5;110m\]›\[\e[0m\] '
+fi
