@@ -814,6 +814,20 @@ async function getCurrentBranchOpenPr(cwd, branch) {
   return normalizeOpenPr(prs[0]);
 }
 
+async function mergeCurrentBranchOpenPr(cwd, branch) {
+  const { baseRepo } = await getRepoPrContext(cwd);
+  const openPr = await getCurrentBranchOpenPr(cwd, branch);
+  if (!baseRepo || !openPr) return null;
+  const raw = await ghRepo([
+    "api",
+    "--method",
+    "PUT",
+    `/repos/${baseRepo}/pulls/${openPr.number}/merge`,
+  ], cwd, { timeout: 60000 });
+  const result = JSON.parse(raw);
+  return { openPr, result };
+}
+
 ipcMain.handle("git-branches", async (_event, cwd) => {
   if (!cwd) return { current: null, branches: [] };
   try {
@@ -1206,6 +1220,27 @@ ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
       };
     }
     return { ok: false, stderr: msg };
+  }
+});
+
+ipcMain.handle("git-merge-pr", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+    if (branch === "HEAD") return { ok: false, stderr: "detached HEAD" };
+    const merged = await mergeCurrentBranchOpenPr(cwd, branch);
+    if (!merged?.openPr) return { ok: false, stderr: "No open upstream PR for this branch" };
+    if (merged.result?.merged === false) {
+      return { ok: false, stderr: merged.result.message || `Failed to merge PR #${merged.openPr.number}` };
+    }
+    return {
+      ok: true,
+      number: merged.openPr.number,
+      url: merged.openPr.url,
+      stdout: merged.result?.message || "Pull request merged",
+    };
+  } catch (err) {
+    return { ok: false, stderr: err.message || String(err) };
   }
 });
 

@@ -281,6 +281,23 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
     }
   };
 
+  const handleMergePr = async () => {
+    if (!openPr || !window.api?.gitMergePr) return;
+    setBusy(true);
+    setError(null);
+    clearPrSuccess();
+    try {
+      const r = await window.api.gitMergePr(cwd);
+      if (!r.ok) { setError(r.stderr || "Failed to merge PR"); return; }
+      await refreshPrInfo();
+      await refetch();
+      await refresh();
+      flashPrSuccess("PR merged");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleGenerateMessage = async () => {
     if (generating || !window.api?.gitGenCommitMessage) return;
     const requestCwd = cwd;
@@ -450,17 +467,53 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
           padding: "0 12px 8px",
           display: "flex",
           alignItems: "center",
-          gap: 6,
+          justifyContent: "space-between",
+          gap: 10,
           color: openPr ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.42)",
           fontFamily: "'JetBrains Mono',monospace",
           fontSize: s(11),
         }}>
-          <GitPullRequestArrow size={12} strokeWidth={1.6} />
-          <span>
-            {isCheckingPr
-              ? "CHECKING PR STATUS"
-              : `UPSTREAM PR #${openPr.number} → ${openPr.baseRefName}`}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            <GitPullRequestArrow size={12} strokeWidth={1.6} />
+            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {isCheckingPr
+                ? "CHECKING PR STATUS"
+                : `UPSTREAM PR #${openPr.number} → ${openPr.baseRefName}`}
+            </span>
+          </div>
+          {openPr && (
+            <button
+              onClick={handleMergePr}
+              disabled={busy}
+              onMouseEnter={(e) => {
+                if (busy) return;
+                e.currentTarget.style.color = "rgba(255,255,255,0.96)";
+                e.currentTarget.style.textDecorationColor = "rgba(255,255,255,0.96)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "rgba(255,255,255,0.78)";
+                e.currentTarget.style.textDecorationColor = "rgba(255,255,255,0.52)";
+              }}
+              style={{
+                padding: 0,
+                background: "none",
+                border: "none",
+                color: "rgba(255,255,255,0.78)",
+                fontSize: s(10),
+                fontFamily: "system-ui,sans-serif",
+                cursor: busy ? "default" : "pointer",
+                flexShrink: 0,
+                textDecorationLine: "underline",
+                textDecorationStyle: "dashed",
+                textDecorationColor: "rgba(255,255,255,0.52)",
+                textUnderlineOffset: "0.22em",
+                textDecorationThickness: "1px",
+                transition: "color .15s ease, text-decoration-color .15s ease",
+              }}
+            >
+              {busy ? "…" : "Merge"}
+            </button>
+          )}
         </div>
       )}
 

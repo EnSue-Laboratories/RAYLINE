@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld("api", {
   gitPull: (cwd) => ipcRenderer.invoke("git-pull", cwd),
   gitPrStatus: (cwd) => ipcRenderer.invoke("git-pr-status", cwd),
   gitCreatePr: (cwd, base) => ipcRenderer.invoke("git-create-pr", cwd, base),
+  gitMergePr: (cwd) => ipcRenderer.invoke("git-merge-pr", cwd),
   gitGenCommitMessage: (cwd) => ipcRenderer.invoke("git-gen-commit-message", cwd),
 
   // Terminal sessions
