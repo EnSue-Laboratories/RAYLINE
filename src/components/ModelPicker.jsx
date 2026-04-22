@@ -8,6 +8,8 @@ const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 const MIN_MENU_WIDTH = 220;
 const PREFERRED_MAX_HEIGHT = 420;
+const CLI_RECHECK_INTERVAL_MS = 5000;
+const DEFAULT_CLI_INSTALL_STATUS = { claude: true, codex: true };
 
 const PROVIDER_INSTALL_GUIDES = {
   claude: { url: "https://docs.claude.com/en/docs/claude-code/setup", label: "Install Claude Code\u2026" },
@@ -28,24 +30,70 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
   const ref = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
-  // `null` until the main-process probe resolves — treat as "installed" during
-  // that window so the menu never flickers a false "missing" state on open.
   const [cliInstalled, setCliInstalled] = useState(null);
+  const cliCheckedAtRef = useRef(0);
   const m = getMOrMulticaFallback(value, extraModels);
 
+  const probeCliInstalled = useCallback(async ({ force = false } = {}) => {
+    if (!window.api?.checkCliInstalled) {
+      setCliInstalled(DEFAULT_CLI_INSTALL_STATUS);
+      return DEFAULT_CLI_INSTALL_STATUS;
+    }
+
+    try {
+      const result = await window.api.checkCliInstalled({ force });
+      if (result) {
+        setCliInstalled(result);
+        cliCheckedAtRef.current = Date.now();
+        return result;
+      }
+    } catch {
+      setCliInstalled((prev) => prev || DEFAULT_CLI_INSTALL_STATUS);
+      return DEFAULT_CLI_INSTALL_STATUS;
+    }
+
+    return null;
+  }, []);
+
   useEffect(() => {
-    let cancelled = false;
-    const probe = async () => {
-      try {
-        const result = await window.api?.checkCliInstalled?.();
-        if (!cancelled && result) setCliInstalled(result);
-      } catch { /* probe is best-effort; stale state falls back to showing models */ }
-    };
-    probe();
-    // Re-probe each time the menu opens so installing the CLI in another
-    // terminal while the app is running reflects without a restart.
-    return () => { cancelled = true; };
-  }, [open]);
+    const timerId = window.setTimeout(() => {
+      void probeCliInstalled();
+    }, 0);
+    return () => window.clearTimeout(timerId);
+  }, [probeCliInstalled]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!cliInstalled) {
+      const timerId = window.setTimeout(() => {
+        void probeCliInstalled();
+      }, 0);
+      return () => window.clearTimeout(timerId);
+    }
+    if ((Date.now() - cliCheckedAtRef.current) > CLI_RECHECK_INTERVAL_MS) {
+      const timerId = window.setTimeout(() => {
+        void probeCliInstalled({ force: true });
+      }, 0);
+      return () => window.clearTimeout(timerId);
+    }
+  }, [cliInstalled, open, probeCliInstalled]);
+
+  useEffect(() => {
+    if (!cliInstalled || !onChange) return;
+
+    const currentProvider = m.provider;
+    if (!PROVIDER_INSTALL_GUIDES[currentProvider] || cliInstalled[currentProvider] !== false) return;
+
+    const fallback = [...MODELS, ...extraModels].find((candidate) => {
+      if (candidate.id === value) return false;
+      const guide = PROVIDER_INSTALL_GUIDES[candidate.provider];
+      return !guide || cliInstalled[candidate.provider] !== false;
+    });
+
+    if (fallback && fallback.id !== value) {
+      onChange(fallback.id);
+    }
+  }, [cliInstalled, extraModels, m.provider, onChange, value]);
 
   const updateMenuPosition = useCallback(() => {
     if (!ref.current) return;
@@ -151,13 +199,39 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
               const entries = all.filter((mm) => mm.provider === provider);
               const isMulticaEmpty = provider === "multica" && entries.length === 0;
               const guide = PROVIDER_INSTALL_GUIDES[provider];
-              const cliMissing = Boolean(guide) && cliInstalled && cliInstalled[provider] === false;
+              const cliKnown = !guide || Object.prototype.hasOwnProperty.call(cliInstalled || {}, provider);
+              const cliUnknown = Boolean(guide) && !cliKnown;
+              const cliMissing = Boolean(guide) && cliKnown && cliInstalled[provider] === false;
               return (
                 <div key={provider}>
                   {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
                   <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
                     {provider.toUpperCase()}
                   </div>
+                  {cliUnknown && (
+                    <button
+                      key={`${provider}-checking`}
+                      disabled
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "flex-start",
+                        width: "100%",
+                        padding: "9px 13px",
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: 7,
+                        color: "rgba(255,255,255,0.4)",
+                        fontSize: s(11),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        cursor: "default",
+                        textAlign: "left",
+                        opacity: 0.5,
+                      }}
+                    >
+                      {`Checking ${provider.toUpperCase()} CLI\u2026`}
+                    </button>
+                  )}
                   {cliMissing && (
                     <button
                       key={`${provider}-install`}
@@ -343,7 +417,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                       </button>
                     );
                   })()}
-                  {!cliMissing && entries.map((mm) => (
+                  {!cliUnknown && !cliMissing && entries.map((mm) => (
                     <button
                       key={mm.id}
                       onClick={() => { onChange(mm.id); setMenuStyle(null); set(false); }}

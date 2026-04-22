@@ -498,14 +498,29 @@ ipcMain.handle("path-exists", (_e, p) => {
   try { return fs.existsSync(p); } catch { return false; }
 });
 
+const CLI_INSTALL_CHECK_TTL_MS = 5000;
+let cliInstallCheckCache = null;
+let cliInstallCheckCacheAt = 0;
+
+function getCliInstalledSnapshot({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && cliInstallCheckCache && (now - cliInstallCheckCacheAt) < CLI_INSTALL_CHECK_TTL_MS) {
+    return cliInstallCheckCache;
+  }
+
+  cliInstallCheckCache = {
+    claude: Boolean(resolveCliBin("claude", { envVarName: "CLAUDE_BIN" })),
+    codex: Boolean(resolveCliBin("codex", { envVarName: "CODEX_BIN" })),
+  };
+  cliInstallCheckCacheAt = Date.now();
+  return cliInstallCheckCache;
+}
+
 // IPC: probe which provider CLIs are installed on PATH (claude, codex).
 // Renderer uses this to gray out provider groups whose CLI is missing and
 // redirect the user to the installation guide instead.
-ipcMain.handle("check-cli-installed", () => {
-  return {
-    claude: Boolean(resolveCliBin("claude", { envVarName: "CLAUDE_BIN" })),
-    codex:  Boolean(resolveCliBin("codex",  { envVarName: "CODEX_BIN"  })),
-  };
+ipcMain.handle("check-cli-installed", (_event, options = {}) => {
+  return getCliInstalledSnapshot(options);
 });
 
 ipcMain.handle("system-info", () => ({
