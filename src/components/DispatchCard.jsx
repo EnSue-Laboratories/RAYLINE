@@ -575,18 +575,56 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
           attachments={row.attachments}
           onChange={(a) => onChange({ attachments: a })}
         />
-        <button onClick={onRemove} style={removeBtnStyle} aria-label="Remove row">
-          <X size={14} />
-        </button>
+        <RemoveRowButton onClick={onRemove} />
       </div>
       {error && <div style={customErrorStyle}>{error}</div>}
     </div>
   );
 }
 
-function AttachmentPicker({ attachments, onChange }) {
+function RemoveRowButton({ onClick }) {
+  const [hovered, setHovered] = useState(false);
   return (
-    <label style={{ cursor: "pointer", color: "rgba(255,255,255,0.5)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      aria-label="Remove row"
+      style={{
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        color: hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
+        padding: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "color .2s",
+      }}
+    >
+      <X size={13} />
+    </button>
+  );
+}
+
+function AttachmentPicker({ attachments, onChange }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <label
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        cursor: "pointer",
+        color: hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        fontSize: 11,
+        fontFamily: "'JetBrains Mono', monospace",
+        transition: "color .2s",
+      }}
+    >
       <Paperclip size={13} />
       {attachments.length > 0 ? attachments.length : ""}
       <input
@@ -898,10 +936,6 @@ const inputStyle = {
   letterSpacing: ".06em",
   outline: "none",
   transition: "border-color .2s",
-};
-const removeBtnStyle = {
-  background: "none", border: "none", color: "rgba(255,255,255,0.4)",
-  cursor: "pointer", fontSize: 13, padding: "4px 6px",
 };
 const addBtnStyle = {
   display: "inline-flex", alignItems: "center", gap: 6,
