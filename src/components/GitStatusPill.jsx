@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { GitCommitHorizontal, GitPullRequestArrow, CloudUpload, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
+import { GitCommitHorizontal, GitPullRequestArrow, CloudUpload, Check, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import useGitStatus from "../hooks/useGitStatus";
 
@@ -47,22 +47,44 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   const [busy, setBusy] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
+  const [prSuccess, setPrSuccess] = useState("");
   const [prInfo, setPrInfo] = useState({ loading: false, checked: false, unavailable: false, openPr: null });
   const [confirm, setConfirm] = useState(null); // { title, body, confirmLabel, destructive, onConfirm }
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
   const cwdRef = useRef(cwd);
+  const prSuccessTimerRef = useRef(null);
 
   useEffect(() => { cwdRef.current = cwd; }, [cwd]);
+
+  const clearPrSuccess = useCallback(() => {
+    if (prSuccessTimerRef.current) {
+      clearTimeout(prSuccessTimerRef.current);
+      prSuccessTimerRef.current = null;
+    }
+    setPrSuccess("");
+  }, []);
+
+  const flashPrSuccess = useCallback((label) => {
+    if (prSuccessTimerRef.current) clearTimeout(prSuccessTimerRef.current);
+    setPrSuccess(label);
+    prSuccessTimerRef.current = setTimeout(() => {
+      prSuccessTimerRef.current = null;
+      setPrSuccess("");
+    }, 1800);
+  }, []);
+
+  useEffect(() => () => {
+    if (prSuccessTimerRef.current) clearTimeout(prSuccessTimerRef.current);
+  }, []);
 
   const close = useCallback(() => {
     setOpen(false);
     setMenuStyle(null);
     setError(null);
-    setResult(null);
-  }, []);
+    clearPrSuccess();
+  }, [clearPrSuccess]);
 
   const refreshPrInfo = useCallback(async () => {
     if (!cwd || !window.api?.gitPrStatus) {
@@ -93,10 +115,10 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   useEffect(() => {
     setMessage("");
     setError(null);
-    setResult(null);
+    clearPrSuccess();
     setGenerating(false);
     setPrInfo({ loading: false, checked: false, unavailable: false, openPr: null });
-  }, [cwd]);
+  }, [cwd, clearPrSuccess]);
 
   useEffect(() => {
     if (!open) return;
@@ -161,7 +183,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   const isCheckingPr = !prInfo.unavailable && prInfo.loading && !prInfo.checked;
   const canPr = !detached && !!branch && branch !== prBase && !busy && !!upstream && !isCheckingPr && (!hasOpenPr || ahead > 0);
   const canPublish = !detached && !!branch && !upstream && !busy;
-  const prTitle = isCheckingPr
+  const prTitle = prSuccess || (isCheckingPr
     ? "Checking PR status..."
     : canPr
       ? hasOpenPr
@@ -171,13 +193,13 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
         ? `On base branch "${prBase}"`
         : hasOpenPr
           ? `Open PR #${openPr.number} already exists`
-          : "Cannot create PR";
+          : "Cannot create PR");
 
   const handleCommitAndPush = async () => {
     if (!canCommit) return;
     setBusy(true);
     setError(null);
-    setResult(null);
+    clearPrSuccess();
     try {
       const trailer = coauthorEnabled ? (coauthorTrailer || "").trim() : "";
       const c = await window.api.gitCommit(cwd, message.trim(), trailer);
@@ -249,17 +271,15 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
     if (!canPr || !window.api?.gitCreatePr) return;
     setBusy(true);
     setError(null);
-    setResult(null);
+    clearPrSuccess();
     try {
       const r = await window.api.gitCreatePr(cwd, prBase);
       if (!r.ok) { setError(r.stderr || "Failed to create PR"); return; }
       await refresh();
       await refreshPrInfo();
-      const prLabel = r.number ? `PR #${r.number}` : "pull request";
-      const suffix = r.url ? `\n${r.url}` : "";
-      if (r.action === "updated") setResult(`${prLabel} updated.${suffix}`);
-      else if (r.action === "existing") setResult(`${prLabel} already open.${suffix}`);
-      else setResult(`${prLabel} created.${suffix}`);
+      if (r.action === "updated") flashPrSuccess("PR updated");
+      else if (r.action === "existing") flashPrSuccess("PR already open");
+      else flashPrSuccess("PR created");
     } finally {
       setBusy(false);
     }
@@ -287,7 +307,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
     if (!canPublish) return;
     setBusy(true);
     setError(null);
-    setResult(null);
+    clearPrSuccess();
     try {
       const p = await window.api.gitPush(cwd);
       if (!p.ok) { setError(p.stderr || "Publish failed"); return; }
@@ -302,7 +322,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
     if (!canPull) return;
     setBusy(true);
     setError(null);
-    setResult(null);
+    clearPrSuccess();
     try {
       const p = await window.api.gitPull(cwd);
       if (!p.ok) setError(p.stderr || "Pull failed");
@@ -500,21 +520,29 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              background: canPr
+              background: prSuccess
+                ? "rgba(90,180,120,0.16)"
+                : canPr
                 ? (hasOpenPr ? "rgba(120,170,255,0.12)" : "rgba(255,255,255,0.06)")
                 : "rgba(255,255,255,0.03)",
-              border: "1px solid " + (canPr
+              border: "1px solid " + (prSuccess
+                ? "rgba(90,180,120,0.28)"
+                : canPr
                 ? (hasOpenPr ? "rgba(120,170,255,0.2)" : "rgba(255,255,255,0.1)")
                 : "rgba(255,255,255,0.05)"),
               borderRadius: 6,
-              color: canPr
+              color: prSuccess
+                ? "rgba(190,255,205,0.96)"
+                : canPr
                 ? (hasOpenPr ? "rgba(190,220,255,0.92)" : "rgba(255,255,255,0.8)")
                 : "rgba(255,255,255,0.3)",
               fontFamily: "system-ui,sans-serif",
-              cursor: canPr ? "pointer" : "default",
+              cursor: canPr && !prSuccess ? "pointer" : "default",
             }}
           >
-            <GitPullRequestArrow size={14} strokeWidth={1.6} />
+            {prSuccess
+              ? <Check size={14} strokeWidth={2} />
+              : <GitPullRequestArrow size={14} strokeWidth={1.6} />}
           </button>
         )}
         <button
@@ -535,25 +563,6 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
           Pull
         </button>
       </div>
-
-      {result && !error && (
-        <div style={{
-          padding: "8px 12px",
-          background: "rgba(90,180,120,0.08)",
-          borderTop: "1px solid rgba(90,180,120,0.2)",
-          color: "rgba(190,255,205,0.92)",
-          fontFamily: "'JetBrains Mono',monospace",
-          fontSize: s(11),
-          display: "flex",
-          alignItems: "flex-start",
-          gap: 8,
-        }}>
-          <span style={{ flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{result}</span>
-          <button onClick={() => setResult(null)} style={{ background: "none", border: "none", color: "rgba(190,255,205,0.92)", cursor: "pointer", padding: 0 }}>
-            <X size={12} />
-          </button>
-        </div>
-      )}
 
       {error && (
         <div style={{
