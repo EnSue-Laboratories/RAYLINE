@@ -498,6 +498,16 @@ ipcMain.handle("path-exists", (_e, p) => {
   try { return fs.existsSync(p); } catch { return false; }
 });
 
+// IPC: probe which provider CLIs are installed on PATH (claude, codex).
+// Renderer uses this to gray out provider groups whose CLI is missing and
+// redirect the user to the installation guide instead.
+ipcMain.handle("check-cli-installed", () => {
+  return {
+    claude: Boolean(resolveCliBin("claude", { envVarName: "CLAUDE_BIN" })),
+    codex:  Boolean(resolveCliBin("codex",  { envVarName: "CODEX_BIN"  })),
+  };
+});
+
 ipcMain.handle("system-info", () => ({
   user: os.userInfo().username,
   hostname: os.hostname(),

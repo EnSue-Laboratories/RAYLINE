@@ -9,6 +9,11 @@ const VIEWPORT_PADDING = 8;
 const MIN_MENU_WIDTH = 220;
 const PREFERRED_MAX_HEIGHT = 420;
 
+const PROVIDER_INSTALL_GUIDES = {
+  claude: { url: "https://docs.claude.com/en/docs/claude-code/setup", label: "Install Claude Code\u2026" },
+  codex:  { url: "https://developers.openai.com/codex/cli",           label: "Install Codex CLI\u2026"   },
+};
+
 function extractMulticaErrorStatus(err) {
   if (!err) return null;
   if (typeof err.status === "number") return err.status;
@@ -23,7 +28,24 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
   const ref = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
+  // `null` until the main-process probe resolves — treat as "installed" during
+  // that window so the menu never flickers a false "missing" state on open.
+  const [cliInstalled, setCliInstalled] = useState(null);
   const m = getMOrMulticaFallback(value, extraModels);
+
+  useEffect(() => {
+    let cancelled = false;
+    const probe = async () => {
+      try {
+        const result = await window.api?.checkCliInstalled?.();
+        if (!cancelled && result) setCliInstalled(result);
+      } catch { /* probe is best-effort; stale state falls back to showing models */ }
+    };
+    probe();
+    // Re-probe each time the menu opens so installing the CLI in another
+    // terminal while the app is running reflects without a restart.
+    return () => { cancelled = true; };
+  }, [open]);
 
   const updateMenuPosition = useCallback(() => {
     if (!ref.current) return;
@@ -128,12 +150,44 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
             return ["claude", "codex", "multica"].map((provider, gi) => {
               const entries = all.filter((mm) => mm.provider === provider);
               const isMulticaEmpty = provider === "multica" && entries.length === 0;
+              const guide = PROVIDER_INSTALL_GUIDES[provider];
+              const cliMissing = Boolean(guide) && cliInstalled && cliInstalled[provider] === false;
               return (
                 <div key={provider}>
                   {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
                   <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
                     {provider.toUpperCase()}
                   </div>
+                  {cliMissing && (
+                    <button
+                      key={`${provider}-install`}
+                      onClick={() => {
+                        window.open(guide.url, "_blank", "noopener,noreferrer");
+                        setMenuStyle(null);
+                        set(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "flex-start",
+                        width: "100%",
+                        padding: "9px 13px",
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: 7,
+                        color: "rgba(255,255,255,0.4)",
+                        fontSize: s(11),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "all .12s",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {guide.label}
+                    </button>
+                  )}
                   {isMulticaEmpty && (() => {
                     const status = extractMulticaErrorStatus(extraError);
                     if (extraLoading && !extraError) {
@@ -289,7 +343,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                       </button>
                     );
                   })()}
-                  {entries.map((mm) => (
+                  {!cliMissing && entries.map((mm) => (
                     <button
                       key={mm.id}
                       onClick={() => { onChange(mm.id); setMenuStyle(null); set(false); }}
