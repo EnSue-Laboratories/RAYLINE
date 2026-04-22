@@ -207,7 +207,7 @@ export default function DispatchCard({
           <div style={headerTextStyle}>
             <div style={titleStyle}>Dispatch</div>
             <div style={subtitleStyle}>
-              Run multiple agent sessions at once — each on its own branch, optionally with a different model.
+              Run multiple agent sessions at once — each in its own worktree, optionally with a different model.
             </div>
           </div>
           <button onClick={onClose} style={closeBtnStyle} aria-label="Close">
@@ -829,7 +829,7 @@ const headerStyle = {
   gap: 12,
   padding: "14px 18px", borderBottom: "1px solid var(--pane-border)",
 };
-const headerTextStyle = { display: "flex", flexDirection: "column", gap: 4, minWidth: 0 };
+const headerTextStyle = { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 };
 const titleStyle = { fontSize: 14, fontWeight: 500 };
 const subtitleStyle = {
   fontSize: 11,
