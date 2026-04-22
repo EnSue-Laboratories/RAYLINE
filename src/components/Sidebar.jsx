@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow, FolderPlus, GitBranch, ChevronDown } from "lucide-react";
+import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow, FolderPlus } from "lucide-react";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
 import { getMOrMulticaFallback } from "../data/models";
@@ -77,12 +77,11 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onCloneRepo, onAddLocalProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [] }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [] }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [newProjectOpen, setNewProjectOpen] = useState(false);
 
   const filtered = convos.filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase())
@@ -193,7 +192,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           Dispatch
         </button>
         <button
-          onClick={() => setNewProjectOpen((v) => !v)}
+          onClick={onOpenNewProject}
           style={{
             display: "flex", alignItems: "center", gap: 10,
             padding: "8px 10px", borderRadius: 7,
@@ -206,53 +205,8 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <FolderPlus size={15} strokeWidth={1.5} />
-          <span style={{ flex: 1 }}>New Project</span>
-          <ChevronDown
-            size={12}
-            strokeWidth={1.8}
-            style={{
-              opacity: 0.6,
-              transform: `rotate(${newProjectOpen ? 180 : 0}deg)`,
-              transition: "transform .15s",
-            }}
-          />
+          New Project
         </button>
-        {newProjectOpen && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 1, paddingLeft: 22, marginTop: -2, marginBottom: 2 }}>
-            <button
-              onClick={() => { setNewProjectOpen(false); onCloneRepo?.(); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 9,
-                padding: "6px 10px", borderRadius: 6,
-                background: "none", border: "none", cursor: "pointer",
-                color: "rgba(255,255,255,0.45)", fontSize: s(11.5),
-                fontFamily: "system-ui, sans-serif", transition: "all .15s",
-                textAlign: "left",
-              }}
-              onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-              onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
-            >
-              <GitBranch size={13} strokeWidth={1.5} />
-              Clone from Git…
-            </button>
-            <button
-              onClick={() => { setNewProjectOpen(false); onAddLocalProject?.(); }}
-              style={{
-                display: "flex", alignItems: "center", gap: 9,
-                padding: "6px 10px", borderRadius: 6,
-                background: "none", border: "none", cursor: "pointer",
-                color: "rgba(255,255,255,0.45)", fontSize: s(11.5),
-                fontFamily: "system-ui, sans-serif", transition: "all .15s",
-                textAlign: "left",
-              }}
-              onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-              onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
-            >
-              <FolderOpen size={13} strokeWidth={1.5} />
-              Open Local Folder…
-            </button>
-          </div>
-        )}
         {developerMode && (
           <button
             onClick={onOpenProjectManager}

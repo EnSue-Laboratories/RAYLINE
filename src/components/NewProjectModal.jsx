@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { X, FolderOpen, GitBranch } from "lucide-react";
+import { X, FolderOpen, GitBranch, FolderPlus } from "lucide-react";
 
 function deriveRepoDirName(url) {
   const s = String(url || "").trim();
@@ -10,7 +10,7 @@ function deriveRepoDirName(url) {
   return m ? m[1] : null;
 }
 
-export default function CloneRepoModal({ open, onClose, onCloned }) {
+export default function NewProjectModal({ open, onClose, onCloned, onPickedLocalFolder }) {
   const [url, setUrl] = useState("");
   const [parentDir, setParentDir] = useState("");
   const [busy, setBusy] = useState(false);
@@ -63,6 +63,19 @@ export default function CloneRepoModal({ open, onClose, onCloned }) {
     }
   }, [canClone, url, parentDir, onCloned, onClose]);
 
+  const handlePickLocal = useCallback(async () => {
+    if (busy) return;
+    try {
+      const folder = await window.api?.pickFolder?.();
+      if (folder) {
+        onPickedLocalFolder?.(folder);
+        onClose?.();
+      }
+    } catch (e) {
+      setError(e?.message || String(e));
+    }
+  }, [busy, onPickedLocalFolder, onClose]);
+
   if (!open) return null;
 
   return createPortal(
@@ -74,8 +87,8 @@ export default function CloneRepoModal({ open, onClose, onCloned }) {
       >
         <div style={headerStyle}>
           <div style={titleRowStyle}>
-            <GitBranch size={14} strokeWidth={1.8} />
-            <span style={titleStyle}>Clone Git Repository</span>
+            <FolderPlus size={14} strokeWidth={1.8} />
+            <span style={titleStyle}>New Project</span>
           </div>
           <button
             type="button"
@@ -88,8 +101,11 @@ export default function CloneRepoModal({ open, onClose, onCloned }) {
         </div>
 
         <div style={bodyStyle}>
-          <div>
-            <div style={labelStyle}>Repository URL or owner/repo</div>
+          <div style={sectionStyle}>
+            <div style={sectionHeaderStyle}>
+              <GitBranch size={12} strokeWidth={1.8} />
+              <span>Clone from Git</span>
+            </div>
             <input
               autoFocus
               type="text"
@@ -99,14 +115,13 @@ export default function CloneRepoModal({ open, onClose, onCloned }) {
               onKeyDown={(e) => { if (e.key === "Enter") handleClone(); }}
               style={inputStyle}
               spellCheck={false}
+              disabled={busy}
             />
             <div style={hintStyle}>
               Uses <code style={codeStyle}>gh repo clone</code> for GitHub, falls back to <code style={codeStyle}>git clone</code>.
             </div>
-          </div>
 
-          <div>
-            <div style={labelStyle}>Destination parent folder</div>
+            <div style={{ ...labelStyle, marginTop: 10 }}>Destination parent folder</div>
             <div style={rowStyle}>
               <input
                 type="text"
@@ -114,8 +129,9 @@ export default function CloneRepoModal({ open, onClose, onCloned }) {
                 onChange={(e) => setParentDir(e.target.value)}
                 style={{ ...inputStyle, flex: 1 }}
                 spellCheck={false}
+                disabled={busy}
               />
-              <button type="button" style={secondaryBtnStyle} onClick={pickParent}>
+              <button type="button" style={secondaryBtnStyle} onClick={pickParent} disabled={busy}>
                 <FolderOpen size={12} strokeWidth={1.8} style={{ marginRight: 6 }} />
                 Browse
               </button>
@@ -125,6 +141,29 @@ export default function CloneRepoModal({ open, onClose, onCloned }) {
                 Will clone into <code style={codeStyle}>{parentDir.replace(/\/$/, "")}/{previewName}</code>
               </div>
             )}
+          </div>
+
+          <div style={dividerRowStyle}>
+            <div style={dividerLineStyle} />
+            <span style={dividerTextStyle}>OR</span>
+            <div style={dividerLineStyle} />
+          </div>
+
+          <div style={sectionStyle}>
+            <div style={sectionHeaderStyle}>
+              <FolderOpen size={12} strokeWidth={1.8} />
+              <span>Open Local Folder</span>
+            </div>
+            <div style={hintStyle}>Pick an existing folder on your machine.</div>
+            <button
+              type="button"
+              style={{ ...secondaryBtnStyle, marginTop: 8, alignSelf: "flex-start" }}
+              onClick={handlePickLocal}
+              disabled={busy}
+            >
+              <FolderOpen size={12} strokeWidth={1.8} style={{ marginRight: 6 }} />
+              Choose folder…
+            </button>
           </div>
 
           {error && <div style={errorStyle}>{error}</div>}
@@ -175,6 +214,26 @@ const closeBtnStyle = {
   cursor: "pointer", padding: 4, display: "flex",
 };
 const bodyStyle = { padding: 18, display: "flex", flexDirection: "column", gap: 14 };
+const sectionStyle = { display: "flex", flexDirection: "column", gap: 4 };
+const sectionHeaderStyle = {
+  display: "flex", alignItems: "center", gap: 6,
+  fontSize: 11, fontWeight: 500,
+  color: "rgba(255,255,255,0.6)",
+  textTransform: "uppercase", letterSpacing: 0.4,
+  marginBottom: 6,
+};
+const dividerRowStyle = {
+  display: "flex", alignItems: "center", gap: 10,
+  padding: "2px 0",
+};
+const dividerLineStyle = {
+  flex: 1, height: 1, background: "var(--pane-border)",
+};
+const dividerTextStyle = {
+  fontSize: 10, fontWeight: 500,
+  color: "rgba(255,255,255,0.35)",
+  letterSpacing: 0.8,
+};
 const rowStyle = { display: "flex", gap: 8, alignItems: "center" };
 const footerStyle = {
   display: "flex", justifyContent: "flex-end", gap: 8,
