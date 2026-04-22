@@ -451,7 +451,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
           display: "flex",
           alignItems: "center",
           gap: 6,
-          color: openPr ? "rgba(150,190,255,0.82)" : "rgba(255,255,255,0.42)",
+          color: openPr ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.42)",
           fontFamily: "'JetBrains Mono',monospace",
           fontSize: s(11),
         }}>
