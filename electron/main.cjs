@@ -64,7 +64,9 @@ function getWindowChromeOptions() {
 
   if (isWindows) {
     return {
-      titleBarStyle: "hidden",
+      // Keep Windows fully in the client area so our custom controls receive
+      // actual pointer events instead of sitting inside the OS title bar.
+      frame: false,
       autoHideMenuBar: true,
     };
   }
