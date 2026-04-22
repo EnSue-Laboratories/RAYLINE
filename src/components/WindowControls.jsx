@@ -13,6 +13,7 @@ const buttonBaseStyle = {
   cursor: "pointer",
   transition: "background .15s ease, border-color .15s ease, color .15s ease",
   padding: 0,
+  WebkitAppRegion: "no-drag",
 };
 
 function getBridge() {
@@ -48,6 +49,20 @@ export default function WindowControls({ visible = false }) {
     target.style.color = "rgba(255,255,255,0.94)";
   };
 
+  const handleMouseDown = (event) => {
+    // Windows keeps a top-level drag region across the header. Explicitly
+    // cancelling pointer-down here prevents the buttons from being treated as
+    // drag targets, so the click reaches the IPC handler.
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleClick = (event, action) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void action();
+  };
+
   return (
     <div
       style={{
@@ -63,7 +78,8 @@ export default function WindowControls({ visible = false }) {
       <button
         aria-label="Minimize window"
         title="Minimize"
-        onClick={() => void bridge.windowMinimize()}
+        onMouseDown={handleMouseDown}
+        onClick={(event) => handleClick(event, bridge.windowMinimize)}
         style={buttonBaseStyle}
         onMouseEnter={(event) => handleHover(event, "minimize", true)}
         onMouseLeave={(event) => handleHover(event, "minimize", false)}
@@ -73,7 +89,8 @@ export default function WindowControls({ visible = false }) {
       <button
         aria-label="Maximize window"
         title="Maximize"
-        onClick={() => void bridge.windowToggleMaximize()}
+        onMouseDown={handleMouseDown}
+        onClick={(event) => handleClick(event, bridge.windowToggleMaximize)}
         style={buttonBaseStyle}
         onMouseEnter={(event) => handleHover(event, "maximize", true)}
         onMouseLeave={(event) => handleHover(event, "maximize", false)}
@@ -83,7 +100,8 @@ export default function WindowControls({ visible = false }) {
       <button
         aria-label="Close window"
         title="Close"
-        onClick={() => void bridge.windowClose()}
+        onMouseDown={handleMouseDown}
+        onClick={(event) => handleClick(event, bridge.windowClose)}
         style={buttonBaseStyle}
         onMouseEnter={(event) => handleHover(event, "close", true)}
         onMouseLeave={(event) => handleHover(event, "close", false)}

@@ -44,6 +44,7 @@ const SHELL_TERMINAL_TIMEOUT_MS = 15000;
 const LAB_CONTROL_ENDPOINT = "http://127.0.0.1:4001/control";
 const LAB_CONTROL_COMMIT_DELAY_MS = 1000;
 const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
+const DEFAULT_FONT_SIZE = 17;
 
 function logSessionState(...args) {
   console.log("[session-state]", ...args);
@@ -1038,7 +1039,7 @@ export default function App() {
   const [stateLoaded, setStateLoaded] = useState(false);
   const [platform, setPlatform] = useState(null);
   const [wallpaper, setWallpaper] = useState(null);
-  const [fontSize, setFontSize] = useState(15);
+  const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
   const [coauthorEnabled, setCoauthorEnabled] = useState(true);
@@ -1253,7 +1254,7 @@ export default function App() {
         return;
       case "fontSize":
       case "app.fontSize":
-        setFontSize(clampNumber(value, 12, 22, 15));
+        setFontSize(clampNumber(value, 12, 22, DEFAULT_FONT_SIZE));
         return;
       case "sidebar.activeOpacity":
         setSidebarActiveOpacity(clampNumber(value, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
