@@ -18,6 +18,34 @@ fi
 autoload -Uz colors && colors
 setopt PROMPT_SUBST
 
+if (( ! ${+functions[compdef]} )); then
+  autoload -Uz compinit
+  compinit -d "${XDG_CACHE_HOME:-$HOME/.cache}/rayline-zcompdump"
+fi
+
+rayline_source_first_existing() {
+  local candidate
+  for candidate in "$@"; do
+    if [[ -f "$candidate" ]]; then
+      source "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+rayline_source_first_existing \
+  "${RAYLINE_FZF_SHELL_ROOT:-}/completion.zsh" \
+  /opt/homebrew/opt/fzf/shell/completion.zsh \
+  /usr/local/opt/fzf/shell/completion.zsh
+
+rayline_source_first_existing \
+  "${RAYLINE_FZF_SHELL_ROOT:-}/key-bindings.zsh" \
+  /opt/homebrew/opt/fzf/shell/key-bindings.zsh \
+  /usr/local/opt/fzf/shell/key-bindings.zsh
+
+: "${FZF_DEFAULT_OPTS:=--height=40% --layout=reverse --border=rounded --color=bg+:#111318,bg:#0d0d10,spinner:#8fd6c2,hl:#89b4fa,fg:#e6edf3,header:#7ed7b9,info:#f5c97a,pointer:#8fd6c2,marker:#f38ba8,fg+:#f5f7fb,hl+:#a6c9ff,prompt:#8fd6c2}"
+
 rayline_git_segment() {
   local branch
   local branch_display

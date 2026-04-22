@@ -91,6 +91,15 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("terminal-output", handler);
     return () => ipcRenderer.removeListener("terminal-output", handler);
   },
+  openTerminalWindow: () => ipcRenderer.invoke("open-terminal-window"),
+  closeTerminalWindow: () => ipcRenderer.invoke("close-terminal-window"),
+  isTerminalWindowOpen: () => ipcRenderer.invoke("is-terminal-window-open"),
+  closeCurrentWindow: () => ipcRenderer.invoke("window-close-current"),
+  onTerminalWindowState: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("terminal-window-state", handler);
+    return () => ipcRenderer.removeListener("terminal-window-state", handler);
+  },
 
   // File operations
   openPath: (dirPath) => ipcRenderer.invoke("open-path", dirPath),

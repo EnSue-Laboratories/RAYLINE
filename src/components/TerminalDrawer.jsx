@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
+import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 
 // ── Shared style helpers ──────────────────────────────────────────────────────
 
@@ -399,13 +400,16 @@ export default function TerminalDrawer({
   onResizeSession,
   drawerOpen,
   onToggleDrawer,
+  onRequestClose,
   registerTerminal,
   unregisterTerminal,
   cwd,
   wallpaper,
+  windowMode = false,
 }) {
   const s = useFontScale();
   const [width, setWidth] = useState(480);
+  const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || "");
   const dragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(480);
@@ -437,7 +441,7 @@ export default function TerminalDrawer({
     handleRef.current?.releasePointerCapture(e.pointerId);
   }, []);
 
-  if (!drawerOpen) return null;
+  if (!windowMode && !drawerOpen) return null;
 
   const handleCreate = () => {
     onCreateSession({ name: `shell-${Date.now()}`, cwd: cwd || undefined });
@@ -446,74 +450,80 @@ export default function TerminalDrawer({
   return (
     <div
       style={{
-        width,
-        minWidth: 280,
+        width: windowMode ? "100%" : width,
+        minWidth: windowMode ? 0 : 280,
+        flex: 1,
         display: "flex",
         flexDirection: "column",
         height: "100%",
         ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
         backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
-        borderLeft: "1px solid rgba(255,255,255,0.025)",
+        borderLeft: windowMode ? "none" : "1px solid rgba(255,255,255,0.025)",
         position: "relative",
         zIndex: 10,
         overflow: "hidden",
       }}
     >
       {/* Resize handle */}
-      <div
-        ref={handleRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        style={{
-          position: "absolute",
-          left: -3,
-          top: 0,
-          bottom: 0,
-          width: 8,
-          cursor: "col-resize",
-          zIndex: 30,
-          touchAction: "none",
-        }}
-      />
+      {!windowMode && (
+        <div
+          ref={handleRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          style={{
+            position: "absolute",
+            left: -3,
+            top: 0,
+            bottom: 0,
+            width: 8,
+            cursor: "col-resize",
+            zIndex: 30,
+            touchAction: "none",
+          }}
+        />
+      )}
       {/* Header */}
       <div
         style={{
-          height: 52,
+          height: WINDOW_DRAG_HEIGHT,
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 14px",
+          justifyContent: windowMode ? "flex-end" : "space-between",
+          padding: windowMode && isMac
+            ? `0 14px 0 ${MAC_TRAFFIC_LIGHT_SAFE_WIDTH + 8}px`
+            : "0 14px",
           WebkitAppRegion: "drag",
         }}
       >
-        {/* Left: icon + label */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            WebkitAppRegion: "drag",
-          }}
-        >
-          <TerminalIcon
-            size={13}
-            strokeWidth={1.5}
-            color="rgba(255,255,255,0.35)"
-          />
-          <span
+        {!windowMode && (
+          <div
             style={{
-              fontSize: s(10),
-              fontFamily: FONT_FAMILY,
-              color: "rgba(255,255,255,0.35)",
-              letterSpacing: ".08em",
-              userSelect: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              WebkitAppRegion: "drag",
             }}
           >
-            TERMINALS
-          </span>
-        </div>
+            <TerminalIcon
+              size={13}
+              strokeWidth={1.5}
+              color="rgba(255,255,255,0.35)"
+            />
+            <span
+              style={{
+                fontSize: s(10),
+                fontFamily: FONT_FAMILY,
+                color: "rgba(255,255,255,0.35)",
+                letterSpacing: ".08em",
+                userSelect: "none",
+              }}
+            >
+              TERMINALS
+            </span>
+          </div>
+        )}
 
         {/* Right: action buttons */}
         <div
@@ -527,7 +537,7 @@ export default function TerminalDrawer({
           <IconButton onClick={handleCreate} title="New terminal">
             <Plus size={13} strokeWidth={1.5} />
           </IconButton>
-          <IconButton onClick={onToggleDrawer} title="Close drawer">
+          <IconButton onClick={windowMode ? onRequestClose : onToggleDrawer} title={windowMode ? "Close window" : "Close drawer"}>
             <X size={13} strokeWidth={1.5} />
           </IconButton>
         </div>

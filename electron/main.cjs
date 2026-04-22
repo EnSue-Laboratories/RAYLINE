@@ -53,6 +53,22 @@ if (isDev && isMac) {
 
 let mainWindow;
 let pmWindow;
+let terminalWindow;
+
+function broadcastToAllWindows(channel, payload) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win || win.isDestroyed()) continue;
+    win.webContents.send(channel, payload);
+  }
+}
+
+function isTerminalWindowOpen() {
+  return Boolean(terminalWindow && !terminalWindow.isDestroyed());
+}
+
+function broadcastTerminalWindowState() {
+  broadcastToAllWindows("terminal-window-state", { open: isTerminalWindowOpen() });
+}
 
 function getWindowChromeOptions() {
   if (isMac) {
@@ -197,6 +213,52 @@ function createProjectManagerWindow() {
   pmWindow.on("closed", () => { pmWindow = null; });
 }
 
+function createTerminalWindow() {
+  if (isTerminalWindowOpen()) {
+    if (terminalWindow.isMinimized()) terminalWindow.restore();
+    terminalWindow.focus();
+    broadcastTerminalWindowState();
+    return terminalWindow;
+  }
+
+  terminalWindow = new BrowserWindow({
+    title: "Terminals",
+    width: 960,
+    height: 760,
+    minWidth: 560,
+    minHeight: 320,
+    backgroundColor: WINDOW_BACKGROUND,
+    icon: path.join(__dirname, "../public/icon.png"),
+    ...getWindowChromeOptions(),
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  applyWindowChromeTweaks(terminalWindow);
+
+  terminalWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  if (isDev) {
+    const port = process.env.VITE_PORT || "5173";
+    terminalWindow.loadURL(`http://localhost:${port}/src/terminal-window.html`);
+  } else {
+    terminalWindow.loadFile(path.join(__dirname, "../dist/src/terminal-window.html"));
+  }
+
+  terminalWindow.on("closed", () => {
+    terminalWindow = null;
+    broadcastTerminalWindowState();
+  });
+
+  broadcastTerminalWindowState();
+  return terminalWindow;
+}
+
 app.setName("RayLine");
 
 app.whenReady().then(() => {
@@ -227,9 +289,7 @@ app.whenReady().then(() => {
 
   // Forward terminal output to renderer
   terminalManager.setOutputCallback((name, data) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("terminal-output", { name, data });
-    }
+    broadcastToAllWindows("terminal-output", { name, data });
   });
 });
 
@@ -251,6 +311,29 @@ ipcMain.handle("folder-pick", async () => {
 
 ipcMain.on("open-project-manager", () => {
   createProjectManagerWindow();
+});
+
+ipcMain.handle("open-terminal-window", () => {
+  createTerminalWindow();
+  return true;
+});
+
+ipcMain.handle("close-terminal-window", () => {
+  if (isTerminalWindowOpen()) {
+    terminalWindow.close();
+  }
+  return true;
+});
+
+ipcMain.handle("is-terminal-window-open", () => {
+  return isTerminalWindowOpen();
+});
+
+ipcMain.handle("window-close-current", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return false;
+  win.close();
+  return true;
 });
 
 ipcMain.handle("set-window-opacity", (event, opacity) => {

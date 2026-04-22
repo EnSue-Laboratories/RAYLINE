@@ -20,6 +20,7 @@
 const os = require("os");
 const path = require("path");
 const fs = require("fs");
+const { app } = require("electron");
 const { WebSocketServer } = require("ws");
 
 // node-pty is a native module — require lazily so syntax-check passes even
@@ -46,7 +47,6 @@ const DEFAULT_SHELL =
     : process.platform === "darwin"
       ? "/bin/zsh"
       : "/bin/bash");
-const SHELL_INIT_ROOT = path.join(__dirname, "shell-init");
 
 // Environment variables to strip from the PTY.  When the Electron app is
 // launched from VS Code (or another IDE), variables like TERM_PROGRAM,
@@ -88,9 +88,50 @@ function log(...args) {
   console.log("[terminal-manager]", ...args);
 }
 
+function getBundledSupportRoot() {
+  if (app?.isPackaged) {
+    return path.join(process.resourcesPath, "app.asar.unpacked", "electron");
+  }
+  return __dirname;
+}
+
+function getShellInitRoot() {
+  return path.join(getBundledSupportRoot(), "shell-init");
+}
+
+function getVendorRoot() {
+  return path.join(getBundledSupportRoot(), "vendor");
+}
+
+function getBundledFzfShellRoot() {
+  const shellRoot = path.join(getVendorRoot(), "fzf", "shell");
+  return fs.existsSync(shellRoot) ? shellRoot : null;
+}
+
+function getBundledFzfBinary() {
+  const executable = process.platform === "win32" ? "fzf.exe" : "fzf";
+  const platformKey = `${process.platform}-${process.arch}`;
+  const candidate = path.join(getVendorRoot(), "fzf", platformKey, "bin", executable);
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
 function withTerminalUxEnv(env, sessionName) {
+  const bundledFzfBinary = getBundledFzfBinary();
+  const bundledFzfShellRoot = getBundledFzfShellRoot();
+  const extraPathEntries = [];
+
+  if (bundledFzfBinary) {
+    extraPathEntries.push(path.dirname(bundledFzfBinary));
+  }
+
+  const existingPath = env.PATH || process.env.PATH || "";
+  const nextPath = extraPathEntries.length > 0
+    ? `${extraPathEntries.join(path.delimiter)}${existingPath ? path.delimiter : ""}${existingPath}`
+    : existingPath;
+
   return {
     ...env,
+    PATH: nextPath,
     TERM: "xterm-256color",
     COLORTERM: "truecolor",
     CLICOLOR: "1",
@@ -104,13 +145,15 @@ function withTerminalUxEnv(env, sessionName) {
     DISABLE_AUTO_TITLE: "true",
     RAYLINE_TERMINAL: "1",
     RAYLINE_PROMPT_MODE: sessionName?.startsWith("shell-run-") ? "minimal" : "compact",
+    ...(bundledFzfShellRoot ? { RAYLINE_FZF_SHELL_ROOT: bundledFzfShellRoot } : {}),
   };
 }
 
 function resolveShellLaunch(shellPath, env) {
   const shellName = path.basename(shellPath || "").toLowerCase();
-  const zshInitDir = path.join(SHELL_INIT_ROOT, "zsh");
-  const bashInitFile = path.join(SHELL_INIT_ROOT, "bash", "bashrc");
+  const shellInitRoot = getShellInitRoot();
+  const zshInitDir = path.join(shellInitRoot, "zsh");
+  const bashInitFile = path.join(shellInitRoot, "bash", "bashrc");
 
   if ((shellName === "zsh" || shellName === "zsh.exe") && fs.existsSync(zshInitDir)) {
     const originalZdotdir = env.ZDOTDIR || os.homedir();

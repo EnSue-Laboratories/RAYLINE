@@ -16,6 +16,43 @@ elif [ -f "${HOME}/.bashrc" ]; then
   . "${HOME}/.bashrc"
 fi
 
+if ! declare -F _init_completion >/dev/null 2>&1; then
+  for completion_file in \
+    /opt/homebrew/etc/profile.d/bash_completion.sh \
+    /usr/local/etc/profile.d/bash_completion.sh \
+    /etc/bash_completion
+  do
+    if [ -f "$completion_file" ]; then
+      . "$completion_file"
+      break
+    fi
+  done
+fi
+
+for fzf_file in \
+  "${RAYLINE_FZF_SHELL_ROOT:-}/completion.bash" \
+  /opt/homebrew/opt/fzf/shell/completion.bash \
+  /usr/local/opt/fzf/shell/completion.bash
+do
+  if [ -f "$fzf_file" ]; then
+    . "$fzf_file"
+    break
+  fi
+done
+
+for fzf_file in \
+  "${RAYLINE_FZF_SHELL_ROOT:-}/key-bindings.bash" \
+  /opt/homebrew/opt/fzf/shell/key-bindings.bash \
+  /usr/local/opt/fzf/shell/key-bindings.bash
+do
+  if [ -f "$fzf_file" ]; then
+    . "$fzf_file"
+    break
+  fi
+done
+
+: "${FZF_DEFAULT_OPTS:=--height=40% --layout=reverse --border=rounded --color=bg+:#111318,bg:#0d0d10,spinner:#8fd6c2,hl:#89b4fa,fg:#e6edf3,header:#7ed7b9,info:#f5c97a,pointer:#8fd6c2,marker:#f38ba8,fg+:#f5f7fb,hl+:#a6c9ff,prompt:#8fd6c2}"
+
 rayline_git_segment() {
   local branch
   local branch_display
