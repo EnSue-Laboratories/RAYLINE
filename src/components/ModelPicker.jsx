@@ -32,27 +32,47 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
   const [menuStyle, setMenuStyle] = useState(null);
   const [cliInstalled, setCliInstalled] = useState(null);
   const cliCheckedAtRef = useRef(0);
+  const cliProbePromiseRef = useRef(null);
   const m = getMOrMulticaFallback(value, extraModels);
 
   const probeCliInstalled = useCallback(async ({ force = false } = {}) => {
+    if (cliProbePromiseRef.current) return cliProbePromiseRef.current;
+
     if (!window.api?.checkCliInstalled) {
       setCliInstalled(DEFAULT_CLI_INSTALL_STATUS);
+      cliCheckedAtRef.current = Date.now();
       return DEFAULT_CLI_INSTALL_STATUS;
     }
 
-    try {
-      const result = await window.api.checkCliInstalled({ force });
-      if (result) {
-        setCliInstalled(result);
+    if (force) {
+      setCliInstalled(null);
+    }
+
+    const probePromise = (async () => {
+      try {
+        const result = await window.api.checkCliInstalled({ force });
+        if (result) {
+          setCliInstalled(result);
+          cliCheckedAtRef.current = Date.now();
+          return result;
+        }
+      } catch {
+        setCliInstalled(DEFAULT_CLI_INSTALL_STATUS);
         cliCheckedAtRef.current = Date.now();
-        return result;
+        return DEFAULT_CLI_INSTALL_STATUS;
       }
-    } catch {
-      setCliInstalled((prev) => prev || DEFAULT_CLI_INSTALL_STATUS);
-      return DEFAULT_CLI_INSTALL_STATUS;
-    }
 
-    return null;
+      return null;
+    })();
+
+    cliProbePromiseRef.current = probePromise;
+    try {
+      return await probePromise;
+    } finally {
+      if (cliProbePromiseRef.current === probePromise) {
+        cliProbePromiseRef.current = null;
+      }
+    }
   }, []);
 
   useEffect(() => {
