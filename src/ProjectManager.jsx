@@ -17,6 +17,7 @@ import RepoManager from "./pm-components/RepoManager";
 import IssueList from "./pm-components/IssueList";
 import PRList from "./pm-components/PRList";
 import ItemDetail from "./pm-components/ItemDetail";
+import HoverIconButton from "./components/HoverIconButton";
 import { getPaneInteractionStyle, getPaneSurfaceStyle } from "./utils/paneSurface";
 import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
@@ -354,10 +355,11 @@ export default function ProjectManager() {
             REPOS
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
+            <HoverIconButton
               onClick={() => setRemoveMode(!removeMode)}
-              title={removeMode ? "Done editing repositories" : "Edit repositories"}
-              aria-label={removeMode ? "Done editing repositories" : "Edit repositories"}
+              ariaLabel={removeMode ? "Done editing repositories" : "Edit repositories"}
+              baseColor={removeMode ? "rgba(120,230,150,0.9)" : "rgba(255,255,255,0.5)"}
+              hoverColor={removeMode ? "rgba(150,245,170,1)" : "rgba(255,255,255,0.9)"}
               style={{
                 ...iconBtnStyle,
                 ...(removeMode
@@ -365,7 +367,6 @@ export default function ProjectManager() {
                     border: "1px solid rgba(120,230,150,0.22)",
                     background: "rgba(120,230,150,0.12)",
                     boxShadow: "0 0 0 1px rgba(120,230,150,0.06) inset",
-                    color: "rgba(120,230,150,0.9)",
                   }
                   : {}),
               }}
@@ -373,18 +374,19 @@ export default function ProjectManager() {
               {removeMode
                 ? <Check size={12} strokeWidth={1.8} />
                 : <Pencil size={12} strokeWidth={1.6} />}
-            </button>
-            <button
+            </HoverIconButton>
+            <HoverIconButton
               onClick={() => {
                 setRemoveMode(false);
                 setShowAddRepo(true);
               }}
-              title="Add repository"
-              aria-label="Add repository"
-              style={iconBtnStyle}
+              ariaLabel="Add repository"
+              baseColor="rgba(255,255,255,0.5)"
+              hoverColor="rgba(255,255,255,0.9)"
+              style={{ ...iconBtnStyle, color: undefined }}
             >
               <Plus size={12} strokeWidth={1.5} />
-            </button>
+            </HoverIconButton>
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { GitPullRequest, GitMerge, GitPullRequestClosed, Copy, Check, GitBranch } from "lucide-react";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
+import HoverIconButton from "../components/HoverIconButton";
 
 function timeAgo(dateStr) {
   const now = Date.now();
@@ -174,8 +175,9 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
                   Draft
                 </span>
               )}
-              <button
+              <HoverIconButton
                 className="row-action-btn"
+                tooltip={copiedSummary ? "Copied" : "Copy PR summary"}
                 onClick={(e) => {
                   e.stopPropagation();
                   const url = `https://github.com/${item._repo}/pull/${item.number}`;
@@ -184,20 +186,15 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
                   setCopiedAction(actionId);
                   setTimeout(() => setCopiedAction((v) => v === actionId ? null : v), 1500);
                 }}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: "none", border: "none", cursor: "pointer",
-                  color: copiedSummary ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.2)",
-                  padding: 2, flexShrink: 0,
-                  opacity: copiedSummary ? 1 : 0,
-                  transition: "opacity .15s, color .15s",
-                }}
-                title="Copy PR summary"
+                baseColor={copiedSummary ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.35)"}
+                hoverColor={copiedSummary ? "rgba(150,245,170,1)" : "rgba(255,255,255,0.9)"}
+                style={{ opacity: copiedSummary ? 1 : 0 }}
               >
                 {copiedSummary ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
-              </button>
-              <button
+              </HoverIconButton>
+              <HoverIconButton
                 className="row-action-btn"
+                tooltip={copiedCheckout ? "Copied" : "Copy checkout command"}
                 onClick={(e) => {
                   e.stopPropagation();
                   const cmd = `gh pr checkout ${item.number} -R ${item._repo}`;
@@ -206,18 +203,12 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
                   setCopiedAction(actionId);
                   setTimeout(() => setCopiedAction((v) => v === actionId ? null : v), 1500);
                 }}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: "none", border: "none", cursor: "pointer",
-                  color: copiedCheckout ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.2)",
-                  padding: 2, flexShrink: 0,
-                  opacity: copiedCheckout ? 1 : 0,
-                  transition: "opacity .15s, color .15s",
-                }}
-                title="Copy checkout command"
+                baseColor={copiedCheckout ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.35)"}
+                hoverColor={copiedCheckout ? "rgba(150,245,170,1)" : "rgba(255,255,255,0.9)"}
+                style={{ opacity: copiedCheckout ? 1 : 0 }}
               >
                 {copiedCheckout ? <Check size={12} strokeWidth={2} /> : <GitBranch size={12} strokeWidth={1.5} />}
-              </button>
+              </HoverIconButton>
               <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11, flexShrink: 0 }}>
                 {repoShort}
               </span>
