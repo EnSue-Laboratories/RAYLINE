@@ -503,6 +503,7 @@ ipcMain.handle("system-info", () => ({
   hostname: os.hostname(),
   platform: os.platform(),
   arch: os.arch(),
+  home: os.homedir(),
   nodeVersion: process.versions.node,
   electronVersion: process.versions.electron,
   cpus: os.cpus().length,
@@ -1239,6 +1240,68 @@ ipcMain.handle("gh-save-pm-state", async (_e, pmState) => {
     fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
     return true;
   } catch { return false; }
+});
+
+// IPC: clone a git repo (prefers `gh repo clone`, falls back to `git clone`)
+function normalizeCloneUrl(raw) {
+  let s = String(raw || "").trim();
+  if (!s) return s;
+  s = s.replace(/\s+/g, "");
+  s = s.replace(/\/+$/, "");
+  return s;
+}
+
+function toGhOwnerRepo(url) {
+  if (!url) return null;
+  const m = url.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9][A-Za-z0-9-_.]*)\/([A-Za-z0-9][A-Za-z0-9-_.]*?)(?:\.git)?\/?$/i);
+  if (m) return `${m[1]}/${m[2]}`;
+  if (/^[A-Za-z0-9][A-Za-z0-9-_.]*\/[A-Za-z0-9][A-Za-z0-9-_.]*$/.test(url)) return url;
+  return null;
+}
+
+function deriveRepoDirName(url) {
+  const s = normalizeCloneUrl(url);
+  if (!s) return null;
+  const stripped = s.replace(/\.git$/i, "");
+  const m = stripped.match(/([^/:\s]+)$/);
+  return m ? m[1] : null;
+}
+
+ipcMain.handle("project-clone", async (_e, args = {}) => {
+  const rawUrl = args?.url;
+  const parentDir = args?.parentDir;
+  if (!rawUrl || !parentDir) return { ok: false, stderr: "Missing url or parentDir" };
+  if (!fs.existsSync(parentDir)) return { ok: false, stderr: `Parent directory does not exist: ${parentDir}` };
+  const url = normalizeCloneUrl(rawUrl);
+  const name = deriveRepoDirName(url);
+  if (!name) return { ok: false, stderr: "Could not determine repo name from URL" };
+  const destPath = path.join(parentDir, name);
+  if (fs.existsSync(destPath)) {
+    return { ok: false, stderr: `Destination already exists: ${destPath}` };
+  }
+  const { execFile } = require("child_process");
+  const env = { ...process.env, PATH: buildSpawnPath() };
+  const ghOwnerRepo = toGhOwnerRepo(url);
+  const run = (bin, cliArgs) => new Promise((resolve) => {
+    execFile(bin, cliArgs, { cwd: parentDir, env, timeout: 300000 }, (err, stdout, stderr) => {
+      const errText = (stderr || (err && err.message) || "").toString().trim();
+      if (err) resolve({ ok: false, stderr: errText });
+      else resolve({ ok: true, stdout: (stdout || "").toString() });
+    });
+  });
+  let result;
+  if (ghOwnerRepo) {
+    result = await run("gh", ["repo", "clone", ghOwnerRepo, destPath]);
+    if (!result.ok) {
+      const fallback = await run("git", ["clone", url, destPath]);
+      if (fallback.ok) result = fallback;
+      else result = { ok: false, stderr: `gh: ${result.stderr}\ngit: ${fallback.stderr}` };
+    }
+  } else {
+    result = await run("git", ["clone", url, destPath]);
+  }
+  if (!result.ok) return { ok: false, stderr: result.stderr };
+  return { ok: true, path: destPath };
 });
 
 app.on("before-quit", () => {
