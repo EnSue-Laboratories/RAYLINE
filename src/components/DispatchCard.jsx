@@ -188,7 +188,7 @@ export default function DispatchCard({
       if (key) keyedErrors[key] = f.error?.message || "Dispatch failed.";
     }
     setErrors(keyedErrors);
-    setBanner(`Dispatched ${results.length - failed.length}/${results.length} tasks. ${failed.length} failed — see rows.`);
+    setBanner(`Dispatched ${results.length - failed.length}/${results.length} sessions. ${failed.length} failed — see rows.`);
 
     const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
     if (tab === "issues") {
@@ -204,7 +204,12 @@ export default function DispatchCard({
     <div style={backdropStyle} onClick={onClose}>
       <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <header style={headerStyle}>
-          <div style={titleStyle}>Dispatch</div>
+          <div style={headerTextStyle}>
+            <div style={titleStyle}>Dispatch</div>
+            <div style={subtitleStyle}>
+              Run multiple agent sessions at once — each on its own branch, optionally with a different model.
+            </div>
+          </div>
           <button onClick={onClose} style={closeBtnStyle} aria-label="Close">
             <X size={16} />
           </button>
@@ -478,7 +483,7 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
     <div style={{ padding: "24px 14px 14px" }}>
       {!currentCwd && (
         <div style={noticeStyle}>
-          Select a folder in the sidebar before dispatching custom tasks.
+          Select a folder in the sidebar before dispatching custom sessions.
         </div>
       )}
       {rows.map((r, i) => (
@@ -499,7 +504,7 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
         onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "transparent"; }}
       >
         <Plus size={13} strokeWidth={2} />
-        <span>Add task</span>
+        <span>Add session</span>
       </button>
     </div>
   );
@@ -536,7 +541,7 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
   return (
     <div style={customRowStyle(!!error)}>
       <textarea
-        placeholder={`Task ${index + 1} prompt…`}
+        placeholder={`Session ${index + 1} prompt…`}
         value={row.prompt}
         onChange={(e) => onChange({ prompt: e.target.value })}
         onPaste={handlePaste}
@@ -559,7 +564,7 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
         <span style={customDividerStyle} aria-hidden />
         <DispatchDropdown
           compact
-          ariaLabel={`Model for task ${index + 1}`}
+          ariaLabel={`Model for session ${index + 1}`}
           value={row.model}
           onChange={(v) => onChange({ model: v })}
           options={modelOptionsWithDefault(availableModels)}
@@ -820,10 +825,17 @@ const cardStyle = {
   boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
 };
 const headerStyle = {
-  display: "flex", justifyContent: "space-between", alignItems: "center",
+  display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+  gap: 12,
   padding: "14px 18px", borderBottom: "1px solid var(--pane-border)",
 };
+const headerTextStyle = { display: "flex", flexDirection: "column", gap: 4, minWidth: 0 };
 const titleStyle = { fontSize: 14, fontWeight: 500 };
+const subtitleStyle = {
+  fontSize: 11,
+  color: "rgba(255,255,255,0.45)",
+  lineHeight: 1.45,
+};
 const closeBtnStyle = {
   background: "none", border: "none", color: "rgba(255,255,255,0.55)",
   cursor: "pointer", padding: 4,
