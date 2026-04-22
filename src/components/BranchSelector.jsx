@@ -6,6 +6,93 @@ import { useFontScale } from "../contexts/FontSizeContext";
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 
+function IconActionButton({
+  icon: Icon,
+  tooltip,
+  onClick,
+  disabled = false,
+  visible = true,
+  hoverColor = "rgba(255,255,255,0.72)",
+  baseColor = "rgba(255,255,255,0.45)",
+  disabledColor = "rgba(255,255,255,0.12)",
+  ariaLabel,
+}) {
+  const btnRef = useRef(null);
+  const [hovered, setHovered] = useState(false);
+  const [tipPos, setTipPos] = useState(null);
+
+  useEffect(() => {
+    if (!hovered || disabled || !btnRef.current) { setTipPos(null); return; }
+    const r = btnRef.current.getBoundingClientRect();
+    setTipPos({ left: r.left + r.width / 2, top: r.top });
+  }, [hovered, disabled]);
+
+  const active = !disabled && visible;
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        aria-label={ariaLabel || tooltip}
+        disabled={disabled}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!disabled) onClick?.(e);
+        }}
+        onMouseEnter={() => { if (active) setHovered(true); }}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 22,
+          height: 22,
+          borderRadius: 5,
+          background: "transparent",
+          border: "none",
+          color: disabled ? disabledColor : active && hovered ? hoverColor : baseColor,
+          cursor: disabled ? "default" : "pointer",
+          opacity: visible ? 1 : 0,
+          pointerEvents: visible ? "auto" : "none",
+          transition: "opacity .12s, color .2s",
+          flexShrink: 0,
+          marginLeft: 4,
+          padding: 0,
+        }}
+      >
+        <Icon size={11} strokeWidth={2} />
+      </button>
+      {hovered && active && tipPos && createPortal(
+        <div
+          role="tooltip"
+          style={{
+            position: "fixed",
+            left: tipPos.left,
+            top: tipPos.top - 6,
+            transform: "translate(-50%, -100%)",
+            padding: "3px 7px",
+            background: "rgba(14,14,18,0.95)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 4,
+            color: "rgba(255,255,255,0.8)",
+            fontSize: 9,
+            fontFamily: "'JetBrains Mono',monospace",
+            letterSpacing: ".04em",
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            zIndex: 600,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+          }}
+        >
+          {tooltip}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocusTerminal }) {
   const s = useFontScale();
   const [open, setOpen] = useState(false);
@@ -475,18 +562,12 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     </button>
                     {b === current && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
                     {!isProtected && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setConfirmDelete({ type: "branch", name: b }); setError(null); }}
-                        style={{
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          width: 22, height: 22, borderRadius: 5,
-                          background: "transparent", border: "none",
-                          color: "rgba(255,255,255,0.15)", cursor: "pointer",
-                          opacity: hoveredRow === `branch-${b}` ? 1 : 0,
-                          transition: "opacity .12s",
-                          flexShrink: 0, marginLeft: 4,
-                        }}
-                      ><Trash2 size={11} strokeWidth={2} /></button>
+                      <IconActionButton
+                        icon={Trash2}
+                        tooltip="delete"
+                        visible={hoveredRow === `branch-${b}`}
+                        onClick={() => { setConfirmDelete({ type: "branch", name: b }); setError(null); }}
+                      />
                     )}
                   </div>
                 );
@@ -743,41 +824,25 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                       </span>
                     </button>
                     {mainWorktree && (
-                      <button
-                        title="Promote to main"
-                        onClick={(e) => {
-                          e.stopPropagation();
+                      <IconActionButton
+                        icon={ArrowUpFromLine}
+                        tooltip="promote"
+                        visible={hoveredRow === `wt-${wt.path}`}
+                        onClick={() => {
                           setConfirmPromote({ path: wt.path, branch: wt.branch });
                           setPromoteError(null);
                           setConfirmDelete(null);
                           setError(null);
                         }}
-                        style={{
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          width: 22, height: 22, borderRadius: 5,
-                          background: "transparent", border: "none",
-                          color: "rgba(255,255,255,0.15)", cursor: "pointer",
-                          opacity: hoveredRow === `wt-${wt.path}` ? 1 : 0,
-                          transition: "opacity .12s, color .12s",
-                          flexShrink: 0, marginLeft: 4,
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(180,220,255,0.7)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.15)"; }}
-                      ><ArrowUpFromLine size={11} strokeWidth={2} /></button>
+                      />
                     )}
                     {!isActive && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setConfirmDelete({ type: "worktree", path: wt.path, branch: wt.branch }); setDeleteBranchToo(false); setError(null); }}
-                        style={{
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          width: 22, height: 22, borderRadius: 5,
-                          background: "transparent", border: "none",
-                          color: "rgba(255,255,255,0.15)", cursor: "pointer",
-                          opacity: hoveredRow === `wt-${wt.path}` ? 1 : 0,
-                          transition: "opacity .12s",
-                          flexShrink: 0, marginLeft: 4,
-                        }}
-                      ><Trash2 size={11} strokeWidth={2} /></button>
+                      <IconActionButton
+                        icon={Trash2}
+                        tooltip="delete"
+                        visible={hoveredRow === `wt-${wt.path}`}
+                        onClick={() => { setConfirmDelete({ type: "worktree", path: wt.path, branch: wt.branch }); setDeleteBranchToo(false); setError(null); }}
+                      />
                     )}
                   </div>
                 );

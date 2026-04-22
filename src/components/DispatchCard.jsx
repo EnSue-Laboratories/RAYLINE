@@ -188,7 +188,7 @@ export default function DispatchCard({
       if (key) keyedErrors[key] = f.error?.message || "Dispatch failed.";
     }
     setErrors(keyedErrors);
-    setBanner(`Dispatched ${results.length - failed.length}/${results.length} tasks. ${failed.length} failed — see rows.`);
+    setBanner(`Dispatched ${results.length - failed.length}/${results.length} sessions. ${failed.length} failed — see rows.`);
 
     const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
     if (tab === "issues") {
@@ -204,7 +204,12 @@ export default function DispatchCard({
     <div style={backdropStyle} onClick={onClose}>
       <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <header style={headerStyle}>
-          <div style={titleStyle}>Dispatch</div>
+          <div style={headerTextStyle}>
+            <div style={titleStyle}>Dispatch</div>
+            <div style={subtitleStyle}>
+              Run multiple agent sessions at once — each in its own worktree, optionally with a different model.
+            </div>
+          </div>
           <button onClick={onClose} style={closeBtnStyle} aria-label="Close">
             <X size={16} />
           </button>
@@ -302,12 +307,15 @@ function DispatchLoadingDots() {
 }
 
 function TabBtn({ active, onClick, children }) {
+  const [hovered, setHovered] = useState(false);
   return (
     <button
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      style={tabBtnStyle(active)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={tabBtnStyle(active, hovered)}
     >
       {children}
     </button>
@@ -478,7 +486,7 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
     <div style={{ padding: "24px 14px 14px" }}>
       {!currentCwd && (
         <div style={noticeStyle}>
-          Select a folder in the sidebar before dispatching custom tasks.
+          Select a folder in the sidebar before dispatching custom sessions.
         </div>
       )}
       {rows.map((r, i) => (
@@ -499,7 +507,7 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
         onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "transparent"; }}
       >
         <Plus size={13} strokeWidth={2} />
-        <span>Add task</span>
+        <span>Add session</span>
       </button>
     </div>
   );
@@ -536,7 +544,7 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
   return (
     <div style={customRowStyle(!!error)}>
       <textarea
-        placeholder={`Task ${index + 1} prompt…`}
+        placeholder={`Session ${index + 1} prompt…`}
         value={row.prompt}
         onChange={(e) => onChange({ prompt: e.target.value })}
         onPaste={handlePaste}
@@ -559,7 +567,7 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
         <span style={customDividerStyle} aria-hidden />
         <DispatchDropdown
           compact
-          ariaLabel={`Model for task ${index + 1}`}
+          ariaLabel={`Model for session ${index + 1}`}
           value={row.model}
           onChange={(v) => onChange({ model: v })}
           options={modelOptionsWithDefault(availableModels)}
@@ -570,18 +578,56 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
           attachments={row.attachments}
           onChange={(a) => onChange({ attachments: a })}
         />
-        <button onClick={onRemove} style={removeBtnStyle} aria-label="Remove row">
-          <X size={14} />
-        </button>
+        <RemoveRowButton onClick={onRemove} />
       </div>
       {error && <div style={customErrorStyle}>{error}</div>}
     </div>
   );
 }
 
-function AttachmentPicker({ attachments, onChange }) {
+function RemoveRowButton({ onClick }) {
+  const [hovered, setHovered] = useState(false);
   return (
-    <label style={{ cursor: "pointer", color: "rgba(255,255,255,0.5)", display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      aria-label="Remove row"
+      style={{
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        color: hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
+        padding: 0,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "color .2s",
+      }}
+    >
+      <X size={13} />
+    </button>
+  );
+}
+
+function AttachmentPicker({ attachments, onChange }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <label
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        cursor: "pointer",
+        color: hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        fontSize: 11,
+        fontFamily: "'JetBrains Mono', monospace",
+        transition: "color .2s",
+      }}
+    >
       <Paperclip size={13} />
       {attachments.length > 0 ? attachments.length : ""}
       <input
@@ -616,6 +662,7 @@ function DispatchDropdown({
   ariaLabel,
 }) {
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const ref = useRef(null);
   const menuRef = useRef(null);
   const [menuStyle, setMenuStyle] = useState(null);
@@ -672,15 +719,17 @@ function DispatchDropdown({
   const triggerStyle = compact
     ? {
         display: "inline-flex", alignItems: "center", gap: 6,
-        padding: "4px 0",
+        padding: "3px 6px",
         background: "transparent",
-        border: "none",
+        border: "1px solid " + (hovered ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)"),
+        borderRadius: 6,
         color: selected ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.45)",
         fontSize: 10,
         fontFamily: "'JetBrains Mono',monospace",
         letterSpacing: ".06em",
         cursor: "pointer",
         outline: "none",
+        transition: "border-color .2s",
       }
     : {
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -715,8 +764,12 @@ function DispatchDropdown({
         onClick={toggle}
         aria-label={ariaLabel}
         style={triggerStyle}
-        onMouseEnter={compact ? undefined : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
-        onMouseLeave={compact ? undefined : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
+        onMouseEnter={compact
+          ? () => setHovered(true)
+          : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+        onMouseLeave={compact
+          ? () => setHovered(false)
+          : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: fullWidth ? 1 : undefined, textAlign: "left" }}>
           {triggerText}
@@ -820,10 +873,17 @@ const cardStyle = {
   boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
 };
 const headerStyle = {
-  display: "flex", justifyContent: "space-between", alignItems: "center",
+  display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+  gap: 12,
   padding: "14px 18px", borderBottom: "1px solid var(--pane-border)",
 };
+const headerTextStyle = { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 };
 const titleStyle = { fontSize: 14, fontWeight: 500 };
+const subtitleStyle = {
+  fontSize: 11,
+  color: "rgba(255,255,255,0.45)",
+  lineHeight: 1.45,
+};
 const closeBtnStyle = {
   background: "none", border: "none", color: "rgba(255,255,255,0.55)",
   cursor: "pointer", padding: 4,
@@ -832,13 +892,16 @@ const tabsStyle = {
   display: "flex", gap: 4, padding: "10px 14px 0",
   borderBottom: "1px solid var(--pane-border)",
 };
-const tabBtnStyle = (active) => ({
+const tabBtnStyle = (active, hovered) => ({
   display: "flex", gap: 6, alignItems: "center",
   padding: "8px 12px", borderRadius: "6px 6px 0 0",
   background: active ? "var(--pane-hover)" : "transparent",
-  color: active ? "white" : "rgba(255,255,255,0.55)",
+  color: active
+    ? "white"
+    : hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.55)",
   border: "none", borderBottom: active ? "1px solid white" : "1px solid transparent",
   cursor: "pointer", fontSize: 12,
+  transition: "color .2s",
 });
 const bodyStyle = { flex: 1, overflow: "auto", padding: 0 };
 const footerStyle = {
@@ -886,10 +949,6 @@ const inputStyle = {
   letterSpacing: ".06em",
   outline: "none",
   transition: "border-color .2s",
-};
-const removeBtnStyle = {
-  background: "none", border: "none", color: "rgba(255,255,255,0.4)",
-  cursor: "pointer", fontSize: 13, padding: "4px 6px",
 };
 const addBtnStyle = {
   display: "inline-flex", alignItems: "center", gap: 6,
