@@ -100,6 +100,7 @@ contextBridge.exposeInMainWorld("api", {
 
   // Project Manager
   openProjectManager: () => ipcRenderer.send("open-project-manager"),
+  cloneRepo: ({ url, parentDir }) => ipcRenderer.invoke("project-clone", { url, parentDir }),
 
   // Window appearance
   setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
