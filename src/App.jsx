@@ -4,6 +4,7 @@ import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
 import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
+import WindowControls from "./components/WindowControls";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
 import TerminalDrawer from "./components/TerminalDrawer";
@@ -1035,6 +1036,7 @@ export default function App() {
   const [defaultModel, setDefaultModel] = useState(DEFAULT_MODEL_ID);
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
+  const [platform, setPlatform] = useState(null);
   const [wallpaper, setWallpaper] = useState(null);
   const [fontSize, setFontSize] = useState(15);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
@@ -1130,6 +1132,13 @@ export default function App() {
     () => queuedMessages.filter((item) => item?.conversationId === active),
     [active, queuedMessages]
   );
+  const showWindowControls = platform === "win32";
+
+  useEffect(() => {
+    window.api?.getSystemInfo?.().then((info) => {
+      if (info?.platform) setPlatform(info.platform);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     activeConversationIdRef.current = active;
@@ -3268,6 +3277,8 @@ export default function App() {
         </div>
       )}
 
+      <WindowControls visible={showWindowControls} />
+
       <div
         style={{
           display: "flex",
@@ -3390,6 +3401,7 @@ export default function App() {
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
           developerMode={developerMode}
+          windowControlsVisible={showWindowControls}
         />
       )}
 

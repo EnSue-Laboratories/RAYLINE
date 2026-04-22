@@ -18,6 +18,7 @@ import IssueList from "./pm-components/IssueList";
 import PRList from "./pm-components/PRList";
 import ItemDetail from "./pm-components/ItemDetail";
 import HoverIconButton from "./components/HoverIconButton";
+import WindowControls from "./components/WindowControls";
 import { getPaneInteractionStyle, getPaneSurfaceStyle } from "./utils/paneSurface";
 import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
@@ -148,6 +149,7 @@ export default function ProjectManager() {
   const [showAccountManager, setShowAccountManager] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
   const [wallpaper, setWallpaper] = useState(null);
+  const [platform, setPlatform] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [showCreate, setShowCreate] = useState(null); // null | "issue" | "pr"
   const [refreshSignal, setRefreshSignal] = useState(0);
@@ -163,6 +165,9 @@ export default function ProjectManager() {
 
   useEffect(() => {
     refreshAuth();
+    window.ghApi.getSystemInfo?.().then((info) => {
+      if (info?.platform) setPlatform(info.platform);
+    }).catch(() => {});
     window.ghApi.loadPmState().then(({ repos, wallpaper: wp }) => {
       setRepos(repos);
       if (wp?.path) {
@@ -286,6 +291,8 @@ export default function ProjectManager() {
         position: "relative",
       }}
     >
+      <WindowControls visible={platform === "win32"} />
+
       {/* Background — wallpaper or aurora */}
       {wallpaper?.dataUrl ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
