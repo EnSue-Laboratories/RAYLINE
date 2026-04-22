@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
     <img src="https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite 8" />
     <img src="https://img.shields.io/badge/node--pty-1.x-339933?style=flat-square&logo=gnometerminal&logoColor=white" alt="node-pty" />
-    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-1a1a1a?style=flat-square" alt="Platforms" />
+    <img src="https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%26%20Linux%20(experimental)-1a1a1a?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/status-alpha-f25f3a?style=flat-square" alt="Alpha" />
   </p>
 
@@ -86,10 +86,31 @@ If you're only working on the main UI, you can skip the rebuild — terminal ses
 | `npm run dev:electron` | Vite + Electron together (default dev flow) |
 | `npm run build` | Production renderer bundle |
 | `npm run build:electron` | Renderer build plus a packaged desktop app |
+| `npm run build:electron:mac` | macOS DMG build |
 | `npm run build:electron:win` | Windows NSIS build (skips `npm rebuild`) |
 | `npm run lint` | ESLint |
 | `npm run preview` | Preview the production renderer |
 | `npm run rebuild` | Rebuild `node-pty` for the active Electron version |
+
+## Release Automation
+
+GitHub Actions packages the desktop app for **Windows** and **macOS** only. It runs on:
+
+- manual dispatch via the **Package Desktop App** workflow
+- published GitHub releases
+
+Manual runs upload the build output as workflow artifacts. Release runs upload the same files to the GitHub release. Linux packaging is intentionally left out for now because this repo does not have a reliable Linux app validation path yet.
+
+For signed and notarized macOS builds in CI, configure these repository secrets:
+
+- `CSC_LINK`
+- `CSC_KEY_PASSWORD`
+- `APPLE_SIGNING_IDENTITY` or `CSC_NAME` if the certificate name should be pinned explicitly
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
+
+If the macOS signing secrets are not present, CI falls back to an unsigned DMG so manual packaging still succeeds.
 
 ## Architecture
 
@@ -145,11 +166,13 @@ scripts/      Dev launchers and shell-facing helpers
 
 ## Platform Support
 
+RayLine is developed and tested primarily on **macOS**. Windows and Linux builds are **experimental** — they compile and launch, but may have rough edges around native integrations (window chrome, PTY behavior, signing, auto-update). Bug reports from those platforms are welcome.
+
 | Platform | Status | Notes |
 |---|---|---|
-| macOS | First-class | Signed + notarized DMG |
-| Windows | Supported | NSIS installer; `node-pty` needs Python + VS Build Tools |
-| Linux | Supported | AppImage, `deb`, and `tar.gz` targets |
+| macOS | First-class | Signed + notarized DMG; primary development target |
+| Windows | Experimental | NSIS installer; `node-pty` needs Python + VS Build Tools. Not all features verified |
+| Linux | Experimental | AppImage, `deb`, and `tar.gz` targets. Built but not part of CI validation |
 
 ## Contributing & Issues
 

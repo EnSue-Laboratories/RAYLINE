@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Circle, CheckCircle2, Copy, Check, GitPullRequest } from "lucide-react";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
+import HoverIconButton from "../components/HoverIconButton";
 
 function timeAgo(dateStr) {
   const now = Date.now();
@@ -168,8 +169,9 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               <span style={{ color: "rgba(255,255,255,0.8)", fontFamily: "system-ui", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.title}
               </span>
-              <button
+              <HoverIconButton
                 className="copy-btn"
+                tooltip={copiedId === `${item._repo}-${item.number}` ? "Copied" : "Copy issue summary"}
                 onClick={(e) => {
                   e.stopPropagation();
                   const url = `https://github.com/${item._repo}/issues/${item.number}`;
@@ -178,17 +180,12 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
                   setCopiedId(id);
                   setTimeout(() => setCopiedId((v) => v === id ? null : v), 1500);
                 }}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: "none", border: "none", cursor: "pointer",
-                  color: copiedId === `${item._repo}-${item.number}` ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.2)",
-                  padding: 2, flexShrink: 0,
-                  opacity: copiedId === `${item._repo}-${item.number}` ? 1 : 0,
-                  transition: "opacity .15s, color .15s",
-                }}
+                baseColor={copiedId === `${item._repo}-${item.number}` ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.35)"}
+                hoverColor={copiedId === `${item._repo}-${item.number}` ? "rgba(150,245,170,1)" : "rgba(255,255,255,0.9)"}
+                style={{ opacity: copiedId === `${item._repo}-${item.number}` ? 1 : 0 }}
               >
                 {copiedId === `${item._repo}-${item.number}` ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
-              </button>
+              </HoverIconButton>
               <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                 <span style={{ width: 25, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.35)" }} title={linkedPRs[`${item._repo}/${item.number}`] ? `${linkedPRs[`${item._repo}/${item.number}`].length} linked PR${linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "s" : ""}` : undefined}>
                   {linkedPRs[`${item._repo}/${item.number}`] && (

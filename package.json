@@ -8,15 +8,16 @@
   },
   "homepage": "https://github.com/EnSue-Laboratories/RAYLINE",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "dev:electron": "concurrently \"vite --port 5199 --strictPort\" \"wait-on http://localhost:5199 && node scripts/dev-electron.cjs 5199\"",
     "build": "vite build",
-    "build:electron": "vite build && electron-builder",
-    "build:electron:win": "vite build && electron-builder --win --config.npmRebuild=false",
+    "build:electron": "vite build && electron-builder --config electron-builder.config.cjs",
+    "build:electron:mac": "vite build && electron-builder --config electron-builder.config.cjs --mac",
+    "build:electron:win": "vite build && electron-builder --config electron-builder.config.cjs --win --config.npmRebuild=false",
     "lint": "eslint .",
     "preview": "vite preview",
     "rebuild": "electron-rebuild -f -w node-pty"
@@ -41,75 +42,6 @@
     "remark-math": "^6.0.0",
     "uuid": "^13.0.0",
     "ws": "^8.20.0"
-  },
-  "build": {
-    "appId": "com.ensue.rayline",
-    "productName": "RayLine",
-    "publish": {
-      "provider": "github",
-      "owner": "EnSue-Laboratories",
-      "repo": "RAYLINE",
-      "releaseType": "draft"
-    },
-    "win": {
-      "icon": "public/icon.png",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": true,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": false
-    },
-    "mac": {
-      "category": "public.app-category.developer-tools",
-      "icon": "public/icon.png",
-      "target": "dmg",
-      "identity": "Yanfei Ding (55VR37C6LP)",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
-      "notarize": true
-    },
-    "dmg": {
-      "title": "RayLine",
-      "iconSize": 80,
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    },
-    "linux": {
-      "category": "Development",
-      "icon": "public/icon.png",
-      "maintainer": "Ensue Laboratories <contact@ensue.dev>",
-      "target": [
-        "AppImage",
-        "deb",
-        "tar.gz"
-      ]
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "public/**/*"
-    ],
-    "directories": {
-      "output": "release"
-    }
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",

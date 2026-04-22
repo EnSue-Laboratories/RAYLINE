@@ -1055,6 +1055,7 @@ export default function App() {
   const [showNewChatCard, setShowNewChatCard] = useState(false);
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const [showMulticaSetup, setShowMulticaSetup] = useState(false);
+  const [showNewProject, setShowNewProject] = useState(false);
   useEffect(() => {
     const h = () => setShowMulticaSetup(true);
     window.addEventListener("open-multica-setup", h);
@@ -1875,6 +1876,27 @@ export default function App() {
       [projectRoot]: { ...prev[projectRoot], hidden: true },
     }));
   };
+
+  const registerManualProject = useCallback((projectPath) => {
+    if (!projectPath) return;
+    const projectRoot = getMainRepoRoot(projectPath);
+    setProjects((prev) => {
+      const existing = prev[projectRoot] || {};
+      return {
+        ...prev,
+        [projectRoot]: {
+          ...existing,
+          name: existing.name || projectRoot.split("/").pop(),
+          manual: true,
+          hidden: false,
+        },
+      };
+    });
+  }, []);
+
+  const handleClonedRepo = useCallback((clonedPath) => {
+    if (clonedPath) registerManualProject(clonedPath);
+  }, [registerManualProject]);
 
   const handleNewInProject = (cwdRoot) => {
     const id = "c" + Date.now();
@@ -3285,6 +3307,7 @@ export default function App() {
           onPickFolder={handlePickFolder}
           onOpenSettings={() => setShowSettings(true)}
           onOpenProjectManager={() => window.api?.openProjectManager()}
+          onOpenNewProject={() => setShowNewProject(true)}
           projects={projects}
           onToggleProjectCollapse={handleToggleProjectCollapse}
           onHideProject={handleHideProject}
@@ -3384,6 +3407,13 @@ export default function App() {
       <MulticaSetupModal
         open={showMulticaSetup}
         onClose={() => setShowMulticaSetup(false)}
+      />
+
+      <NewProjectModal
+        open={showNewProject}
+        onClose={() => setShowNewProject(false)}
+        onCloned={handleClonedRepo}
+        onPickedLocalFolder={registerManualProject}
       />
 
       {/* Terminal drawer */}

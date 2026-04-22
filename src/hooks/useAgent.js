@@ -32,16 +32,26 @@ function freezeElapsed(msg) {
 
 function mapMulticaTaskMessage(p) {
   // Target the `{type: "tool"}` part shape that Message.jsx renders via
-  // ToolCallBlock. Multica task:message events carry no tool_use_id, so we
-  // can't merge use/result into a single part like Claude does — emit them
-  // as two adjacent tool parts.
+  // ToolCallBlock. Multica carries no tool_use_id, so the task:message
+  // handler pairs tool_use/tool_result by name+order (see pairing below).
   switch (p.type) {
     case "text": return { type: "text", text: p.content || "" };
-    case "tool_use": return { type: "tool", name: p.tool, args: p.input || {} };
-    case "tool_result": return { type: "tool", name: p.tool, result: p.output || "" };
+    case "tool_use": return { type: "tool", id: "mt" + uid(), name: p.tool, args: p.input || {}, result: null, status: "running" };
+    case "tool_result": return { type: "tool", id: "mt" + uid(), name: p.tool, args: {}, result: p.output || "", status: "done" };
     case "error": return { type: "text", text: `_${p.content || "error"}_` };
     default: return null;
   }
+}
+
+// Multica pairs: match an incoming tool_result to the most recent tool_use
+// part with the same name that hasn't been completed yet. Without a
+// tool_use_id, order + name is the best correlation we have.
+function findPendingMulticaToolIdx(parts, name) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    if (p.type === "tool" && p.status === "running" && p.name === name) return i;
+  }
+  return -1;
 }
 
 function mergeUsage(prev, incoming) {
@@ -310,7 +320,17 @@ export default function useAgent() {
               if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
               return next;
             }
-            const parts = [...(assistant.parts || []), part];
+            const parts = [...(assistant.parts || [])];
+            if (p.type === "tool_result") {
+              const pendingIdx = findPendingMulticaToolIdx(parts, p.tool);
+              if (pendingIdx >= 0) {
+                parts[pendingIdx] = { ...parts[pendingIdx], result: p.output || "", status: "done" };
+              } else {
+                parts.push(part);
+              }
+            } else {
+              parts.push(part);
+            }
             msgs[msgs.length - 1] = { ...assistant, parts, isStreaming: true };
             next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: true });
             return next;

@@ -532,11 +532,37 @@ ipcMain.handle("path-exists", (_e, p) => {
   try { return fs.existsSync(p); } catch { return false; }
 });
 
+const CLI_INSTALL_CHECK_TTL_MS = 5000;
+let cliInstallCheckCache = null;
+let cliInstallCheckCacheAt = 0;
+
+function getCliInstalledSnapshot({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && cliInstallCheckCache && (now - cliInstallCheckCacheAt) < CLI_INSTALL_CHECK_TTL_MS) {
+    return cliInstallCheckCache;
+  }
+
+  cliInstallCheckCache = {
+    claude: Boolean(resolveCliBin("claude", { envVarName: "CLAUDE_BIN" })),
+    codex: Boolean(resolveCliBin("codex", { envVarName: "CODEX_BIN" })),
+  };
+  cliInstallCheckCacheAt = Date.now();
+  return cliInstallCheckCache;
+}
+
+// IPC: probe which provider CLIs are installed on PATH (claude, codex).
+// Renderer uses this to gray out provider groups whose CLI is missing and
+// redirect the user to the installation guide instead.
+ipcMain.handle("check-cli-installed", (_event, options = {}) => {
+  return getCliInstalledSnapshot(options);
+});
+
 ipcMain.handle("system-info", () => ({
   user: os.userInfo().username,
   hostname: os.hostname(),
   platform: os.platform(),
   arch: os.arch(),
+  home: os.homedir(),
   nodeVersion: process.versions.node,
   electronVersion: process.versions.electron,
   cpus: os.cpus().length,
@@ -761,6 +787,79 @@ function gitLong(args, cwd) {
       else resolve(stdout.trim());
     });
   });
+}
+
+function ghRepo(args, cwd, { timeout = 15000, maxBuffer = 10 * 1024 * 1024 } = {}) {
+  return new Promise((resolve, reject) => {
+    execFile("gh", args, {
+      cwd,
+      env: { ...process.env, PATH: buildSpawnPath() },
+      timeout,
+      maxBuffer,
+    }, (err, stdout, stderr) => {
+      if (err) reject(new Error((stderr || "").trim() || err.message));
+      else resolve(stdout.trim());
+    });
+  });
+}
+
+function extractPrNumber(value) {
+  const match = String(value || "").match(/\/pull\/(\d+)(?:\D|$)/);
+  return match ? Number(match[1]) : null;
+}
+
+async function getRepoPrContext(cwd) {
+  const raw = await ghRepo(["repo", "view", "--json", "nameWithOwner,parent"], cwd);
+  const repo = JSON.parse(raw);
+  const currentRepo = repo?.nameWithOwner || null;
+  const baseRepo = repo?.parent?.nameWithOwner || currentRepo;
+  const headOwner = currentRepo?.split("/")[0] || null;
+  return { currentRepo, baseRepo, headOwner };
+}
+
+function normalizeOpenPr(pr) {
+  if (!pr) return null;
+  return {
+    number: pr.number,
+    title: pr.title,
+    url: pr.html_url || pr.url || null,
+    state: String(pr.state || "").toUpperCase(),
+    headRefName: pr.head?.ref || pr.headRefName || null,
+    baseRefName: pr.base?.ref || pr.baseRefName || null,
+    isDraft: Boolean(pr.draft ?? pr.isDraft),
+  };
+}
+
+async function getCurrentBranchOpenPr(cwd, branch) {
+  const { baseRepo, headOwner } = await getRepoPrContext(cwd);
+  if (!baseRepo || !headOwner || !branch) return null;
+  const raw = await ghRepo([
+    "api",
+    "--method",
+    "GET",
+    `/repos/${baseRepo}/pulls`,
+    "-f",
+    "state=open",
+    "-f",
+    `head=${headOwner}:${branch}`,
+  ], cwd);
+  const prs = JSON.parse(raw);
+  if (!Array.isArray(prs) || prs.length === 0) return null;
+  return normalizeOpenPr(prs[0]);
+}
+
+async function mergeCurrentBranchOpenPr(cwd, branch) {
+  const { baseRepo } = await getRepoPrContext(cwd);
+  const openPr = await getCurrentBranchOpenPr(cwd, branch);
+  if (!baseRepo || !openPr) return null;
+  const raw = await ghRepo([
+    "api",
+    "--method",
+    "PUT",
+    `/repos/${baseRepo}/pulls/${openPr.number}/merge`,
+  ], cwd, { timeout: 60000 });
+  const result = JSON.parse(raw);
+  return { openPr, result };
 }
 
 ipcMain.handle("git-branches", async (_event, cwd) => {
@@ -1094,12 +1193,36 @@ ipcMain.handle("git-pull", async (_event, cwd) => {
   }
 });
 
+ipcMain.handle("git-pr-status", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+    if (branch === "HEAD") return { ok: true, branch: null, openPr: null };
+    try {
+      const openPr = await getCurrentBranchOpenPr(cwd, branch);
+      return { ok: true, branch, openPr };
+    } catch (err) {
+      const msg = err.message || String(err);
+      return { ok: false, stderr: msg };
+    }
+  } catch (err) {
+    return { ok: false, stderr: err.message || String(err) };
+  }
+});
+
 ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
   if (!cwd) return { ok: false, stderr: "no cwd" };
   try {
     const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
     if (branch === "HEAD") return { ok: false, stderr: "detached HEAD" };
     if (base && branch === base) return { ok: false, stderr: `already on base branch "${base}"` };
+    const openPr = await getCurrentBranchOpenPr(cwd, branch);
+    if (openPr) {
+      return {
+        ok: false,
+        stderr: `Open PR #${openPr.number} already exists\n${openPr.url || ""}`.trim(),
+      };
+    }
     // Ensure upstream exists and is current.
     let pushArgs;
     try {
@@ -1111,26 +1234,47 @@ ipcMain.handle("git-create-pr", async (_event, cwd, base) => {
     await gitLong(pushArgs, cwd);
     const ghArgs = ["pr", "create", "--fill"];
     if (base) ghArgs.push("--base", base);
-    const stdout = await new Promise((resolve, reject) => {
-      execFile("gh", ghArgs, {
-        cwd,
-        env: { ...process.env, PATH: buildSpawnPath() },
-        timeout: 60000,
-      }, (err, out, stderr) => {
-        if (err) reject(new Error((stderr || "").trim() || err.message));
-        else resolve(out.trim());
-      });
-    });
+    const stdout = await ghRepo(ghArgs, cwd, { timeout: 60000 });
     const urlMatch = stdout.match(/https?:\/\/\S+/);
     const url = urlMatch ? urlMatch[0] : null;
-    return { ok: true, url, stdout };
+    return {
+      ok: true,
+      action: "created",
+      number: extractPrNumber(url),
+      url,
+      stdout,
+    };
   } catch (err) {
     const msg = err.message || String(err);
     const existing = msg.match(/https?:\/\/github\.com\/\S+\/pull\/\d+/);
     if (existing) {
-      return { ok: true, url: existing[0], stdout: msg };
+      return {
+        ok: false,
+        stderr: `Open PR #${extractPrNumber(existing[0]) || "?"} already exists\n${existing[0]}`,
+      };
     }
     return { ok: false, stderr: msg };
+  }
+});
+
+ipcMain.handle("git-merge-pr", async (_event, cwd) => {
+  if (!cwd) return { ok: false, stderr: "no cwd" };
+  try {
+    const branch = await git(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+    if (branch === "HEAD") return { ok: false, stderr: "detached HEAD" };
+    const merged = await mergeCurrentBranchOpenPr(cwd, branch);
+    if (!merged?.openPr) return { ok: false, stderr: "No open upstream PR for this branch" };
+    if (merged.result?.merged === false) {
+      return { ok: false, stderr: merged.result.message || `Failed to merge PR #${merged.openPr.number}` };
+    }
+    return {
+      ok: true,
+      number: merged.openPr.number,
+      url: merged.openPr.url,
+      stdout: merged.result?.message || "Pull request merged",
+    };
+  } catch (err) {
+    return { ok: false, stderr: err.message || String(err) };
   }
 });
 
@@ -1273,6 +1417,68 @@ ipcMain.handle("gh-save-pm-state", async (_e, pmState) => {
     fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
     return true;
   } catch { return false; }
+});
+
+// IPC: clone a git repo (prefers `gh repo clone`, falls back to `git clone`)
+function normalizeCloneUrl(raw) {
+  let s = String(raw || "").trim();
+  if (!s) return s;
+  s = s.replace(/\s+/g, "");
+  s = s.replace(/\/+$/, "");
+  return s;
+}
+
+function toGhOwnerRepo(url) {
+  if (!url) return null;
+  const m = url.match(/^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9][A-Za-z0-9-_.]*)\/([A-Za-z0-9][A-Za-z0-9-_.]*?)(?:\.git)?\/?$/i);
+  if (m) return `${m[1]}/${m[2]}`;
+  if (/^[A-Za-z0-9][A-Za-z0-9-_.]*\/[A-Za-z0-9][A-Za-z0-9-_.]*$/.test(url)) return url;
+  return null;
+}
+
+function deriveRepoDirName(url) {
+  const s = normalizeCloneUrl(url);
+  if (!s) return null;
+  const stripped = s.replace(/\.git$/i, "");
+  const m = stripped.match(/([^/:\s]+)$/);
+  return m ? m[1] : null;
+}
+
+ipcMain.handle("project-clone", async (_e, args = {}) => {
+  const rawUrl = args?.url;
+  const parentDir = args?.parentDir;
+  if (!rawUrl || !parentDir) return { ok: false, stderr: "Missing url or parentDir" };
+  if (!fs.existsSync(parentDir)) return { ok: false, stderr: `Parent directory does not exist: ${parentDir}` };
+  const url = normalizeCloneUrl(rawUrl);
+  const name = deriveRepoDirName(url);
+  if (!name) return { ok: false, stderr: "Could not determine repo name from URL" };
+  const destPath = path.join(parentDir, name);
+  if (fs.existsSync(destPath)) {
+    return { ok: false, stderr: `Destination already exists: ${destPath}` };
+  }
+  const { execFile } = require("child_process");
+  const env = { ...process.env, PATH: buildSpawnPath() };
+  const ghOwnerRepo = toGhOwnerRepo(url);
+  const run = (bin, cliArgs) => new Promise((resolve) => {
+    execFile(bin, cliArgs, { cwd: parentDir, env, timeout: 300000 }, (err, stdout, stderr) => {
+      const errText = (stderr || (err && err.message) || "").toString().trim();
+      if (err) resolve({ ok: false, stderr: errText });
+      else resolve({ ok: true, stdout: (stdout || "").toString() });
+    });
+  });
+  let result;
+  if (ghOwnerRepo) {
+    result = await run("gh", ["repo", "clone", ghOwnerRepo, destPath]);
+    if (!result.ok) {
+      const fallback = await run("git", ["clone", url, destPath]);
+      if (fallback.ok) result = fallback;
+      else result = { ok: false, stderr: `gh: ${result.stderr}\ngit: ${fallback.stderr}` };
+    }
+  } else {
+    result = await run("git", ["clone", url, destPath]);
+  }
+  if (!result.ok) return { ok: false, stderr: result.stderr };
+  return { ok: true, path: destPath };
 });
 
 app.on("before-quit", () => {

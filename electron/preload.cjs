@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld("api", {
   getSystemInfo: () => ipcRenderer.invoke("system-info"),
   getDraftsPath: () => ipcRenderer.invoke("get-drafts-path"),
   pathExists: (p) => ipcRenderer.invoke("path-exists", p),
+  checkCliInstalled: (options) => ipcRenderer.invoke("check-cli-installed", options),
   shellRun: ({ command, cwd }) => ipcRenderer.invoke("shell-run", { command, cwd }),
 
   // Git operations
@@ -71,7 +72,9 @@ contextBridge.exposeInMainWorld("api", {
   gitCommit: (cwd, message, coauthor) => ipcRenderer.invoke("git-commit", cwd, message, coauthor),
   gitPush: (cwd) => ipcRenderer.invoke("git-push", cwd),
   gitPull: (cwd) => ipcRenderer.invoke("git-pull", cwd),
+  gitPrStatus: (cwd) => ipcRenderer.invoke("git-pr-status", cwd),
   gitCreatePr: (cwd, base) => ipcRenderer.invoke("git-create-pr", cwd, base),
+  gitMergePr: (cwd) => ipcRenderer.invoke("git-merge-pr", cwd),
   gitGenCommitMessage: (cwd) => ipcRenderer.invoke("git-gen-commit-message", cwd),
 
   // Terminal sessions
@@ -100,6 +103,7 @@ contextBridge.exposeInMainWorld("api", {
 
   // Project Manager
   openProjectManager: () => ipcRenderer.send("open-project-manager"),
+  cloneRepo: ({ url, parentDir }) => ipcRenderer.invoke("project-clone", { url, parentDir }),
 
   // Window appearance
   setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
