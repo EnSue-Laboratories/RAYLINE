@@ -415,23 +415,32 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
 
             {filesToShow && filesToShow.length > 0 && (
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", marginBottom: 8 }}>
-            {filesToShow.map((f, i) => (
-              <div key={i} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "4px 10px",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 6,
-                fontSize: s(11),
-                fontFamily: "'JetBrains Mono',monospace",
-                color: "rgba(255,255,255,0.5)",
-              }}>
+            {filesToShow.map((f, i) => {
+              const openable = !!f.path;
+              return (
+              <div
+                key={i}
+                onClick={openable ? () => window.api?.openPath?.(f.path) : undefined}
+                title={openable ? `Open ${f.path}` : undefined}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "4px 10px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 6,
+                  fontSize: s(11),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  color: "rgba(255,255,255,0.5)",
+                  cursor: openable ? "pointer" : "default",
+                }}
+              >
                 <FileText size={12} strokeWidth={1.5} />
                 {f.name || f.path?.split("/").pop() || "file"}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

@@ -27,6 +27,13 @@ function getToolLabel(tool) {
   return tool.name;
 }
 
+const FILE_PATH_TOOLS = new Set(["Read", "Edit", "Write", "NotebookEdit"]);
+
+function getFilePath(tool) {
+  if (!FILE_PATH_TOOLS.has(tool?.name)) return null;
+  return tool.args?.file_path || null;
+}
+
 function getPreview(tool) {
   const args = tool.args;
   if (!args || typeof args !== "object") return null;
@@ -122,6 +129,7 @@ export default function ToolCallBlock({ tool }) {
   const isRunning = tool.status === "running";
   const preview = getPreview(tool);
   const toolLabel = getToolLabel(tool);
+  const filePath = getFilePath(tool);
 
   return (
     <div
@@ -160,15 +168,22 @@ export default function ToolCallBlock({ tool }) {
           whiteSpace: "nowrap",
         }}>{toolLabel}</span>
         {preview && !expanded && (
-          <span style={{
-            color: "rgba(255,255,255,0.25)",
-            fontSize: s(10),
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            flex: 1,
-            minWidth: 0,
-          }}>
+          <span
+            onClick={filePath ? (e) => { e.stopPropagation(); window.api?.openPath?.(filePath); } : undefined}
+            title={filePath ? `Open ${filePath}` : undefined}
+            style={{
+              color: "rgba(255,255,255,0.25)",
+              fontSize: s(10),
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              flex: 1,
+              minWidth: 0,
+              cursor: filePath ? "pointer" : "inherit",
+              textDecoration: filePath ? "underline dotted rgba(255,255,255,0.2)" : "none",
+              textUnderlineOffset: 2,
+            }}
+          >
             {preview}
           </span>
         )}
