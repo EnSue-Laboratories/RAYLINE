@@ -9,12 +9,13 @@ export default function ChromeRail({ sidebarOpen, onToggleSidebar, onNew, showNe
     width: CHROME_RAIL_BUTTON_SIZE,
     height: CHROME_RAIL_BUTTON_SIZE,
     borderRadius: 7,
-    background: "rgba(10,10,12,0.24)",
+    background: "var(--control-bg-soft)",
     backdropFilter: "blur(10px)",
-    border: "1px solid rgba(255,255,255,0.06)",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.18)",
+    border: "1px solid var(--control-border)",
+    boxShadow: "var(--control-shadow)",
     WebkitAppRegion: "no-drag",
     pointerEvents: "auto",
+    color: "var(--text-secondary)",
   };
 
   return (

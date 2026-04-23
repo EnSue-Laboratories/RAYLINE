@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 :root {
+  color-scheme: dark;
   --pane-background: #0D0D10;
   --pane-background-rgb: 13, 13, 16;
   --pane-overlay-alpha: 0.82;
@@ -18,6 +19,79 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
+  --pane-interaction-rgb: 255, 255, 255;
+  --app-background: #0D0D10;
+  --text-primary: rgba(255,255,255,0.92);
+  --text-secondary: rgba(255,255,255,0.78);
+  --text-tertiary: rgba(255,255,255,0.58);
+  --text-muted: rgba(255,255,255,0.38);
+  --text-faint: rgba(255,255,255,0.22);
+  --text-inverse: #0D0D10;
+  --control-bg: rgba(255,255,255,0.04);
+  --control-bg-soft: rgba(255,255,255,0.02);
+  --control-bg-strong: rgba(255,255,255,0.08);
+  --control-bg-hover: rgba(255,255,255,0.1);
+  --control-bg-active: rgba(255,255,255,0.14);
+  --control-border: rgba(255,255,255,0.08);
+  --control-border-soft: rgba(255,255,255,0.04);
+  --control-border-strong: rgba(255,255,255,0.12);
+  --control-shadow: 0 12px 36px rgba(0,0,0,0.2);
+  --panel-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  --accent-link: rgba(140,180,255,0.82);
+  --aurora-bg: #0D0D0F;
+  --aurora-glow: rgba(255,255,255,0.018);
+  --grain-opacity: 0.4;
+  --grain-blend-mode: overlay;
+  --scrollbar-thumb: rgba(255,255,255,0.03);
+  --placeholder-color: rgba(255,255,255,0.25);
+  --slider-track-fill: rgba(255,255,255,0.5);
+  --slider-track-rest: rgba(255,255,255,0.08);
+  --slider-thumb: rgba(255,255,255,0.9);
+  --empty-lockup: rgb(200, 200, 200);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --pane-background: #f4efe7;
+  --pane-background-rgb: 244, 239, 231;
+  --pane-overlay-alpha: 0.8;
+  --pane-background-overlay: rgba(255,255,255,0.72);
+  --pane-hover-overlay: rgba(255,255,255,0.9);
+  --pane-active-overlay: rgba(255,255,255,0.96);
+  --pane-elevated-rgb: 255, 255, 255;
+  --pane-elevated: rgba(255,255,255,0.78);
+  --pane-hover: rgba(31, 41, 55, 0.05);
+  --pane-active: rgba(31, 41, 55, 0.09);
+  --pane-border: rgba(41, 51, 65, 0.12);
+  --pane-interaction-rgb: 31, 41, 55;
+  --app-background: #f4efe7;
+  --text-primary: rgba(26, 33, 43, 0.92);
+  --text-secondary: rgba(26, 33, 43, 0.78);
+  --text-tertiary: rgba(26, 33, 43, 0.58);
+  --text-muted: rgba(26, 33, 43, 0.4);
+  --text-faint: rgba(26, 33, 43, 0.24);
+  --text-inverse: #ffffff;
+  --control-bg: rgba(255,255,255,0.74);
+  --control-bg-soft: rgba(255,255,255,0.56);
+  --control-bg-strong: rgba(255,255,255,0.88);
+  --control-bg-hover: rgba(255,255,255,0.95);
+  --control-bg-active: rgba(255,255,255,0.98);
+  --control-border: rgba(31, 41, 55, 0.12);
+  --control-border-soft: rgba(31, 41, 55, 0.08);
+  --control-border-strong: rgba(31, 41, 55, 0.2);
+  --control-shadow: 0 16px 40px rgba(122, 98, 75, 0.12);
+  --panel-shadow: 0 24px 60px rgba(122, 98, 75, 0.18);
+  --accent-link: rgba(41, 98, 255, 0.88);
+  --aurora-bg: #f4efe7;
+  --aurora-glow: rgba(217, 180, 121, 0.18);
+  --grain-opacity: 0.14;
+  --grain-blend-mode: multiply;
+  --scrollbar-thumb: rgba(31, 41, 55, 0.12);
+  --placeholder-color: rgba(26, 33, 43, 0.34);
+  --slider-track-fill: rgba(31, 41, 55, 0.28);
+  --slider-track-rest: rgba(31, 41, 55, 0.08);
+  --slider-thumb: rgba(31, 41, 55, 0.9);
+  --empty-lockup: rgb(76, 77, 82);
 }
 
 *, *::before, *::after {
@@ -29,13 +103,14 @@
 html, body, #root {
   height: 100%;
   width: 100%;
-  background: var(--pane-background);
+  background: var(--app-background);
+  color: var(--text-primary);
 }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar        { width: 2px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.03); border-radius: 2px; }
+::-webkit-scrollbar-thumb  { background: var(--scrollbar-thumb); border-radius: 2px; }
 
 /* ── KaTeX dark theme overrides ── */
 .katex { color: inherit; }
@@ -44,7 +119,7 @@ html, body, #root {
 
 /* ── Form resets ── */
 textarea::placeholder,
-input::placeholder  { color: rgba(255, 255, 255, 0.25); }
+input::placeholder  { color: var(--placeholder-color); }
 textarea:focus,
 input:focus         { outline: none; }
 
@@ -112,7 +187,7 @@ input[type="range"]::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--slider-thumb);
   cursor: pointer;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }

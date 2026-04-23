@@ -18,7 +18,9 @@ import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, ge
 import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
+import { applyDocumentTheme, detectDefaultTheme, getSystemTheme, normalizeThemeMode, resolveTheme } from "./utils/theme";
 import { detectDefaultLocale, normalizeLocale } from "./i18n";
+import { CHROME_RAIL_COLLAPSED_SAFE_INSET } from "./windowChrome";
 import {
   pinTabPatch,
   runEndedPatch,
@@ -45,6 +47,7 @@ const SHELL_TERMINAL_TIMEOUT_MS = 15000;
 const LAB_CONTROL_ENDPOINT = "http://127.0.0.1:4001/control";
 const LAB_CONTROL_COMMIT_DELAY_MS = 1000;
 const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
+const EMPTY_COMPOSER_DRAFT = Object.freeze({ text: "", attachments: [] });
 
 function logSessionState(...args) {
   console.log("[session-state]", ...args);
@@ -204,6 +207,27 @@ function clampNumber(value, min, max, fallback) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.min(max, Math.max(min, numeric));
+}
+
+function normalizeComposerDraft(draft) {
+  const text = typeof draft?.text === "string" ? draft.text : "";
+  const attachments = Array.isArray(draft?.attachments)
+    ? draft.attachments.filter(Boolean)
+    : [];
+  return { text, attachments };
+}
+
+function normalizeComposerDraftMap(value) {
+  if (!value || typeof value !== "object") return {};
+
+  const next = {};
+  for (const [conversationId, draft] of Object.entries(value)) {
+    if (!conversationId) continue;
+    const normalized = normalizeComposerDraft(draft);
+    if (!normalized.text && normalized.attachments.length === 0) continue;
+    next[conversationId] = normalized;
+  }
+  return next;
 }
 
 function stripAnsi(text) {
@@ -1039,6 +1063,8 @@ export default function App() {
   const [stateLoaded, setStateLoaded] = useState(false);
   const [wallpaper, setWallpaper] = useState(null);
   const [locale, setLocale] = useState(() => detectDefaultLocale());
+  const [themeMode, setThemeMode] = useState(() => detectDefaultTheme());
+  const [systemTheme, setSystemTheme] = useState(() => getSystemTheme());
   const [fontSize, setFontSize] = useState(15);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
@@ -1059,6 +1085,7 @@ export default function App() {
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const [showMulticaSetup, setShowMulticaSetup] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [composerDrafts, setComposerDrafts] = useState({});
   useEffect(() => {
     const h = () => setShowMulticaSetup(true);
     window.addEventListener("open-multica-setup", h);
@@ -1096,6 +1123,7 @@ export default function App() {
     cwd,
     defaultModel,
     locale,
+    theme: themeMode,
     fontSize,
     sidebarActiveOpacity,
     wallpaper: getPersistedWallpaper(wallpaper),
@@ -1110,6 +1138,7 @@ export default function App() {
     notificationSound,
     notificationsMuted,
     queuedMessages,
+    composerDrafts,
   }), [
     appBlur,
     appOpacity,
@@ -1122,18 +1151,24 @@ export default function App() {
     draftsCollapsed,
     fontSize,
     locale,
+    themeMode,
     notificationSound,
     notificationsMuted,
     persistedActive,
     persistableConversations,
     projects,
     queuedMessages,
+    composerDrafts,
     sidebarActiveOpacity,
     wallpaper,
   ]);
   const activeQueuedMessages = useMemo(
     () => queuedMessages.filter((item) => item?.conversationId === active),
     [active, queuedMessages]
+  );
+  const activeComposerDraft = useMemo(
+    () => normalizeComposerDraft(active ? composerDrafts[active] : EMPTY_COMPOSER_DRAFT),
+    [active, composerDrafts]
   );
 
   useEffect(() => {
@@ -1181,6 +1216,26 @@ export default function App() {
     messageQueue.current = nextQueue;
     setQueuedMessages(nextQueue);
     return nextQueue;
+  }, []);
+
+  const updateComposerDraft = useCallback((conversationId, nextDraft) => {
+    if (!conversationId) return;
+
+    setComposerDrafts((prev) => {
+      const current = normalizeComposerDraft(prev[conversationId]);
+      const resolved = typeof nextDraft === "function"
+        ? normalizeComposerDraft(nextDraft(current))
+        : normalizeComposerDraft(nextDraft);
+
+      if (!resolved.text && resolved.attachments.length === 0) {
+        if (!(conversationId in prev)) return prev;
+        const next = { ...prev };
+        delete next[conversationId];
+        return next;
+      }
+
+      return { ...prev, [conversationId]: resolved };
+    });
   }, []);
 
   const removeQueuedMessage = useCallback((queueId) => {
@@ -1265,6 +1320,31 @@ export default function App() {
   }, [queueLabControlUpdate]);
 
   useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+    const handleChange = () => setSystemTheme(media.matches ? "light" : "dark");
+    handleChange();
+
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", handleChange);
+      return () => media.removeEventListener("change", handleChange);
+    }
+
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
+  }, []);
+
+  const effectiveTheme = useMemo(
+    () => resolveTheme(themeMode, systemTheme),
+    [systemTheme, themeMode]
+  );
+
+  useEffect(() => {
+    applyDocumentTheme(effectiveTheme);
+  }, [effectiveTheme]);
+
+  useEffect(() => {
     if (!window.api?.onAgentStream || !window.api?.onAgentDone) return undefined;
 
     const offStream = window.api.onAgentStream(({ conversationId, event }) => {
@@ -1329,6 +1409,7 @@ export default function App() {
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
         if (state.locale) setLocale(normalizeLocale(state.locale));
+        if (state.theme) setThemeMode(normalizeThemeMode(state.theme));
         if (state.fontSize) setFontSize(state.fontSize);
         if (state.sidebarActiveOpacity != null) {
           setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
@@ -1342,6 +1423,9 @@ export default function App() {
             .filter(Boolean);
           messageQueue.current = restoredQueue;
           setQueuedMessages(restoredQueue);
+        }
+        if (state.composerDrafts) {
+          setComposerDrafts(normalizeComposerDraftMap(state.composerDrafts));
         }
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
@@ -1927,6 +2011,12 @@ export default function App() {
   const handleDelete = (id, e) => {
     e.stopPropagation();
     cancelMessage(id);
+    setComposerDrafts((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     const remaining = convoList.filter((c) => c.id !== id);
     const nextConversations = resetPinnedTabs(remaining);
     if (nextConversations !== remaining) {
@@ -3239,7 +3329,7 @@ export default function App() {
 
   return (
     <FontSizeContext.Provider value={fontSize}>
-    <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative" }}>
+    <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative", background: "var(--app-background)", color: "var(--text-primary)" }}>
       {wallpaper?.dataUrl ? (
         <div style={{
           position: "fixed",
@@ -3269,8 +3359,8 @@ export default function App() {
           transform: appBlur > 0 ? "scale(1.05)" : "none",
           transition: "filter .2s",
         }}>
-          <AuroraCanvas />
-          <Grain />
+          <AuroraCanvas theme={effectiveTheme} />
+          <Grain theme={effectiveTheme} />
         </div>
       )}
 
@@ -3280,6 +3370,7 @@ export default function App() {
         onNew={handleNew}
         showNewButton={!sidebarOpen && !showSettings}
         locale={locale}
+        theme={effectiveTheme}
       />
 
       <div
@@ -3295,7 +3386,7 @@ export default function App() {
         style={{
           width: sidebarOpen ? 264 : 0,
           minWidth: sidebarOpen ? 264 : 0,
-          borderRight: sidebarOpen ? "1px solid rgba(255,255,255,0.025)" : "none",
+          borderRight: sidebarOpen ? "1px solid var(--control-border-soft)" : "none",
           display: "flex",
           flexDirection: "column",
           position: "relative",
@@ -3317,6 +3408,7 @@ export default function App() {
           onOpenDispatch={() => setShowDispatchCard(true)}
           onDelete={handleDelete}
           locale={locale}
+          theme={effectiveTheme}
           cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
           onPickFolder={handlePickFolder}
           onOpenSettings={() => setShowSettings(true)}
@@ -3350,6 +3442,8 @@ export default function App() {
           onAppBlurChange={setAppBlur}
           appOpacity={appOpacity}
           onAppOpacityChange={setAppOpacity}
+          theme={themeMode}
+          onThemeChange={setThemeMode}
           developerMode={developerMode}
           onDeveloperModeChange={setDeveloperMode}
           notificationSound={notificationSound}
@@ -3359,6 +3453,7 @@ export default function App() {
           locale={locale}
           onLocaleChange={setLocale}
           onClose={() => setShowSettings(false)}
+          chromeRailInset={sidebarOpen ? 0 : CHROME_RAIL_COLLAPSED_SAFE_INSET}
         />
       ) : (
         <ChatArea
@@ -3404,6 +3499,10 @@ export default function App() {
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
           developerMode={developerMode}
+          locale={locale}
+          composerDraft={activeComposerDraft}
+          onComposerDraftChange={(nextDraft) => updateComposerDraft(active, nextDraft)}
+          chromeRailInset={sidebarOpen ? 0 : CHROME_RAIL_COLLAPSED_SAFE_INSET}
         />
       )}
 
@@ -3428,6 +3527,7 @@ export default function App() {
         onClose={() => setShowNewProject(false)}
         onCloned={handleClonedRepo}
         onPickedLocalFolder={registerManualProject}
+        locale={locale}
       />
 
       {/* Terminal drawer */}

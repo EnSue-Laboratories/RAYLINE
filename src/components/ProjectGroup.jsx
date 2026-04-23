@@ -5,6 +5,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { getMOrMulticaFallback } from "../data/models";
 import { relativeTime } from "../utils/time";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
+import { createTranslator } from "../i18n";
 
 export default function ProjectGroup({
   project,
@@ -16,8 +17,10 @@ export default function ProjectGroup({
   onHideProject,
   searchActive,
   multicaModels = [],
+  locale = "en-US",
 }) {
   const s = useFontScale();
+  const t = createTranslator(locale);
   const [headerHovered, setHeaderHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
@@ -80,7 +83,7 @@ export default function ProjectGroup({
           style={{
             display: "flex",
             alignItems: "center",
-            color: "rgba(255,255,255,0.25)",
+            color: "var(--text-faint)",
             transform: `rotate(${expanded ? 90 : 0}deg)`,
             transition: "transform .15s",
             flexShrink: 0,
@@ -94,7 +97,7 @@ export default function ProjectGroup({
           style={{
             display: "flex",
             alignItems: "center",
-            color: "rgba(255,255,255,0.3)",
+            color: "var(--text-muted)",
             flexShrink: 0,
           }}
         >
@@ -108,7 +111,7 @@ export default function ProjectGroup({
             minWidth: 0,
             fontSize: s(11),
             fontFamily: "'JetBrains Mono', monospace",
-            color: "rgba(255,255,255,0.4)",
+            color: "var(--text-muted)",
             letterSpacing: ".04em",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -128,7 +131,7 @@ export default function ProjectGroup({
                 transform: "translateY(-50%)",
                 fontSize: s(9),
                 fontFamily: "'JetBrains Mono', monospace",
-                color: "rgba(255,255,255,0.15)",
+                color: "var(--text-faint)",
                 letterSpacing: ".04em",
                 opacity: headerHovered ? 0 : 1,
                 pointerEvents: "none",
@@ -156,21 +159,21 @@ export default function ProjectGroup({
           >
             <button
               onClick={() => onNewInProject(project.cwdRoot)}
-              title="New chat in project"
+              title={t("projectGroup.newChatInProject")}
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 background: "none",
                 border: "none",
-                color: "rgba(255,255,255,0.25)",
+                color: "var(--text-faint)",
                 cursor: "pointer",
                 padding: 3,
                 borderRadius: 4,
                 transition: "color .15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-faint)"; }}
             >
               <Plus size={11} strokeWidth={1.5} />
             </button>
@@ -178,21 +181,21 @@ export default function ProjectGroup({
             <button
               ref={moreRef}
               onClick={openMenu}
-              title="More options"
+              title={t("projectGroup.moreOptions")}
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 background: "none",
                 border: "none",
-                color: "rgba(255,255,255,0.25)",
+                color: "var(--text-faint)",
                 cursor: "pointer",
                 padding: 3,
                 borderRadius: 4,
                 transition: "color .15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-faint)"; }}
             >
               <MoreHorizontal size={11} strokeWidth={1.5} />
             </button>
@@ -243,7 +246,7 @@ export default function ProjectGroup({
                 <div
                   style={{
                     fontSize: s(12.5),
-                    color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
+                    color: isActive ? "var(--text-primary)" : "var(--text-tertiary)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -256,7 +259,7 @@ export default function ProjectGroup({
                 <div
                   style={{
                     fontSize: s(11),
-                    color: "rgba(255,255,255,0.3)",
+                    color: "var(--text-muted)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -287,14 +290,14 @@ export default function ProjectGroup({
                 style={{
                   background: "none",
                   border: "none",
-                  color: "rgba(255,255,255,0.25)",
+                  color: "var(--text-faint)",
                   cursor: "pointer",
                   padding: 1,
                   transition: "color .15s",
                   display: "flex",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(200,80,80,0.5)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-faint)"; }}
               >
                 <Trash2 size={12} strokeWidth={1.5} />
               </button>
@@ -313,7 +316,7 @@ export default function ProjectGroup({
                 style={{
                   fontSize: s(9),
                   fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.35)",
+                  color: "var(--text-muted)",
                   letterSpacing: ".08em",
                   minWidth: 0,
                 }}
@@ -364,19 +367,19 @@ export default function ProjectGroup({
             left: menuPos.left,
             zIndex: 400,
             minWidth: 180,
-            background: "rgba(8,8,12,0.55)",
+            background: "var(--pane-elevated)",
             backdropFilter: "blur(48px) saturate(1.2)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            border: "1px solid var(--control-border)",
             borderRadius: 10,
             padding: 3,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+            boxShadow: "var(--panel-shadow)",
             animation: "dropIn .15s ease",
             WebkitAppRegion: "no-drag",
           }}
         >
           <MenuBtn
             s={s}
-            label="Open in Finder"
+            label={t("projectGroup.openInFinder")}
             onClick={() => {
               window.api?.openPath?.(project.cwdRoot);
               closeMenu();
@@ -384,7 +387,7 @@ export default function ProjectGroup({
           />
           <MenuBtn
             s={s}
-            label="Copy path"
+            label={t("projectGroup.copyPath")}
             onClick={() => {
               navigator.clipboard.writeText(project.cwdRoot);
               closeMenu();
@@ -392,11 +395,11 @@ export default function ProjectGroup({
           />
 
           {/* Divider */}
-          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "3px 8px" }} />
+          <div style={{ height: 1, background: "var(--control-border-soft)", margin: "3px 8px" }} />
 
           <MenuBtn
             s={s}
-            label="Hide project"
+            label={t("projectGroup.hideProject")}
             danger
             onClick={() => {
               onHideProject(project.cwdRoot);
@@ -421,7 +424,7 @@ function MenuBtn({ s, label, onClick, danger = false }) {
         background: "transparent",
         border: "none",
         borderRadius: 7,
-        color: danger ? "rgba(210,80,80,0.7)" : "rgba(255,255,255,0.55)",
+        color: danger ? "rgba(210,80,80,0.7)" : "var(--text-tertiary)",
         fontSize: s(11),
         fontFamily: "system-ui, sans-serif",
         cursor: "pointer",
@@ -429,12 +432,12 @@ function MenuBtn({ s, label, onClick, danger = false }) {
         transition: "all .12s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-        e.currentTarget.style.color = danger ? "rgba(220,90,90,1)" : "rgba(255,255,255,0.85)";
+        e.currentTarget.style.background = "var(--control-bg)";
+        e.currentTarget.style.color = danger ? "rgba(220,90,90,1)" : "var(--text-primary)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = danger ? "rgba(210,80,80,0.7)" : "rgba(255,255,255,0.55)";
+        e.currentTarget.style.color = danger ? "rgba(210,80,80,0.7)" : "var(--text-tertiary)";
       }}
     >
       {label}

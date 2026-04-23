@@ -1,12 +1,15 @@
 import { useRef, useEffect } from "react";
 
-export default function AuroraCanvas() {
+export default function AuroraCanvas({ theme = "dark" }) {
   const ref = useRef(null);
 
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
     const ctx = c.getContext("2d");
+    const rootStyles = getComputedStyle(document.documentElement);
+    const auroraBackground = rootStyles.getPropertyValue("--aurora-bg").trim() || "#0D0D0F";
+    const auroraGlow = rootStyles.getPropertyValue("--aurora-glow").trim() || "rgba(255,255,255,0.018)";
     let w, h, raf;
 
     var orbList = [
@@ -25,7 +28,7 @@ export default function AuroraCanvas() {
     const draw = () => {
       t += 0.003;
 
-      ctx.fillStyle = "#0D0D0F";
+      ctx.fillStyle = auroraBackground;
       ctx.fillRect(0, 0, w, h);
 
       // Compute orb positions
@@ -43,7 +46,7 @@ export default function AuroraCanvas() {
       for (var gi = 0; gi < orbPositions.length; gi++) {
         var gp = orbPositions[gi];
         var grad = ctx.createRadialGradient(gp.x, gp.y, 0, gp.x, gp.y, gp.r * 0.7);
-        grad.addColorStop(0, "rgba(255,255,255,0.018)");
+        grad.addColorStop(0, auroraGlow);
         grad.addColorStop(1, "transparent");
         ctx.fillStyle = grad;
         ctx.beginPath();
@@ -60,7 +63,7 @@ export default function AuroraCanvas() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [theme]);
 
   return (
     <canvas

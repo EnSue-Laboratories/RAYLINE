@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Check, FolderClosed, FolderOpen } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { createTranslator } from "../i18n";
 
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
@@ -13,8 +14,9 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-export default function ProjectPicker({ value, onChange, allCwdRoots, projects, onBrowse }) {
+export default function ProjectPicker({ value, onChange, allCwdRoots, projects, onBrowse, locale = "en-US" }) {
   const s = useFontScale();
+  const t = createTranslator(locale);
   const [open, set] = useState(false);
   const ref = useRef(null);
   const menuRef = useRef(null);
@@ -22,7 +24,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
 
   const projectName = value
     ? (projects?.[value]?.name || value.split("/").pop())
-    : "Drafts";
+    : t("projectPicker.drafts");
 
   const updateMenuPosition = useCallback(() => {
     if (!ref.current) return;
@@ -171,7 +173,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
           >
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <FolderOpen size={12} strokeWidth={1.8} />
-              Drafts
+              {t("projectPicker.drafts")}
             </span>
             {value === null && <Check size={12} strokeWidth={2.2} />}
           </button>
@@ -260,7 +262,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
           >
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <FolderOpen size={12} strokeWidth={1.8} />
-              Browse...
+              {t("projectPicker.browse")}
             </span>
           </button>
         </div>,

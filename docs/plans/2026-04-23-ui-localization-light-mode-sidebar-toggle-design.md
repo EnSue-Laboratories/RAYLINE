@@ -178,6 +178,58 @@ Adopt a single fixed toggle location, inspired by the stable mode-switch anchor 
 - Add a compact command rail for `toggle sidebar`, `new chat`, and `terminal`
 - Add a keyboard shortcut hint in the tooltip
 
+---
+
+### Issue 4: Preserve composer drafts across UI switches and reserve a collapsed-sidebar safe zone
+
+**Problem**
+
+Two workflow regressions now show up together in daily use:
+
+- when the sidebar is collapsed, top-left chrome controls can overlap content controls such as the Settings back button
+- in-progress chat input and attachments can be lost when users switch to Settings or other top-level surfaces mid-draft
+
+These both reduce confidence during active collaboration because the shell feels unstable while multitasking.
+
+**Goal**
+
+Make the shell resilient during context switches:
+
+- reserve a stable left-side safe zone when the sidebar is collapsed
+- preserve in-progress composer state so users can move around the app without losing partial work
+
+**Scope**
+
+- Introduce a collapsed-sidebar safe inset for shell-level content chrome
+- Apply the inset to at least:
+  - settings header / back navigation
+  - chat header / tab area
+- Persist active chat composer draft state:
+  - input text
+  - staged attachments
+- Keep those drafts when opening Settings and returning to the chat
+- Persist draft state through the existing app-state save/load flow when reasonable
+
+**Suggested implementation**
+
+- Define one shell constant for the collapsed chrome rail safe area
+- Pass that inset from `App.jsx` into content surfaces instead of hard-coding independent paddings
+- Lift chat composer draft state from `ChatArea.jsx` into `App.jsx`
+- Store drafts by conversation id so switching surfaces does not destroy the active draft
+- Reuse the existing renderer persistence file instead of inventing a second temp-store path
+
+**Acceptance criteria**
+
+1. With the sidebar collapsed, the Settings back button remains visible and clickable.
+2. Top-left shell controls never overlap primary content controls.
+3. Typing in the active chat composer, then opening Settings and returning, restores the text and attachments.
+4. Draft restoration works after relaunch if the persisted state was saved successfully.
+
+**Follow-up worth tracking**
+
+- Extend the same draft-preservation model to `NewChatCard` and other creation flows
+- Add a lightweight visual cue when a conversation has an unsent local draft
+
 ## Recommended implementation order
 
 1. **Issue 3 first**

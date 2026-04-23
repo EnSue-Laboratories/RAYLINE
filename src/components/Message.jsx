@@ -60,7 +60,7 @@ function PreBlock({ rawText, s = (x) => x, children }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: "rgba(0,0,0,0.4)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        border: "1px solid var(--control-border)",
         borderRadius: 8,
         padding: "12px 14px",
         overflow: "auto",
@@ -89,6 +89,7 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
       return (
         <code style={{
           background: "rgba(255,255,255,0.06)",
+          color: "var(--text-primary)",
           padding: "2px 5px",
           borderRadius: 4,
           fontSize: "0.85em",
@@ -157,10 +158,10 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
   h3: ({ children }) => <h3 style={{ fontSize: s(15), fontWeight: 600, margin: "12px 0 4px" }}>{children}</h3>,
   blockquote: ({ children }) => (
     <blockquote style={{
-      borderLeft: "2px solid rgba(255,255,255,0.15)",
+      borderLeft: "2px solid var(--control-border-strong)",
       paddingLeft: 14,
       margin: "8px 0",
-      color: "rgba(255,255,255,0.45)",
+      color: "var(--text-tertiary)",
       fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
       fontStyle: "italic",
       fontSize: s(13),
@@ -170,13 +171,13 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
   a: ({ href, children }) => {
     const safe = href && !href.startsWith("javascript:");
     return safe ? (
-      <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(140,180,255,0.8)", textDecoration: "none" }}
+      <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-link)", textDecoration: "none" }}
          onMouseEnter={(e) => { e.target.style.textDecoration = "underline"; }}
          onMouseLeave={(e) => { e.target.style.textDecoration = "none"; }}
       >{children}</a>
     ) : <span>{children}</span>;
   },
-  strong: ({ children }) => <strong style={{ fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>{children}</strong>,
+  strong: ({ children }) => <strong style={{ fontWeight: 600, color: "var(--text-primary)" }}>{children}</strong>,
   table: ({ children }) => (
     <table style={{
       width: "100%",
@@ -185,10 +186,10 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
       fontSize: s(13),
     }}>{children}</table>
   ),
-  thead: ({ children }) => <thead style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>{children}</thead>,
-  th: ({ children }) => <th style={{ textAlign: "left", padding: "6px 12px 6px 0", fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{children}</th>,
-  td: ({ children }) => <td style={{ padding: "4px 12px 4px 0", color: "rgba(255,255,255,0.55)" }}>{children}</td>,
-  hr: () => <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "16px 0" }} />,
+  thead: ({ children }) => <thead style={{ borderBottom: "1px solid var(--control-border)" }}>{children}</thead>,
+  th: ({ children }) => <th style={{ textAlign: "left", padding: "6px 12px 6px 0", fontWeight: 600, color: "var(--text-secondary)" }}>{children}</th>,
+  td: ({ children }) => <td style={{ padding: "4px 12px 4px 0", color: "var(--text-tertiary)" }}>{children}</td>,
+  hr: () => <hr style={{ border: "none", borderTop: "1px solid var(--control-border)", margin: "16px 0" }} />,
 });
 
 // Escape non-standard HTML tags that rehype-raw would try to parse (e.g. <thinking>, </thinking>)
@@ -345,7 +346,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
         <div style={{
           fontSize: s(9),
           fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.38)",
+          color: "var(--text-muted)",
           letterSpacing: ".14em",
           marginBottom: 10,
         }}>
@@ -361,10 +362,10 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
               autoFocus
               style={{
                 width: "100%",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.1)",
+                background: "var(--control-bg)",
+                border: "1px solid var(--control-border-strong)",
                 borderRadius: 8,
-                color: "rgba(255,255,255,0.9)",
+                color: "var(--text-primary)",
                 fontSize: s(15),
                 lineHeight: 1.7,
                 fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
@@ -378,9 +379,9 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                 onClick={() => { setEditing(false); setEditText(msg.text); }}
                 style={{
                   background: "none",
-                  border: "1px solid rgba(255,255,255,0.1)",
+                  border: "1px solid var(--control-border-strong)",
                   borderRadius: 6,
-                  color: "rgba(255,255,255,0.4)",
+                  color: "var(--text-muted)",
                   padding: "4px 12px",
                   fontSize: s(11),
                   height: 26,
@@ -391,10 +392,10 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                 onClick={handleSubmitEdit}
                 disabled={!editChanged}
                 style={{
-                  background: editChanged ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.15)",
+                  background: editChanged ? "var(--text-primary)" : "var(--control-bg-active)",
                   border: "1px solid transparent",
                   borderRadius: 6,
-                  color: editChanged ? "#000" : "rgba(255,255,255,0.25)",
+                  color: editChanged ? "var(--text-inverse)" : "var(--text-faint)",
                   padding: "3px 12px",
                   fontSize: s(11),
                   height: 24,
@@ -421,12 +422,12 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                 alignItems: "center",
                 gap: 5,
                 padding: "4px 10px",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: "var(--control-bg)",
+                border: "1px solid var(--control-border)",
                 borderRadius: 6,
                 fontSize: s(11),
                 fontFamily: "'JetBrains Mono',monospace",
-                color: "rgba(255,255,255,0.5)",
+                color: "var(--text-tertiary)",
               }}>
                 <FileText size={12} strokeWidth={1.5} />
                 {f.name || f.path?.split("/").pop() || "file"}
@@ -449,9 +450,9 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                     maxWidth: "85%",
                     padding: "10px 12px",
                     borderRadius: 12,
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    background: "linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))",
-                    color: "rgba(255,255,255,0.85)",
+                    border: "1px solid var(--control-border)",
+                    background: "linear-gradient(135deg, var(--control-bg-strong), var(--control-bg-soft))",
+                    color: "var(--text-primary)",
                     fontSize: s(12),
                     lineHeight: 1.6,
                     fontFamily: "'JetBrains Mono',monospace",
@@ -459,13 +460,13 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                     overflowWrap: "anywhere",
                   }}
                 >
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>$ </span>
+                  <span style={{ color: "var(--text-tertiary)" }}>$ </span>
                   {displayText}
                 </div>
               </div>
             ) : (
               <div style={{
-                color: "rgba(255,255,255,0.92)",
+                color: "var(--text-primary)",
                 fontSize: s(15),
                 lineHeight: 1.7,
                 fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
@@ -513,8 +514,8 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
             maxWidth: "88%",
             padding: "14px 16px 12px",
             borderRadius: 14,
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
+            border: "1px solid var(--control-border)",
+            background: "linear-gradient(180deg, var(--control-bg), var(--control-bg-soft))",
             boxShadow: "0 20px 40px rgba(0,0,0,0.18)",
           }}
         >
@@ -526,7 +527,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
               marginBottom: 10,
               fontSize: s(9),
               fontFamily: "'JetBrains Mono',monospace",
-              color: "rgba(255,255,255,0.4)",
+              color: "var(--text-muted)",
               letterSpacing: ".14em",
             }}
           >
@@ -535,7 +536,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
           </div>
           <div
             style={{
-              color: "rgba(255,255,255,0.82)",
+              color: "var(--text-primary)",
               fontSize: s(14),
               lineHeight: 1.75,
               fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
@@ -568,7 +569,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
         <div style={{
           fontSize: s(9),
           fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.38)",
+          color: "var(--text-muted)",
           letterSpacing: ".14em",
           marginBottom: 12,
           display: "flex",
@@ -584,7 +585,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
             const isLastPart = i === (msg.parts || []).length - 1;
             return (
               <div key={i} style={{
-                color: "rgba(255,255,255,0.75)",
+                color: "var(--text-secondary)",
                 fontSize: s(15),
                 lineHeight: 1.85,
                 fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
@@ -636,9 +637,9 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                   margin: "10px 0 14px",
                   padding: "10px 12px",
                   borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  background: isPaused ? "rgba(255,214,153,0.08)" : "rgba(255,255,255,0.04)",
-                  color: "rgba(255,255,255,0.72)",
+                  border: "1px solid var(--control-border)",
+                  background: isPaused ? "rgba(255,214,153,0.08)" : "var(--control-bg)",
+                  color: "var(--text-secondary)",
                   maxWidth: "80%",
                 }}
               >
@@ -651,7 +652,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                     fontFamily: "'JetBrains Mono',monospace",
                     letterSpacing: ".04em",
                     textTransform: "uppercase",
-                    color: isPaused ? "rgba(255,220,170,0.9)" : "rgba(255,255,255,0.6)",
+                    color: isPaused ? "rgba(255,220,170,0.9)" : "var(--text-tertiary)",
                   }}
                 >
                   {isPaused && <PauseCircle size={14} strokeWidth={1.8} />}
@@ -664,7 +665,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                       fontSize: s(13),
                       lineHeight: 1.65,
                       fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
-                      color: "rgba(255,255,255,0.66)",
+                      color: "var(--text-secondary)",
                     }}
                   >
                     {part.text}
@@ -699,7 +700,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
         {/* Fallback for old format messages (text + toolCalls) */}
         {!msg.parts && msg.text && (
           <div style={{
-            color: "rgba(255,255,255,0.75)",
+            color: "var(--text-secondary)",
             fontSize: s(15),
             lineHeight: 1.85,
             fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
@@ -745,7 +746,7 @@ function MsgBtn({ icon, onClick }) {
       style={{
         background: "none",
         border: "none",
-        color: "rgba(255,255,255,0.3)",
+        color: "var(--text-muted)",
         cursor: "pointer",
         padding: "2px 4px",
         display: "inline-flex",
@@ -753,8 +754,8 @@ function MsgBtn({ icon, onClick }) {
         borderRadius: 3,
         transition: "color .2s",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-tertiary)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
     >
       {icon}
     </button>

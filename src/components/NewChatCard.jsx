@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect, useCallback, forwardRef } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { Paperclip, X, GitBranch, GitFork, Link2 } from "lucide-react";
 import { ModelPickerWithMultica } from "../data/multicaModels.jsx";
 import ProjectPicker from "./ProjectPicker";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { clipboardItemsToAttachments, dataTransferHasFiles, fileListToAttachments } from "../utils/attachments";
+import { createTranslator } from "../i18n";
 
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
@@ -51,8 +52,10 @@ export default function NewChatCard({
   onPickFolder,
   onCancel,
   developerMode = true,
+  locale = "en-US",
 }) {
   const s = useFontScale();
+  const t = createTranslator(locale);
   const textareaRef = useRef(null);
   const dragDepthRef = useRef(0);
 
@@ -220,14 +223,14 @@ export default function NewChatCard({
     if (!trimmedPrompt || creatingChat) return;
 
     if ((trimmedBranch || worktree) && !selectedCwd) {
-      setError("Select a project before creating a branch or worktree.");
+      setError(t("newChat.selectProjectBeforeBranchOrWorktree"));
       return;
     }
 
     if (worktree) {
       const base = trimmedBranch || currentBranch;
       if (!base) {
-        setError("Pick a base branch first.");
+        setError(t("newChat.pickBaseBranchFirst"));
         return;
       }
       nextWorktreeBaseBranch = base;
@@ -250,11 +253,11 @@ export default function NewChatCard({
         attachments: attachments.length ? attachments : undefined,
       });
     } catch (createError) {
-      setError(createError?.message || "Failed to create chat.");
+      setError(createError?.message || t("newChat.failedToCreateChat"));
     } finally {
       setCreatingChat(false);
     }
-  }, [attachments, branch, branchMode, creatingChat, currentBranch, issueContext, makeClaudiBranchName, model, onCreateChat, prompt, selectedCwd, worktree, worktreeName]);
+  }, [attachments, branch, branchMode, creatingChat, currentBranch, issueContext, makeClaudiBranchName, model, onCreateChat, prompt, selectedCwd, t, worktree, worktreeName]);
 
   // Enter to create, Shift+Enter for newline
   const handleKeyDown = useCallback(
@@ -296,7 +299,7 @@ export default function NewChatCard({
 
   const openBranchPicker = useCallback(() => {
     if (!selectedCwd) {
-      setError("Select a project before choosing a branch.");
+      setError(t("newChat.selectProjectBeforeBranch"));
       return;
     }
     setError(null);
@@ -324,7 +327,7 @@ export default function NewChatCard({
 
   const openTreeInput = useCallback(() => {
     if (!selectedCwd) {
-      setError("Select a project before creating a worktree.");
+      setError(t("newChat.selectProjectBeforeWorktree"));
       return;
     }
     setError(null);
@@ -468,9 +471,9 @@ export default function NewChatCard({
     strokeWidth: 2,
   };
 
-  const branchLabel = branch || currentBranch || (worktree ? "Base" : "Branch");
-  const treeLabel = worktreeName || "Tree";
-  const issueLabel = issueContext ? `#${issueContext.match(/Issue #(\d+)/)?.[1] || ""}` : "Issue";
+  const branchLabel = branch || currentBranch || (worktree ? t("newChat.base") : t("newChat.branch"));
+  const treeLabel = worktreeName || t("newChat.tree");
+  const issueLabel = issueContext ? `#${issueContext.match(/Issue #(\d+)/)?.[1] || ""}` : t("newChat.issue");
 
   return (
     <div
@@ -505,7 +508,7 @@ export default function NewChatCard({
         {/* Main textarea */}
         <textarea
           ref={textareaRef}
-          placeholder="What do you want to do?"
+          placeholder={t("newChat.promptPlaceholder")}
           value={prompt}
           onChange={(e) => {
             setPrompt(e.target.value);
@@ -583,7 +586,7 @@ export default function NewChatCard({
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
           >
             <Paperclip style={chipIconStyle} />
-            File
+            {t("newChat.file")}
           </button>
 
           {/* Branch — searchable typeahead */}
@@ -608,6 +611,7 @@ export default function NewChatCard({
                 worktree={worktree}
                 onSelectBranch={selectExistingBranch}
                 onUseCustomBranch={useCustomBranch}
+                locale={locale}
               />,
               document.body
             )}
@@ -632,6 +636,7 @@ export default function NewChatCard({
                 baseBranch={branch || currentBranch}
                 onConfirm={confirmTreeName}
                 onDisable={disableWorktree}
+                locale={locale}
               />,
               document.body
             )}
@@ -660,6 +665,7 @@ export default function NewChatCard({
                 issues={filteredIssues}
                 loading={issueLoading}
                 onSelect={selectIssue}
+                locale={locale}
               />,
               document.body
             )}
@@ -677,12 +683,13 @@ export default function NewChatCard({
             allCwdRoots={allCwdRoots}
             projects={projects}
             onBrowse={handleBrowseProject}
+            locale={locale}
           />
           <span style={{
             fontSize: s(10), color: "rgba(255,255,255,0.2)",
             fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
           }}>
-            {creatingChat ? "Creating..." : "Enter to create"}
+            {creatingChat ? t("newChat.creating") : t("newChat.enterToCreate")}
           </span>
         </div>
 
@@ -703,9 +710,10 @@ export default function NewChatCard({
 /* ── Issue search dropdown ──────────────────────────────────────── */
 
 const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
-  { anchorRef, s, query, onQueryChange, issues, loading, onSelect },
+  { anchorRef, s, query, onQueryChange, issues, loading, onSelect, locale = "en-US" },
   ref
 ) {
+  const t = createTranslator(locale);
   const [pos, setPos] = useState(null);
   const updatePosition = useCallback(() => {
     if (!anchorRef?.current) return;
@@ -754,7 +762,7 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
       <input
         autoFocus
         type="text"
-        placeholder="Search issues..."
+        placeholder={t("newChat.searchIssues")}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         style={{
@@ -772,12 +780,12 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {loading && (
           <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
-            Loading...
+            {t("newChat.loading")}
           </div>
         )}
         {!loading && issues.length === 0 && (
           <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
-            No issues found
+            {t("newChat.noIssuesFound")}
           </div>
         )}
         {issues.map((issue) => (
@@ -822,9 +830,10 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
 });
 
 const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
-  { anchorRef, s, query, onQueryChange, branches, loading, currentBranch, worktree, onSelectBranch, onUseCustomBranch },
+  { anchorRef, s, query, onQueryChange, branches, loading, currentBranch, worktree, onSelectBranch, onUseCustomBranch, locale = "en-US" },
   ref
 ) {
+  const t = createTranslator(locale);
   const [pos, setPos] = useState(null);
   const trimmedQuery = query.trim();
   const exactBranchName = branches.find((branch) => branch.toLowerCase() === trimmedQuery.toLowerCase()) || null;
@@ -875,7 +884,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
       <input
         autoFocus
         type="text"
-        placeholder={worktree ? "Pick a base branch..." : "Find or type a branch..."}
+        placeholder={worktree ? t("newChat.pickBaseBranch") : t("newChat.findOrTypeBranch")}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={(e) => {
@@ -918,18 +927,18 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
             onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
-            Use "{trimmedQuery}" as a new branch
+            {t("newChat.useAsNewBranch", { value: trimmedQuery })}
           </button>
         )}
 
         {loading && (
           <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
-            Loading...
+            {t("newChat.loading")}
           </div>
         )}
         {!loading && branches.length === 0 && (
           <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
-            No branches found
+            {t("newChat.noBranchesFound")}
           </div>
         )}
 
@@ -960,7 +969,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
             <span>{branchName}</span>
             {branchName === currentBranch && (
               <span style={{ fontSize: s(8.5), color: "rgba(255,255,255,0.25)", letterSpacing: ".04em" }}>
-                CURRENT
+                {t("newChat.currentBranch")}
               </span>
             )}
           </button>
@@ -990,9 +999,10 @@ function getNeutralDropdownItemStyle(s) {
 /* ── Worktree name input ────────────────────────────────────────── */
 
 const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
-  { anchorRef, s, initialValue, active, baseBranch, onConfirm, onDisable },
+  { anchorRef, s, initialValue, active, baseBranch, onConfirm, onDisable, locale = "en-US" },
   ref
 ) {
+  const t = createTranslator(locale);
   const [pos, setPos] = useState(null);
   const [value, setValue] = useState(initialValue || "");
 
@@ -1042,7 +1052,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
       <input
         autoFocus
         type="text"
-        placeholder="Name (empty = random)"
+        placeholder={t("newChat.worktreeNamePlaceholder")}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
@@ -1072,7 +1082,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
           color: "rgba(255,255,255,0.3)",
           letterSpacing: ".04em",
         }}>
-          FROM {baseBranch}
+          {t("newChat.worktreeFrom", { value: baseBranch })}
         </div>
       )}
 
@@ -1082,7 +1092,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
         onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
       >
-        {value.trim() ? `Use "${value.trim()}"` : "Use random name"}
+        {value.trim() ? t("newChat.useNamedWorktree", { value: value.trim() }) : t("newChat.useRandomWorktree")}
       </button>
 
       {active && (
@@ -1092,7 +1102,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
           onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
         >
-          Turn off worktree
+          {t("newChat.turnOffWorktree")}
         </button>
       )}
     </div>

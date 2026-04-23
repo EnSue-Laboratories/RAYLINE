@@ -1,6 +1,6 @@
 import { useRef, useEffect } from "react";
 
-export default function Grain() {
+export default function Grain({ theme = "dark" }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -52,8 +52,8 @@ export default function Grain() {
         height: "100%",
         pointerEvents: "none",
         zIndex: 1,
-        opacity: 0.4,
-        mixBlendMode: "overlay",
+        opacity: theme === "light" ? 0.14 : 0.4,
+        mixBlendMode: theme === "light" ? "multiply" : "overlay",
       }}
     />
   );

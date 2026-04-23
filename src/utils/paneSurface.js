@@ -5,7 +5,7 @@ function clampOpacity(value, fallback) {
 }
 
 function alphaFill(alphaPercent) {
-  return `rgba(255, 255, 255, ${(alphaPercent / 100).toFixed(3)})`;
+  return `rgba(var(--pane-interaction-rgb, 255, 255, 255), ${(alphaPercent / 100).toFixed(3)})`;
 }
 
 const INTERACTION_STYLES = {
