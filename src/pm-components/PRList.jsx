@@ -174,7 +174,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
                   border: "1px solid var(--control-border)",
                   flexShrink: 0,
                 }}>
-                  Draft
+                  {t("pm.draft")}
                 </span>
               )}
               <HoverIconButton

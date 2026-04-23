@@ -221,7 +221,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
           {phase === "starting" && (
             <Center>
               <Loader2 size={22} style={{ animation: "spin 1s linear infinite", color: "var(--text-muted)" }} />
-              <Label>Starting GitHub authentication…</Label>
+              <Label>{t("pm.startingAuth")}</Label>
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </Center>
           )}
@@ -229,7 +229,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
           {phase === "code" && code && (
             <>
               <Label>
-                1. Copy this one-time code
+                {t("pm.copyOneTimeCode")}
               </Label>
               <div
                 style={{
@@ -273,11 +273,11 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                   }}
                 >
                   {copied ? <Check size={12} /> : <Copy size={12} />}
-                  {copied ? "COPIED" : "COPY"}
+                  {copied ? t("pm.copied") : t("pm.copy")}
                 </button>
               </div>
               <Label style={{ marginTop: 16 }}>
-                2. Paste the code in your browser to authorize
+                {t("pm.pasteCodeInBrowser")}
               </Label>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
                 <ExternalLink size={12} style={{ color: "var(--text-muted)" }} />
@@ -300,7 +300,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                 }}
               >
                 <Label style={{ marginTop: 0 }}>
-                  3. Waiting for authorization…
+                  {t("pm.waitingForAuthorization")}
                 </Label>
                 <Loader2
                   size={16}
@@ -332,7 +332,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                 <Check size={18} />
               </div>
               <div style={{ fontSize: 14, color: "var(--text-primary)", marginTop: 10 }}>
-                {user ? <>Signed in as <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>@{user}</span></> : "Signed in"}
+                {user ? <>{t("pm.signedInAs")} <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>@{user}</span></> : t("pm.signedIn")}
               </div>
             </Center>
           )}
@@ -393,9 +393,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                     fontFamily: "system-ui, sans-serif",
                   }}
                 >
-                  <summary style={{ cursor: "pointer", userSelect: "none" }}>
-                    Show gh output
-                  </summary>
+                  <summary style={{ cursor: "pointer", userSelect: "none" }}>{t("pm.showGhOutput")}</summary>
                   <pre
                     style={{
                       marginTop: 6,
@@ -417,18 +415,18 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                 </details>
               )}
               <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-                <button onClick={retry} style={primaryBtn}>Try again</button>
-                <button onClick={onClose} style={secondaryBtn}>Close</button>
+                <button onClick={retry} style={primaryBtn}>{t("pm.tryAgain")}</button>
+                <button onClick={onClose} style={secondaryBtn}>{t("pm.cancel")}</button>
               </div>
             </>
           )}
 
           {phase === "cancelled" && (
             <Center>
-              <Label>Authentication cancelled.</Label>
+              <Label>{t("pm.authCancelled")}</Label>
               <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-                <button onClick={retry} style={primaryBtn}>Start again</button>
-                <button onClick={onClose} style={secondaryBtn}>Close</button>
+                <button onClick={retry} style={primaryBtn}>{t("pm.startAgain")}</button>
+                <button onClick={onClose} style={secondaryBtn}>{t("pm.cancel")}</button>
               </div>
             </Center>
           )}

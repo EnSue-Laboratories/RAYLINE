@@ -48,10 +48,11 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
       ]).then(([b, currentBranch, defaultBranch]) => {
         const branchNames = b.map((br) => br.name);
         setBranches(b);
-        if (!head) {
+        setHead((prev) => {
+          if (prev) return prev;
           const match = branchNames.find((n) => n === currentBranch);
-          setHead(match || branchNames[0] || "");
-        }
+          return match || branchNames[0] || "";
+        });
         setBase(defaultBranch);
       }).catch(() => {});
     }

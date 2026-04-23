@@ -106,7 +106,7 @@ function TabButton({ label, active, onClick }) {
   );
 }
 
-function StateToggle({ value, onChange }) {
+function StateToggle({ value, onChange, openLabel = "OPEN", closedLabel = "CLOSED" }) {
   const btn = (label, val) => {
     const active = value === val;
     return (
@@ -131,8 +131,8 @@ function StateToggle({ value, onChange }) {
   };
   return (
     <div style={{ display: "flex", gap: 4 }}>
-      {btn("OPEN", "open")}
-      {btn("CLOSED", "closed")}
+      {btn(openLabel, "open")}
+      {btn(closedLabel, "closed")}
     </div>
   );
 }
@@ -535,6 +535,8 @@ export default function ProjectManager() {
             )}
             <StateToggle
               value={stateFilter}
+              openLabel={t("pm.filterOpen")}
+              closedLabel={t("pm.filterClosed")}
               onChange={(v) => {
                 setStateFilter(v);
                 setSelectedItem(null);
