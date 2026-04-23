@@ -112,7 +112,7 @@ input:focus         { outline: none; }
 
 .rayline-terminal-host .xterm .xterm-cursor-layer .xterm-cursor {
   transition: background-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
-  box-shadow: 0 0 16px rgba(143, 214, 194, 0.16);
+  box-shadow: none;
 }
 
 .rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar {

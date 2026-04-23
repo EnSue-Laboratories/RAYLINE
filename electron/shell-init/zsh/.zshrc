@@ -45,6 +45,27 @@ rayline_source_first_existing \
   /opt/homebrew/opt/fzf/shell/key-bindings.zsh \
   /usr/local/opt/fzf/shell/key-bindings.zsh
 
+typeset -g ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=242'
+typeset -ga ZSH_AUTOSUGGEST_STRATEGY
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+
+rayline_source_first_existing \
+  "${RAYLINE_BOOTSTRAP_ZDOTDIR:h:h}/vendor/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+  /opt/homebrew/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
+  /usr/local/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+if (( ${+widgets[autosuggest-accept]} )); then
+  rayline_autosuggest_or_complete() {
+    if [[ -n "${POSTDISPLAY:-}" ]] && (( CURSOR == $#BUFFER )); then
+      zle autosuggest-accept
+    else
+      zle expand-or-complete
+    fi
+  }
+  zle -N rayline_autosuggest_or_complete
+  bindkey '^I' rayline_autosuggest_or_complete
+fi
+
 : "${FZF_DEFAULT_OPTS:=--height=40% --layout=reverse --border=rounded --color=bg+:#111318,bg:#0d0d10,spinner:#8fd6c2,hl:#89b4fa,fg:#e6edf3,header:#7ed7b9,info:#f5c97a,pointer:#8fd6c2,marker:#f38ba8,fg+:#f5f7fb,hl+:#a6c9ff,prompt:#8fd6c2}"
 
 if [[ -n "${RAYLINE_BOOTSTRAP_ZDOTDIR:-}" && -f "${RAYLINE_BOOTSTRAP_ZDOTDIR:h}/common/smart-cd.sh" ]]; then

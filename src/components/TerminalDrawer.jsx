@@ -24,7 +24,7 @@ function getTerminalTheme(opaqueBackground) {
   return {
     background: opaqueBackground ? TERMINAL_OPAQUE_BG : XTERM_TRANSPARENT,
     foreground: "rgba(244,247,250,0.88)",
-    cursor: "#8fd6c2",
+    cursor: "rgba(245,247,251,0.98)",
     cursorAccent: opaqueBackground ? TERMINAL_OPAQUE_BG : XTERM_TRANSPARENT,
     selectionBackground: "rgba(120,182,255,0.18)",
     selectionInactiveBackground: "rgba(120,182,255,0.1)",
@@ -224,8 +224,7 @@ function SessionTerminal({
         lineHeight: 1.28,
         letterSpacing: 0,
         cursorBlink: true,
-        cursorStyle: "bar",
-        cursorWidth: 2,
+        cursorStyle: "underline",
         customGlyphs: true,
         drawBoldTextInBrightColors: false,
         fastScrollSensitivity: 3,
