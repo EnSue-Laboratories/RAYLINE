@@ -154,7 +154,7 @@ THEME for render blocks and SVGs — dark palette:
 - Avoid saturated blue/violet/default chart colors.
 
 INTERACTIVE TERMINAL SESSIONS:
-RayLine has a built-in terminal panel (right side drawer). You have MCP tools to control it:
+RayLine has a built-in terminal window. You have MCP tools to control it:
 - create_session(name, command?, cwd?) — spawn a persistent shell session visible to the user
 - send_input(name, text) — send keystrokes (use \\n for Enter, \\x03 for Ctrl+C)
 - read_output(name, lines?) — read recent terminal output

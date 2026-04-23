@@ -6,7 +6,6 @@ import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
-import TerminalDrawer from "./components/TerminalDrawer";
 import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
 import NewProjectModal from "./components/NewProjectModal";
@@ -3188,13 +3187,6 @@ export default function App() {
     [pinnedTabs]
   );
 
-  // Refresh terminal sessions periodically (catches Claude-created sessions)
-  useEffect(() => {
-    terminal.refreshSessions();
-    const interval = setInterval(() => terminal.refreshSessions(), 3000);
-    return () => clearInterval(interval);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const allCwdRoots = useMemo(() => {
     const roots = new Set();
     convoList.forEach(c => { if (c.cwd) roots.add(getMainRepoRoot(c.cwd)); });
@@ -3217,7 +3209,7 @@ export default function App() {
 
   const handleToggleTerminal = async () => {
     if (terminal.drawerOpen) {
-      terminal.setDrawerOpen(false);
+      await terminal.closeWindow();
       return;
     }
 
@@ -3226,7 +3218,7 @@ export default function App() {
       return;
     }
 
-    terminal.setDrawerOpen(true);
+    await terminal.openWindow();
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -3367,7 +3359,7 @@ export default function App() {
           onCloseTab={handleCloseTab}
           wallpaper={wallpaper}
           cwd={terminalCwd}
-          onRefocusTerminal={terminal.focusActiveSession}
+          onRefocusTerminal={terminal.openWindow}
           onCwdChange={(newCwd) => {
             setCwd(newCwd);
             if (active) {
@@ -3414,23 +3406,6 @@ export default function App() {
         onClose={() => setShowNewProject(false)}
         onCloned={handleClonedRepo}
         onPickedLocalFolder={registerManualProject}
-      />
-
-      {/* Terminal drawer */}
-      <TerminalDrawer
-        sessions={terminal.sessions}
-        activeSession={terminal.activeSession}
-        onSelectSession={terminal.setActiveSession}
-        onCreateSession={terminal.createSession}
-        cwd={terminalCwd}
-        onKillSession={terminal.killSession}
-        onSendInput={terminal.sendInput}
-        onResizeSession={terminal.resizeSession}
-        drawerOpen={terminal.drawerOpen}
-        onToggleDrawer={() => terminal.setDrawerOpen((o) => !o)}
-        registerTerminal={terminal.registerTerminal}
-        unregisterTerminal={terminal.unregisterTerminal}
-        wallpaper={wallpaper}
       />
       </div>
     </div>
