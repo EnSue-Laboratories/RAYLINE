@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
+import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 
 // ── Shared style helpers ──────────────────────────────────────────────────────
 
@@ -165,6 +166,7 @@ function TerminalViewport({
         cursorStyle:  "bar",
         allowTransparency: true,
         allowProposedApi: true,
+        scrollbarWidth: "none",
       });
 
       const fitAddon = new FitAddon();
@@ -390,6 +392,7 @@ export default function TerminalDrawer({
   unregisterTerminal,
   cwd,
   wallpaper,
+  windowControlsVisible = false,
 }) {
   const s = useFontScale();
   const [width, setWidth] = useState(480);
@@ -463,6 +466,11 @@ export default function TerminalDrawer({
           touchAction: "none",
         }}
       />
+      {/* Spacer that clears the window controls area on Windows */}
+      {windowControlsVisible && (
+        <div style={{ height: WINDOW_DRAG_HEIGHT, flexShrink: 0 }} />
+      )}
+
       {/* Header */}
       <div
         style={{

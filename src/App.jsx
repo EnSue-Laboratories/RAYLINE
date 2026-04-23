@@ -3445,6 +3445,7 @@ export default function App() {
         registerTerminal={terminal.registerTerminal}
         unregisterTerminal={terminal.unregisterTerminal}
         wallpaper={wallpaper}
+        windowControlsVisible={showWindowControls}
       />
       </div>
     </div>
