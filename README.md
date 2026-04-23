@@ -28,7 +28,7 @@
 
 ## About
 
-RayLine wraps Claude Code, Codex, and connected Multica agents in a native desktop chat, adding the workflow glue a plain terminal session can't give you: persistent conversations, tool-call visibility, image and file attachments, checkpoint-based undo, and an embedded terminal drawer alongside the chat.
+RayLine supports Claude Code, Codex, and connected Multica agents in a native desktop chat, adding the workflow glue a plain terminal session can't give you.
 
 
 ## Highlights
@@ -102,23 +102,6 @@ docs/plans/   Design and implementation notes
 build/        Packaging config (entitlements, icons)
 scripts/      Dev launchers and shell-facing helpers
 ```
-
-<details>
-<summary><strong>Key files worth opening first</strong></summary>
-
-- `electron/main.cjs` — Electron bootstrap and the IPC surface
-- `electron/agent-manager.cjs` — Claude process spawning and stream handling
-- `electron/codex-agent-manager.cjs` — Codex CLI spawning and stream handling
-- `electron/multica-manager.cjs` — Multica HTTP/WebSocket bridge
-- `electron/terminal-manager.cjs` — PTY-backed terminal sessions
-- `electron/checkpoint.cjs` — Git-based file checkpoints for edit rewind
-- `electron/github-manager.cjs` — `gh` CLI wrapper powering the Project Manager
-- `electron/session-reader.cjs` — Claude + Codex session rehydration
-- `src/App.jsx` — Top-level chat state and interaction flow
-- `src/hooks/useAgent.js` — Streamed message assembly in the renderer
-- `src/ProjectManager.jsx` — GitHub Project Manager window
-
-</details>
 
 ## Platform Support
 
