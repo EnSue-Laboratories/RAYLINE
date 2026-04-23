@@ -20,6 +20,7 @@ import ItemDetail from "./pm-components/ItemDetail";
 import HoverIconButton from "./components/HoverIconButton";
 import { getPaneInteractionStyle, getPaneSurfaceStyle } from "./utils/paneSurface";
 import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
+import { createTranslator, detectDefaultLocale, normalizeLocale } from "./i18n";
 
 const iconBtnStyle = {
   width: 24,
@@ -38,7 +39,7 @@ const iconBtnStyle = {
   padding: 0,
 };
 
-function RepoFilterItem({ label, active, onClick, removeMode }) {
+function RepoFilterItem({ label, active, onClick, removeMode, isAll = false }) {
   const [hovered, setHovered] = useState(false);
   return (
     <button
@@ -72,7 +73,7 @@ function RepoFilterItem({ label, active, onClick, removeMode }) {
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {label}
       </span>
-      {removeMode && label !== "All" && hovered && (
+      {removeMode && !isAll && hovered && (
         <X size={12} style={{ color: "rgba(200,80,80,0.7)", flexShrink: 0, marginLeft: 4 }} />
       )}
     </button>
@@ -104,7 +105,7 @@ function TabButton({ label, active, onClick }) {
   );
 }
 
-function StateToggle({ value, onChange }) {
+function StateToggle({ value, onChange, openLabel = "OPEN", closedLabel = "CLOSED" }) {
   const btn = (label, val) => {
     const active = value === val;
     return (
@@ -129,13 +130,14 @@ function StateToggle({ value, onChange }) {
   };
   return (
     <div style={{ display: "flex", gap: 4 }}>
-      {btn("OPEN", "open")}
-      {btn("CLOSED", "closed")}
+      {btn(openLabel, "open")}
+      {btn(closedLabel, "closed")}
     </div>
   );
 }
 
 export default function ProjectManager() {
+  const [locale, setLocale] = useState(() => detectDefaultLocale());
   const [repos, setRepos] = useState([]);
   const [activeTab, setActiveTab] = useState("issues");
   const [stateFilter, setStateFilter] = useState("open");
@@ -153,6 +155,7 @@ export default function ProjectManager() {
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [freshIssue, setFreshIssue] = useState(null);
   const [freshPR, setFreshPR] = useState(null);
+  const t = createTranslator(locale);
 
   const refreshAuth = () =>
     window.ghApi.checkAuth().then(({ ok, user }) => {
@@ -163,8 +166,13 @@ export default function ProjectManager() {
 
   useEffect(() => {
     refreshAuth();
-    window.ghApi.loadPmState().then(({ repos, wallpaper: wp }) => {
-      setRepos(repos);
+    Promise.all([
+      window.ghApi.loadPmState(),
+      window.ghApi.loadAppState ? window.ghApi.loadAppState().catch(() => null) : Promise.resolve(null),
+    ]).then(([pmState, appState]) => {
+      const { repos, wallpaper: wp } = pmState || {};
+      setRepos(Array.isArray(repos) ? repos : []);
+      if (appState?.locale) setLocale(normalizeLocale(appState.locale));
       if (wp?.path) {
         setWallpaper(normalizeWallpaper(wp));
         window.ghApi.readImage(wp.path).then((dataUrl) => {
@@ -215,7 +223,7 @@ export default function ProjectManager() {
           fontSize: 14,
         }}
       >
-        Checking authentication...
+        {t("pm.checkingAuth")}
       </div>
     );
   }
@@ -237,10 +245,10 @@ export default function ProjectManager() {
       >
         <GitHubIcon size={48} />
         <div style={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }}>
-          GitHub CLI not authenticated
+          {t("pm.authMissingTitle")}
         </div>
         <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", maxWidth: 360, textAlign: "center" }}>
-          Sign in with GitHub to browse your repos, issues, and pull requests.
+          {t("pm.authMissingBody")}
         </div>
         <button
           onClick={() => setAuthModalMode("signin")}
@@ -259,7 +267,7 @@ export default function ProjectManager() {
             cursor: "pointer",
           }}
         >
-          <GitHubIcon size={14} /> Sign in with GitHub
+          <GitHubIcon size={14} /> {t("pm.signIn")}
         </button>
         {authModalMode && (
           <AuthModal
@@ -267,6 +275,7 @@ export default function ProjectManager() {
             currentUser={authUser}
             onClose={() => setAuthModalMode(null)}
             onAuthSuccess={handleAuthSuccess}
+            locale={locale}
           />
         )}
       </div>
@@ -352,12 +361,12 @@ export default function ProjectManager() {
               letterSpacing: ".08em",
             }}
           >
-            REPOS
+            {t("pm.repos")}
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <HoverIconButton
               onClick={() => setRemoveMode(!removeMode)}
-              ariaLabel={removeMode ? "Done editing repositories" : "Edit repositories"}
+              ariaLabel={removeMode ? t("pm.doneEditingRepos") : t("pm.editRepos")}
               baseColor={removeMode ? "rgba(120,230,150,0.9)" : "rgba(255,255,255,0.5)"}
               hoverColor={removeMode ? "rgba(150,245,170,1)" : "rgba(255,255,255,0.9)"}
               style={{
@@ -380,7 +389,7 @@ export default function ProjectManager() {
                 setRemoveMode(false);
                 setShowAddRepo(true);
               }}
-              ariaLabel="Add repository"
+              ariaLabel={t("pm.addRepo")}
               baseColor="rgba(255,255,255,0.5)"
               hoverColor="rgba(255,255,255,0.9)"
               style={{ ...iconBtnStyle, color: undefined }}
@@ -393,9 +402,10 @@ export default function ProjectManager() {
         {/* Repo filter list */}
         <div style={{ flex: 1, overflowY: "auto", padding: "0 6px" }}>
           <RepoFilterItem
-            label="All"
+            label={t("pm.allRepos")}
             active={repoFilter === null}
             onClick={() => setRepoFilter(null)}
+            isAll
           />
           {repos.map((r) => (
             <RepoFilterItem
@@ -431,7 +441,7 @@ export default function ProjectManager() {
               transition: "color .2s",
             }}
           >
-            MANAGE ACCOUNT
+            {t("pm.manageAccount")}
           </button>
         </div>
       </div>
@@ -465,7 +475,7 @@ export default function ProjectManager() {
             }}
           >
             <TabButton
-              label="Issues"
+              label={t("pm.issues")}
               active={activeTab === "issues"}
               onClick={() => {
                 setActiveTab("issues");
@@ -473,7 +483,7 @@ export default function ProjectManager() {
               }}
             />
             <TabButton
-              label="Pull Requests"
+              label={t("pm.pullRequests")}
               active={activeTab === "prs"}
               onClick={() => {
                 setActiveTab("prs");
@@ -495,11 +505,13 @@ export default function ProjectManager() {
                   marginRight: 8, transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
                 }}
               >
-                <Plus size={11} strokeWidth={2} /> NEW
+                <Plus size={11} strokeWidth={2} /> {t("pm.new")}
               </button>
             )}
             <StateToggle
               value={stateFilter}
+              openLabel={t("pm.filterOpen")}
+              closedLabel={t("pm.filterClosed")}
               onChange={(v) => {
                 setStateFilter(v);
                 setSelectedItem(null);
@@ -534,6 +546,7 @@ export default function ProjectManager() {
               onSelectItem={setSelectedItem}
               refreshSignal={refreshSignal}
               freshItem={freshPR}
+              locale={locale}
             />
           )}
         </div>
@@ -550,6 +563,7 @@ export default function ProjectManager() {
             else setFreshPR(item);
             setRefreshSignal((k) => k + 1);
           }}
+          locale={locale}
         />
       )}
 
@@ -591,6 +605,7 @@ export default function ProjectManager() {
           currentUser={authUser}
           onClose={() => setAuthModalMode(null)}
           onAuthSuccess={handleAuthSuccess}
+          locale={locale}
         />
       )}
     </div>

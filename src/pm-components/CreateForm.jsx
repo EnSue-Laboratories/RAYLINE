@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ExternalLink, X } from "lucide-react";
 import SearchableSelect from "./SearchableSelect";
+import { createTranslator } from "../i18n";
 
 const inputStyle = {
   width: "100%",
@@ -26,10 +27,8 @@ const selectStyle = {
   paddingRight: 30,
 };
 
-const imageUploadCalloutTitle = "Images use GitHub's web uploader";
-const imageUploadCalloutBody = "Text-only drafts can be created here. To include screenshots, continue in GitHub's composer with the title and description prefilled, then paste the images there.";
-
-export default function CreateForm({ repos, type, onClose, onCreated }) {
+export default function CreateForm({ repos, type, onClose, onCreated, locale = "en-US" }) {
+  const t = createTranslator(locale);
   const [repo, setRepo] = useState(repos[0] || "");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -155,7 +154,7 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <span style={{ fontSize: 15, color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>
-            New {type === "pr" ? "Pull Request" : "Issue"}
+            {type === "pr" ? t("pm.newPullRequest") : t("pm.newIssue")}
           </span>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", padding: 2 }}>
             <X size={16} strokeWidth={1.5} />
@@ -164,7 +163,7 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
 
         {/* Repo selector */}
         <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>REPO</label>
+          <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.repo")}</label>
           <select
             value={repo}
             onChange={(e) => setRepo(e.target.value)}
@@ -178,21 +177,21 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
         {type === "pr" && (
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>HEAD</label>
+              <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.head")}</label>
               <SearchableSelect
                 options={branches.map((b) => b.name)}
                 value={head}
                 onChange={setHead}
-                placeholder="Search branches..."
+                placeholder={t("pm.searchBranches")}
               />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>BASE</label>
+              <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.base")}</label>
               <SearchableSelect
                 options={branches.map((b) => b.name)}
                 value={base}
                 onChange={setBase}
-                placeholder="Search branches..."
+                placeholder={t("pm.searchBranches")}
               />
             </div>
           </div>
@@ -200,12 +199,12 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
 
         {/* Title */}
         <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>TITLE</label>
+          <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.title")}</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={type === "pr" ? "PR title..." : "Issue title..."}
+            placeholder={type === "pr" ? t("pm.prTitlePlaceholder") : t("pm.issueTitlePlaceholder")}
             style={{ ...inputStyle, marginTop: 4 }}
             autoFocus
           />
@@ -213,11 +212,11 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
 
         {/* Body */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>DESCRIPTION</label>
+          <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.description")}</label>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Optional description..."
+            placeholder={t("pm.optionalDescription")}
             rows={4}
             style={{ ...inputStyle, marginTop: 4, resize: "vertical", minHeight: 60 }}
             onPaste={handlePaste}
@@ -255,10 +254,10 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
               }}
             >
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.82)", fontWeight: 600, marginBottom: 4 }}>
-                {imageUploadCalloutTitle}
+                {t("pm.imageUploadTitle")}
               </div>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.52)", lineHeight: 1.45, marginBottom: 8 }}>
-                {imageUploadCalloutBody}
+                {t("pm.imageUploadBody")}
               </div>
               <button
                 onClick={() => setImages([])}
@@ -274,7 +273,7 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
                   cursor: "pointer",
                 }}
               >
-                Create Without Images
+                {t("pm.createWithoutImages")}
               </button>
             </div>
           </div>
@@ -292,7 +291,7 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
             color: "rgba(255,255,255,0.4)", fontSize: 12,
             fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
           }}>
-            Cancel
+            {t("pm.cancel")}
           </button>
           <button
             onClick={images.length > 0 ? handleContinueInGitHub : handleSubmit}
@@ -310,15 +309,15 @@ export default function CreateForm({ repos, type, onClose, onCreated }) {
             }}
           >
             {submitting
-              ? "Creating..."
+              ? t("pm.creating")
               : images.length > 0
                 ? (
                   <>
-                    Continue in GitHub
+                    {t("pm.continueInGithub")}
                     <ExternalLink size={13} strokeWidth={1.75} />
                   </>
                 )
-                : "Create"}
+                : t("pm.create")}
           </button>
         </div>
       </div>
