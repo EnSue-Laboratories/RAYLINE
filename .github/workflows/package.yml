@@ -29,10 +29,6 @@ jobs:
             label: Windows
             platform: windows
             binary_glob: "*.exe"
-          - os: macos-latest
-            label: macOS
-            platform: macos
-            binary_glob: "*.dmg"
 
     steps:
       - name: Check out repository
@@ -80,27 +76,6 @@ jobs:
           npx electron-builder --config electron-builder.config.cjs --win \
             --publish "$PUBLISH_FLAG" \
             --config.npmRebuild=false
-
-      - name: Package macOS app
-        if: matrix.platform == 'macos'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_NAME: ${{ secrets.CSC_NAME }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            PUBLISH_FLAG="always"
-          else
-            PUBLISH_FLAG="never"
-          fi
-          npx electron-builder --config electron-builder.config.cjs --mac \
-            --publish "$PUBLISH_FLAG"
 
       - name: Collect packaged files
         shell: bash
