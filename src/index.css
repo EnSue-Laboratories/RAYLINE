@@ -33,9 +33,10 @@ html, body, #root {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar        { width: 2px; }
-::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.03); border-radius: 2px; }
+::-webkit-scrollbar               { width: 3px; }
+::-webkit-scrollbar-track         { background: transparent; }
+::-webkit-scrollbar-thumb         { background: rgba(255,255,255,0.15); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover   { background: rgba(255,255,255,0.35); }
 
 /* ── KaTeX dark theme overrides ── */
 .katex { color: inherit; }
@@ -89,7 +90,7 @@ input:focus         { outline: none; }
   to   { opacity: 1; max-height: 60px; }
 }
 
-/* ── xterm transparent background ── */
+/* ── xterm transparent background + hidden scrollbar ── */
 .xterm,
 .xterm .xterm-screen,
 .xterm .xterm-viewport,
@@ -97,6 +98,8 @@ input:focus         { outline: none; }
   background: transparent !important;
   background-color: transparent !important;
 }
+.xterm .xterm-viewport::-webkit-scrollbar { display: none; }
+.xterm .xterm-viewport { scrollbar-width: none; }
 
 /* ── Range slider ── */
 input[type="range"] {

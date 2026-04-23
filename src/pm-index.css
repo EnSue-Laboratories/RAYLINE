@@ -35,9 +35,10 @@ html, body, #root {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar        { width: 2px; }
-::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.03); border-radius: 2px; }
+::-webkit-scrollbar               { width: 3px; }
+::-webkit-scrollbar-track         { background: transparent; }
+::-webkit-scrollbar-thumb         { background: rgba(255,255,255,0.15); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover   { background: rgba(255,255,255,0.35); }
 
 /* ── Form resets ── */
 textarea::placeholder,
