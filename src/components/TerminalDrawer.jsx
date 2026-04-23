@@ -154,7 +154,6 @@ function SessionTerminal({
   sessionName,
   isActive,
   opaqueBackground = false,
-  wallpaper = null,
   onSendInput,
   onResizeSession,
   registerTerminal,
@@ -358,9 +357,6 @@ function SessionTerminal({
     };
   }, [isActive, sessionName]);
 
-  const hasWallpaper = Boolean(wallpaper?.dataUrl);
-  const overlayAlpha = getTerminalWallpaperOverlayAlpha(wallpaper);
-
   return (
     <div
       style={{
@@ -375,39 +371,9 @@ function SessionTerminal({
         overflow: "hidden",
       }}
     >
-      {hasWallpaper && (
-        <>
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 0,
-              pointerEvents: "none",
-              backgroundImage: `url(${wallpaper.dataUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
-              filter: getWallpaperImageFilter(wallpaper),
-              opacity: getWallpaperOpacityValue(wallpaper).toFixed(3),
-              transform: wallpaper.imgBlur ? "scale(1.04)" : "none",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 1,
-              pointerEvents: "none",
-              background: `linear-gradient(180deg, rgba(13,13,16,${overlayAlpha.toFixed(2)}), rgba(9,9,11,${Math.min(overlayAlpha + 0.12, 0.84).toFixed(2)}))`,
-            }}
-          />
-        </>
-      )}
       <div
         ref={containerRef}
         style={{
-          position: "relative",
-          zIndex: 2,
           width: "100%",
           height: "100%",
           overflow: "hidden",
@@ -425,7 +391,6 @@ function TerminalViewport({
   sessions,
   activeSession,
   opaqueBackground = false,
-  wallpaper = null,
   onSendInput,
   onResizeSession,
   registerTerminal,
@@ -454,7 +419,6 @@ function TerminalViewport({
           sessionName={session.name}
           isActive={session.name === visibleSession}
           opaqueBackground={opaqueBackground}
-          wallpaper={wallpaper}
           onSendInput={onSendInput}
           onResizeSession={onResizeSession}
           registerTerminal={registerTerminal}
@@ -525,13 +489,20 @@ function EmptyState({ onCreate, blank = false }) {
 
 // ── TabBar ────────────────────────────────────────────────────────────────────
 
-function TabBar({ sessions, activeSession, onSelectSession, onKillSession }) {
+function TabBar({
+  sessions,
+  activeSession,
+  onSelectSession,
+  onKillSession,
+  background = "transparent",
+}) {
   const s = useFontScale();
   return (
     <div
       style={{
         display: "flex",
         overflowX: "auto",
+        background,
         borderBottom: "1px solid rgba(255,255,255,0.04)",
         flexShrink: 0,
         scrollbarWidth: "none",
@@ -630,6 +601,7 @@ export default function TerminalDrawer({
   const s = useFontScale();
   const [width, setWidth] = useState(480);
   const hasWallpaper = Boolean(wallpaper?.dataUrl);
+  const overlayAlpha = getTerminalWallpaperOverlayAlpha(wallpaper);
   const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || "");
   const dragging = useRef(false);
   const startX = useRef(0);
@@ -678,7 +650,7 @@ export default function TerminalDrawer({
         flexDirection: "column",
         height: "100%",
         ...(windowMode
-          ? { background: hasWallpaper ? "rgba(13, 13, 16, 0.46)" : TERMINAL_OPAQUE_BG }
+          ? { background: TERMINAL_OPAQUE_BG }
           : getPaneSurfaceStyle(hasWallpaper)),
         backdropFilter: windowMode ? "none" : (hasWallpaper ? "saturate(1.1)" : "blur(56px) saturate(1.1)"),
         borderLeft: windowMode ? "none" : "1px solid rgba(255,255,255,0.025)",
@@ -688,6 +660,34 @@ export default function TerminalDrawer({
         isolation: "isolate",
       }}
     >
+      {windowMode && hasWallpaper && (
+        <>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 0,
+              pointerEvents: "none",
+              backgroundImage: `url(${wallpaper.dataUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+              filter: getWallpaperImageFilter(wallpaper),
+              opacity: getWallpaperOpacityValue(wallpaper).toFixed(3),
+              transform: wallpaper.imgBlur ? "scale(1.04)" : "none",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 1,
+              pointerEvents: "none",
+              background: `linear-gradient(180deg, rgba(13,13,16,${overlayAlpha.toFixed(2)}), rgba(9,9,11,${Math.min(overlayAlpha + 0.12, 0.84).toFixed(2)}))`,
+            }}
+          />
+        </>
+      )}
       {/* Resize handle */}
       {!windowMode && (
         <div
@@ -707,90 +707,115 @@ export default function TerminalDrawer({
           }}
         />
       )}
-      {/* Header */}
       <div
         style={{
-          height: WINDOW_DRAG_HEIGHT,
+          position: "relative",
+          zIndex: 2,
           flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: windowMode ? "flex-end" : "space-between",
-          padding: windowMode && isMac
-            ? `0 14px 0 ${MAC_TRAFFIC_LIGHT_SAFE_WIDTH + 8}px`
-            : "0 14px",
-          WebkitAppRegion: "drag",
+          overflow: "hidden",
         }}
       >
-        {!windowMode && (
+        <div
+          style={{
+            position: "relative",
+          }}
+        >
+          {/* Header */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 7,
+              justifyContent: windowMode ? "flex-end" : "space-between",
+              height: WINDOW_DRAG_HEIGHT,
+              padding: windowMode && isMac
+                ? `0 14px 0 ${MAC_TRAFFIC_LIGHT_SAFE_WIDTH + 8}px`
+                : "0 14px",
               WebkitAppRegion: "drag",
             }}
           >
-            <TerminalIcon
-              size={13}
-              strokeWidth={1.5}
-              color="rgba(255,255,255,0.35)"
-            />
-            <span
+            {!windowMode && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  WebkitAppRegion: "drag",
+                }}
+              >
+                <TerminalIcon
+                  size={13}
+                  strokeWidth={1.5}
+                  color="rgba(255,255,255,0.35)"
+                />
+                <span
+                  style={{
+                    fontSize: s(10),
+                    fontFamily: FONT_FAMILY,
+                    color: "rgba(255,255,255,0.35)",
+                    letterSpacing: ".08em",
+                    userSelect: "none",
+                  }}
+                >
+                  TERMINALS
+                </span>
+              </div>
+            )}
+
+            {/* Right: action buttons */}
+            <div
               style={{
-                fontSize: s(10),
-                fontFamily: FONT_FAMILY,
-                color: "rgba(255,255,255,0.35)",
-                letterSpacing: ".08em",
-                userSelect: "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                WebkitAppRegion: "no-drag",
               }}
             >
-              TERMINALS
-            </span>
+              <IconButton onClick={handleCreate} title="New terminal">
+                <Plus size={13} strokeWidth={1.5} />
+              </IconButton>
+              <IconButton onClick={windowMode ? onRequestClose : onToggleDrawer} title={windowMode ? "Close window" : "Close drawer"}>
+                <X size={13} strokeWidth={1.5} />
+              </IconButton>
+            </div>
           </div>
-        )}
 
-        {/* Right: action buttons */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            WebkitAppRegion: "no-drag",
-          }}
-        >
-          <IconButton onClick={handleCreate} title="New terminal">
-            <Plus size={13} strokeWidth={1.5} />
-          </IconButton>
-          <IconButton onClick={windowMode ? onRequestClose : onToggleDrawer} title={windowMode ? "Close window" : "Close drawer"}>
-            <X size={13} strokeWidth={1.5} />
-          </IconButton>
+          {/* Tab bar — only when there are multiple sessions */}
+          {sessions.length > 1 && (
+            <TabBar
+              sessions={sessions}
+              activeSession={activeSession}
+              onSelectSession={onSelectSession}
+              onKillSession={onKillSession}
+              background="transparent"
+            />
+          )}
         </div>
       </div>
-
-      {/* Tab bar — only when there are multiple sessions */}
-      {sessions.length > 1 && (
-        <TabBar
-          sessions={sessions}
-          activeSession={activeSession}
-          onSelectSession={onSelectSession}
-          onKillSession={onKillSession}
-        />
-      )}
 
       {/* Content */}
       {sessions.length === 0 ? (
         <EmptyState onCreate={handleCreate} blank={windowMode} />
       ) : (
-        <TerminalViewport
-          sessions={sessions}
-          activeSession={activeSession}
-          opaqueBackground={windowMode && !hasWallpaper}
-          wallpaper={windowMode ? wallpaper : null}
-          onSendInput={onSendInput}
-          onResizeSession={onResizeSession}
-          registerTerminal={registerTerminal}
-          unregisterTerminal={unregisterTerminal}
-        />
+        <div
+          style={{
+            position: "relative",
+            zIndex: 2,
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <TerminalViewport
+            sessions={sessions}
+            activeSession={activeSession}
+            opaqueBackground={windowMode && !hasWallpaper}
+            onSendInput={onSendInput}
+            onResizeSession={onResizeSession}
+            registerTerminal={registerTerminal}
+            unregisterTerminal={unregisterTerminal}
+          />
+        </div>
       )}
     </div>
   );
