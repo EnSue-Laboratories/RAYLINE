@@ -501,11 +501,14 @@ function TabBar({
     <div
       style={{
         display: "flex",
+        alignItems: "center",
+        gap: 7,
         overflowX: "auto",
         background,
         borderBottom: "1px solid rgba(255,255,255,0.04)",
         flexShrink: 0,
         scrollbarWidth: "none",
+        padding: "5px 8px 4px",
       }}
     >
       {sessions.map((session) => {
@@ -517,12 +520,15 @@ function TabBar({
               display: "flex",
               alignItems: "center",
               gap: 4,
+              minHeight: 28,
               padding: "5px 10px",
               cursor: "pointer",
               flexShrink: 0,
-              background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
-              borderRight: "1px solid rgba(255,255,255,0.04)",
-              transition: "background .15s",
+              background: isActive
+                ? "rgba(255,255,255,0.08)"
+                : "rgba(255,255,255,0.018)",
+              borderRadius: 7,
+              transition: "background .15s, color .15s",
             }}
             onMouseEnter={(e) => {
               if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
