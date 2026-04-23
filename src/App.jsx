@@ -3467,6 +3467,7 @@ export default function App() {
           projects={projects}
           defaultModel={defaultModel}
           availableModels={dispatchAvailableModels}
+          locale={locale}
         />
       )}
 

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, GitBranch, FileText, Check, ChevronRight, ChevronDown, Paperclip, Plus } from "lucide-react";
 import ImagePreview from "./ImagePreview";
+import { createTranslator } from "../i18n";
 
 function TransparentCheckbox({ checked, onChange, ariaLabel }) {
   return (
@@ -108,7 +109,9 @@ export default function DispatchCard({
   projects,
   defaultModel = "sonnet",
   availableModels = [],
+  locale,
 }) {
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [tab, setTab] = useState("issues"); // "issues" | "custom"
   const [globalModel, setGlobalModel] = useState(defaultModel);
   const [customRows, setCustomRows] = useState([]);
@@ -142,9 +145,9 @@ export default function DispatchCard({
     const seenBranches = new Set();
     for (const r of rowsToRun) {
       const trimmed = r.branch?.trim();
-      if (!r.prompt?.trim()) rowErrors[r.key] = "Prompt is empty.";
-      else if (!trimmed) rowErrors[r.key] = "Branch name is empty.";
-      else if (seenBranches.has(trimmed)) rowErrors[r.key] = "Branch name is duplicated in this batch.";
+      if (!r.prompt?.trim()) rowErrors[r.key] = t("dispatch.errorPromptEmpty");
+      else if (!trimmed) rowErrors[r.key] = t("dispatch.errorBranchEmpty");
+      else if (seenBranches.has(trimmed)) rowErrors[r.key] = t("dispatch.errorBranchDuplicate");
       else seenBranches.add(trimmed);
     }
 
@@ -185,10 +188,14 @@ export default function DispatchCard({
     const keyedErrors = {};
     for (const f of failed) {
       const key = byBranch[f.row.branch];
-      if (key) keyedErrors[key] = f.error?.message || "Dispatch failed.";
+      if (key) keyedErrors[key] = f.error?.message || t("dispatch.errorDispatchFailed");
     }
     setErrors(keyedErrors);
-    setBanner(`Dispatched ${results.length - failed.length}/${results.length} sessions. ${failed.length} failed — see rows.`);
+    setBanner(t("dispatch.banner", {
+      success: results.length - failed.length,
+      total: results.length,
+      failed: failed.length,
+    }));
 
     const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
     if (tab === "issues") {
@@ -198,19 +205,19 @@ export default function DispatchCard({
     } else {
       setCustomRows((prev) => prev.filter((r) => !successBranches.has(r.branch.trim())));
     }
-  }, [tab, issueRows, customRows, currentCwd, globalModel, onDispatch, onClose]);
+  }, [tab, issueRows, customRows, currentCwd, globalModel, onDispatch, onClose, t]);
 
   return (
     <div style={backdropStyle} onClick={onClose}>
       <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <header style={headerStyle}>
           <div style={headerTextStyle}>
-            <div style={titleStyle}>Dispatch</div>
+            <div style={titleStyle}>{t("dispatch.title")}</div>
             <div style={subtitleStyle}>
-              Run multiple agent sessions at once — each in its own worktree, optionally with a different model.
+              {t("dispatch.subtitle")}
             </div>
           </div>
-          <button onClick={onClose} style={closeBtnStyle} aria-label="Close">
+          <button onClick={onClose} style={closeBtnStyle} aria-label={t("dispatch.close")}>
             <X size={16} />
           </button>
         </header>
@@ -223,10 +230,10 @@ export default function DispatchCard({
 
         <div style={tabsStyle} role="tablist">
           <TabBtn active={tab === "issues"} onClick={() => setTab("issues")}>
-            <GitBranch size={13} /> From Issues
+            <GitBranch size={13} /> {t("dispatch.tabIssues")}
           </TabBtn>
           <TabBtn active={tab === "custom"} onClick={() => setTab("custom")}>
-            <FileText size={13} /> Custom
+            <FileText size={13} /> {t("dispatch.tabCustom")}
           </TabBtn>
         </div>
 
@@ -239,6 +246,7 @@ export default function DispatchCard({
               currentCwd={currentCwd}
               availableModels={availableModels}
               errors={errors}
+              t={t}
             />
           ) : (
             <CustomTab
@@ -247,13 +255,14 @@ export default function DispatchCard({
               currentCwd={currentCwd}
               availableModels={availableModels}
               errors={errors}
+              t={t}
             />
           )}
         </div>
 
         <footer style={footerStyle}>
           <DispatchDropdown
-            ariaLabel="Default model"
+            ariaLabel={t("dispatch.defaultModel")}
             value={globalModel}
             onChange={setGlobalModel}
             options={availableModels.map((m) => ({
@@ -271,11 +280,11 @@ export default function DispatchCard({
             style={primaryBtnStyle(canDispatch, submitting)}
           >
             <span style={{ visibility: submitting ? "hidden" : "visible" }}>
-              Dispatch {activeRows.length || 0} agent{activeRows.length === 1 ? "" : "s"}
+              {t(activeRows.length === 1 ? "dispatch.dispatchOne" : "dispatch.dispatchMany", { count: activeRows.length || 0 })}
             </span>
             {submitting && (
               <span style={{ position: "absolute", inset: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                <DispatchLoadingDots />
+                <DispatchLoadingDots ariaLabel={t("dispatch.dispatching")} />
               </span>
             )}
           </button>
@@ -285,7 +294,7 @@ export default function DispatchCard({
   );
 }
 
-function DispatchLoadingDots() {
+function DispatchLoadingDots({ ariaLabel }) {
   const dot = (delay) => ({
     width: 5,
     height: 5,
@@ -296,7 +305,7 @@ function DispatchLoadingDots() {
   });
   return (
     <span
-      aria-label="Dispatching"
+      aria-label={ariaLabel || "Dispatching"}
       style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "0 2px" }}
     >
       <span style={dot("0s")} />
@@ -322,7 +331,7 @@ function TabBtn({ active, onClick, children }) {
   );
 }
 
-function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors }) {
+function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors, t }) {
   const [selectedPath, setSelectedPath] = useState(currentCwd || "");
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
@@ -341,20 +350,20 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
         const s = await window.api.gitRemoteSlug(selectedPath);
         if (cancelled) return;
         if (!s) {
-          setRows([]); setLoadError("No GitHub remote on this folder.");
+          setRows([]); setLoadError(t("dispatch.noGithubRemote"));
           return;
         }
         const issues = await window.api.ghListIssues(s, "open");
         if (cancelled) return;
         setRows((issues || []).map((iss) => ({ ...makeIssueRow(iss), cwd: selectedPath })));
       } catch (e) {
-        if (!cancelled) setLoadError(e?.message || "Failed to load issues.");
+        if (!cancelled) setLoadError(e?.message || t("dispatch.failedToLoadIssues"));
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [selectedPath, setRows]);
+  }, [selectedPath, setRows, t]);
 
   const toggleAll = (checked) => setRows((prev) => prev.map((r) => ({ ...r, enabled: checked })));
   const updateRow = (key, patch) => setRows((prev) =>
@@ -366,15 +375,15 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
   return (
     <div style={{ padding: "24px 14px 14px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-        <label style={sectionLabelStyle}>Working directory</label>
+        <label style={sectionLabelStyle}>{t("dispatch.workingDirectory")}</label>
         <DispatchDropdown
           fullWidth
-          ariaLabel="Working directory"
+          ariaLabel={t("dispatch.workingDirectory")}
           value={selectedPath}
           onChange={setSelectedPath}
-          placeholder="(select)"
+          placeholder={t("dispatch.select")}
           options={[
-            { value: "", label: "(select)" },
+            { value: "", label: t("dispatch.select") },
             ...projectPaths.map((p) => ({ value: p, label: p })),
           ]}
         />
@@ -382,7 +391,7 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
 
       {selectedPath && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <span style={sectionLabelStyle}>Issues</span>
+          <span style={sectionLabelStyle}>{t("dispatch.issues")}</span>
           {rows.length > 0 && (
             <span style={{ ...sectionLabelStyle, color: "rgba(255,255,255,0.25)" }}>
               {rows.filter((r) => r.enabled).length}/{rows.length}
@@ -391,10 +400,10 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
         </div>
       )}
 
-      {loading && <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>Loading issues…</div>}
+      {loading && <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>{t("dispatch.loadingIssues")}</div>}
       {loadError && <div style={errorStyle}>{loadError}</div>}
       {!loading && !loadError && rows.length === 0 && selectedPath && (
-        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>No open issues.</div>
+        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{t("dispatch.noOpenIssues")}</div>
       )}
 
       {rows.length > 0 && (
@@ -402,10 +411,10 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
           <TransparentCheckbox
             checked={allChecked}
             onChange={toggleAll}
-            ariaLabel="Select all issues"
+            ariaLabel={t("dispatch.selectAllIssues")}
           />
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-            Select all
+            {t("dispatch.selectAll")}
           </span>
         </div>
       )}
@@ -417,13 +426,14 @@ function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors
           availableModels={availableModels}
           error={errors[r.key]}
           onChange={(patch) => updateRow(r.key, patch)}
+          t={t}
         />
       ))}
     </div>
   );
 }
 
-function IssueRow({ row, availableModels, error, onChange }) {
+function IssueRow({ row, availableModels, error, onChange, t }) {
   const { issue } = row;
   return (
     <div style={{ ...rowStyle(!!error), flexDirection: "column", gap: 6 }}>
@@ -431,12 +441,12 @@ function IssueRow({ row, availableModels, error, onChange }) {
         <TransparentCheckbox
           checked={row.enabled}
           onChange={(v) => onChange({ enabled: v })}
-          ariaLabel={`Select issue #${issue.number}`}
+          ariaLabel={t("dispatch.selectIssue", { number: issue.number })}
         />
         <button
           onClick={() => onChange({ expanded: !row.expanded })}
           style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
-          aria-label="Toggle details"
+          aria-label={t("dispatch.toggleDetails")}
         >
           {row.expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </button>
@@ -454,10 +464,10 @@ function IssueRow({ row, availableModels, error, onChange }) {
           {...fieldHoverProps}
         />
         <DispatchDropdown
-          ariaLabel={`Model for issue #${issue.number}`}
+          ariaLabel={t("dispatch.modelForIssue", { number: issue.number })}
           value={row.model}
           onChange={(v) => onChange({ model: v })}
-          options={modelOptionsWithDefault(availableModels)}
+          options={modelOptionsWithDefault(availableModels, t)}
           grouped
         />
       </div>
@@ -475,7 +485,7 @@ function IssueRow({ row, availableModels, error, onChange }) {
   );
 }
 
-function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
+function CustomTab({ rows, setRows, currentCwd, availableModels, errors, t }) {
   const addRow = () => setRows((prev) => [...prev, makeCustomRow(prev.length)]);
   const removeRow = (key) => setRows((prev) => prev.filter((r) => r.key !== key));
   const updateRow = (key, patch) => setRows((prev) =>
@@ -486,7 +496,7 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
     <div style={{ padding: "24px 14px 14px" }}>
       {!currentCwd && (
         <div style={noticeStyle}>
-          Select a folder in the sidebar before dispatching custom sessions.
+          {t("dispatch.selectFolderNotice")}
         </div>
       )}
       {rows.map((r, i) => (
@@ -498,6 +508,7 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
           error={errors[r.key]}
           onChange={(patch) => updateRow(r.key, patch)}
           onRemove={() => removeRow(r.key)}
+          t={t}
         />
       ))}
       <button
@@ -507,13 +518,13 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors }) {
         onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "transparent"; }}
       >
         <Plus size={13} strokeWidth={2} />
-        <span>Add session</span>
+        <span>{t("dispatch.addSession")}</span>
       </button>
     </div>
   );
 }
 
-function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
+function CustomRow({ row, index, availableModels, error, onChange, onRemove, t }) {
   const attachments = row.attachments || [];
 
   const addAttachments = (items) => {
@@ -544,7 +555,7 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
   return (
     <div style={customRowStyle(!!error)}>
       <textarea
-        placeholder={`Session ${index + 1} prompt…`}
+        placeholder={t("dispatch.sessionPromptPlaceholder", { number: index + 1 })}
         value={row.prompt}
         onChange={(e) => onChange({ prompt: e.target.value })}
         onPaste={handlePaste}
@@ -560,17 +571,17 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
         <input
           type="text"
           value={row.branch}
-          placeholder="branch name"
+          placeholder={t("dispatch.branchNamePlaceholder")}
           onChange={(e) => onChange({ branch: e.target.value })}
           style={customBranchStyle}
         />
         <span style={customDividerStyle} aria-hidden />
         <DispatchDropdown
           compact
-          ariaLabel={`Model for session ${index + 1}`}
+          ariaLabel={t("dispatch.modelForSession", { number: index + 1 })}
           value={row.model}
           onChange={(v) => onChange({ model: v })}
-          options={modelOptionsWithDefault(availableModels)}
+          options={modelOptionsWithDefault(availableModels, t)}
           grouped
         />
         <span style={customDividerStyle} aria-hidden />
@@ -578,14 +589,14 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove }) {
           attachments={row.attachments}
           onChange={(a) => onChange({ attachments: a })}
         />
-        <RemoveRowButton onClick={onRemove} />
+        <RemoveRowButton onClick={onRemove} t={t} />
       </div>
       {error && <div style={customErrorStyle}>{error}</div>}
     </div>
   );
 }
 
-function RemoveRowButton({ onClick }) {
+function RemoveRowButton({ onClick, t }) {
   const [hovered, setHovered] = useState(false);
   return (
     <button
@@ -593,7 +604,7 @@ function RemoveRowButton({ onClick }) {
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      aria-label="Remove row"
+      aria-label={t ? t("dispatch.removeRow") : "Remove row"}
       style={{
         background: "none",
         border: "none",
@@ -843,9 +854,11 @@ function DispatchDropdown({
   );
 }
 
-function modelOptionsWithDefault(availableModels) {
+function modelOptionsWithDefault(availableModels, t) {
+  const defaultLabel = t ? t("dispatch.modelDefault") : "(default)";
+  const inheritGroup = t ? t("dispatch.inheritGroup") : "INHERIT";
   return [
-    { value: "", label: "(default)", group: "INHERIT" },
+    { value: "", label: defaultLabel, group: inheritGroup },
     ...availableModels.map((m) => ({
       value: m.id,
       label: m.name || m.label || m.id,
