@@ -323,6 +323,7 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
     child,
     cancelled: false,
     sawTurnCompleted: false,
+    lastErrorMessage: null,
     threadId: null,
   };
 
@@ -345,6 +346,15 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
         (event.type === "event_msg" && event.payload?.type === "task_complete")
       ) {
         state.sawTurnCompleted = true;
+      }
+      if (event.type === "error" && typeof event.message === "string" && event.message.trim()) {
+        state.lastErrorMessage = event.message.trim();
+      } else if (event.type === "turn.failed") {
+        const message =
+          (typeof event.error?.message === "string" && event.error.message.trim()) ||
+          (typeof event.message === "string" && event.message.trim()) ||
+          null;
+        if (message) state.lastErrorMessage = message;
       }
       log("Parsed event type:", event.type);
       webContents.send("agent-stream", { conversationId, event });
@@ -400,15 +410,19 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
       return;
     }
 
-    if (shouldEmitStderrError({
+    if (state.lastErrorMessage || shouldEmitStderrError({
       stderrBuffer,
       exitCode,
       signal,
       cancelled: state.cancelled,
       sawTurnCompleted: state.sawTurnCompleted,
     })) {
-      log("Full stderr:", stderrBuffer);
-      webContents.send("agent-error", { conversationId, error: stderrBuffer.trim() });
+      const error = state.lastErrorMessage || stderrBuffer.trim();
+      log("Codex process error:", error);
+      if (stderrBuffer.trim() && error !== stderrBuffer.trim()) {
+        log("Full stderr:", stderrBuffer);
+      }
+      webContents.send("agent-error", { conversationId, error });
     }
 
     scheduleSessionSnapshot(webContents, conversationId, state.threadId);
