@@ -55,6 +55,23 @@ function getMainRepoRoot(dir) {
   return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
 }
 
+function isDraftProjectRoot(dir, draftsPath) {
+  if (!dir || !draftsPath) return false;
+  return getMainRepoRoot(dir) === getMainRepoRoot(draftsPath);
+}
+
+function getProjectRootOrUndefined(dir, draftsPath) {
+  const root = getMainRepoRoot(dir);
+  if (!root || isDraftProjectRoot(root, draftsPath)) return undefined;
+  return root;
+}
+
+function normalizeConversationCreationCwd(dir, draftsPath) {
+  if (dir === null) return null;
+  if (dir === undefined) return undefined;
+  return getProjectRootOrUndefined(dir, draftsPath);
+}
+
 function getEffectiveConversationCwd(conversation, appCwd, draftsPath) {
   const convoCwd = conversation?.cwd;
   if (convoCwd === null) return draftsPath || undefined;
@@ -2588,7 +2605,7 @@ export default function App() {
           title: deriveConversationTitle(text, attachments),
           modelId: defaultModel,
           ts: Date.now(),
-          cwd: getMainRepoRoot(cwd) || undefined,
+          cwd: getProjectRootOrUndefined(cwd, draftsPath),
         });
         convoId = id;
         setConvoList((p) => [convo, ...p]);
@@ -2708,7 +2725,9 @@ export default function App() {
 
   const handleCreateChat = useCallback(async (opts) => {
     const id = opts.id || ("c" + Date.now());
-    const effectiveCwd = opts.cwd !== undefined ? opts.cwd : (getMainRepoRoot(cwd) || undefined);
+    const effectiveCwd = opts.cwd !== undefined
+      ? normalizeConversationCreationCwd(opts.cwd, draftsPath)
+      : getProjectRootOrUndefined(cwd, draftsPath);
     const modelId = opts.model || defaultModel;
     const n = createConversationDraft({
       id,
@@ -2815,7 +2834,7 @@ export default function App() {
         attachments: opts.attachments,
       });
     }
-  }, [createConversationDraft, cwd, defaultModel, projects, sendMessageToConversation]);
+  }, [createConversationDraft, cwd, defaultModel, draftsPath, projects, sendMessageToConversation]);
 
   const handleDispatch = useCallback(async (rows) => {
     // rows: Array<{ prompt, attachments?, model?, cwd, branch, issueContext?, tag? }>
@@ -3257,21 +3276,27 @@ export default function App() {
 
   const allCwdRoots = useMemo(() => {
     const roots = new Set();
-    convoList.forEach(c => { if (c.cwd) roots.add(getMainRepoRoot(c.cwd)); });
-    Object.keys(projects).forEach(r => roots.add(getMainRepoRoot(r)));
-    return [...roots].filter(r => r && !r.includes("/.worktrees/"));
-  }, [convoList, projects]);
+    convoList.forEach((c) => {
+      const root = getMainRepoRoot(c.cwd);
+      if (root && !isDraftProjectRoot(root, draftsPath)) roots.add(root);
+    });
+    Object.keys(projects).forEach((r) => {
+      const root = getMainRepoRoot(r);
+      if (root && !isDraftProjectRoot(root, draftsPath)) roots.add(root);
+    });
+    return [...roots].filter((r) => r && !r.includes("/.worktrees/"));
+  }, [convoList, draftsPath, projects]);
 
   const newChatDefaultCwd = useMemo(() => {
     const activeCwd = activeConvo?.cwd;
-    if (activeCwd) return getMainRepoRoot(activeCwd);
-    if (cwd) return getMainRepoRoot(cwd);
+    if (activeCwd && !isDraftProjectRoot(activeCwd, draftsPath)) return getMainRepoRoot(activeCwd);
+    if (cwd && !isDraftProjectRoot(cwd, draftsPath)) return getMainRepoRoot(cwd);
     const sorted = [...convoList].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     for (const c of sorted) {
-      if (c.cwd) return getMainRepoRoot(c.cwd);
+      if (c.cwd && !isDraftProjectRoot(c.cwd, draftsPath)) return getMainRepoRoot(c.cwd);
     }
     return null;
-  }, [activeConvo, cwd, convoList]);
+  }, [activeConvo, cwd, convoList, draftsPath]);
 
   const terminalCwd = activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd);
 
@@ -3370,6 +3395,7 @@ export default function App() {
           onOpenProjectManager={() => window.api?.openProjectManager()}
           onOpenNewProject={() => setShowNewProject(true)}
           projects={projects}
+          draftsPath={draftsPath}
           onToggleProjectCollapse={handleToggleProjectCollapse}
           onHideProject={handleHideProject}
           onNewInProject={handleNewInProject}

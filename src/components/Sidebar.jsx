@@ -13,12 +13,23 @@ function getMainRepoRoot(dir) {
   return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
 }
 
-function groupConvosByProject(convos, projectsMeta) {
+function isDraftConversation(conversation, draftsPath) {
+  if (!conversation) return false;
+  if (conversation.cwd == null) return true;
+  if (!draftsPath) return false;
+  return getMainRepoRoot(conversation.cwd) === getMainRepoRoot(draftsPath);
+}
+
+function groupConvosByProject(convos, projectsMeta, draftsPath) {
   const groups = {};
   const drafts = [];
   for (const c of convos) {
+    if (isDraftConversation(c, draftsPath)) {
+      drafts.push(c);
+      continue;
+    }
     const root = c.cwd ? getMainRepoRoot(c.cwd) : null;
-    if (!root) { drafts.push(c); continue; }
+    if (!root) continue;
     if (!groups[root]) {
       const meta = projectsMeta?.[root] || {};
       groups[root] = {
@@ -34,7 +45,7 @@ function groupConvosByProject(convos, projectsMeta) {
   // Also include manually added projects with 0 convos
   for (const [projectPath, meta] of Object.entries(projectsMeta || {})) {
     const root = getMainRepoRoot(projectPath);
-    if (!root) continue;
+    if (!root || (draftsPath && root === getMainRepoRoot(draftsPath))) continue;
     if (meta.manual && !groups[root]) {
       groups[root] = {
         cwdRoot: root,
@@ -78,7 +89,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], locale = "en-US" }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], locale = "en-US" }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
@@ -91,7 +102,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
 
   const folderOrderRef = useRef([]);
   const { projectGroups, drafts } = useMemo(() => {
-    const result = groupConvosByProject(filtered, projects);
+    const result = groupConvosByProject(filtered, projects, draftsPath);
     const currentRoots = new Set(result.projectGroups.map(g => g.cwdRoot));
     const prevOrder = folderOrderRef.current.filter(r => currentRoots.has(r));
     const known = new Set(prevOrder);
@@ -106,7 +117,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
       projectGroups: nextOrder.map(r => byRoot.get(r)).filter(Boolean),
       drafts: result.drafts,
     };
-  }, [filtered, projects]);
+  }, [draftsPath, filtered, projects]);
   const searchActive = search.length > 0;
 
   const cwdShort = cwd ? (() => {
