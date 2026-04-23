@@ -27,6 +27,19 @@ const MemoModelPickerWithMultica = memo(ModelPickerWithMultica);
 const MemoSelectionToolbar = memo(SelectionToolbar);
 const MemoTabStrip = memo(TabStrip);
 
+function getMainRepoRoot(dir) {
+  if (!dir) return dir;
+  const wtIdx = dir.indexOf("/.worktrees/");
+  return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
+}
+
+function isDraftConversation(convo, draftsPath) {
+  if (!convo) return false;
+  if (convo.cwd == null) return true;
+  if (!draftsPath) return false;
+  return getMainRepoRoot(convo.cwd) === getMainRepoRoot(draftsPath);
+}
+
 const ChatTranscript = memo(function ChatTranscript({
   showNewChatCard,
   convo,
@@ -90,8 +103,9 @@ const ChatTranscript = memo(function ChatTranscript({
   );
 });
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, locale }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, locale }) {
   const s = useFontScale();
+  const isDraftContext = showNewChatCard ? newChatDefaultCwd == null : isDraftConversation(convo, draftsPath);
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
@@ -626,7 +640,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
-          {!showNewChatCard && developerMode && (
+          {!showNewChatCard && developerMode && !isDraftContext && (
             <MemoGitStatusPill
               cwd={cwd}
               defaultPrBranch={defaultPrBranch}
@@ -635,7 +649,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               locale={locale}
             />
           )}
-          {!showNewChatCard && developerMode && (
+          {!showNewChatCard && developerMode && !isDraftContext && (
             <MemoBranchSelector
               cwd={cwd}
               onCwdChange={onCwdChange}

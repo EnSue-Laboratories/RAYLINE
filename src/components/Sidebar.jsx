@@ -13,12 +13,23 @@ function getMainRepoRoot(dir) {
   return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
 }
 
-function groupConvosByProject(convos, projectsMeta) {
+function isDraftConversation(conversation, draftsPath) {
+  if (!conversation) return false;
+  if (conversation.cwd == null) return true;
+  if (!draftsPath) return false;
+  return getMainRepoRoot(conversation.cwd) === getMainRepoRoot(draftsPath);
+}
+
+function groupConvosByProject(convos, projectsMeta, draftsPath) {
   const groups = {};
   const drafts = [];
   for (const c of convos) {
+    if (isDraftConversation(c, draftsPath)) {
+      drafts.push(c);
+      continue;
+    }
     const root = c.cwd ? getMainRepoRoot(c.cwd) : null;
-    if (!root) { drafts.push(c); continue; }
+    if (!root) continue;
     if (!groups[root]) {
       const meta = projectsMeta?.[root] || {};
       groups[root] = {
@@ -34,7 +45,7 @@ function groupConvosByProject(convos, projectsMeta) {
   // Also include manually added projects with 0 convos
   for (const [projectPath, meta] of Object.entries(projectsMeta || {})) {
     const root = getMainRepoRoot(projectPath);
-    if (!root) continue;
+    if (!root || (draftsPath && root === getMainRepoRoot(draftsPath))) continue;
     if (meta.manual && !groups[root]) {
       groups[root] = {
         cwdRoot: root,
@@ -78,11 +89,12 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], locale = "en-US" }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], locale = "en-US" }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [draftsHeaderHovered, setDraftsHeaderHovered] = useState(false);
   const t = useMemo(() => createTranslator(locale), [locale]);
 
   const filtered = convos.filter((c) =>
@@ -91,7 +103,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
 
   const folderOrderRef = useRef([]);
   const { projectGroups, drafts } = useMemo(() => {
-    const result = groupConvosByProject(filtered, projects);
+    const result = groupConvosByProject(filtered, projects, draftsPath);
     const currentRoots = new Set(result.projectGroups.map(g => g.cwdRoot));
     const prevOrder = folderOrderRef.current.filter(r => currentRoots.has(r));
     const known = new Set(prevOrder);
@@ -106,7 +118,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
       projectGroups: nextOrder.map(r => byRoot.get(r)).filter(Boolean),
       drafts: result.drafts,
     };
-  }, [filtered, projects]);
+  }, [draftsPath, filtered, projects]);
   const searchActive = search.length > 0;
 
   const cwdShort = cwd ? (() => {
@@ -343,13 +355,20 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                 gap: 5,
                 padding: "5px 6px",
                 borderRadius: 6,
+                minHeight: 26,
                 cursor: "pointer",
                 transition: "background .15s",
                 userSelect: "none",
               }}
               onClick={onToggleDraftsCollapsed}
-              onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); }}
-              onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); }}
+              onMouseEnter={(e) => {
+                setDraftsHeaderHovered(true);
+                applyPaneInteractionStyle(e.currentTarget, "hover");
+              }}
+              onMouseLeave={(e) => {
+                setDraftsHeaderHovered(false);
+                applyPaneInteractionStyle(e.currentTarget, "idle");
+              }}
             >
               <span
                 style={{
@@ -373,6 +392,44 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               >
                 {t("sidebar.drafts")}
               </span>
+
+              <div style={{ marginLeft: "auto", width: 18, height: 18, position: "relative", flexShrink: 0 }}>
+                <div
+                  style={{
+                    position: "absolute",
+                    right: 0,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    display: "flex",
+                    alignItems: "center",
+                    opacity: draftsHeaderHovered ? 1 : 0,
+                    pointerEvents: draftsHeaderHovered ? "auto" : "none",
+                    transition: "opacity .15s",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => onNewInProject(null)}
+                    title="New draft chat"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "none",
+                      border: "none",
+                      color: "rgba(255,255,255,0.25)",
+                      cursor: "pointer",
+                      padding: 3,
+                      borderRadius: 4,
+                      transition: "color .15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+                  >
+                    <Plus size={11} strokeWidth={1.5} />
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Draft conversation rows */}
