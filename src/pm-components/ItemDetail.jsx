@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ArrowLeft, GitBranch, Plus, Check, CheckCircle2, GitMerge, RotateCcw, Copy } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CommentBox from "./CommentBox";
+import { createTranslator } from "../i18n";
 
 function timeAgo(dateStr) {
   const now = Date.now();
@@ -21,12 +22,12 @@ const smallBtnStyle = {
   display: "inline-flex",
   alignItems: "center",
   gap: 5,
-  background: "rgba(255,255,255,0.05)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  background: "var(--control-bg)",
+  border: "1px solid var(--control-border)",
   borderRadius: 6,
   padding: "4px 10px",
   cursor: "pointer",
-  color: "rgba(255,255,255,0.55)",
+  color: "var(--text-secondary)",
   fontSize: 11,
   fontFamily: "'JetBrains Mono', monospace",
   letterSpacing: ".04em",
@@ -42,7 +43,7 @@ const markdownCodeComponents = {
       return (
         <code
           style={{
-            background: "rgba(255,255,255,0.06)",
+            background: "var(--control-bg-soft)",
             padding: "1px 5px",
             borderRadius: 4,
             fontSize: 12,
@@ -67,8 +68,8 @@ const markdownCodeComponents = {
   pre: ({ children }) => (
     <pre
       style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--control-bg)",
+        border: "1px solid var(--control-border-soft)",
         borderRadius: 6,
         padding: 12,
         overflowX: "auto",
@@ -80,7 +81,8 @@ const markdownCodeComponents = {
   ),
 };
 
-export default function ItemDetail({ repo, number, type, onBack }) {
+export default function ItemDetail({ repo, number, type, onBack, locale = "en-US" }) {
+  const t = createTranslator(locale);
   const [item, setItem] = useState(null);
   const [comments, setComments] = useState([]);
   const [collaborators, setCollaborators] = useState([]);
@@ -102,32 +104,35 @@ export default function ItemDetail({ repo, number, type, onBack }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showAssignMenu]);
 
-  const fetchAll = () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     const fetchItem =
       type === "pr"
         ? window.ghApi.getPR(repo, number)
         : window.ghApi.getIssue(repo, number);
-    Promise.all([
+    try {
+      const [itemData, commentsData, collabs] = await Promise.all([
       fetchItem,
       window.ghApi.listComments(repo, number),
       window.ghApi.listCollaborators(repo),
-    ])
-      .then(([itemData, commentsData, collabs]) => {
-        setItem(itemData);
-        setComments(commentsData);
-        setCollaborators(collabs);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  };
+      ]);
+      setItem(itemData);
+      setComments(commentsData);
+      setCollaborators(collabs);
+      setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  }, [number, repo, type]);
 
   useEffect(() => {
-    fetchAll();
+    const timeoutId = setTimeout(() => {
+      fetchAll().catch(() => {
+        /* Initial detail refresh failures are surfaced by fetchAll itself. */
+      });
+    }, 0);
     const interval = setInterval(async () => {
       try {
         const fetchItem = type === "pr"
@@ -139,10 +144,15 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         ]);
         setItem(itemData);
         setComments(commentsData);
-      } catch {}
+      } catch {
+        /* Keep showing the current detail snapshot if background refresh fails. */
+      }
     }, 30000);
-    return () => clearInterval(interval);
-  }, [repo, number, type]);
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(interval);
+    };
+  }, [fetchAll, number, repo, type]);
 
   const handleToggleAssign = async (login) => {
     const isAssigned = item.assignees.some((a) => a.login === login);
@@ -163,7 +173,9 @@ export default function ItemDetail({ repo, number, type, onBack }) {
     try {
       const updated = await window.ghApi.closeIssue(repo, number);
       setItem(updated);
-    } catch {}
+    } catch {
+      /* Preserve the previous issue state if closing fails. */
+    }
     setActionLoading(false);
   };
 
@@ -172,7 +184,9 @@ export default function ItemDetail({ repo, number, type, onBack }) {
     try {
       const updated = await window.ghApi.reopenIssue(repo, number);
       setItem(updated);
-    } catch {}
+    } catch {
+      /* Preserve the previous issue state if reopening fails. */
+    }
     setActionLoading(false);
   };
 
@@ -182,7 +196,9 @@ export default function ItemDetail({ repo, number, type, onBack }) {
       await window.ghApi.mergePR(repo, number);
       const updated = await window.ghApi.getPR(repo, number);
       setItem(updated);
-    } catch {}
+    } catch {
+      /* Preserve the previous PR state if merging fails. */
+    }
     setActionLoading(false);
   };
 
@@ -190,13 +206,15 @@ export default function ItemDetail({ repo, number, type, onBack }) {
     try {
       const updated = await window.ghApi.listComments(repo, number);
       setComments(updated);
-    } catch {}
+    } catch {
+      /* Keep existing comments visible if refresh fails. */
+    }
   };
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "rgba(255,255,255,0.4)", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>
-        Loading...
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>
+        {t("pm.loadingItem")}
       </div>
     );
   }
@@ -204,10 +222,10 @@ export default function ItemDetail({ repo, number, type, onBack }) {
   if (error) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, fontFamily: "system-ui, sans-serif" }}>
-        <div style={{ color: "rgba(255,100,100,0.8)", fontSize: 13 }}>{error}</div>
+        <div style={{ color: "var(--danger-soft-text)", fontSize: 13 }}>{error}</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={fetchAll} style={smallBtnStyle}>Retry</button>
-          <button onClick={onBack} style={{ ...smallBtnStyle, background: "none" }}>Back</button>
+          <button onClick={fetchAll} style={smallBtnStyle}>{t("pm.retry")}</button>
+          <button onClick={onBack} style={{ ...smallBtnStyle, background: "none" }}>{t("pm.back")}</button>
         </div>
       </div>
     );
@@ -215,12 +233,12 @@ export default function ItemDetail({ repo, number, type, onBack }) {
 
   const stateBadge = () => {
     if (type === "pr" && item.merged_at) {
-      return { label: "MERGED", bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
+      return { label: t("pm.mergedState"), bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
     }
     if (item.state === "closed") {
-      return { label: "CLOSED", bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
+      return { label: t("pm.closedState"), bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
     }
-    return { label: "OPEN", bg: "rgba(80,200,120,0.15)", color: "rgba(120,230,150,0.9)" };
+    return { label: t("pm.openState"), bg: "rgba(80,200,120,0.15)", color: "rgba(120,230,150,0.9)" };
   };
 
   const badge = stateBadge();
@@ -236,19 +254,19 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         style={{
           display: "flex", alignItems: "center", gap: 6,
           background: "none", border: "none", cursor: "pointer",
-          color: "rgba(255,255,255,0.5)", fontSize: 13,
+          color: "var(--text-secondary)", fontSize: 13,
           fontFamily: "system-ui, sans-serif", padding: "16px 20px",
           transition: "color .15s",
         }}
       >
-        <ArrowLeft size={14} strokeWidth={1.5} /> Back
+        <ArrowLeft size={14} strokeWidth={1.5} /> {t("pm.back")}
       </button>
 
       <div style={{ padding: "0 20px 20px" }}>
         {/* Title — clickable link to GitHub */}
         <div style={{ marginBottom: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: "rgba(255,255,255,0.35)" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: "var(--text-muted)" }}>
               #{number}
             </span>
             <a
@@ -256,12 +274,12 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                fontSize: 18, fontWeight: 600, color: "rgba(255,255,255,0.95)",
+                fontSize: 18, fontWeight: 600, color: "var(--text-primary)",
                 fontFamily: "system-ui, sans-serif", textDecoration: "none",
                 transition: "color .15s", cursor: "pointer",
               }}
               onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(140,180,255,0.95)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.95)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
             >
               {item.title}
             </a>
@@ -273,8 +291,8 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               {badge.label}
             </span>
           </div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "system-ui, sans-serif", marginTop: 4 }}>
-            {repo} &middot; by {item.user?.login} &middot; opened {timeAgo(item.created_at)}
+          <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "system-ui, sans-serif", marginTop: 4 }}>
+            {t("pm.openedBy", { repo, user: item.user?.login || "unknown", time: timeAgo(item.created_at) })}
           </div>
         </div>
 
@@ -299,19 +317,19 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         {/* Assignees — compact with + button */}
         <div style={{
           display: "flex", alignItems: "center", gap: 8, marginTop: 12,
-          fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui, sans-serif",
+          fontSize: 12, color: "var(--text-secondary)", fontFamily: "system-ui, sans-serif",
           position: "relative",
         }}>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Assignees:</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{t("pm.assignees")}</span>
           {item.assignees && item.assignees.length > 0 ? (
             item.assignees.map((a) => (
               <div key={a.login} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <img src={a.avatar_url} alt={a.login} style={{ width: 20, height: 20, borderRadius: 10 }} />
-                <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{a.login}</span>
+                <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>{a.login}</span>
               </div>
             ))
           ) : (
-            <span style={{ fontStyle: "italic", fontSize: 11 }}>None</span>
+            <span style={{ fontStyle: "italic", fontSize: 11, color: "var(--text-muted)" }}>{t("pm.none")}</span>
           )}
           <div ref={assignRef} style={{ position: "relative" }}>
           <button
@@ -320,7 +338,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 20, height: 20, borderRadius: 10,
               background: "none", border: "none",
-              cursor: "pointer", color: "rgba(255,255,255,0.35)", padding: 0,
+              cursor: "pointer", color: "var(--text-muted)", padding: 0,
               transition: "all .15s",
             }}
           >
@@ -330,7 +348,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           {showAssignMenu && (
             <div style={{
               position: "absolute", top: "100%", left: 0, marginTop: 4,
-              background: "rgba(15,15,15,0.95)", border: "1px solid rgba(255,255,255,0.1)",
+              background: "var(--pane-elevated)", border: "1px solid var(--control-border)",
               borderRadius: 8, padding: "4px 0", minWidth: 180, zIndex: 100,
               maxHeight: 220, overflowY: "auto", backdropFilter: "blur(20px)",
             }}>
@@ -342,7 +360,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
                     style={{
                       display: "flex", alignItems: "center", gap: 8, width: "100%",
                       background: "none", border: "none", padding: "6px 12px",
-                      cursor: "pointer", color: "rgba(255,255,255,0.7)", fontSize: 12,
+                      cursor: "pointer", color: "var(--text-secondary)", fontSize: 12,
                       fontFamily: "system-ui, sans-serif", textAlign: "left",
                     }}
                   >
@@ -370,8 +388,8 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               style={smallBtnStyle}
             >
               {copiedCheckout
-                ? <><Check size={11} strokeWidth={1.5} /> Copied!</>
-                : <><Copy size={11} strokeWidth={1.5} /> Checkout</>
+                ? <><Check size={11} strokeWidth={1.5} /> {t("pm.copied")}</>
+                : <><Copy size={11} strokeWidth={1.5} /> {t("pm.checkout")}</>
               }
             </button>
           </div>
@@ -381,8 +399,8 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         <div
           style={{
             marginTop: 16, paddingTop: 16,
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            color: "rgba(255,255,255,0.75)", fontSize: 13,
+            borderTop: "1px solid var(--control-border-soft)",
+            color: "var(--text-secondary)", fontSize: 13,
             lineHeight: 1.7, fontFamily: "system-ui, sans-serif",
           }}
         >
@@ -392,11 +410,11 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               ul: ({ children }) => <ul style={{ listStyle: "disc", paddingLeft: 20, margin: "8px 0" }}>{children}</ul>,
               ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "8px 0" }}>{children}</ol>,
               li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
-              a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(140,180,255,0.9)", textDecoration: "none" }}>{children}</a>,
+              a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-link)", textDecoration: "none" }}>{children}</a>,
               p: ({ children }) => <p style={{ margin: "8px 0" }}>{children}</p>,
-              h1: ({ children }) => <h1 style={{ fontSize: 20, fontWeight: 600, margin: "16px 0 8px", color: "rgba(255,255,255,0.9)" }}>{children}</h1>,
-              h2: ({ children }) => <h2 style={{ fontSize: 17, fontWeight: 600, margin: "14px 0 6px", color: "rgba(255,255,255,0.85)" }}>{children}</h2>,
-              h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 600, margin: "12px 0 4px", color: "rgba(255,255,255,0.85)" }}>{children}</h3>,
+              h1: ({ children }) => <h1 style={{ fontSize: 20, fontWeight: 600, margin: "16px 0 8px", color: "var(--text-primary)" }}>{children}</h1>,
+              h2: ({ children }) => <h2 style={{ fontSize: 17, fontWeight: 600, margin: "14px 0 6px", color: "var(--text-primary)" }}>{children}</h2>,
+              h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 600, margin: "12px 0 4px", color: "var(--text-primary)" }}>{children}</h3>,
               ...markdownCodeComponents,
             }}
           >
@@ -406,21 +424,21 @@ export default function ItemDetail({ repo, number, type, onBack }) {
 
         {/* Comments */}
         <div style={{ marginTop: 24 }}>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em", marginBottom: 12 }}>
-            {comments.length} COMMENT{comments.length !== 1 ? "S" : ""}
+          <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em", marginBottom: 12 }}>
+            {t("pm.commentsCount", { count: comments.length, suffix: comments.length !== 1 ? "S" : "" })}
           </div>
           {comments.map((comment) => (
-            <div key={comment.id} style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 12, marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui, sans-serif", marginBottom: 6 }}>
-                <span style={{ color: "rgba(255,255,255,0.6)" }}>{comment.user?.login}</span> &middot; {timeAgo(comment.created_at)}
+            <div key={comment.id} style={{ borderTop: "1px solid var(--control-border-soft)", paddingTop: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "system-ui, sans-serif", marginBottom: 6 }}>
+                <span style={{ color: "var(--text-secondary)" }}>{comment.user?.login}</span> &middot; {timeAgo(comment.created_at)}
               </div>
-              <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, lineHeight: 1.6, fontFamily: "system-ui, sans-serif" }}>
+              <div style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.6, fontFamily: "system-ui, sans-serif" }}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
                     ul: ({ children }) => <ul style={{ listStyle: "disc", paddingLeft: 20, margin: "6px 0" }}>{children}</ul>,
                     ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "6px 0" }}>{children}</ol>,
-                    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(140,180,255,0.9)", textDecoration: "none" }}>{children}</a>,
+                    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-link)", textDecoration: "none" }}>{children}</a>,
                     p: ({ children }) => <p style={{ margin: "6px 0" }}>{children}</p>,
                     ...markdownCodeComponents,
                   }}
@@ -438,27 +456,28 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         repo={repo}
         number={number}
         onCommentAdded={refreshComments}
+        locale={locale}
         actions={
           <>
             {/* Merge (PR only, open) */}
             {type === "pr" && isOpen && (
-              <button onClick={handleMerge} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
+              <button onClick={handleMerge} disabled={actionLoading} style={smallBtnStyle}>
                 <GitMerge size={11} strokeWidth={1.5} />
-                {actionLoading ? "Merging..." : "Merge"}
+                {actionLoading ? t("pm.merging") : t("pm.merge")}
               </button>
             )}
             {/* Close (issues only) */}
             {type === "issue" && isOpen && (
-              <button onClick={handleClose} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
+              <button onClick={handleClose} disabled={actionLoading} style={smallBtnStyle}>
                 <CheckCircle2 size={11} strokeWidth={1.5} />
-                {actionLoading ? "Closing..." : "Close"}
+                {actionLoading ? t("pm.closing") : t("pm.close")}
               </button>
             )}
             {/* Reopen */}
             {!isOpen && !isMerged && (
-              <button onClick={handleReopen} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
+              <button onClick={handleReopen} disabled={actionLoading} style={smallBtnStyle}>
                 <RotateCcw size={11} strokeWidth={1.5} />
-                {actionLoading ? "Reopening..." : "Reopen"}
+                {actionLoading ? t("pm.reopening") : t("pm.reopen")}
               </button>
             )}
           </>

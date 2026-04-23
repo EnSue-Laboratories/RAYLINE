@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from "react";
 
 const inputStyle = {
   width: "100%",
-  background: "var(--pane-hover)",
-  border: "1px solid var(--pane-border)",
+  background: "var(--control-bg)",
+  border: "1px solid var(--control-border)",
   borderRadius: 6,
   padding: "8px 10px",
-  color: "rgba(255,255,255,0.8)",
+  color: "var(--text-primary)",
   fontSize: 13,
   fontFamily: "system-ui, sans-serif",
   boxSizing: "border-box",
@@ -34,11 +34,6 @@ export default function SearchableSelect({ options, value, onChange, placeholder
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
-  // Reset highlight when filtered list changes
-  useEffect(() => {
-    setHighlightIdx(0);
-  }, [filtered.length]);
 
   // Scroll highlighted item into view
   useEffect(() => {
@@ -77,9 +72,13 @@ export default function SearchableSelect({ options, value, onChange, placeholder
         value={open ? query : value}
         onChange={(e) => {
           setQuery(e.target.value);
+          setHighlightIdx(0);
           if (!open) setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          setHighlightIdx(0);
+          setOpen(true);
+        }}
         onKeyDown={handleKeyDown}
         placeholder={placeholder || "Search..."}
         style={inputStyle}
@@ -98,8 +97,8 @@ export default function SearchableSelect({ options, value, onChange, placeholder
             background: "var(--pane-elevated)",
             backdropFilter: "blur(48px) saturate(1.2)",
             WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-            border: "1px solid var(--pane-border)",
+            boxShadow: "var(--modal-shadow)",
+            border: "1px solid var(--control-border)",
             borderRadius: 6,
             zIndex: 50,
           }}
@@ -113,8 +112,8 @@ export default function SearchableSelect({ options, value, onChange, placeholder
                 padding: "6px 10px",
                 fontSize: 13,
                 fontFamily: "system-ui, sans-serif",
-                color: opt === value ? "rgba(180,220,255,0.9)" : "rgba(255,255,255,0.7)",
-                background: i === highlightIdx ? "var(--pane-hover)" : "transparent",
+                color: opt === value ? "var(--accent-soft-text)" : "var(--text-secondary)",
+                background: i === highlightIdx ? "var(--control-bg-soft)" : "transparent",
                 cursor: "pointer",
               }}
             >

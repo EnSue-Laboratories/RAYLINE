@@ -191,9 +191,9 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
 }
 
 const backdropStyle = {
-  position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+  position: "fixed", inset: 0, background: "var(--pm-modal-backdrop)",
   display: "flex", alignItems: "center", justifyContent: "center",
-  zIndex: 1000, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+  zIndex: 1000, backdropFilter: "blur(var(--pm-modal-backdrop-blur))", WebkitBackdropFilter: "blur(var(--pm-modal-backdrop-blur))",
 };
 const cardStyle = {
   width: 460, maxWidth: "90vw", maxHeight: "85vh",
@@ -202,17 +202,17 @@ const cardStyle = {
   WebkitBackdropFilter: "blur(48px) saturate(1.2)",
   border: "1px solid var(--pane-border)",
   borderRadius: 12, display: "flex", flexDirection: "column",
-  color: "white", fontFamily: "system-ui, sans-serif", fontSize: 13,
-  boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+  color: "var(--text-primary)", fontFamily: "system-ui, sans-serif", fontSize: 13,
+  boxShadow: "var(--modal-shadow)",
 };
 const headerStyle = {
   display: "flex", justifyContent: "space-between", alignItems: "center",
   padding: "14px 18px", borderBottom: "1px solid var(--pane-border)",
 };
-const titleRowStyle = { display: "flex", alignItems: "center", gap: 8, color: "rgba(255,255,255,0.85)" };
+const titleRowStyle = { display: "flex", alignItems: "center", gap: 8, color: "var(--text-primary)" };
 const titleStyle = { fontSize: 13, fontWeight: 500 };
 const closeBtnStyle = {
-  background: "none", border: "none", color: "rgba(255,255,255,0.55)",
+  background: "none", border: "none", color: "var(--text-tertiary)",
   cursor: "pointer", padding: 4, display: "flex",
 };
 const bodyStyle = { padding: 18, display: "flex", flexDirection: "column", gap: 14 };
@@ -220,7 +220,7 @@ const sectionStyle = { display: "flex", flexDirection: "column", gap: 4 };
 const sectionHeaderStyle = {
   display: "flex", alignItems: "center", gap: 6,
   fontSize: 11, fontWeight: 500,
-  color: "rgba(255,255,255,0.6)",
+  color: "var(--text-secondary)",
   textTransform: "uppercase", letterSpacing: 0.4,
   marginBottom: 6,
 };
@@ -233,7 +233,7 @@ const dividerLineStyle = {
 };
 const dividerTextStyle = {
   fontSize: 10, fontWeight: 500,
-  color: "rgba(255,255,255,0.35)",
+  color: "var(--text-muted)",
   letterSpacing: 0.8,
 };
 const rowStyle = { display: "flex", gap: 8, alignItems: "center" };
@@ -243,8 +243,8 @@ const footerStyle = {
 };
 const primaryBtnStyle = (enabled) => ({
   padding: "8px 14px", borderRadius: 6, border: "none",
-  background: enabled ? "white" : "rgba(255,255,255,0.1)",
-  color: enabled ? "black" : "rgba(255,255,255,0.4)",
+  background: enabled ? "var(--button-primary-bg)" : "var(--button-primary-bg-disabled)",
+  color: enabled ? "var(--button-primary-fg)" : "var(--button-primary-fg-disabled)",
   cursor: enabled ? "pointer" : "not-allowed",
   fontSize: 12, fontWeight: 500,
 });
@@ -252,23 +252,23 @@ const secondaryBtnStyle = {
   padding: "8px 12px", borderRadius: 6,
   background: "transparent",
   border: "1px solid var(--pane-border)",
-  color: "rgba(255,255,255,0.7)",
+  color: "var(--button-secondary-fg)",
   cursor: "pointer", fontSize: 12,
   display: "flex", alignItems: "center",
 };
 const inputStyle = {
   width: "100%", padding: "8px 10px", borderRadius: 6,
-  background: "rgba(255,255,255,0.04)",
+  background: "var(--control-bg)",
   border: "1px solid var(--pane-border)",
-  color: "white", fontSize: 13, fontFamily: "'JetBrains Mono',monospace",
+  color: "var(--text-primary)", fontSize: 13, fontFamily: "'JetBrains Mono',monospace",
   outline: "none", boxSizing: "border-box",
 };
-const labelStyle = { fontSize: 11, color: "rgba(255,255,255,0.5)", marginBottom: 4 };
-const hintStyle = { fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 6 };
+const labelStyle = { fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 };
+const hintStyle = { fontSize: 11, color: "var(--text-muted)", marginTop: 6 };
 const errorStyle = {
-  fontSize: 12, color: "rgba(255,180,180,0.9)",
-  background: "rgba(255,120,120,0.08)",
+  fontSize: 12, color: "var(--danger-soft-text)",
+  background: "var(--danger-soft-bg)",
   padding: "8px 10px", borderRadius: 6,
-  border: "1px solid rgba(255,120,120,0.18)",
+  border: "1px solid var(--danger-soft-border)",
   whiteSpace: "pre-wrap", wordBreak: "break-word",
 };

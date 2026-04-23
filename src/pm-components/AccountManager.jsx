@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { X, LogOut, ChevronDown, Loader2, Check, Plus } from "lucide-react";
+import { createTranslator } from "../i18n";
 
 function GitHubGlyph({ size = 18 }) {
   return (
@@ -22,7 +23,9 @@ export default function AccountManager({
   onAccountSwitched,
   onSignedOut,
   onClose,
+  locale = "en-US",
 }) {
+  const t = createTranslator(locale);
   const [accounts, setAccounts] = useState([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -133,7 +136,7 @@ export default function AccountManager({
           background: "var(--pane-elevated)",
           backdropFilter: "blur(48px) saturate(1.2)",
           WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          boxShadow: "var(--modal-shadow)",
           borderRadius: 12,
           border: "1px solid var(--pane-border)",
           display: "flex",
@@ -148,7 +151,7 @@ export default function AccountManager({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: "1px solid var(--control-border-soft)",
             flexShrink: 0,
           }}
         >
@@ -156,10 +159,10 @@ export default function AccountManager({
             style={{
               fontSize: 14,
               fontWeight: 500,
-              color: "rgba(255,255,255,0.85)",
+              color: "var(--text-primary)",
             }}
           >
-            Manage Account
+            {t("pm.manageAccountTitle")}
           </span>
           <button
             onClick={onClose}
@@ -167,9 +170,9 @@ export default function AccountManager({
               width: 28,
               height: 28,
               borderRadius: 7,
-              border: "1px solid var(--pane-border)",
-              background: "var(--pane-hover)",
-              color: "rgba(255,255,255,0.5)",
+              border: "1px solid var(--control-border)",
+              background: "var(--control-bg)",
+              color: "var(--text-tertiary)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -186,8 +189,8 @@ export default function AccountManager({
             style={{
               width: "100%",
               borderRadius: 8,
-              border: "1px solid var(--pane-border)",
-              background: "var(--pane-hover)",
+              border: "1px solid var(--control-border)",
+              background: "var(--control-bg)",
               overflow: "hidden",
             }}
           >
@@ -202,12 +205,12 @@ export default function AccountManager({
                 padding: activeUser ? "12px 14px" : "14px",
                 border: "none",
                 background: "transparent",
-                color: "rgba(255,255,255,0.85)",
+                color: "var(--text-primary)",
                 textAlign: "left",
                 cursor: loadingAccounts || signingOut ? "default" : "pointer",
               }}
             >
-              <div style={{ color: "rgba(255,255,255,0.6)", display: "flex" }}>
+              <div style={{ color: "var(--text-secondary)", display: "flex" }}>
                 <GitHubGlyph size={18} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -217,18 +220,18 @@ export default function AccountManager({
                       style={{
                         fontSize: 10,
                         fontFamily: "'JetBrains Mono', monospace",
-                        color: "rgba(255,255,255,0.35)",
+                        color: "var(--text-muted)",
                         letterSpacing: ".08em",
                         marginBottom: 2,
                       }}
                     >
-                      SIGNED IN AS
+                      {t("pm.signedInAsLabel")}
                     </div>
                     <div
                       style={{
                         fontSize: 13,
                         fontFamily: "'JetBrains Mono', monospace",
-                        color: "rgba(255,255,255,0.85)",
+                        color: "var(--text-primary)",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -241,10 +244,10 @@ export default function AccountManager({
                   <div
                     style={{
                       fontSize: 13,
-                      color: "rgba(255,255,255,0.75)",
+                      color: "var(--text-secondary)",
                     }}
                   >
-                    {loadingAccounts ? "Loading GitHub accounts…" : "Signed in to GitHub"}
+                    {loadingAccounts ? t("pm.loadingAccounts") : t("pm.signedInGithub")}
                   </div>
                 )}
               </div>
@@ -252,14 +255,14 @@ export default function AccountManager({
                 <Loader2
                   size={14}
                   strokeWidth={1.5}
-                  style={{ animation: "spin 1s linear infinite", color: "rgba(255,255,255,0.45)" }}
+                  style={{ animation: "spin 1s linear infinite", color: "var(--text-muted)" }}
                 />
               ) : (
                 <ChevronDown
                   size={15}
                   strokeWidth={1.5}
                   style={{
-                    color: "rgba(255,255,255,0.4)",
+                    color: "var(--text-muted)",
                     transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
                     transition: "transform .18s ease",
                   }}
@@ -270,8 +273,8 @@ export default function AccountManager({
             {menuOpen && (
               <div
                 style={{
-                  borderTop: "1px solid rgba(255,255,255,0.05)",
-                  background: "var(--pane-hover)",
+                  borderTop: "1px solid var(--control-border-soft)",
+                  background: "var(--control-bg)",
                 }}
               >
                 {accounts.map((account) => {
@@ -292,15 +295,15 @@ export default function AccountManager({
                         gap: 10,
                         padding: "10px 12px",
                         border: "none",
-                        borderTop: "1px solid rgba(255,255,255,0.04)",
-                        background: !isSwitching && isHovered ? "rgba(255,255,255,0.05)" : "transparent",
-                        color: "rgba(255,255,255,0.82)",
+                        borderTop: "1px solid var(--control-border-soft)",
+                        background: !isSwitching && isHovered ? "var(--control-bg-soft)" : "transparent",
+                        color: "var(--text-primary)",
                         textAlign: "left",
                         cursor: isActive || isSwitching || signingOut ? "default" : "pointer",
                         opacity: isSwitching ? 0.8 : 1,
                       }}
                     >
-                      <span style={{ display: "flex", color: "rgba(255,255,255,0.45)" }}>
+                      <span style={{ display: "flex", color: "var(--text-muted)" }}>
                         <GitHubGlyph size={16} />
                       </span>
                       <span style={{ flex: 1, minWidth: 0 }}>
@@ -309,7 +312,7 @@ export default function AccountManager({
                             display: "block",
                             fontSize: 13,
                             fontFamily: "'JetBrains Mono', monospace",
-                            color: isActive ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.78)",
+                            color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
                           }}
                         >
                           @{account.login}
@@ -319,20 +322,20 @@ export default function AccountManager({
                             display: "block",
                             marginTop: 2,
                             fontSize: 11,
-                            color: "rgba(255,255,255,0.35)",
+                            color: "var(--text-muted)",
                           }}
                         >
-                          {isActive ? "Current account" : "Switch to this account"}
+                          {isActive ? t("pm.currentAccount") : t("pm.switchToAccount")}
                         </span>
                       </span>
                       {isSwitching ? (
                         <Loader2
                           size={14}
                           strokeWidth={1.5}
-                          style={{ animation: "spin 1s linear infinite", color: "rgba(255,255,255,0.45)" }}
+                          style={{ animation: "spin 1s linear infinite", color: "var(--text-muted)" }}
                         />
                       ) : isActive ? (
-                        <Check size={14} strokeWidth={1.8} style={{ color: "rgba(255,255,255,0.6)" }} />
+                        <Check size={14} strokeWidth={1.8} style={{ color: "var(--text-secondary)" }} />
                       ) : null}
                     </button>
                   );
@@ -345,8 +348,8 @@ export default function AccountManager({
         <div style={{ padding: "4px 12px 12px" }}>
           <ActionRow
             icon={<Plus size={15} strokeWidth={1.5} />}
-            title="Add account"
-            subtitle="Sign in as another GitHub user"
+            title={t("pm.addAccount")}
+            subtitle={t("pm.addAccountSubtitle")}
             onClick={onAddAccount}
           />
           <ActionRow
@@ -361,8 +364,8 @@ export default function AccountManager({
                 <LogOut size={15} strokeWidth={1.5} />
               )
             }
-            title={signingOut ? "Signing out…" : "Sign out"}
-            subtitle="Log out of the active GitHub account on this device"
+            title={signingOut ? t("pm.signingOut") : t("pm.signOut")}
+            subtitle={t("pm.signOutSubtitle")}
             onClick={signingOut ? null : handleSignOut}
             danger
           />
@@ -374,10 +377,10 @@ export default function AccountManager({
                 marginTop: 8,
                 padding: "8px 12px",
                 borderRadius: 7,
-                border: "1px solid rgba(220,120,120,0.22)",
-                background: "rgba(220,120,120,0.07)",
+                border: "1px solid var(--danger-soft-border)",
+                background: "var(--danger-soft-bg)",
                 fontSize: 12,
-                color: "rgba(230,180,180,0.82)",
+                color: "var(--danger-soft-text)",
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",
               }}
@@ -409,14 +412,14 @@ function ActionRow({ icon, title, subtitle, onClick, danger }) {
         borderRadius: 8,
         border: "none",
         cursor: disabled ? "default" : "pointer",
-        background: hovered && !disabled ? "var(--pane-hover)" : "transparent",
+        background: hovered && !disabled ? "var(--control-bg-soft)" : "transparent",
         transition: "background .15s, color .15s",
         textAlign: "left",
         color: danger
           ? hovered
-            ? "rgba(230,140,140,0.95)"
-            : "rgba(220,140,140,0.8)"
-          : "rgba(255,255,255,0.8)",
+            ? "var(--danger-soft-text)"
+            : "var(--danger-soft-text)"
+          : "var(--text-primary)",
         opacity: disabled ? 0.6 : 1,
       }}
     >
@@ -428,9 +431,9 @@ function ActionRow({ icon, title, subtitle, onClick, danger }) {
           flexShrink: 0,
           color: danger
             ? hovered
-              ? "rgba(230,140,140,0.95)"
-              : "rgba(220,140,140,0.7)"
-            : "rgba(255,255,255,0.55)",
+              ? "var(--danger-soft-text)"
+              : "var(--danger-soft-text)"
+            : "var(--text-tertiary)",
         }}
       >
         {icon}
@@ -451,7 +454,7 @@ function ActionRow({ icon, title, subtitle, onClick, danger }) {
             display: "block",
             fontSize: 11,
             fontFamily: "system-ui, sans-serif",
-            color: "rgba(255,255,255,0.35)",
+            color: "var(--text-muted)",
             marginTop: 2,
           }}
         >

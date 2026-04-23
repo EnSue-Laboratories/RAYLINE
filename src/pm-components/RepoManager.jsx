@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { X, Loader2 } from "lucide-react";
+import { createTranslator } from "../i18n";
 
-export default function RepoManager({ repos, onAdd, onClose }) {
+export default function RepoManager({ repos, onAdd, onClose, locale = "en-US" }) {
+  const t = createTranslator(locale);
   const [userRepos, setUserRepos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,7 +25,10 @@ export default function RepoManager({ repos, onAdd, onClose }) {
   };
 
   useEffect(() => {
-    fetchRepos();
+    const timeoutId = setTimeout(() => {
+      fetchRepos();
+    }, 0);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const filtered = userRepos.filter((r) =>
@@ -53,7 +58,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
           background: "var(--pane-elevated)",
           backdropFilter: "blur(48px) saturate(1.2)",
           WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          boxShadow: "var(--modal-shadow)",
           borderRadius: 12,
           border: "1px solid var(--pane-border)",
           display: "flex",
@@ -69,7 +74,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: "1px solid var(--control-border-soft)",
             flexShrink: 0,
           }}
         >
@@ -77,10 +82,10 @@ export default function RepoManager({ repos, onAdd, onClose }) {
             style={{
               fontSize: 14,
               fontWeight: 500,
-              color: "rgba(255,255,255,0.85)",
+              color: "var(--text-primary)",
             }}
           >
-            Add Repository
+            {t("pm.addRepositoryTitle")}
           </span>
           <button
             onClick={onClose}
@@ -88,9 +93,9 @@ export default function RepoManager({ repos, onAdd, onClose }) {
               width: 28,
               height: 28,
               borderRadius: 7,
-              border: "1px solid var(--pane-border)",
-              background: "var(--pane-hover)",
-              color: "rgba(255,255,255,0.5)",
+              border: "1px solid var(--control-border)",
+              background: "var(--control-bg)",
+              color: "var(--text-tertiary)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -106,7 +111,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
         <div style={{ padding: "12px 20px 8px", flexShrink: 0 }}>
           <input
             type="text"
-            placeholder="Filter repositories..."
+            placeholder={t("pm.filterRepositories")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
@@ -114,9 +119,9 @@ export default function RepoManager({ repos, onAdd, onClose }) {
               width: "100%",
               padding: "8px 12px",
               borderRadius: 7,
-              border: "1px solid var(--pane-border)",
-              background: "var(--pane-hover)",
-              color: "rgba(255,255,255,0.85)",
+              border: "1px solid var(--control-border)",
+              background: "var(--control-bg)",
+              color: "var(--text-primary)",
               fontSize: 13,
               fontFamily: "system-ui, sans-serif",
               outline: "none",
@@ -134,13 +139,14 @@ export default function RepoManager({ repos, onAdd, onClose }) {
                 alignItems: "center",
                 justifyContent: "center",
                 padding: 40,
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-muted)",
               }}
             >
               <Loader2
                 size={20}
                 style={{ animation: "spin 1s linear infinite" }}
               />
+              <span style={{ marginLeft: 8, fontSize: 13 }}>{t("pm.loadingRepositories")}</span>
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </div>
           ) : error ? (
@@ -154,23 +160,23 @@ export default function RepoManager({ repos, onAdd, onClose }) {
               }}
             >
               <div
-                style={{ fontSize: 13, color: "rgba(200,80,80,0.7)" }}
+                style={{ fontSize: 13, color: "var(--danger-soft-text)" }}
               >
                 {error}
               </div>
               <button
                 onClick={fetchRepos}
                 style={{
-                  background: "var(--pane-hover)",
-                  border: "1px solid var(--pane-border)",
+                  background: "var(--control-bg)",
+                  border: "1px solid var(--control-border)",
                   borderRadius: 6,
-                  color: "rgba(255,255,255,0.6)",
+                  color: "var(--text-secondary)",
                   fontSize: 12,
                   padding: "6px 14px",
                   cursor: "pointer",
                 }}
               >
-                Retry
+                {t("pm.retry")}
               </button>
             </div>
           ) : filtered.length === 0 ? (
@@ -178,11 +184,11 @@ export default function RepoManager({ repos, onAdd, onClose }) {
               style={{
                 padding: 40,
                 textAlign: "center",
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-muted)",
                 fontSize: 13,
               }}
             >
-              No repositories found
+              {t("pm.noRepositoriesFound")}
             </div>
           ) : (
             filtered.map((r) => {
@@ -192,6 +198,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
                   key={r.nameWithOwner}
                   repo={r}
                   added={added}
+                  labelAdded={t("pm.added")}
                   onClick={() => {
                     if (!added) {
                       onAdd(r.nameWithOwner);
@@ -208,7 +215,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
   );
 }
 
-function RepoRow({ repo, added, onClick }) {
+function RepoRow({ repo, added, onClick, labelAdded }) {
   const [hovered, setHovered] = useState(false);
   return (
     <button
@@ -225,7 +232,7 @@ function RepoRow({ repo, added, onClick }) {
         borderRadius: 8,
         border: "none",
         cursor: added ? "default" : "pointer",
-        background: hovered && !added ? "var(--pane-hover)" : "transparent",
+        background: hovered && !added ? "var(--control-bg-soft)" : "transparent",
         transition: "background .15s",
         textAlign: "left",
         opacity: added ? 0.4 : 1,
@@ -235,7 +242,7 @@ function RepoRow({ repo, added, onClick }) {
         <div
           style={{
             fontSize: 13,
-            color: "rgba(255,255,255,0.85)",
+            color: "var(--text-primary)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -248,7 +255,7 @@ function RepoRow({ repo, added, onClick }) {
           <div
             style={{
               fontSize: 11,
-              color: "rgba(255,255,255,0.3)",
+              color: "var(--text-muted)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -265,13 +272,13 @@ function RepoRow({ repo, added, onClick }) {
           style={{
             fontSize: 10,
             fontFamily: "'JetBrains Mono', monospace",
-            color: "rgba(255,255,255,0.3)",
+            color: "var(--text-faint)",
             letterSpacing: ".06em",
             marginLeft: 8,
             flexShrink: 0,
           }}
         >
-          ADDED
+          {labelAdded}
         </span>
       )}
     </button>

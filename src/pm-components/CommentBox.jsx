@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { createTranslator } from "../i18n";
 
-export default function CommentBox({ repo, number, onCommentAdded, actions }) {
+export default function CommentBox({ repo, number, onCommentAdded, actions, locale = "en-US" }) {
+  const t = createTranslator(locale);
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -11,24 +13,26 @@ export default function CommentBox({ repo, number, onCommentAdded, actions }) {
       await window.ghApi.addComment(repo, number, body.trim());
       setBody("");
       onCommentAdded();
-    } catch {}
+    } catch {
+      /* Keep the current draft visible if comment submission fails. */
+    }
     setSubmitting(false);
   };
 
   return (
-    <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", padding: "12px 20px" }}>
+    <div style={{ borderTop: "1px solid var(--control-border-soft)", padding: "12px 20px" }}>
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="Write a comment..."
+        placeholder={t("pm.commentPlaceholder")}
         rows={3}
         style={{
           width: "100%",
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.08)",
+          background: "var(--control-bg)",
+          border: "1px solid var(--control-border)",
           borderRadius: 6,
           padding: "8px 10px",
-          color: "rgba(255,255,255,0.8)",
+          color: "var(--text-primary)",
           fontSize: 12,
           fontFamily: "system-ui, sans-serif",
           resize: "vertical",
@@ -43,19 +47,19 @@ export default function CommentBox({ repo, number, onCommentAdded, actions }) {
           onClick={handleSubmit}
           disabled={!body.trim() || submitting}
           style={{
-            background: body.trim() ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: body.trim() ? "var(--button-primary-bg)" : "var(--button-primary-bg-disabled)",
+            border: "1px solid var(--control-border)",
             borderRadius: 6,
             padding: "5px 12px",
             cursor: body.trim() ? "pointer" : "default",
-            color: body.trim() ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
+            color: body.trim() ? "var(--button-primary-fg)" : "var(--button-primary-fg-disabled)",
             fontSize: 11,
             fontFamily: "'JetBrains Mono', monospace",
             letterSpacing: ".04em",
             transition: "all .15s",
           }}
         >
-          {submitting ? "..." : "Comment"}
+          {submitting ? "..." : t("pm.comment")}
         </button>
       </div>
     </div>

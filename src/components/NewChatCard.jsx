@@ -441,7 +441,7 @@ export default function NewChatCard({
     background: "transparent",
     border: "none",
     outline: "none",
-    color: "rgba(255,255,255,0.85)",
+    color: "var(--text-primary)",
     fontFamily: "system-ui, sans-serif",
   };
 
@@ -452,16 +452,16 @@ export default function NewChatCard({
     padding: "5px 11px",
     background: active ? SHEET_ACTIVE : SHEET_HOVER,
     backdropFilter: active ? "var(--pane-interaction-active-filter, none)" : "var(--pane-interaction-hover-filter, none)",
-    border: `1px solid ${active ? "rgba(255,255,255,0.12)" : SHEET_BORDER}`,
+    border: `1px solid ${active ? "var(--control-border-strong)" : SHEET_BORDER}`,
     borderRadius: 999,
-    color: active ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.5)",
+    color: active ? "var(--text-primary)" : "var(--text-tertiary)",
     fontSize: s(10.5),
     fontFamily: "system-ui, sans-serif",
     fontWeight: 600,
     cursor: "pointer",
     transition: "all .2s",
     letterSpacing: ".01em",
-    boxShadow: active ? "var(--pane-interaction-active-shadow, inset 0 0 0 1px rgba(255,255,255,0.08))" : "var(--pane-interaction-hover-shadow, none)",
+    boxShadow: active ? "var(--pane-interaction-active-shadow, inset 0 0 0 1px var(--control-border-soft))" : "var(--pane-interaction-hover-shadow, none)",
   });
 
   const chipIconStyle = {
@@ -493,9 +493,9 @@ export default function NewChatCard({
       <div style={{
         maxWidth: 600,
         width: "100%",
-        background: dragOver ? "rgba(180,220,255,0.05)" : SHEET_BG,
+        background: dragOver ? "var(--accent-soft-bg)" : SHEET_BG,
         backdropFilter: "blur(48px) saturate(1.2)",
-        border: `1px solid ${dragOver ? "rgba(180,220,255,0.12)" : SHEET_BORDER}`,
+        border: `1px solid ${dragOver ? "var(--accent-soft-border)" : SHEET_BORDER}`,
         borderRadius: 14,
         padding: 20,
         display: "flex",
@@ -536,15 +536,15 @@ export default function NewChatCard({
               <span style={{
                 display: "inline-flex", alignItems: "center", gap: 4,
                 padding: "3px 8px",
-                background: "rgba(140,180,255,0.1)",
-                border: "1px solid rgba(140,180,255,0.15)",
+                background: "var(--accent-soft-bg)",
+                border: "1px solid var(--accent-soft-border)",
                 borderRadius: 6, fontSize: s(10),
                 fontFamily: "'JetBrains Mono', monospace",
-                color: "rgba(180,210,255,0.8)",
+                color: "var(--accent-soft-text)",
               }}>
                 {issueContext.split("\n")[0]}
                 <button onClick={() => setIssueContext(null)} style={{
-                  background: "none", border: "none", color: "rgba(255,255,255,0.3)",
+                  background: "none", border: "none", color: "var(--text-muted)",
                   cursor: "pointer", padding: 0, display: "flex",
                 }}>
                   <X size={10} />
@@ -555,18 +555,18 @@ export default function NewChatCard({
               <span key={i} style={{
                 display: "inline-flex", alignItems: "center", gap: 4,
                 padding: "3px 8px",
-                background: f.type === "image" ? "rgba(180,255,200,0.06)" : "rgba(255,255,255,0.04)",
-                border: `1px solid ${f.type === "image" ? "rgba(180,255,200,0.1)" : "rgba(255,255,255,0.06)"}`,
+                background: f.type === "image" ? "var(--success-soft-bg)" : "var(--control-bg)",
+                border: `1px solid ${f.type === "image" ? "var(--success-soft-border)" : "var(--control-border)"}`,
                 borderRadius: 6, fontSize: s(10),
                 fontFamily: "'JetBrains Mono', monospace",
-                color: "rgba(255,255,255,0.5)",
+                color: f.type === "image" ? "var(--success-soft-text)" : "var(--text-secondary)",
               }}>
                 {f.type === "image" && f.dataUrl && (
                   <img src={f.dataUrl} alt="" style={{ width: 14, height: 14, borderRadius: 2, objectFit: "cover" }} />
                 )}
                 {f.name}
                 <button onClick={() => removeAttachment(i)} style={{
-                  background: "none", border: "none", color: "rgba(255,255,255,0.3)",
+                  background: "none", border: "none", color: "var(--text-muted)",
                   cursor: "pointer", padding: 0, display: "flex",
                 }}>
                   <X size={10} />
@@ -582,8 +582,8 @@ export default function NewChatCard({
 
           {/* Attach */}
           <button onClick={handleAttach} style={toolBtnStyle(false)}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--control-border-strong)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--control-border-soft)"; }}
           >
             <Paperclip style={chipIconStyle} />
             {t("newChat.file")}
@@ -686,7 +686,7 @@ export default function NewChatCard({
             locale={locale}
           />
           <span style={{
-            fontSize: s(10), color: "rgba(255,255,255,0.2)",
+            fontSize: s(10), color: "var(--text-faint)",
             fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
           }}>
             {creatingChat ? t("newChat.creating") : t("newChat.enterToCreate")}
@@ -696,7 +696,7 @@ export default function NewChatCard({
         {error && (
           <div style={{
             fontSize: s(10),
-            color: "rgba(255,180,180,0.7)",
+            color: "var(--danger-soft-text)",
             fontFamily: "'JetBrains Mono', monospace",
           }}>
             {error}
@@ -772,19 +772,19 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
           padding: "8px 10px",
           fontSize: s(11),
           fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.8)",
+          color: "var(--text-primary)",
           borderBottom: "1px solid var(--pane-border)",
           borderRadius: "7px 7px 0 0",
         }}
       />
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {loading && (
-          <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+          <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "'JetBrains Mono',monospace" }}>
             {t("newChat.loading")}
           </div>
         )}
         {!loading && issues.length === 0 && (
-          <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+          <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "'JetBrains Mono',monospace" }}>
             {t("newChat.noIssuesFound")}
           </div>
         )}
@@ -801,7 +801,7 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
               background: "transparent",
               border: "none",
               borderRadius: 7,
-              color: "rgba(255,255,255,0.55)",
+              color: "var(--text-secondary)",
               fontSize: s(11),
               fontFamily: "system-ui, sans-serif",
               cursor: "pointer",
@@ -813,7 +813,7 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
           >
             <span style={{
               fontSize: s(9), fontFamily: "'JetBrains Mono',monospace",
-              color: "rgba(255,255,255,0.3)", flexShrink: 0,
+              color: "var(--text-muted)", flexShrink: 0,
             }}>
               #{issue.number}
             </span>
@@ -901,7 +901,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
           padding: "8px 10px",
           fontSize: s(11),
           fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.8)",
+          color: "var(--text-primary)",
           borderBottom: "1px solid var(--pane-border)",
           borderRadius: "7px 7px 0 0",
         }}
@@ -918,7 +918,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
               background: "transparent",
               border: "none",
               borderRadius: 7,
-              color: "rgba(180,220,255,0.82)",
+              color: "var(--accent-soft-text)",
               fontSize: s(11),
               fontFamily: "'JetBrains Mono',monospace",
               cursor: "pointer",
@@ -932,12 +932,12 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
         )}
 
         {loading && (
-          <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+          <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "'JetBrains Mono',monospace" }}>
             {t("newChat.loading")}
           </div>
         )}
         {!loading && branches.length === 0 && (
-          <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+          <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "'JetBrains Mono',monospace" }}>
             {t("newChat.noBranchesFound")}
           </div>
         )}
@@ -956,7 +956,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
               background: "transparent",
               border: "none",
               borderRadius: 7,
-              color: branchName === currentBranch ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.55)",
+              color: branchName === currentBranch ? "var(--text-primary)" : "var(--text-secondary)",
               fontSize: s(11),
               fontFamily: "'JetBrains Mono',monospace",
               cursor: "pointer",
@@ -968,7 +968,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
           >
             <span>{branchName}</span>
             {branchName === currentBranch && (
-              <span style={{ fontSize: s(8.5), color: "rgba(255,255,255,0.25)", letterSpacing: ".04em" }}>
+              <span style={{ fontSize: s(8.5), color: "var(--text-faint)", letterSpacing: ".04em" }}>
                 {t("newChat.currentBranch")}
               </span>
             )}
@@ -987,7 +987,7 @@ function getNeutralDropdownItemStyle(s) {
     background: "transparent",
     border: "none",
     borderRadius: 7,
-    color: "rgba(255,255,255,0.55)",
+    color: "var(--text-secondary)",
     fontSize: s(11),
     fontFamily: "'JetBrains Mono',monospace",
     cursor: "pointer",
@@ -1068,7 +1068,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
           padding: "8px 10px",
           fontSize: s(11),
           fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.8)",
+          color: "var(--text-primary)",
           borderBottom: "1px solid var(--pane-border)",
           borderRadius: "7px 7px 0 0",
         }}
@@ -1079,7 +1079,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
           padding: "6px 10px 2px",
           fontSize: s(9),
           fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.3)",
+          color: "var(--text-muted)",
           letterSpacing: ".04em",
         }}>
           {t("newChat.worktreeFrom", { value: baseBranch })}

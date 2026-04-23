@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell, clipboard } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell, clipboard, nativeTheme } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -53,6 +53,18 @@ if (isDev && isMac) {
 
 let mainWindow;
 let pmWindow;
+
+function getCurrentSystemTheme() {
+  return nativeTheme.shouldUseDarkColors ? "dark" : "light";
+}
+
+function broadcastSystemTheme() {
+  const theme = getCurrentSystemTheme();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win || win.isDestroyed()) continue;
+    win.webContents.send("system-theme-changed", theme);
+  }
+}
 
 function getWindowChromeOptions() {
   if (isMac) {
@@ -231,6 +243,8 @@ app.whenReady().then(() => {
       mainWindow.webContents.send("terminal-output", { name, data });
     }
   });
+
+  nativeTheme.on("updated", broadcastSystemTheme);
 });
 
 app.on("window-all-closed", () => {
@@ -261,6 +275,8 @@ ipcMain.handle("set-window-opacity", (event, opacity) => {
   win.setOpacity(Math.max(0.2, Math.min(1, v)));
   return true;
 });
+
+ipcMain.handle("get-system-theme", () => getCurrentSystemTheme());
 
 ipcMain.handle("clipboard-write-image", (_event, dataUrl) => {
   if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {

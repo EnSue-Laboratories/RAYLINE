@@ -107,6 +107,12 @@ contextBridge.exposeInMainWorld("api", {
 
   // Window appearance
   setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
+  getSystemTheme: () => ipcRenderer.invoke("get-system-theme"),
+  onSystemThemeChange: (cb) => {
+    const handler = (_e, theme) => cb(theme);
+    ipcRenderer.on("system-theme-changed", handler);
+    return () => ipcRenderer.removeListener("system-theme-changed", handler);
+  },
   writeClipboardImage: (dataUrl) => ipcRenderer.invoke("clipboard-write-image", dataUrl),
 
   // multica

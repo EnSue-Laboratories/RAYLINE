@@ -18,7 +18,7 @@ import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, ge
 import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
-import { applyDocumentTheme, detectDefaultTheme, getSystemTheme, normalizeThemeMode, resolveTheme } from "./utils/theme";
+import { applyDocumentTheme, buildStoredThemeState, detectDefaultTheme, getStoredThemeMode, getSystemTheme, resolveTheme } from "./utils/theme";
 import { detectDefaultLocale, normalizeLocale } from "./i18n";
 import { CHROME_RAIL_COLLAPSED_SAFE_INSET } from "./windowChrome";
 import {
@@ -1123,7 +1123,7 @@ export default function App() {
     cwd,
     defaultModel,
     locale,
-    theme: themeMode,
+    ...buildStoredThemeState(themeMode),
     fontSize,
     sidebarActiveOpacity,
     wallpaper: getPersistedWallpaper(wallpaper),
@@ -1320,19 +1320,26 @@ export default function App() {
   }, [queueLabControlUpdate]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    let disposed = false;
 
-    const media = window.matchMedia("(prefers-color-scheme: light)");
-    const handleChange = () => setSystemTheme(media.matches ? "light" : "dark");
-    handleChange();
+    const applyTheme = (nextTheme) => {
+      if (disposed) return;
+      setSystemTheme(nextTheme === "light" ? "light" : "dark");
+    };
 
-    if (typeof media.addEventListener === "function") {
-      media.addEventListener("change", handleChange);
-      return () => media.removeEventListener("change", handleChange);
+    if (window.api?.getSystemTheme) {
+      window.api.getSystemTheme().then(applyTheme).catch(() => {
+        applyTheme(getSystemTheme());
+      });
+    } else {
+      applyTheme(getSystemTheme());
     }
 
-    media.addListener(handleChange);
-    return () => media.removeListener(handleChange);
+    const off = window.api?.onSystemThemeChange?.(applyTheme);
+    return () => {
+      disposed = true;
+      off?.();
+    };
   }, []);
 
   const effectiveTheme = useMemo(
@@ -1409,7 +1416,7 @@ export default function App() {
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
         if (state.locale) setLocale(normalizeLocale(state.locale));
-        if (state.theme) setThemeMode(normalizeThemeMode(state.theme));
+        setThemeMode(getStoredThemeMode(state));
         if (state.fontSize) setFontSize(state.fontSize);
         if (state.sidebarActiveOpacity != null) {
           setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));

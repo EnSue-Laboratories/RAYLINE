@@ -1,5 +1,6 @@
 const DEFAULT_THEME_MODE = "auto";
 const FALLBACK_THEME = "dark";
+export const THEME_PREFERENCE_VERSION = 2;
 
 export function normalizeTheme(theme) {
   return theme === "light" ? "light" : FALLBACK_THEME;
@@ -21,6 +22,25 @@ export function getSystemTheme() {
 
 export function detectDefaultTheme() {
   return DEFAULT_THEME_MODE;
+}
+
+export function getStoredThemeMode(state) {
+  const version = Number(state?.themePreferenceVersion || 0);
+  if (version >= THEME_PREFERENCE_VERSION) {
+    return normalizeThemeMode(state?.themeMode ?? state?.theme);
+  }
+
+  // Migrate pre-auto builds to system-following mode once.
+  return DEFAULT_THEME_MODE;
+}
+
+export function buildStoredThemeState(themeMode) {
+  const normalizedMode = normalizeThemeMode(themeMode);
+  return {
+    theme: normalizedMode,
+    themeMode: normalizedMode,
+    themePreferenceVersion: THEME_PREFERENCE_VERSION,
+  };
 }
 
 export function resolveTheme(themeMode, systemTheme = getSystemTheme()) {
