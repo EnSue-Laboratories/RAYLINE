@@ -493,12 +493,18 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      {/* Drag region matching sidebar spacer */}
+      {/* Drag region matching sidebar spacer.
+          When window controls are visible (Windows), shrink the drag region on
+          the right so the control buttons are not inside the drag hit-area.
+          Electron processes WebkitAppRegion regions before React event handlers,
+          and a drag region physically covering a button causes clicks to be
+          swallowed by the OS window-move handler even with no-drag on the button. */}
       <div
         style={{
           height: WINDOW_DRAG_HEIGHT,
           WebkitAppRegion: "drag",
           flexShrink: 0,
+          marginRight: windowControlsVisible ? topTabsRight : 0,
         }}
       />
 
