@@ -277,8 +277,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
   const hasDirtyWorktree = (gitStatus?.files?.length || 0) > 0;
   const hasNoUpstream = Boolean(gitStatus?.branch) && !gitStatus?.upstream && !gitStatus?.detached;
   const branchNeedsAttention = hasDirtyWorktree || hasNoUpstream;
-  const [branchHintDismissed, setBranchHintDismissed] = useState(false);
-  useEffect(() => { setBranchHintDismissed(false); }, [convo?.id]);
+  const activeConvoId = convo?.id || "";
+  const [branchHintDismissedFor, setBranchHintDismissedFor] = useState("");
+  const branchHintDismissed = activeConvoId !== "" && branchHintDismissedFor === activeConvoId;
   const showBranchHint = isMulticaModel && !showNewChatCard && branchNeedsAttention && !branchHintDismissed && !shellMode;
   const branchHintText = (() => {
     if (hasDirtyWorktree && hasNoUpstream) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES + NOT PUBLISHED";
@@ -296,9 +297,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
       setSelectedCmd(0);
     });
     if (inRef.current) inRef.current.style.height = "20px";
-    if (isMulticaModel && !shellMode) setBranchHintDismissed(true);
+    if (isMulticaModel && !shellMode && activeConvoId) setBranchHintDismissedFor(activeConvoId);
     onSend(nextInput, nextAttachments);
-  }, [attachments, canSend, isMulticaModel, onSend, shellMode, trimmedInput]);
+  }, [activeConvoId, attachments, canSend, isMulticaModel, onSend, setAttachments, setInput, shellMode, trimmedInput]);
 
   const handleInput = (e) => {
     setInput(e.target.value);
@@ -346,7 +347,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
     }
   };
 
-  const handlePaste = useCallback((e) => {
+  const handlePaste = (e) => {
     const items = Array.from(e.clipboardData?.items || []);
     if (!items.some((item) => item?.kind === "file")) return;
 
@@ -355,7 +356,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
       if (nextAttachments.length === 0) return;
       setAttachments((prev) => [...prev, ...nextAttachments]);
     });
-  }, []);
+  };
 
   const [dragOver, setDragOver] = useState(false);
 
@@ -375,7 +376,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
       if (nextAttachments.length === 0) return;
       setAttachments((prev) => [...prev, ...nextAttachments]);
     });
-  }, [resetDragState]);
+  }, [resetDragState, setAttachments]);
 
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
   const showConversationTitle = Boolean(convo && !showNewChatCard);
@@ -389,13 +390,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
     inRef.current.style.height = `${Math.min(inRef.current.scrollHeight, 120)}px`;
   }, [input]);
 
-  const handleDragEnter = useCallback((e) => {
+  const handleDragEnter = (e) => {
     if (!dataTransferHasFiles(e.dataTransfer)) return;
     e.preventDefault();
     e.stopPropagation();
     dragDepthRef.current += 1;
     setDragOver(true);
-  }, []);
+  };
 
   const handleDragOver = useCallback((e) => {
     if (!dataTransferHasFiles(e.dataTransfer)) return;
@@ -404,13 +405,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
     if (!dragOver) setDragOver(true);
   }, [dragOver]);
 
-  const handleDragLeave = useCallback((e) => {
+  const handleDragLeave = (e) => {
     if (!dataTransferHasFiles(e.dataTransfer)) return;
     e.preventDefault();
     e.stopPropagation();
     dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
     if (dragDepthRef.current === 0) setDragOver(false);
-  }, []);
+  };
 
   useEffect(() => {
     const handleWindowDrop = () => resetDragState();
@@ -435,9 +436,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
     };
   }, []);
 
-  const removeAttachment = useCallback((index) => {
+  const removeAttachment = (index) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  };
 
   const handleTranscriptAnswer = useCallback((text) => {
     onSend(text);
@@ -501,7 +502,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
   }, [editingQueueId, queueDraft]);
 
   // Selection toolbar handlers
-  const handleQuote = useCallback((text) => {
+  const handleQuote = (text) => {
     const quoted = text.split("\n").map(l => `> ${l}`).join("\n");
     setInput((prev) => prev ? `${prev}\n\n${quoted}\n\n` : `${quoted}\n\n`);
     // Expand textarea to fit
@@ -512,7 +513,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
         inRef.current.focus();
       }
     }, 0);
-  }, []);
+  };
 
 
   return (

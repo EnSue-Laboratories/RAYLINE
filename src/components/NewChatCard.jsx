@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo, forwardRef } from "react";
+import { useState, useRef, useEffect, useCallback, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import { Paperclip, X, GitBranch, GitFork, Link2 } from "lucide-react";
 import { ModelPickerWithMultica } from "../data/multicaModels.jsx";
@@ -305,7 +305,7 @@ export default function NewChatCard({
     setError(null);
     setBranchSearchQuery("");
     setShowBranchSearch((prev) => !prev);
-  }, [selectedCwd]);
+  }, [selectedCwd, t]);
 
   const selectExistingBranch = useCallback((name) => {
     setBranch(name);
@@ -332,7 +332,7 @@ export default function NewChatCard({
     }
     setError(null);
     setShowTreeInput((prev) => !prev);
-  }, [selectedCwd]);
+  }, [selectedCwd, t]);
 
   const confirmTreeName = useCallback((value) => {
     setWorktreeName(value.trim());
