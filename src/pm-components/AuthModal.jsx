@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Loader2, Check, Copy, ExternalLink, AlertCircle } from "lucide-react";
+import { createTranslator } from "../i18n";
 
 function cleanError(msg) {
   if (!msg) return "Unknown error";
@@ -18,7 +19,8 @@ function GitHubGlyph({ size = 28 }) {
 }
 
 // phases: idle | starting | code | success | error | cancelled
-export default function AuthModal({ mode = "signin", currentUser, onClose, onAuthSuccess }) {
+export default function AuthModal({ mode = "signin", currentUser, onClose, onAuthSuccess, locale = "en-US" }) {
+  const t = createTranslator(locale);
   const isAddAccount = mode === "add" || mode === "switch";
   const [phase, setPhase] = useState("idle");
   const [code, setCode] = useState(null);
@@ -56,7 +58,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
         setPhase("success");
       } else if (event.type === "error") {
         flowStartedRef.current = false;
-        setError(cleanError(event.error) || "Authentication failed");
+      setError(cleanError(event.error) || t("pm.authFailed"));
         setErrorOutput(event.output || null);
         setPhase("error");
       } else if (event.type === "cancelled") {
@@ -73,7 +75,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
       await window.ghApi.authStart();
     } catch (err) {
       flowStartedRef.current = false;
-      setError(cleanError(err && err.message) || "Failed to start auth flow");
+      setError(cleanError(err && err.message) || t("pm.authStartFailed"));
       setPhase("error");
     }
   };
@@ -154,7 +156,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
           background: "var(--pane-elevated)",
           backdropFilter: "blur(48px) saturate(1.2)",
           WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          boxShadow: "var(--modal-shadow)",
           borderRadius: 12,
           border: "1px solid var(--pane-border)",
           display: "flex",
@@ -170,13 +172,13 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: "1px solid var(--control-border-soft)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "rgba(255,255,255,0.85)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-primary)" }}>
             <GitHubGlyph size={18} />
             <span style={{ fontSize: 14, fontWeight: 500 }}>
-              {isAddAccount ? "Add GitHub account" : "Sign in to GitHub"}
+              {isAddAccount ? t("pm.addGithubAccount") : t("pm.signInGithub")}
             </span>
           </div>
           <button
@@ -186,8 +188,8 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
               height: 28,
               borderRadius: 7,
               border: "1px solid var(--pane-border)",
-              background: "var(--pane-hover)",
-              color: "rgba(255,255,255,0.5)",
+              background: "var(--control-bg)",
+              color: "var(--text-tertiary)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -205,12 +207,12 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
             <div
               style={{
                 fontSize: 12,
-                color: "rgba(255,255,255,0.45)",
+                color: "var(--text-muted)",
                 marginBottom: 14,
               }}
             >
-              Currently signed in as{" "}
-              <span style={{ color: "rgba(255,255,255,0.75)", fontFamily: "'JetBrains Mono', monospace" }}>
+              {t("pm.currentlySignedIn")}{" "}
+              <span style={{ color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
                 @{currentUser}
               </span>
             </div>
@@ -218,8 +220,8 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
 
           {phase === "starting" && (
             <Center>
-              <Loader2 size={22} style={{ animation: "spin 1s linear infinite", color: "rgba(255,255,255,0.5)" }} />
-              <Label>Starting GitHub authentication…</Label>
+              <Loader2 size={22} style={{ animation: "spin 1s linear infinite", color: "var(--text-muted)" }} />
+              <Label>{t("pm.startingAuth")}</Label>
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </Center>
           )}
@@ -227,7 +229,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
           {phase === "code" && code && (
             <>
               <Label>
-                1. Copy this one-time code
+                {t("pm.copyOneTimeCode")}
               </Label>
               <div
                 style={{
@@ -247,7 +249,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: 22,
                     letterSpacing: ".18em",
-                    color: "rgba(255,255,255,0.9)",
+                    color: "var(--text-primary)",
                     textAlign: "center",
                   }}
                 >
@@ -262,7 +264,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                     background: "var(--pane-interaction-hover-fill, var(--pane-hover))",
                     border: "1px solid var(--pane-border)",
                     borderRadius: 6,
-                    color: copied ? "rgba(130, 220, 160, 0.9)" : "rgba(255,255,255,0.6)",
+                    color: copied ? "var(--success-soft-text)" : "var(--text-secondary)",
                     fontSize: 11,
                     fontFamily: "'JetBrains Mono', monospace",
                     padding: "6px 10px",
@@ -271,19 +273,19 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                   }}
                 >
                   {copied ? <Check size={12} /> : <Copy size={12} />}
-                  {copied ? "COPIED" : "COPY"}
+                  {copied ? t("pm.copied") : t("pm.copy")}
                 </button>
               </div>
               <Label style={{ marginTop: 16 }}>
-                2. Paste the code in your browser to authorize
+                {t("pm.pasteCodeInBrowser")}
               </Label>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-                <ExternalLink size={12} style={{ color: "rgba(255,255,255,0.35)" }} />
+                <ExternalLink size={12} style={{ color: "var(--text-muted)" }} />
                 <span
                   style={{
                     fontSize: 12,
                     fontFamily: "'JetBrains Mono', monospace",
-                    color: "rgba(255,255,255,0.55)",
+                    color: "var(--text-secondary)",
                   }}
                 >
                   github.com/login/device
@@ -298,13 +300,13 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                 }}
               >
                 <Label style={{ marginTop: 0 }}>
-                  3. Waiting for authorization…
+                  {t("pm.waitingForAuthorization")}
                 </Label>
                 <Loader2
                   size={16}
                   style={{
                     animation: "spin 1s linear infinite",
-                    color: "rgba(255,255,255,0.35)",
+                    color: "var(--text-muted)",
                     flexShrink: 0,
                   }}
                 />
@@ -329,8 +331,8 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
               >
                 <Check size={18} />
               </div>
-              <div style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", marginTop: 10 }}>
-                {user ? <>Signed in as <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>@{user}</span></> : "Signed in"}
+              <div style={{ fontSize: 14, color: "var(--text-primary)", marginTop: 10 }}>
+                {user ? <>{t("pm.signedInAs")} <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>@{user}</span></> : t("pm.signedIn")}
               </div>
             </Center>
           )}
@@ -357,10 +359,10 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                   style={{
                     fontSize: 14,
                     fontWeight: 500,
-                    color: "rgba(255,255,255,0.85)",
+                    color: "var(--text-primary)",
                   }}
                 >
-                  Authentication failed
+                  {t("pm.authFailed")}
                 </div>
               </div>
               <div
@@ -368,11 +370,11 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                   marginTop: 10,
                   padding: "10px 12px",
                   borderRadius: 7,
-                  border: "1px solid rgba(255,255,255,0.05)",
-                  background: "rgba(255,255,255,0.025)",
+                  border: "1px solid var(--control-border-soft)",
+                  background: "var(--control-bg-soft)",
                   fontSize: 12,
                   fontFamily: "system-ui, sans-serif",
-                  color: "rgba(255,255,255,0.55)",
+                  color: "var(--text-secondary)",
                   lineHeight: 1.45,
                   maxHeight: 140,
                   overflow: "auto",
@@ -387,23 +389,21 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                   style={{
                     marginTop: 8,
                     fontSize: 11,
-                    color: "rgba(255,255,255,0.4)",
+                    color: "var(--text-muted)",
                     fontFamily: "system-ui, sans-serif",
                   }}
                 >
-                  <summary style={{ cursor: "pointer", userSelect: "none" }}>
-                    Show gh output
-                  </summary>
+                  <summary style={{ cursor: "pointer", userSelect: "none" }}>{t("pm.showGhOutput")}</summary>
                   <pre
                     style={{
                       marginTop: 6,
                       padding: "8px 10px",
                       borderRadius: 6,
-                      border: "1px solid rgba(255,255,255,0.05)",
+                      border: "1px solid var(--control-border-soft)",
                       background: "rgba(0,0,0,0.25)",
                       fontSize: 11,
                       fontFamily: "'JetBrains Mono', monospace",
-                      color: "rgba(255,255,255,0.55)",
+                      color: "var(--text-secondary)",
                       maxHeight: 160,
                       overflow: "auto",
                       whiteSpace: "pre-wrap",
@@ -415,18 +415,18 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                 </details>
               )}
               <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-                <button onClick={retry} style={primaryBtn}>Try again</button>
-                <button onClick={onClose} style={secondaryBtn}>Close</button>
+                <button onClick={retry} style={primaryBtn}>{t("pm.tryAgain")}</button>
+                <button onClick={onClose} style={secondaryBtn}>{t("pm.cancel")}</button>
               </div>
             </>
           )}
 
           {phase === "cancelled" && (
             <Center>
-              <Label>Authentication cancelled.</Label>
+              <Label>{t("pm.authCancelled")}</Label>
               <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-                <button onClick={retry} style={primaryBtn}>Start again</button>
-                <button onClick={onClose} style={secondaryBtn}>Close</button>
+                <button onClick={retry} style={primaryBtn}>{t("pm.startAgain")}</button>
+                <button onClick={onClose} style={secondaryBtn}>{t("pm.cancel")}</button>
               </div>
             </Center>
           )}
@@ -460,7 +460,7 @@ function Label({ children, style }) {
         fontSize: 12,
         fontFamily: "'JetBrains Mono', monospace",
         letterSpacing: ".06em",
-        color: "rgba(255,255,255,0.55)",
+        color: "var(--text-secondary)",
         ...(style || {}),
       }}
     >
@@ -470,10 +470,10 @@ function Label({ children, style }) {
 }
 
 const primaryBtn = {
-  background: "rgba(255,255,255,0.18)",
-  border: "1px solid rgba(255,255,255,0.12)",
+  background: "var(--button-primary-bg)",
+  border: "1px solid var(--control-border)",
   borderRadius: 6,
-  color: "rgba(255,255,255,0.95)",
+  color: "var(--button-primary-fg)",
   fontSize: 12,
   fontWeight: 500,
   fontFamily: "system-ui, sans-serif",
@@ -485,7 +485,7 @@ const secondaryBtn = {
   background: "transparent",
   border: "1px solid var(--pane-border)",
   borderRadius: 6,
-  color: "rgba(255,255,255,0.5)",
+  color: "var(--text-secondary)",
   fontSize: 12,
   fontFamily: "system-ui, sans-serif",
   padding: "7px 14px",
