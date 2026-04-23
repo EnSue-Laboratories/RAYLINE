@@ -262,6 +262,11 @@ export default function useAgent() {
         const convo = next.get(conversationId) || { messages: [], isStreaming: true, error: null };
         const msgs = [...convo.messages];
         let lastMsg = msgs[msgs.length - 1];
+        // Some runs finish logically before the underlying CLI process fully
+        // exits, e.g. a background shell keeps stdout/stderr open for a moment.
+        // Track the conversation-level flag separately so we can unblock the UI
+        // on terminal completion events without waiting for `agent-done`.
+        let nextIsStreaming = Boolean(convo.isStreaming);
 
         if (event.session_id && convo._claudeSessionId !== event.session_id) {
           convo._claudeSessionId = event.session_id;
@@ -568,6 +573,7 @@ export default function useAgent() {
               msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
             }
           }
+          nextIsStreaming = false;
         }
 
         // Claude Code plan quota — synthetic event emitted by the main process
@@ -780,6 +786,7 @@ export default function useAgent() {
             });
             lastMsg = msgs[msgs.length - 1];
           }
+          nextIsStreaming = false;
         } else if (event.type === "event_msg" && event.payload?.type === "task_complete") {
           const completionText = event.payload.last_agent_message;
           const am = ensureAssistant();
@@ -797,9 +804,10 @@ export default function useAgent() {
             isThinking: false,
           });
           lastMsg = msgs[msgs.length - 1];
+          nextIsStreaming = false;
         }
 
-        next.set(conversationId, { ...convo, messages: msgs });
+        next.set(conversationId, { ...convo, messages: msgs, isStreaming: nextIsStreaming });
         return next;
       });
     });
