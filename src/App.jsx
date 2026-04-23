@@ -4,6 +4,7 @@ import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
 import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
+import ChromeRail   from "./components/ChromeRail";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
 import Settings     from "./components/Settings";
@@ -3323,6 +3324,13 @@ export default function App() {
         </div>
       )}
 
+      <ChromeRail
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen((open) => !open)}
+        onNew={handleNew}
+        showNewButton={!sidebarOpen && !showSettings}
+      />
+
       <div
         style={{
           display: "flex",
@@ -3357,7 +3365,6 @@ export default function App() {
           onNew={handleNew}
           onOpenDispatch={() => setShowDispatchCard(true)}
           onDelete={handleDelete}
-          onToggleSidebar={() => setSidebarOpen((o) => !o)}
           cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
           onPickFolder={handlePickFolder}
           onOpenSettings={() => setShowSettings(true)}
@@ -3405,9 +3412,7 @@ export default function App() {
           onSend={handleSend}
           onCancel={handleCancel}
           onEdit={handleEdit}
-          onToggleSidebar={() => setSidebarOpen((o) => !o)}
           sidebarOpen={sidebarOpen}
-          onNew={handleNew}
           onModelChange={handleModelChange}
           defaultModel={defaultModel}
           queuedMessages={activeQueuedMessages}
