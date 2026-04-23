@@ -56,6 +56,7 @@ let mainWindow;
 let pmWindow;
 let terminalWindow;
 let terminalWindowRevealTimer = null;
+let pendingPreferredTerminalSessionName = null;
 
 function terminalDebug(event, details = {}, meta = {}) {
   if (!TERMINAL_DEBUG_ENABLED) return;
@@ -388,6 +389,12 @@ app.whenReady().then(() => {
   });
 
   terminalManager.setSessionStateCallback((payload) => {
+    if (payload.reason === "created" && payload.name) {
+      pendingPreferredTerminalSessionName = payload.name;
+    } else if (!payload.sessions?.some((session) => session.name === pendingPreferredTerminalSessionName)) {
+      pendingPreferredTerminalSessionName = null;
+    }
+
     broadcastToAllWindows("terminal-sessions-state", payload);
 
     if (payload.sessions.length === 0) {
@@ -928,6 +935,12 @@ ipcMain.handle("terminal-resize", async (_event, { name, cols, rows }) => {
 
 ipcMain.handle("terminal-metadata", async () => {
   return terminalManager.getSessionMetadata();
+});
+
+ipcMain.handle("terminal-consume-preferred-session", async () => {
+  const preferredSessionName = pendingPreferredTerminalSessionName;
+  pendingPreferredTerminalSessionName = null;
+  return preferredSessionName;
 });
 
 // IPC: saved terminal metadata for restore on launch

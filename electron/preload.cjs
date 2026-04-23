@@ -85,6 +85,7 @@ contextBridge.exposeInMainWorld("api", {
   terminalList: () => ipcRenderer.invoke("terminal-list"),
   terminalResize: ({ name, cols, rows }) => ipcRenderer.invoke("terminal-resize", { name, cols, rows }),
   terminalMetadata: () => ipcRenderer.invoke("terminal-metadata"),
+  terminalConsumePreferredSession: () => ipcRenderer.invoke("terminal-consume-preferred-session"),
   terminalSavedMetadata: () => ipcRenderer.invoke("terminal-saved-metadata"),
   terminalDebugLog: (payload) => ipcRenderer.send("terminal-debug-log", payload),
   onTerminalOutput: (cb) => {

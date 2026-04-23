@@ -8,21 +8,21 @@ export default function useTerminal() {
 
   // Maps session name -> xterm.Terminal instance
   const terminalRefs = useRef(new Map());
-  // Track known session names so we can detect new ones from MCP/external creation
-  const knownSessionNames = useRef(new Set());
+  const pendingPreferredSessionRef = useRef(null);
 
   // ── Internal helpers ────────────────────────────────────────────────────────
 
   const applySessionSnapshot = useCallback((incoming, options = {}) => {
     const nextSessions = Array.isArray(incoming) ? incoming : [];
     const incomingNames = new Set(nextSessions.map((s) => s.name));
-    knownSessionNames.current = incomingNames;
+    const preferredSessionName = options.preferredSessionName ?? pendingPreferredSessionRef.current ?? null;
     setSessions(nextSessions);
     setHasLoadedSessions(true);
 
     setActiveSession((prev) => {
-      if (options.preferredSessionName && incomingNames.has(options.preferredSessionName)) {
-        return options.preferredSessionName;
+      if (preferredSessionName && incomingNames.has(preferredSessionName)) {
+        pendingPreferredSessionRef.current = null;
+        return preferredSessionName;
       }
       if (prev && incomingNames.has(prev)) return prev;
       return nextSessions[0]?.name ?? null;
@@ -112,6 +112,9 @@ export default function useTerminal() {
     if (!window.api?.onTerminalSessionsState) return;
 
     const cleanup = window.api.onTerminalSessionsState((payload = {}) => {
+      if (payload.reason === "created" && payload.name) {
+        pendingPreferredSessionRef.current = payload.name;
+      }
       applySessionSnapshot(payload.sessions, {
         preferredSessionName: payload.reason === "created" ? payload.name : null,
       });
@@ -128,7 +131,15 @@ export default function useTerminal() {
   }, []);
 
   useEffect(() => {
-    const kickoff = window.setTimeout(() => {
+    const kickoff = window.setTimeout(async () => {
+      try {
+        const preferredSessionName = await window.api?.terminalConsumePreferredSession?.();
+        if (preferredSessionName) {
+          pendingPreferredSessionRef.current = preferredSessionName;
+        }
+      } catch (e) {
+        console.error("[useTerminal] terminalConsumePreferredSession failed:", e);
+      }
       refreshSessions();
     }, 0);
     const interval = window.setInterval(() => {
@@ -145,6 +156,7 @@ export default function useTerminal() {
   const createSession = useCallback(async ({ name, command, cwd }) => {
     if (!window.api?.terminalCreate) return;
     try {
+      pendingPreferredSessionRef.current = name;
       await window.api.terminalCreate({ name, command, cwd });
       await refreshSessions();
       setActiveSession(name);
@@ -238,7 +250,10 @@ export default function useTerminal() {
     refreshSessions,
     registerTerminal,
     unregisterTerminal,
-    setActiveSession,
+    setActiveSession: (name) => {
+      pendingPreferredSessionRef.current = null;
+      setActiveSession(name);
+    },
     setDrawerOpen,
     hasLoadedSessions,
   };
