@@ -3458,6 +3458,7 @@ export default function App() {
           onCloseTab={handleCloseTab}
           wallpaper={wallpaper}
           cwd={terminalCwd}
+          draftsPath={draftsPath}
           onRefocusTerminal={terminal.openWindow}
           onCwdChange={(newCwd) => {
             setCwd(newCwd);

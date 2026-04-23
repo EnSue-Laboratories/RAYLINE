@@ -89,6 +89,7 @@ export default function NewChatCard({
   const [showTreeInput, setShowTreeInput] = useState(false);
   const treeBtnRef = useRef(null);
   const treeMenuRef = useRef(null);
+  const isDraftSelection = selectedCwd == null;
 
   const makeClaudiBranchName = useCallback((baseBranch) => {
     const suffix = Math.random().toString(36).slice(2, 8);
@@ -285,6 +286,11 @@ export default function NewChatCard({
     setWorktree(false);
     setWorktreeName("");
     setShowTreeInput(false);
+    if (nextCwd == null) {
+      setIssueContext(null);
+      setShowIssueSearch(false);
+      setIssueSearchQuery("");
+    }
     setError(null);
   }, []);
 
@@ -587,7 +593,7 @@ export default function NewChatCard({
           </button>
 
           {/* Branch — searchable typeahead */}
-          {developerMode && <div ref={branchSearchRef} style={{ position: "relative" }}>
+          {developerMode && !isDraftSelection && <div ref={branchSearchRef} style={{ position: "relative" }}>
             <button onClick={openBranchPicker} style={toolBtnStyle(!!branch)}>
               <GitBranch style={chipIconStyle} />
               <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -614,7 +620,7 @@ export default function NewChatCard({
           </div>}
 
           {/* Worktree — inline name input */}
-          {developerMode && <div ref={treeBtnRef} style={{ position: "relative" }}>
+          {developerMode && !isDraftSelection && <div ref={treeBtnRef} style={{ position: "relative" }}>
             <button onClick={openTreeInput} style={toolBtnStyle(worktree)}>
               <GitFork style={chipIconStyle} />
               <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -638,7 +644,7 @@ export default function NewChatCard({
           </div>}
 
           {/* Link issue — text toggle with searchable dropdown */}
-          {developerMode && <div ref={issueSearchRef} style={{ position: "relative" }}>
+          {developerMode && !isDraftSelection && <div ref={issueSearchRef} style={{ position: "relative" }}>
             <button
               onClick={() => {
                 if (issueContext) { setIssueContext(null); return; }
