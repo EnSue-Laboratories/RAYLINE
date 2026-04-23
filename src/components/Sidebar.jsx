@@ -5,6 +5,7 @@ import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DR
 import ProjectGroup from "./ProjectGroup";
 import { getMOrMulticaFallback } from "../data/models";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
+import { createTranslator } from "../i18n";
 
 function getMainRepoRoot(dir) {
   if (!dir) return dir;
@@ -77,11 +78,13 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [] }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], locale = "en-US" }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], locale = "en-US" }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const t = useMemo(() => createTranslator(locale), [locale]);
 
   const filtered = convos.filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase())
@@ -173,7 +176,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <Plus size={15} strokeWidth={1.5} />
-          New Chat
+          {t("sidebar.newChat")}
         </button>
         <button
           onClick={onOpenDispatch}
@@ -189,7 +192,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <Workflow size={15} strokeWidth={1.5} />
-          Dispatch
+          {t("sidebar.dispatch")}
         </button>
         <button
           onClick={onOpenNewProject}
@@ -205,7 +208,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <FolderPlus size={15} strokeWidth={1.5} />
-          New Project
+          {t("sidebar.newProject")}
         </button>
         {developerMode && (
           <button
@@ -222,7 +225,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
           >
             <GitHubIcon size={15} />
-            GitHub Projects
+            {t("sidebar.githubProjects")}
           </button>
         )}
         {convos.length > 0 && !searchOpen && <button
@@ -239,7 +242,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <Search size={15} strokeWidth={1.5} />
-          Search
+          {t("sidebar.search")}
         </button>}
         {searchOpen && <div
           style={{
@@ -263,7 +266,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           </span>
           <input
             type="text"
-            placeholder="Search..."
+            placeholder={t("sidebar.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onFocus={() => setSF(true)}
@@ -300,14 +303,14 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               color: "rgba(255,255,255,0.15)",
               letterSpacing: ".08em",
             }}>
-              NO CONVERSATIONS
+              {t("sidebar.noConversations")}
             </div>
             <div style={{
               fontSize: s(10),
               color: "rgba(255,255,255,0.1)",
               fontFamily: "system-ui,sans-serif",
             }}>
-              Start typing to begin
+              {t("sidebar.noConversationsHint")}
             </div>
           </div>
         )}
@@ -369,7 +372,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                   letterSpacing: ".04em",
                 }}
               >
-                DRAFTS
+                {t("sidebar.drafts")}
               </span>
             </div>
 

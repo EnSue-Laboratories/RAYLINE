@@ -16,6 +16,7 @@ import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, ge
 import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
+import { detectDefaultLocale, normalizeLocale } from "./i18n";
 import {
   pinTabPatch,
   runEndedPatch,
@@ -1036,6 +1037,7 @@ export default function App() {
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [wallpaper, setWallpaper] = useState(null);
+  const [locale, setLocale] = useState(() => detectDefaultLocale());
   const [fontSize, setFontSize] = useState(15);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
@@ -1095,6 +1097,7 @@ export default function App() {
     active: persistedActive,
     cwd,
     defaultModel,
+    locale,
     fontSize,
     sidebarActiveOpacity,
     wallpaper: getPersistedWallpaper(wallpaper),
@@ -1120,6 +1123,7 @@ export default function App() {
     developerMode,
     draftsCollapsed,
     fontSize,
+    locale,
     notificationSound,
     notificationsMuted,
     persistedActive,
@@ -1363,6 +1367,7 @@ export default function App() {
         else if (state.active) setActive(state.active);
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
+        if (state.locale) setLocale(normalizeLocale(state.locale));
         if (state.fontSize) setFontSize(state.fontSize);
         if (state.sidebarActiveOpacity != null) {
           setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
@@ -3358,6 +3363,7 @@ export default function App() {
           onOpenDispatch={() => setShowDispatchCard(true)}
           onDelete={handleDelete}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
+          locale={locale}
           cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
           onPickFolder={handlePickFolder}
           onOpenSettings={() => setShowSettings(true)}
@@ -3397,6 +3403,8 @@ export default function App() {
           onNotificationSoundChange={setNotificationSound}
           notificationsMuted={notificationsMuted}
           onNotificationsMutedChange={setNotificationsMuted}
+          locale={locale}
+          onLocaleChange={setLocale}
           onClose={() => setShowSettings(false)}
         />
       ) : (

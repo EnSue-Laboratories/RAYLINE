@@ -5,9 +5,11 @@ import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
+import { createTranslator } from "../i18n";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, onClose }) {
   const s = useFontScale();
+  const t = createTranslator(locale);
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
   const [multica, setMultica] = useState(() => loadMulticaState());
   const [multicaServerDraft, setMulticaServerDraft] = useState(() => loadMulticaState().serverUrl || "");
@@ -76,12 +78,12 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const normalizedMulticaServerDraft = normalizeMulticaServerUrl(multicaServerDraft);
   const multicaConnected = Boolean(multica.token && multica.serverUrl && (multica.workspaceId || multica.workspaceSlug));
   const multicaStatus = multicaConnected
-    ? "Connected"
+    ? t("settings.multicaConnected")
     : multica.token && multica.serverUrl
-      ? "Authenticated, workspace not selected"
+      ? t("settings.multicaAuthenticatedNoWorkspace")
       : multica.serverUrl
-        ? "Server configured"
-        : "Not configured";
+        ? t("settings.multicaServerConfigured")
+        : t("settings.multicaNotConfigured");
   const multicaServerDirty = normalizedMulticaServerDraft !== (multica.serverUrl || "");
 
   const refreshMultica = useCallback(() => {
@@ -233,7 +235,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             color: "rgba(255,255,255,0.85)",
           }}
         >
-          Settings
+          {t("settings.title")}
         </span>
       </div>
 
@@ -259,7 +261,64 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginBottom: 20,
             }}
           >
-            APPEARANCE
+            {t("settings.appearance")}
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 2,
+              }}
+            >
+              {t("settings.language")}
+            </div>
+            <div
+              style={{
+                fontSize: s(11),
+                color: "rgba(255,255,255,0.3)",
+                marginBottom: 10,
+              }}
+            >
+              {t("settings.languageDescription")}
+            </div>
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <select
+                value={locale}
+                onChange={(e) => onLocaleChange?.(e.target.value)}
+                style={{
+                  width: "100%",
+                  height: 32,
+                  padding: "0 28px 0 10px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 7,
+                  color: "rgba(255,255,255,0.9)",
+                  fontFamily: "system-ui, sans-serif",
+                  fontSize: s(12),
+                  outline: "none",
+                  WebkitAppearance: "none",
+                  MozAppearance: "none",
+                  appearance: "none",
+                }}
+              >
+                <option value="en-US">{t("settings.languageEnglish")}</option>
+                <option value="zh-CN">{t("settings.languageChinese")}</option>
+              </select>
+              <ChevronDown
+                size={12}
+                strokeWidth={2}
+                style={{
+                  position: "absolute",
+                  right: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "rgba(255,255,255,0.5)",
+                  pointerEvents: "none",
+                }}
+              />
+            </div>
           </div>
 
           {/* Wallpaper subsection */}
@@ -271,7 +330,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 2,
               }}
             >
-              Wallpaper
+              {t("settings.wallpaper")}
             </div>
             <div
               style={{
@@ -280,7 +339,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 12,
               }}
             >
-              Set a custom background image
+              {t("settings.wallpaperDescription")}
             </div>
 
             {/* Preview row */}
@@ -338,7 +397,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     fontFamily: "system-ui, sans-serif",
                   }}
                 >
-                  Choose Image
+                  {t("settings.chooseImage")}
                 </button>
                 {local.path && (
                   <button
@@ -359,7 +418,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       fontFamily: "system-ui, sans-serif",
                     }}
                   >
-                    Remove
+                    {t("settings.remove")}
                   </button>
                 )}
               </div>
@@ -390,7 +449,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              Image Blur: {local.imgBlur || 0}
+              {t("settings.imageBlurValue", { value: local.imgBlur || 0 })}
             </div>
             <input
               type="range"
@@ -411,7 +470,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              Image Opacity: {local.imgOpacity || 0}
+              {t("settings.imageOpacityValue", { value: local.imgOpacity || 0 })}
             </div>
             <input
               type="range"
@@ -428,7 +487,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginTop: 8,
               }}
             >
-              Controls wallpaper transparency.
+              {t("settings.imageOpacityDescription")}
             </div>
           </div>
 
@@ -441,7 +500,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              Application Blur: {appBlur || 0}
+              {t("settings.appBlurValue", { value: appBlur || 0 })}
             </div>
             <input
               type="range"
@@ -458,7 +517,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginTop: 8,
               }}
             >
-              Blurs the window background only.
+              {t("settings.appBlurDescription")}
             </div>
           </div>
 
@@ -471,7 +530,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              Application Opacity: {appOpacity ?? 100}
+              {t("settings.appOpacityValue", { value: appOpacity ?? 100 })}
             </div>
             <input
               type="range"
@@ -488,7 +547,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginTop: 8,
               }}
             >
-              Makes the entire window transparent.
+              {t("settings.appOpacityDescription")}
             </div>
           </div>
 
@@ -505,7 +564,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginTop: 12,
             }}
           >
-            TYPOGRAPHY
+            {t("settings.typography")}
           </div>
 
           {/* Font Size */}
@@ -517,7 +576,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              Font Size: {fontSize}px
+              {t("settings.fontSizeValue", { value: fontSize })}
             </div>
             <input
               type="range"
@@ -542,7 +601,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginTop: 12,
             }}
           >
-            INTEGRATIONS
+            {t("settings.integrations")}
           </div>
 
           <div style={{ marginBottom: 28 }}>
@@ -553,7 +612,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 2,
               }}
             >
-              Multica
+              {t("settings.multica")}
             </div>
             <div
               style={{
@@ -562,7 +621,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 12,
               }}
             >
-              Configure the default Multica server used for setup and agent discovery.
+              {t("settings.multicaDescription")}
             </div>
 
             <div style={{ marginBottom: 12 }}>
@@ -583,7 +642,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     marginBottom: 2,
                   }}
                 >
-                  Email: {multica.email}
+                  {t("settings.email", { value: multica.email })}
                 </div>
               )}
               {(multica.workspaceSlug || multica.workspaceId) && (
@@ -593,7 +652,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     color: "rgba(255,255,255,0.42)",
                   }}
                 >
-                  Workspace: {multica.workspaceSlug || multica.workspaceId}
+                  {t("settings.workspace", { value: multica.workspaceSlug || multica.workspaceId })}
                 </div>
               )}
             </div>
@@ -606,7 +665,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   marginBottom: 2,
                 }}
               >
-                Server URL
+                {t("settings.serverUrl")}
               </div>
               <div
                 style={{
@@ -615,12 +674,12 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   marginBottom: 10,
                 }}
               >
-                Changing the server clears the current Multica auth and workspace selection.
+                {t("settings.serverUrlDescription")}
               </div>
               <input
                 type="text"
                 value={multicaServerDraft}
-                placeholder="https://your-multica-server"
+                placeholder={t("settings.serverUrlPlaceholder")}
                 onChange={(e) => setMulticaServerDraft(e.target.value)}
                 spellCheck={false}
                 style={{
@@ -656,7 +715,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   fontFamily: "system-ui, sans-serif",
                 }}
               >
-                {normalizedMulticaServerDraft ? "Save Server" : "Clear Server"}
+                {normalizedMulticaServerDraft ? t("settings.saveServer") : t("settings.clearServer")}
               </button>
               <button
                 type="button"
@@ -673,7 +732,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   fontFamily: "system-ui, sans-serif",
                 }}
               >
-                {multicaConnected ? "Manage Connection" : "Open Setup"}
+                {multicaConnected ? t("settings.manageConnection") : t("settings.openSetup")}
               </button>
               {(multica.token || multica.workspaceId || multica.workspaceSlug) && (
                 <button
@@ -691,7 +750,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     fontFamily: "system-ui, sans-serif",
                   }}
                 >
-                  Disconnect
+                  {t("settings.disconnect")}
                 </button>
               )}
             </div>
@@ -710,7 +769,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginTop: 12,
             }}
           >
-            ADVANCED
+            {t("settings.advanced")}
           </div>
 
           {/* Developer mode toggle */}
@@ -731,7 +790,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     marginBottom: 2,
                   }}
                 >
-                  Developer mode
+                  {t("settings.developerMode")}
                 </div>
                 <div
                   style={{
@@ -739,7 +798,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     color: "rgba(255,255,255,0.3)",
                   }}
                 >
-                  Show developer-related settings such as Git
+                  {t("settings.developerModeDescription")}
                 </div>
               </div>
               <button
@@ -791,15 +850,15 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   marginTop: 12,
                 }}
               >
-                NOTIFICATIONS
+                {t("settings.notifications")}
               </div>
 
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)", marginBottom: 2 }}>
-                  Completion chime
+                  {t("settings.completionChime")}
                 </div>
                 <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.3)", marginBottom: 10 }}>
-                  Plays each time a run finishes, even if multiple sessions complete back-to-back.
+                  {t("settings.completionChimeDescription")}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -859,7 +918,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       opacity: notificationsMuted ? 0.4 : 1,
                     }}
                   >
-                    Preview
+                    {t("settings.preview")}
                   </button>
                 </div>
               </div>
@@ -913,7 +972,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   />
                 </span>
                 <span style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)" }}>
-                  Mute completion chime
+                  {t("settings.muteCompletionChime")}
                 </span>
               </label>
 
@@ -930,7 +989,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   marginTop: 12,
                 }}
               >
-                GIT
+                {t("settings.git")}
               </div>
 
               {/* Default PR branch */}
@@ -941,8 +1000,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     color: "rgba(255,255,255,0.8)",
                     marginBottom: 2,
                   }}
-                >
-                  Default PR branch
+                  >
+                  {t("settings.defaultPrBranch")}
                 </div>
                 <div
                   style={{
@@ -950,8 +1009,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     color: "rgba(255,255,255,0.3)",
                     marginBottom: 10,
                   }}
-                >
-                  Target branch used when creating a pull request
+                  >
+                  {t("settings.defaultPrBranchDescription")}
                 </div>
                 <input
                   type="text"
@@ -996,8 +1055,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         color: "rgba(255,255,255,0.8)",
                         marginBottom: 2,
                       }}
-                    >
-                      Auto coauthor
+                      >
+                      {t("settings.autoCoauthor")}
                     </div>
                     <div
                       style={{
@@ -1005,7 +1064,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         color: "rgba(255,255,255,0.3)",
                       }}
                     >
-                      Append a Co-Authored-By trailer to every commit
+                      {t("settings.autoCoauthorDescription")}
                     </div>
                   </div>
                   <button
