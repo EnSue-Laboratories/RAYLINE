@@ -1,23 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Circle, CheckCircle2, Copy, Check, GitPullRequest } from "lucide-react";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 import HoverIconButton from "../components/HoverIconButton";
+import { createTranslator } from "../i18n";
 
-function timeAgo(dateStr) {
+function timeAgo(dateStr, t) {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diff = now - then;
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return t("pm.timeMinutesAgo", { count: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t("pm.timeHoursAgo", { count: hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return t("pm.timeDaysAgo", { count: days });
   const months = Math.floor(days / 30);
-  return `${months}mo ago`;
+  return t("pm.timeMonthsAgo", { count: months });
 }
 
-export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem, refreshSignal, freshItem }) {
+export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem, refreshSignal, freshItem, locale }) {
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [issues, setIssues] = useState([]);
   const [initialLoad, setInitialLoad] = useState(true);
   const [error, setError] = useState(null);
@@ -49,7 +51,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
         );
       });
     } catch (err) {
-      setError(err.message || "Failed to load issues");
+      setError(err.message || t("pm.failedToLoadIssues"));
     } finally {
       setInitialLoad(false);
     }
@@ -109,7 +111,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
   if (initialLoad && issues.length === 0) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui", fontSize: 13 }}>
-        Loading issues...
+        {t("pm.loadingIssues")}
       </div>
     );
   }
@@ -122,7 +124,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
           onClick={() => fetchIssues()}
           style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "rgba(255,255,255,0.5)", padding: "6px 16px", cursor: "pointer", fontFamily: "system-ui", fontSize: 12 }}
         >
-          Retry
+          {t("pm.retry")}
         </button>
       </div>
     );
@@ -131,7 +133,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
   if (issues.length === 0) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "rgba(255,255,255,0.3)", fontFamily: "system-ui", fontSize: 13 }}>
-        No issues found
+        {t("pm.noIssuesFound")}
       </div>
     );
   }
@@ -171,7 +173,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               </span>
               <HoverIconButton
                 className="copy-btn"
-                tooltip={copiedId === `${item._repo}-${item.number}` ? "Copied" : "Copy issue summary"}
+                tooltip={copiedId === `${item._repo}-${item.number}` ? t("pm.copied") : t("pm.copyIssueSummary")}
                 onClick={(e) => {
                   e.stopPropagation();
                   const url = `https://github.com/${item._repo}/issues/${item.number}`;
@@ -187,7 +189,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
                 {copiedId === `${item._repo}-${item.number}` ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
               </HoverIconButton>
               <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                <span style={{ width: 25, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.35)" }} title={linkedPRs[`${item._repo}/${item.number}`] ? `${linkedPRs[`${item._repo}/${item.number}`].length} linked PR${linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "s" : ""}` : undefined}>
+                <span style={{ width: 25, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.35)" }} title={linkedPRs[`${item._repo}/${item.number}`] ? t(linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "pm.linkedPrsTooltip" : "pm.linkedPrTooltip", { count: linkedPRs[`${item._repo}/${item.number}`].length }) : undefined}>
                   {linkedPRs[`${item._repo}/${item.number}`] && (
                     <GitPullRequest size={12} strokeWidth={1.5} />
                   )}
@@ -198,7 +200,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               </div>
             </div>
             <div style={{ marginLeft: 26, color: "rgba(255,255,255,0.3)", fontFamily: "system-ui", fontSize: 12, marginTop: 2 }}>
-              by {item.user?.login || "unknown"} · updated {timeAgo(item.updated_at)}
+              {t("pm.byUpdated", { user: item.user?.login || t("pm.unknownUser"), time: timeAgo(item.updated_at, t) })}
             </div>
           </div>
         );

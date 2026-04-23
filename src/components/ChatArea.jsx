@@ -103,7 +103,7 @@ const ChatTranscript = memo(function ChatTranscript({
   );
 });
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, locale }) {
   const s = useFontScale();
   const isDraftContext = showNewChatCard ? newChatDefaultCwd == null : isDraftConversation(convo, draftsPath);
   const [input, setInput]             = useState("");
@@ -646,6 +646,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               defaultPrBranch={defaultPrBranch}
               coauthorEnabled={coauthorEnabled}
               coauthorTrailer={coauthorTrailer}
+              locale={locale}
             />
           )}
           {!showNewChatCard && developerMode && !isDraftContext && (
@@ -654,6 +655,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               onCwdChange={onCwdChange}
               hasMessages={convo?.msgs?.length > 0}
               onRefocusTerminal={onRefocusTerminal}
+              locale={locale}
             />
           )}
           {!showNewChatCard && <MemoModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
