@@ -1,5 +1,7 @@
 import { memo, useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
+import { useLanguage } from "../contexts/LanguageContext";
+import { t } from "../i18n";
 import { Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
@@ -92,6 +94,8 @@ const ChatTranscript = memo(function ChatTranscript({
 
 export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, windowControlsVisible = false }) {
   const s = useFontScale();
+  // Consume language context so we re-render when language changes
+  useLanguage();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
@@ -222,9 +226,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   // Slash command suggestions
   const COMMANDS = [
-    { cmd: "/clear", desc: "Start a new conversation" },
-    { cmd: "/new", desc: "Start a new conversation" },
-    { cmd: "/compact", desc: "Compact conversation context" },
+    { cmd: "/clear", desc: t("cmd_clear_desc") },
+    { cmd: "/new", desc: t("cmd_clear_desc") },
+    { cmd: "/compact", desc: t("cmd_compact_desc") },
   ];
   const showCommands = input.startsWith("/") && !input.includes(" ");
   const filteredCommands = showCommands
@@ -254,9 +258,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   useEffect(() => { setBranchHintDismissed(false); }, [convo?.id]);
   const showBranchHint = isMulticaModel && !showNewChatCard && branchNeedsAttention && !branchHintDismissed && !shellMode;
   const branchHintText = (() => {
-    if (hasDirtyWorktree && hasNoUpstream) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES + NOT PUBLISHED";
-    if (hasDirtyWorktree) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES";
-    return "BRANCH MAY NEED UPDATING  //  NOT PUBLISHED TO ORIGIN";
+    if (hasDirtyWorktree && hasNoUpstream) return t("branch_warn_both");
+    if (hasDirtyWorktree) return t("branch_warn_dirty");
+    return t("branch_warn_no_upstream");
   })();
 
   const send = useCallback(() => {
@@ -590,7 +594,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                   letterSpacing: ".1em",
                 }}
               >
-                {convo.msgs.length} MESSAGES
+                {t("messages", convo.msgs.length)}
               </div>
             </div>
           )}
@@ -620,7 +624,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           {!showNewChatCard && developerMode && onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
-              title="Toggle terminal"
+              title={t("toggle_terminal")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -700,8 +704,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       {!showNewChatCard && convo && convo.msgs.length > 0 && (
         <button
           onClick={scrollToBottom}
-          aria-label="Scroll to bottom"
-          title="Scroll to bottom"
+          aria-label={t("scroll_to_bottom")}
+          title={t("scroll_to_bottom")}
           style={{
             position: "absolute",
             bottom: 108,
@@ -792,7 +796,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                           letterSpacing: ".06em",
                           flexShrink: 0,
                         }}>
-                          {i === 0 ? "QUEUED NEXT" : "QUEUED"}
+                          {i === 0 ? t("queued_next") : t("queued")}
                         </span>
                         {attachmentCount > 0 && (
                           <span style={{
@@ -801,7 +805,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                             color: "rgba(255,255,255,0.13)",
                             letterSpacing: ".06em",
                           }}>
-                            {attachmentCount} ATTACHMENT{attachmentCount === 1 ? "" : "S"}
+                            {t("attachment", attachmentCount)}
                           </span>
                         )}
                       </div>
@@ -865,13 +869,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                               color: "rgba(255,255,255,0.54)",
                             }}
                           >
-                            SAVE
+                            {t("save")}
                           </button>
                           <button
                             onClick={cancelQueuedEdit}
                             style={queueActionButtonStyle}
                           >
-                            CANCEL
+                            {t("cancel")}
                           </button>
                         </>
                       ) : (
@@ -880,13 +884,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                             onClick={() => startQueuedEdit(q)}
                             style={queueActionButtonStyle}
                           >
-                            EDIT
+                            {t("edit")}
                           </button>
                           <button
                             onClick={() => removeQueuedItem(q.id)}
                             style={queueActionButtonStyle}
                           >
-                            DELETE
+                            {t("delete")}
                           </button>
                         </>
                       )}
@@ -949,8 +953,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               }}
             >
               {canRunShell
-                ? `SHELL MODE  //  RUNS IN ${shellLocation.toUpperCase()}`
-                : "SHELL MODE  //  TYPE A COMMAND AFTER !"}
+                ? t("shell_mode_ready", shellLocation)
+                : t("shell_mode_empty")}
             </div>
           )}
           {showBranchHint && (
@@ -1000,7 +1004,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 composingRef.current = false;
                 setInputFocused(false);
               }}
-              placeholder={shellMode ? "Run a shell command locally..." : "Ask anything..."}
+              placeholder={shellMode ? t("placeholder_shell") : t("placeholder_ask")}
               rows={1}
               style={{
                 flex: 1,
@@ -1071,7 +1075,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                         letterSpacing: ".1em",
                       }}
                     >
-                      RUN
+                      {t("run")}
                     </span>
                   </>
                 ) : (
@@ -1093,9 +1097,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           >
             {shellMode
               ? (canRunShell
-                  ? "ENTER TO RUN  //  OUTPUT APPENDS BELOW  //  LOCAL SHELL"
-                  : "TYPE A COMMAND AFTER !  //  ENTER TO RUN")
-              : "ENTER TO SEND  //  SHIFT+ENTER NEWLINE  //  PASTE IMAGES"}
+                  ? t("hint_shell_run")
+                  : t("hint_shell_empty"))
+              : t("hint_chat")}
           </div>
         </div>
       </div>}
