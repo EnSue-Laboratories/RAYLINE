@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow, FolderPlus } from "lucide-react";
+import { Plus, Search, Trash2, PanelLeftClose, PanelLeftOpen, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow, FolderPlus } from "lucide-react";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
 import { getMOrMulticaFallback } from "../data/models";
@@ -69,6 +69,26 @@ function groupConvosByProject(convos, projectsMeta) {
   return { projectGroups: sorted, drafts };
 }
 
+function IconRailBtn({ onClick, title, children }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        width: 40, height: 40, borderRadius: 9,
+        background: "none", border: "none", cursor: "pointer",
+        color: "rgba(255,255,255,0.45)", transition: "background .15s, color .15s",
+        WebkitAppRegion: "no-drag",
+      }}
+      onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.82)"; }}
+      onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function GitHubIcon({ size = 12 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor">
@@ -77,7 +97,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [] }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
@@ -116,23 +136,105 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
     return parts.slice(-2).join("/");
   })() : null;
 
+  // ── Icon-rail collapsed state ──────────────────────────────────────────────
+  if (!isOpen) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", alignItems: "center", WebkitAppRegion: "no-drag" }}>
+        {/* Drag region: logo on top, expand toggle below */}
+        <div style={{ height: WINDOW_DRAG_HEIGHT, width: "100%", WebkitAppRegion: "drag", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0, position: "relative" }}>
+          <button
+            onClick={() => window.open("https://ensuechat.com")}
+            title="Ensue Chat"
+            style={{
+              position: "absolute", top: 10,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 24, height: 24, padding: 0,
+              background: "none", border: "none", cursor: "pointer",
+              borderRadius: 6, opacity: 0.82, transition: "opacity .15s, transform .15s",
+              WebkitAppRegion: "no-drag",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "scale(1.08)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.82"; e.currentTarget.style.transform = "scale(1)"; }}
+          >
+            <img src="/favicon.svg" style={{ width: 24, height: 24, borderRadius: 5, display: "block" }} draggable={false} />
+          </button>
+        </div>
+
+        {/* Action icons */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, paddingTop: 2 }}>
+          <IconRailBtn onClick={onToggleSidebar} title="Expand sidebar"><PanelLeftOpen size={18} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onNew} title="New Chat"><Plus size={18} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onOpenDispatch} title="Dispatch"><Workflow size={18} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onOpenNewProject} title="New Project"><FolderPlus size={18} strokeWidth={1.5} /></IconRailBtn>
+          {developerMode && <IconRailBtn onClick={onOpenProjectManager} title="GitHub Projects"><GitHubIcon size={18} /></IconRailBtn>}
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Footer icons */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "12px 0" }}>
+          <IconRailBtn onClick={onPickFolder} title={cwdShort || "Select Folder"}><FolderOpen size={16} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onOpenSettings} title="Settings"><SettingsIcon size={16} strokeWidth={1.5} /></IconRailBtn>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Drag region + collapse button */}
+      {/* Drag region + logo + collapse button */}
       <div
         style={{
           height: WINDOW_DRAG_HEIGHT,
           WebkitAppRegion: "drag",
           flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          paddingLeft: 18,
           position: "relative",
         }}
       >
+        {/* App logo + wordmark — links to homepage */}
+        <button
+          onClick={() => window.open("https://ensuechat.com")}
+          title="RayLine"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: 0,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            opacity: 0.82,
+            transition: "opacity .15s",
+            WebkitAppRegion: "no-drag",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.82"; }}
+        >
+          <img src="/favicon.svg" style={{ width: 22, height: 22, borderRadius: 5, display: "block", flexShrink: 0 }} draggable={false} />
+          <span style={{
+            fontFamily: "'Barlow Condensed', 'Inter Tight', sans-serif",
+            fontWeight: 600,
+            fontSize: 18,
+            letterSpacing: "0.12em",
+            color: "rgba(218,218,222,0.95)",
+            userSelect: "none",
+            lineHeight: 1,
+          }}>
+            R<span style={{ color: "#FF4422", letterSpacing: 0 }}>/</span>YLINE<span style={{ color: "#FF4422", letterSpacing: 0 }}>.</span>
+          </span>
+        </button>
+
+        {/* Collapse button */}
         <button
           onClick={onToggleSidebar}
           style={{
             position: "absolute",
             top: SIDEBAR_TOGGLE_TOP,
-            left: SIDEBAR_TOGGLE_LEFT,
+            right: 10,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -153,7 +255,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             e.currentTarget.style.color = "rgba(255,255,255,0.4)";
           }}
         >
-          <PanelLeftClose size={14} strokeWidth={1.5} />
+          <PanelLeftClose size={17} strokeWidth={1.5} />
         </button>
       </div>
 
