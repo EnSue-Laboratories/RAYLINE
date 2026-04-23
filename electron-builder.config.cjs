@@ -48,7 +48,7 @@ module.exports = {
     provider: "github",
     owner: "EnSue-Laboratories",
     repo: "RAYLINE",
-    releaseType: "draft",
+    releaseType: "release",
   },
   win: {
     icon: "public/icon.png",

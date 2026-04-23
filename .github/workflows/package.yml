@@ -46,10 +46,9 @@ jobs:
       - name: Build renderer
         run: npm run build
 
-      # Create a draft GitHub release for tag-push builds (only runs once,
-      # the second matrix job will get a benign "already exists" error which
-      # the `|| true` swallows).
-      - name: Create GitHub draft release (tag push only)
+      # Pre-create the GitHub release so electron-builder can publish assets to it.
+      # If the release already exists (e.g. re-triggered CI), the || true suppresses the error.
+      - name: Create GitHub release (tag push only)
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
@@ -57,7 +56,6 @@ jobs:
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           gh release create "$TAG" \
-            --draft \
             --title "$TAG" \
             --notes "Automated release for $TAG" \
             || true
