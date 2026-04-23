@@ -1973,7 +1973,7 @@ export default function App() {
       title: "New chat",
       modelId: defaultModel,
       ts: Date.now(),
-      cwd: cwdRoot || undefined,
+      cwd: cwdRoot ?? null,
     });
     setConvoList((p) => [n, ...p]);
     setActive(id);

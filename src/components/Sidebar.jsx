@@ -94,6 +94,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [draftsHeaderHovered, setDraftsHeaderHovered] = useState(false);
   const t = useMemo(() => createTranslator(locale), [locale]);
 
   const filtered = convos.filter((c) =>
@@ -354,13 +355,20 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                 gap: 5,
                 padding: "5px 6px",
                 borderRadius: 6,
+                minHeight: 26,
                 cursor: "pointer",
                 transition: "background .15s",
                 userSelect: "none",
               }}
               onClick={onToggleDraftsCollapsed}
-              onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); }}
-              onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); }}
+              onMouseEnter={(e) => {
+                setDraftsHeaderHovered(true);
+                applyPaneInteractionStyle(e.currentTarget, "hover");
+              }}
+              onMouseLeave={(e) => {
+                setDraftsHeaderHovered(false);
+                applyPaneInteractionStyle(e.currentTarget, "idle");
+              }}
             >
               <span
                 style={{
@@ -384,6 +392,44 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               >
                 {t("sidebar.drafts")}
               </span>
+
+              <div style={{ marginLeft: "auto", width: 18, height: 18, position: "relative", flexShrink: 0 }}>
+                <div
+                  style={{
+                    position: "absolute",
+                    right: 0,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    display: "flex",
+                    alignItems: "center",
+                    opacity: draftsHeaderHovered ? 1 : 0,
+                    pointerEvents: draftsHeaderHovered ? "auto" : "none",
+                    transition: "opacity .15s",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => onNewInProject(null)}
+                    title="New draft chat"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "none",
+                      border: "none",
+                      color: "rgba(255,255,255,0.25)",
+                      cursor: "pointer",
+                      padding: 3,
+                      borderRadius: 4,
+                      transition: "color .15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+                  >
+                    <Plus size={11} strokeWidth={1.5} />
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Draft conversation rows */}
