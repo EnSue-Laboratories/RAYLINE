@@ -9,7 +9,7 @@ const inputStyle = {
   border: "1px solid var(--pane-border)",
   borderRadius: 6,
   padding: "8px 10px",
-  color: "var(--text-primary)",
+  color: "rgba(255,255,255,0.8)",
   fontSize: 13,
   fontFamily: "system-ui, sans-serif",
   boxSizing: "border-box",
@@ -21,7 +21,7 @@ const selectStyle = {
   cursor: "pointer",
   WebkitAppearance: "none",
   appearance: "none",
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(82,95,110,0.62)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
   backgroundRepeat: "no-repeat",
   backgroundPosition: "right 10px center",
   paddingRight: 30,
@@ -48,11 +48,10 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
       ]).then(([b, currentBranch, defaultBranch]) => {
         const branchNames = b.map((br) => br.name);
         setBranches(b);
-        setHead((prev) => {
-          if (prev) return prev;
+        if (!head) {
           const match = branchNames.find((n) => n === currentBranch);
-          return match || branchNames[0] || "";
-        });
+          setHead(match || branchNames[0] || "");
+        }
         setBase(defaultBranch);
       }).catch(() => {});
     }
@@ -147,24 +146,24 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
           width: 440, background: "var(--pane-elevated)",
           backdropFilter: "blur(48px) saturate(1.2)",
           WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-          boxShadow: "var(--modal-shadow)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
           border: "1px solid var(--pane-border)", borderRadius: 12,
           padding: "20px", fontFamily: "system-ui, sans-serif",
         }}
       >
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <span style={{ fontSize: 15, color: "var(--text-primary)", fontWeight: 600 }}>
+          <span style={{ fontSize: 15, color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>
             {type === "pr" ? t("pm.newPullRequest") : t("pm.newIssue")}
           </span>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 2 }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", padding: 2 }}>
             <X size={16} strokeWidth={1.5} />
           </button>
         </div>
 
         {/* Repo selector */}
         <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.repo")}</label>
+          <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.repo")}</label>
           <select
             value={repo}
             onChange={(e) => setRepo(e.target.value)}
@@ -178,7 +177,7 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
         {type === "pr" && (
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.head")}</label>
+              <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.head")}</label>
               <SearchableSelect
                 options={branches.map((b) => b.name)}
                 value={head}
@@ -187,7 +186,7 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
               />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.base")}</label>
+              <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.base")}</label>
               <SearchableSelect
                 options={branches.map((b) => b.name)}
                 value={base}
@@ -200,7 +199,7 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
 
         {/* Title */}
         <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.title")}</label>
+          <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.title")}</label>
           <input
             type="text"
             value={title}
@@ -213,7 +212,7 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
 
         {/* Body */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.description")}</label>
+          <label style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em" }}>{t("pm.description")}</label>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -229,15 +228,15 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
               {images.map((img, i) => (
                 <div key={i} style={{ position: "relative" }}>
-                  <img src={img.dataUrl} alt={img.name} style={{ height: 48, maxWidth: 80, borderRadius: 4, border: "1px solid var(--control-border)" }} />
+                  <img src={img.dataUrl} alt={img.name} style={{ height: 48, maxWidth: 80, borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)" }} />
                   <button
                     onClick={() => {
                       setImages((prev) => prev.filter((_, j) => j !== i));
                     }}
                     style={{
                       position: "absolute", top: -4, right: -4, width: 16, height: 16,
-                      borderRadius: "50%", background: "var(--app-background)", border: "1px solid var(--control-border-strong)",
-                      color: "var(--text-secondary)", fontSize: 10, cursor: "pointer",
+                      borderRadius: "50%", background: "rgba(0,0,0,0.8)", border: "1px solid rgba(255,255,255,0.15)",
+                      color: "rgba(255,255,255,0.6)", fontSize: 10, cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
                     }}
                   >
@@ -254,19 +253,19 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
                 padding: "10px 12px",
               }}
             >
-              <div style={{ fontSize: 12, color: "var(--text-primary)", fontWeight: 600, marginBottom: 4 }}>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.82)", fontWeight: 600, marginBottom: 4 }}>
                 {t("pm.imageUploadTitle")}
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)", lineHeight: 1.45, marginBottom: 8 }}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.52)", lineHeight: 1.45, marginBottom: 8 }}>
                 {t("pm.imageUploadBody")}
               </div>
               <button
                 onClick={() => setImages([])}
                 style={{
-                  background: "var(--button-primary-bg)",
-                  border: "1px solid var(--control-border)",
+                  background: "var(--pane-active)",
+                  border: "1px solid rgba(255,255,255,0.1)",
                   borderRadius: 6,
-                  color: "var(--button-primary-fg)",
+                  color: "rgba(255,255,255,0.72)",
                   fontSize: 11,
                   fontFamily: "'JetBrains Mono', monospace",
                   letterSpacing: ".04em",
@@ -281,15 +280,15 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
         )}
 
         {error && (
-          <div style={{ fontSize: 12, color: "var(--danger-soft-text)", marginBottom: 10 }}>{error}</div>
+          <div style={{ fontSize: 12, color: "rgba(248,81,73,0.8)", marginBottom: 10 }}>{error}</div>
         )}
 
         {/* Submit */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button onClick={onClose} style={{
-            background: "none", border: "1px solid var(--control-border)",
+            background: "none", border: "1px solid var(--pane-border)",
             borderRadius: 6, padding: "6px 14px", cursor: "pointer",
-            color: "var(--text-muted)", fontSize: 12,
+            color: "rgba(255,255,255,0.4)", fontSize: 12,
             fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
           }}>
             {t("pm.cancel")}
@@ -298,10 +297,10 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
             onClick={images.length > 0 ? handleContinueInGitHub : handleSubmit}
             disabled={!canSubmit || submitting}
             style={{
-              background: canSubmit ? "var(--button-primary-bg)" : "var(--button-primary-bg-disabled)",
-              border: "1px solid var(--control-border)", borderRadius: 6,
+              background: canSubmit ? "var(--pane-active)" : "var(--pane-hover)",
+              border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6,
               padding: "6px 14px", cursor: canSubmit ? "pointer" : "default",
-              color: canSubmit ? "var(--button-primary-fg)" : "var(--button-primary-fg-disabled)",
+              color: canSubmit ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
               fontSize: 12, fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
               transition: "all .15s",
               display: "flex",

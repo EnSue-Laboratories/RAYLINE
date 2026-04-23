@@ -21,7 +21,6 @@ import HoverIconButton from "./components/HoverIconButton";
 import { getPaneInteractionStyle, getPaneSurfaceStyle } from "./utils/paneSurface";
 import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 import { createTranslator, detectDefaultLocale, normalizeLocale } from "./i18n";
-import { applyDocumentTheme, detectDefaultTheme, getStoredThemeMode, getSystemTheme, resolveTheme } from "./utils/theme";
 
 const iconBtnStyle = {
   width: 24,
@@ -31,7 +30,7 @@ const iconBtnStyle = {
   background: "var(--pane-interaction-hover-fill, var(--pane-hover))",
   backdropFilter: "var(--pane-interaction-hover-filter, none)",
   boxShadow: "var(--pane-interaction-hover-shadow, none)",
-  color: "var(--text-tertiary)",
+  color: "rgba(255,255,255,0.5)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -59,8 +58,8 @@ function RepoFilterItem({ label, active, onClick, removeMode, isAll = false }) {
         fontSize: 12,
         fontFamily: "system-ui, sans-serif",
         color: active
-          ? "var(--text-primary)"
-          : "var(--text-tertiary)",
+          ? "rgba(255,255,255,0.9)"
+          : "rgba(255,255,255,0.45)",
         transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
         textAlign: "left",
         marginBottom: 1,
@@ -75,7 +74,7 @@ function RepoFilterItem({ label, active, onClick, removeMode, isAll = false }) {
         {label}
       </span>
       {removeMode && !isAll && hovered && (
-        <X size={12} style={{ color: "var(--danger-soft-text)", flexShrink: 0, marginLeft: 4 }} />
+        <X size={12} style={{ color: "rgba(200,80,80,0.7)", flexShrink: 0, marginLeft: 4 }} />
       )}
     </button>
   );
@@ -91,14 +90,14 @@ function TabButton({ label, active, onClick }) {
       style={{
         background: "none",
         border: "none",
-        borderBottom: active ? "2px solid var(--text-primary)" : "2px solid transparent",
-        color: active ? "var(--text-primary)" : "var(--text-muted)",
+        borderBottom: active ? "2px solid rgba(255,255,255,0.8)" : "2px solid transparent",
+        color: active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
         fontSize: 13,
         fontFamily: "system-ui, sans-serif",
         padding: "10px 16px",
         cursor: "pointer",
         transition: "color .15s, border-color .15s",
-        ...(hovered && !active ? { color: "var(--text-secondary)" } : {}),
+        ...(hovered && !active ? { color: "rgba(255,255,255,0.6)" } : {}),
       }}
     >
       {label}
@@ -113,9 +112,9 @@ function StateToggle({ value, onChange, openLabel = "OPEN", closedLabel = "CLOSE
       <button
         onClick={() => onChange(val)}
         style={{
-          border: "1px solid " + (active ? "var(--control-border-strong)" : "var(--pane-border)"),
+          border: "1px solid " + (active ? "rgba(255,255,255,0.1)" : "var(--pane-border)"),
           borderRadius: 6,
-          color: active ? "var(--text-primary)" : "var(--text-muted)",
+          color: active ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.35)",
           fontSize: 11,
           fontFamily: "'JetBrains Mono', monospace",
           letterSpacing: ".04em",
@@ -139,8 +138,6 @@ function StateToggle({ value, onChange, openLabel = "OPEN", closedLabel = "CLOSE
 
 export default function ProjectManager() {
   const [locale, setLocale] = useState(() => detectDefaultLocale());
-  const [themeMode, setThemeMode] = useState(() => detectDefaultTheme());
-  const [systemTheme, setSystemTheme] = useState(() => getSystemTheme());
   const [repos, setRepos] = useState([]);
   const [activeTab, setActiveTab] = useState("issues");
   const [stateFilter, setStateFilter] = useState("open");
@@ -159,7 +156,6 @@ export default function ProjectManager() {
   const [freshIssue, setFreshIssue] = useState(null);
   const [freshPR, setFreshPR] = useState(null);
   const t = createTranslator(locale);
-  const effectiveTheme = resolveTheme(themeMode, systemTheme);
 
   const refreshAuth = () =>
     window.ghApi.checkAuth().then(({ ok, user }) => {
@@ -167,26 +163,6 @@ export default function ProjectManager() {
       setAuthUser(ok ? user || null : null);
       return ok;
     });
-
-  useEffect(() => {
-    applyDocumentTheme(effectiveTheme);
-  }, [effectiveTheme]);
-
-  useEffect(() => {
-    let disposed = false;
-    if (window.ghApi?.getSystemTheme) {
-      window.ghApi.getSystemTheme().then((theme) => {
-        if (!disposed) setSystemTheme(theme === "light" ? "light" : "dark");
-      }).catch(() => {});
-    }
-    const off = window.ghApi?.onSystemThemeChange?.((theme) => {
-      setSystemTheme(theme === "light" ? "light" : "dark");
-    });
-    return () => {
-      disposed = true;
-      off?.();
-    };
-  }, []);
 
   useEffect(() => {
     refreshAuth();
@@ -197,7 +173,6 @@ export default function ProjectManager() {
       const { repos, wallpaper: wp } = pmState || {};
       setRepos(Array.isArray(repos) ? repos : []);
       if (appState?.locale) setLocale(normalizeLocale(appState.locale));
-      setThemeMode(getStoredThemeMode(appState));
       if (wp?.path) {
         setWallpaper(normalizeWallpaper(wp));
         window.ghApi.readImage(wp.path).then((dataUrl) => {
@@ -242,12 +217,12 @@ export default function ProjectManager() {
           alignItems: "center",
           justifyContent: "center",
           height: "100vh",
-        background: "var(--pane-background)",
-        color: "var(--text-muted)",
-        fontFamily: "system-ui, sans-serif",
-        fontSize: 14,
-      }}
-    >
+          background: "var(--pane-background)",
+          color: "rgba(255,255,255,0.3)",
+          fontFamily: "system-ui, sans-serif",
+          fontSize: 14,
+        }}
+      >
         {t("pm.checkingAuth")}
       </div>
     );
@@ -269,10 +244,10 @@ export default function ProjectManager() {
         }}
       >
         <GitHubIcon size={48} />
-        <div style={{ fontSize: 16, color: "var(--text-secondary)" }}>
+        <div style={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }}>
           {t("pm.authMissingTitle")}
         </div>
-        <div style={{ fontSize: 13, color: "var(--text-muted)", maxWidth: 360, textAlign: "center" }}>
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", maxWidth: 360, textAlign: "center" }}>
           {t("pm.authMissingBody")}
         </div>
         <button
@@ -285,8 +260,8 @@ export default function ProjectManager() {
             padding: "9px 18px",
             borderRadius: 8,
             border: "1px solid var(--pane-border)",
-            background: "var(--button-primary-bg)",
-            color: "var(--button-primary-fg)",
+            background: "rgba(255,255,255,0.1)",
+            color: "rgba(255,255,255,0.9)",
             fontSize: 13,
             fontFamily: "system-ui, sans-serif",
             cursor: "pointer",
@@ -314,8 +289,8 @@ export default function ProjectManager() {
         height: "100vh",
         width: "100vw",
         overflow: "hidden",
-        background: "var(--app-background)",
-        color: "var(--text-primary)",
+        background: "var(--pane-background)",
+        color: "rgba(255,255,255,0.85)",
         fontFamily: "system-ui, sans-serif",
         position: "relative",
       }}
@@ -334,8 +309,8 @@ export default function ProjectManager() {
         </div>
       ) : (
         <>
-          <AuroraCanvas theme={effectiveTheme} />
-          <Grain theme={effectiveTheme} />
+          <AuroraCanvas />
+          <Grain />
         </>
       )}
 
@@ -359,7 +334,7 @@ export default function ProjectManager() {
           minWidth: 200,
           display: "flex",
           flexDirection: "column",
-          borderRight: "1px solid var(--control-border-soft)",
+          borderRight: "1px solid rgba(255,255,255,0.025)",
           position: "relative",
           zIndex: 10,
           ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
@@ -382,7 +357,7 @@ export default function ProjectManager() {
             style={{
               fontSize: 12,
               fontFamily: "'JetBrains Mono', monospace",
-              color: "var(--text-muted)",
+              color: "rgba(255,255,255,0.5)",
               letterSpacing: ".08em",
             }}
           >
@@ -392,15 +367,15 @@ export default function ProjectManager() {
             <HoverIconButton
               onClick={() => setRemoveMode(!removeMode)}
               ariaLabel={removeMode ? t("pm.doneEditingRepos") : t("pm.editRepos")}
-              baseColor={removeMode ? "var(--success-soft-text)" : "var(--text-tertiary)"}
-              hoverColor={removeMode ? "var(--success-soft-text)" : "var(--text-primary)"}
+              baseColor={removeMode ? "rgba(120,230,150,0.9)" : "rgba(255,255,255,0.5)"}
+              hoverColor={removeMode ? "rgba(150,245,170,1)" : "rgba(255,255,255,0.9)"}
               style={{
                 ...iconBtnStyle,
                 ...(removeMode
                   ? {
-                    border: "1px solid var(--success-soft-border)",
-                    background: "var(--success-soft-bg)",
-                    boxShadow: "0 0 0 1px color-mix(in srgb, var(--success-soft-border) 35%, transparent) inset",
+                    border: "1px solid rgba(120,230,150,0.22)",
+                    background: "rgba(120,230,150,0.12)",
+                    boxShadow: "0 0 0 1px rgba(120,230,150,0.06) inset",
                   }
                   : {}),
               }}
@@ -415,8 +390,8 @@ export default function ProjectManager() {
                 setShowAddRepo(true);
               }}
               ariaLabel={t("pm.addRepo")}
-              baseColor="var(--text-tertiary)"
-              hoverColor="var(--text-primary)"
+              baseColor="rgba(255,255,255,0.5)"
+              hoverColor="rgba(255,255,255,0.9)"
               style={{ ...iconBtnStyle, color: undefined }}
             >
               <Plus size={12} strokeWidth={1.5} />
@@ -459,7 +434,7 @@ export default function ProjectManager() {
               cursor: "pointer",
               fontSize: 10,
               fontFamily: "'JetBrains Mono', monospace",
-              color: "var(--text-muted)",
+              color: "rgba(255,255,255,0.3)",
               letterSpacing: ".08em",
               padding: 0,
               textAlign: "left",
@@ -494,7 +469,7 @@ export default function ProjectManager() {
               display: "flex",
               alignItems: "center",
               padding: "0 20px",
-              borderBottom: "1px solid var(--control-border-soft)",
+              borderBottom: "1px solid rgba(255,255,255,0.04)",
               marginBottom: 12,
               flexShrink: 0,
             }}
@@ -525,7 +500,7 @@ export default function ProjectManager() {
               backdropFilter: "var(--pane-interaction-hover-filter, none)",
               boxShadow: "var(--pane-interaction-hover-shadow, none)",
               borderRadius: 6, padding: "4px 10px", cursor: "pointer",
-              color: "var(--text-tertiary)", fontSize: 11,
+              color: "rgba(255,255,255,0.5)", fontSize: 11,
               fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
                   marginRight: 8, transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
                 }}
@@ -553,7 +528,6 @@ export default function ProjectManager() {
               number={selectedItem.number}
               type={selectedItem.type}
               onBack={() => setSelectedItem(null)}
-              locale={locale}
             />
           ) : activeTab === "issues" ? (
             <IssueList
@@ -563,7 +537,6 @@ export default function ProjectManager() {
               onSelectItem={setSelectedItem}
               refreshSignal={refreshSignal}
               freshItem={freshIssue}
-              locale={locale}
             />
           ) : (
             <PRList
@@ -600,7 +573,6 @@ export default function ProjectManager() {
           repos={repos}
           onAdd={handleAddRepo}
           onClose={() => setShowAddRepo(false)}
-          locale={locale}
         />
       )}
 
@@ -623,7 +595,6 @@ export default function ProjectManager() {
             await refreshAuth();
           }}
           onClose={() => setShowAccountManager(false)}
-          locale={locale}
         />
       )}
 
