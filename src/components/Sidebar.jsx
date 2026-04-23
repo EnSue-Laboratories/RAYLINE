@@ -76,13 +76,14 @@ function IconRailBtn({ onClick, title, children }) {
       title={title}
       style={{
         display: "flex", alignItems: "center", justifyContent: "center",
-        width: 40, height: 40, borderRadius: 9,
+        width: 40, height: 40, borderRadius: 8,
         background: "none", border: "none", cursor: "pointer",
-        color: "rgba(255,255,255,0.45)", transition: "background .15s, color .15s",
+        color: "rgba(255,255,255,0.55)", transition: "background .15s, color .15s",
         WebkitAppRegion: "no-drag",
+        flexShrink: 0,
       }}
-      onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.82)"; }}
-      onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.88)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
     >
       {children}
     </button>
@@ -161,18 +162,18 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
         </div>
 
         {/* Action icons */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, paddingTop: 2 }}>
-          <IconRailBtn onClick={onToggleSidebar} title="Expand sidebar"><PanelLeftOpen size={18} strokeWidth={1.5} /></IconRailBtn>
-          <IconRailBtn onClick={onNew} title="New Chat"><Plus size={18} strokeWidth={1.5} /></IconRailBtn>
-          <IconRailBtn onClick={onOpenDispatch} title="Dispatch"><Workflow size={18} strokeWidth={1.5} /></IconRailBtn>
-          <IconRailBtn onClick={onOpenNewProject} title="New Project"><FolderPlus size={18} strokeWidth={1.5} /></IconRailBtn>
-          {developerMode && <IconRailBtn onClick={onOpenProjectManager} title="GitHub Projects"><GitHubIcon size={18} /></IconRailBtn>}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 0" }}>
+          <IconRailBtn onClick={onToggleSidebar} title="Expand sidebar"><PanelLeftOpen size={17} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onNew} title="New Chat"><Plus size={17} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onOpenDispatch} title="Dispatch"><Workflow size={17} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onOpenNewProject} title="New Project"><FolderPlus size={17} strokeWidth={1.5} /></IconRailBtn>
+          {developerMode && <IconRailBtn onClick={onOpenProjectManager} title="GitHub Projects"><GitHubIcon size={17} /></IconRailBtn>}
         </div>
 
         <div style={{ flex: 1 }} />
 
         {/* Footer icons */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "12px 0" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 0 14px" }}>
           <IconRailBtn onClick={onPickFolder} title={cwdShort || "Select Folder"}><FolderOpen size={16} strokeWidth={1.5} /></IconRailBtn>
           <IconRailBtn onClick={onOpenSettings} title="Settings"><SettingsIcon size={16} strokeWidth={1.5} /></IconRailBtn>
         </div>
