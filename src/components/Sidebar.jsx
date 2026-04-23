@@ -161,7 +161,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "scale(1.08)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.82"; e.currentTarget.style.transform = "scale(1)"; }}
           >
-            <img src="/favicon.svg" style={{ width: 24, height: 24, borderRadius: 5, display: "block" }} draggable={false} />
+            <img src={`${import.meta.env.BASE_URL}favicon.svg`} style={{ width: 24, height: 24, borderRadius: 5, display: "block" }} draggable={false} />
           </button>
         </div>
 
@@ -234,7 +234,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
           onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.82"; }}
         >
-          <img src="/favicon.svg" style={{ width: 22, height: 22, borderRadius: 5, display: "block", flexShrink: 0 }} draggable={false} />
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} style={{ width: 22, height: 22, borderRadius: 5, display: "block", flexShrink: 0 }} draggable={false} />
           <span style={{
             fontFamily: "'Barlow Condensed', 'Inter Tight', sans-serif",
             fontWeight: 600,
