@@ -3455,6 +3455,7 @@ export default function App() {
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
           developerMode={developerMode}
+          locale={locale}
         />
       )}
 
@@ -3466,6 +3467,7 @@ export default function App() {
           projects={projects}
           defaultModel={defaultModel}
           availableModels={dispatchAvailableModels}
+          locale={locale}
         />
       )}
 

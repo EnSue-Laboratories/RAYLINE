@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { GitBranch, Plus, Check, X, ChevronDown, Trash2, ArrowUpFromLine } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { createTranslator } from "../i18n";
 
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
@@ -93,8 +94,9 @@ function IconActionButton({
   );
 }
 
-export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocusTerminal }) {
+export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocusTerminal, locale }) {
   const s = useFontScale();
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(null);
   const [branches, setBranches] = useState([]);
@@ -297,7 +299,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
         confirmPromote.branch || null,
       );
       if (!result?.success) {
-        setPromoteError(result?.error || "Promote failed");
+        setPromoteError(result?.error || t("git.branch.promoteFailed"));
         setPromoting(false);
         return;
       }
@@ -310,7 +312,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
       refresh();
       onRefocusTerminal?.();
     } catch (e) {
-      setPromoteError(e.message || "Promote failed");
+      setPromoteError(e.message || t("git.branch.promoteFailed"));
       setPromoting(false);
     }
   };
@@ -409,17 +411,17 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
             padding: "3px 3px 0",
             marginBottom: 2,
           }}>
-            {["branch", "worktree"].map((t) => (
+            {["branch", "worktree"].map((tab) => (
               <button
-                key={t}
-                onClick={() => handleModeChange(t)}
+                key={tab}
+                onClick={() => handleModeChange(tab)}
                 style={{
                   flex: 1,
                   padding: "5px 0",
-                  background: mode === t ? "rgba(255,255,255,0.04)" : "transparent",
+                  background: mode === tab ? "rgba(255,255,255,0.04)" : "transparent",
                   border: "none",
                   borderRadius: 6,
-                  color: mode === t ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
+                  color: mode === tab ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
                   fontSize: s(9),
                   fontFamily: "'JetBrains Mono',monospace",
                   letterSpacing: ".08em",
@@ -427,7 +429,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   transition: "all .15s",
                 }}
               >
-                {t === "branch" ? "BRANCHES" : "WORKTREES"}
+                {tab === "branch" ? t("git.branch.branches") : t("git.branch.worktrees")}
               </button>
             ))}
           </div>
@@ -454,7 +456,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   }
                 }
               }}
-              placeholder={mode === "worktree" ? "Search worktrees" : "Search branches"}
+              placeholder={mode === "worktree" ? t("git.branch.searchWorktrees") : t("git.branch.searchBranches")}
               style={{
                 width: "100%",
                 padding: "6px 8px",
@@ -496,7 +498,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
-                      }}>Delete {b}?</span>
+                      }}>{t("git.branch.deletePrompt", { name: b })}</span>
                       <span style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                         <button
                           onClick={() => handleDeleteBranch(b)}
@@ -564,7 +566,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     {!isProtected && (
                       <IconActionButton
                         icon={Trash2}
-                        tooltip="delete"
+                        tooltip={t("git.branch.deleteTooltip")}
                         visible={hoveredRow === `branch-${b}`}
                         onClick={() => { setConfirmDelete({ type: "branch", name: b }); setError(null); }}
                       />
@@ -579,7 +581,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   fontFamily: "'JetBrains Mono',monospace",
                   color: "rgba(255,255,255,0.25)",
                 }}>
-                  No branches match
+                  {t("git.branch.noBranchesMatch")}
                 </div>
               )}
             </div>
@@ -596,7 +598,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   color: "rgba(255,255,255,0.25)",
                   letterSpacing: ".04em",
                 }}>
-                  Start a new chat to switch worktrees
+                  {t("git.branch.startNewChatToSwitch")}
                 </div>
               )}
               {/* None option — use main repo directly */}
@@ -627,7 +629,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   onMouseEnter={(e) => { if (!worktreeLocked && isInWorktree) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
                   onMouseLeave={(e) => { if (isInWorktree) e.currentTarget.style.background = "transparent"; }}
                 >
-                  <span>None</span>
+                  <span>{t("git.branch.none")}</span>
                   {!isInWorktree && <Check size={12} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />}
                 </button>
               )}
@@ -656,7 +658,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
-                        }}>Promote {wt.branch || "worktree"} to main?</span>
+                        }}>{t("git.branch.promotePrompt", { name: wt.branch || t("git.branch.worktreeLabel") })}</span>
                         <span style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                           <button
                             onClick={handlePromoteWorktree}
@@ -692,7 +694,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                       }}>
                         {promoteError
                           ? promoteError
-                          : "Removes this worktree and checks out the branch in the main repo. Main must be clean."}
+                          : t("git.branch.promoteHint")}
                       </div>
                     </div>
                   );
@@ -718,7 +720,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
-                        }}>Delete {wt.branch || "worktree"}?</span>
+                        }}>{t("git.branch.deletePrompt", { name: wt.branch || t("git.branch.worktreeLabel") })}</span>
                         <span style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                           <button
                             onClick={handleDeleteWorktree}
@@ -767,7 +769,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                           }}>
                             {deleteBranchToo && <Check size={10} strokeWidth={2.5} style={{ color: "#fff" }} />}
                           </span>
-                          Also delete branch
+                          {t("git.branch.alsoDeleteBranch")}
                         </div>
                       )}
                     </div>
@@ -820,13 +822,13 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                         whiteSpace: "nowrap",
                         maxWidth: "100%",
                       }}>
-                        {wt.branch || "detached"}
+                        {wt.branch || t("git.branch.detached")}
                       </span>
                     </button>
                     {mainWorktree && (
                       <IconActionButton
                         icon={ArrowUpFromLine}
-                        tooltip="promote"
+                        tooltip={t("git.branch.promoteTooltip")}
                         visible={hoveredRow === `wt-${wt.path}`}
                         onClick={() => {
                           setConfirmPromote({ path: wt.path, branch: wt.branch });
@@ -839,7 +841,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     {!isActive && (
                       <IconActionButton
                         icon={Trash2}
-                        tooltip="delete"
+                        tooltip={t("git.branch.deleteTooltip")}
                         visible={hoveredRow === `wt-${wt.path}`}
                         onClick={() => { setConfirmDelete({ type: "worktree", path: wt.path, branch: wt.branch }); setDeleteBranchToo(false); setError(null); }}
                       />
@@ -854,7 +856,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   fontFamily: "'JetBrains Mono',monospace",
                   color: "rgba(255,255,255,0.25)",
                 }}>
-                  No worktrees match
+                  {t("git.branch.noWorktreesMatch")}
                 </div>
               )}
             </div>
@@ -893,7 +895,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     flexShrink: 0,
                   }}
                 >
-                  {mode === "worktree" ? "WORKTREE" : "BRANCH"}
+                  {mode === "worktree" ? t("git.branch.worktreeModeLabel") : t("git.branch.branchModeLabel")}
                 </button>
                 <input
                   ref={inputRef}
@@ -903,7 +905,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     if (e.key === "Enter") handleCreate();
                     if (e.key === "Escape") { setCreating(false); setNewName(""); setError(null); }
                   }}
-                  placeholder={mode === "worktree" ? "worktree-name" : "branch-name"}
+                  placeholder={mode === "worktree" ? t("git.branch.worktreeNamePlaceholder") : t("git.branch.branchNamePlaceholder")}
                   style={{
                     flex: 1,
                     padding: "5px 8px",
@@ -987,7 +989,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
             >
               <Plus size={12} strokeWidth={2} />
-              {mode === "worktree" ? "New worktree" : "New branch"}
+              {mode === "worktree" ? t("git.branch.newWorktree") : t("git.branch.newBranch")}
             </button>
           )}
         </div>,

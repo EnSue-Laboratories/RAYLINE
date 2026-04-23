@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { GitCommitHorizontal, GitPullRequestArrow, CloudUpload, Check, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import useGitStatus from "../hooks/useGitStatus";
+import { createTranslator } from "../i18n";
 
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
@@ -39,8 +40,9 @@ const rowIconBtnStyle = {
   transition: "color .15s",
 };
 
-export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = false, coauthorTrailer = "" }) {
+export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = false, coauthorTrailer = "", locale }) {
   const s = useFontScale();
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const { status, refresh, refetch } = useGitStatus(cwd);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -184,14 +186,14 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   const canPr = !detached && !!branch && branch !== prBase && !busy && !!upstream && !isCheckingPr && !hasOpenPr;
   const canPublish = !detached && !!branch && !upstream && !busy;
   const prTitle = prSuccess || (isCheckingPr
-    ? "Checking PR status..."
+    ? t("git.status.checkingPrTitle")
     : canPr
-      ? `Create PR → ${prBase}`
+      ? t("git.status.createPrTitle", { base: prBase })
       : branch === prBase
-        ? `On base branch "${prBase}"`
+        ? t("git.status.onBaseBranch", { base: prBase })
         : hasOpenPr
-          ? `Upstream PR #${openPr.number} already exists`
-          : "Cannot create PR");
+          ? t("git.status.upstreamPrExists", { number: openPr.number })
+          : t("git.status.cannotCreatePr"));
 
   const handleCommitAndPush = async () => {
     if (!canCommit) return;
@@ -201,11 +203,11 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
     try {
       const trailer = coauthorEnabled ? (coauthorTrailer || "").trim() : "";
       const c = await window.api.gitCommit(cwd, message.trim(), trailer);
-      if (!c.ok) { setError(c.stderr || "Commit failed"); return; }
+      if (!c.ok) { setError(c.stderr || t("git.status.commitFailed")); return; }
       setMessage("");
       if (canPush) {
         const p = await window.api.gitPush(cwd);
-        if (!p.ok) { setError(p.stderr || "Push failed"); await refresh(); return; }
+        if (!p.ok) { setError(p.stderr || t("git.status.pushFailed")); await refresh(); return; }
       }
       await refresh();
     } finally {
@@ -244,15 +246,15 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   const handleRevert = (path, untracked) => {
     if (!window.api?.gitRevert) return;
     setConfirm({
-      title: untracked ? "Delete untracked file" : "Discard changes",
+      title: untracked ? t("git.status.deleteUntrackedTitle") : t("git.status.discardChangesTitle"),
       body: untracked
-        ? `"${path}" isn't tracked by git and cannot be recovered once deleted.`
-        : `All uncommitted changes to "${path}" will be lost. This cannot be undone.`,
-      confirmLabel: untracked ? "Delete" : "Discard",
+        ? t("git.status.deleteUntrackedBody", { path })
+        : t("git.status.discardChangesBody", { path }),
+      confirmLabel: untracked ? t("git.status.delete") : t("git.status.discard"),
       destructive: true,
       onConfirm: async () => {
         const r = await window.api.gitRevert(cwd, path, !!untracked);
-        if (!r.ok) setError(r.stderr || "Revert failed");
+        if (!r.ok) setError(r.stderr || t("git.status.revertFailed"));
         await refresh();
       },
     });
@@ -261,7 +263,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   const handleIgnore = async (path) => {
     if (!window.api?.gitIgnore) return;
     const r = await window.api.gitIgnore(cwd, path);
-    if (!r.ok) setError(r.stderr || "Failed to update .gitignore");
+    if (!r.ok) setError(r.stderr || t("git.status.gitignoreFailed"));
     await refresh();
   };
 
@@ -272,10 +274,10 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
     clearPrSuccess();
     try {
       const r = await window.api.gitCreatePr(cwd, prBase);
-      if (!r.ok) { setError(r.stderr || "Failed to create PR"); return; }
+      if (!r.ok) { setError(r.stderr || t("git.status.createPrFailed")); return; }
       await refresh();
       await refreshPrInfo();
-      flashPrSuccess("PR created");
+      flashPrSuccess(t("git.status.prCreated"));
     } finally {
       setBusy(false);
     }
@@ -288,11 +290,11 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
     clearPrSuccess();
     try {
       const r = await window.api.gitMergePr(cwd);
-      if (!r.ok) { setError(r.stderr || "Failed to merge PR"); return; }
+      if (!r.ok) { setError(r.stderr || t("git.status.mergePrFailed")); return; }
       await refreshPrInfo();
       await refetch();
       await refresh();
-      flashPrSuccess("PR merged");
+      flashPrSuccess(t("git.status.prMerged"));
     } finally {
       setBusy(false);
     }
@@ -307,7 +309,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
       const r = await window.api.gitGenCommitMessage(requestCwd);
       if (cwdRef.current !== requestCwd) return;
       if (!r.ok) {
-        setError(r.stderr || "Failed to generate commit message");
+        setError(r.stderr || t("git.status.genCommitMessageFailed"));
         return;
       }
       setMessage(r.message || "");
@@ -323,7 +325,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
     clearPrSuccess();
     try {
       const p = await window.api.gitPush(cwd);
-      if (!p.ok) { setError(p.stderr || "Publish failed"); return; }
+      if (!p.ok) { setError(p.stderr || t("git.status.publishFailed")); return; }
       await refresh();
       await refreshPrInfo();
     } finally {
@@ -338,7 +340,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
     clearPrSuccess();
     try {
       const p = await window.api.gitPull(cwd);
-      if (!p.ok) setError(p.stderr || "Pull failed");
+      if (!p.ok) setError(p.stderr || t("git.status.pullFailed"));
       await refresh();
     } finally {
       setBusy(false);
@@ -377,7 +379,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
         gap: 4,
       }}>
         <span style={{ color: "rgba(255,255,255,0.7)" }}>
-          {branch || (detached ? "(detached)" : "?")}
+          {branch || (detached ? t("git.status.detachedLabel") : "?")}
           {upstream && <span style={{ color: "rgba(255,255,255,0.3)" }}> → {upstream}</span>}
         </span>
         <span style={{ display: "flex", gap: 10 }}>
@@ -394,12 +396,12 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
       <div style={{ padding: "8px 12px", maxHeight: 260, overflowY: "auto" }}>
         {clean && (
           <div style={{ color: "rgba(255,255,255,0.4)", fontSize: s(10), fontFamily: "'JetBrains Mono',monospace", letterSpacing: ".08em" }}>
-            NO CHANGES
+            {t("git.status.noChanges")}
           </div>
         )}
         {staged.length > 0 && (
           <FileSection
-            title={`STAGED CHANGES (${staged.length})`}
+            title={t("git.status.stagedChanges", { count: staged.length })}
             files={staged}
             s={s}
             pickCode={(f) => f.index}
@@ -407,12 +409,13 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
             onAction={handleUnstage}
             onRevert={handleRevert}
             onBulkAction={handleUnstageAll}
-            bulkActionTitle="Unstage all"
+            bulkActionTitle={t("git.status.unstageAll")}
+            t={t}
           />
         )}
         {unstaged.length > 0 && (
           <FileSection
-            title={`CHANGES (${unstaged.length})`}
+            title={t("git.status.changes", { count: unstaged.length })}
             files={unstaged}
             s={s}
             pickCode={(f) => (f.index === "?" ? "?" : f.worktree)}
@@ -421,8 +424,9 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
             onRevert={handleRevert}
             onIgnore={handleIgnore}
             onBulkAction={handleStageAll}
-            bulkActionTitle="Stage all"
+            bulkActionTitle={t("git.status.stageAll")}
             style={{ marginTop: staged.length > 0 ? 10 : 0 }}
+            t={t}
           />
         )}
       </div>
@@ -431,7 +435,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
       {!detached && (
         <div style={{ padding: "8px 12px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           <textarea
-            placeholder={generating ? "Generating…" : "Commit message  (⇥ to generate)"}
+            placeholder={generating ? t("git.status.generating") : t("git.status.commitPlaceholder")}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => {
@@ -477,8 +481,8 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
             <GitPullRequestArrow size={12} strokeWidth={1.6} />
             <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {isCheckingPr
-                ? "CHECKING PR STATUS"
-                : `UPSTREAM PR #${openPr.number} → ${openPr.baseRefName}`}
+                ? t("git.status.checkingPrStatus")
+                : t("git.status.upstreamPr", { number: openPr.number, base: openPr.baseRefName })}
             </span>
           </div>
           {openPr && (
@@ -511,7 +515,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
                 transition: "color .15s ease, text-decoration-color .15s ease",
               }}
             >
-              {busy ? "…" : "Merge"}
+              {busy ? "…" : t("git.status.merge")}
             </button>
           )}
         </div>
@@ -535,13 +539,13 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
             transition: "all .15s",
           }}
         >
-          {busy ? "…" : "Commit & Push"}
+          {busy ? "…" : t("git.status.commitAndPush")}
         </button>
         {!upstream && !detached ? (
           <button
             onClick={handlePublish}
             disabled={!canPublish}
-            title={canPublish ? `Publish "${branch}" to origin` : "Cannot publish branch"}
+            title={canPublish ? t("git.status.publishTooltip", { branch }) : t("git.status.cannotPublish")}
             style={{
               height: 30,
               padding: "0 10px",
@@ -609,7 +613,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
             cursor: canPull && !busy ? "pointer" : "default",
           }}
         >
-          Pull
+          {t("git.status.pull")}
         </button>
       </div>
 
@@ -641,10 +645,10 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
         ref={triggerRef}
         onClick={() => setOpen((v) => !v)}
         title={
-          detached ? "Detached HEAD" :
-          !upstream ? "No upstream configured" :
-          clean ? "Clean & in sync" :
-          `${dirty} changed · ${ahead} ahead · ${behind} behind`
+          detached ? t("git.status.detachedTooltip") :
+          !upstream ? t("git.status.noUpstream") :
+          clean ? t("git.status.cleanInSync") :
+          t("git.status.statusSummary", { dirty, ahead, behind })
         }
         style={{
           display: "flex",
@@ -667,12 +671,12 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
         {detached ? (
           <>
             <GitCommitHorizontal size={13} strokeWidth={1.6} />
-            <span style={{ color: "rgba(200,160,100,0.8)" }}>detached</span>
+            <span style={{ color: "rgba(200,160,100,0.8)" }}>{t("git.status.detached")}</span>
           </>
         ) : !upstream ? (
           <>
             <GitCommitHorizontal size={13} strokeWidth={1.6} />
-            <span style={{ color: "rgba(255,255,255,0.4)" }}>local</span>
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("git.status.local")}</span>
           </>
         ) : clean ? (
           <GitCommitHorizontal size={13} strokeWidth={1.6} />
@@ -697,13 +701,14 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
             setConfirm(null);
             if (fn) await fn();
           }}
+          t={t}
         />
       )}
     </>
   );
 }
 
-function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, onConfirm }) {
+function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, onConfirm, t }) {
   const confirmBtnRef = useRef(null);
   useEffect(() => {
     confirmBtnRef.current?.focus();
@@ -771,7 +776,7 @@ function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, on
               cursor: "pointer",
             }}
           >
-            Cancel
+            {t ? t("git.status.cancel") : "Cancel"}
           </button>
           <button
             ref={confirmBtnRef}
@@ -788,7 +793,7 @@ function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, on
               cursor: "pointer",
             }}
           >
-            {confirmLabel || "Confirm"}
+            {confirmLabel || (t ? t("git.status.confirm") : "Confirm")}
           </button>
         </div>
       </div>
@@ -797,7 +802,7 @@ function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, on
   );
 }
 
-function FileSection({ title, files, s, pickCode, action, onAction, onRevert, onIgnore, onBulkAction, bulkActionTitle, style }) {
+function FileSection({ title, files, s, pickCode, action, onAction, onRevert, onIgnore, onBulkAction, bulkActionTitle, style, t }) {
   const BulkIcon = action === "stage" ? Plus : Minus;
   return (
     <div style={style}>
@@ -827,6 +832,7 @@ function FileSection({ title, files, s, pickCode, action, onAction, onRevert, on
           onAction={onAction}
           onRevert={onRevert}
           onIgnore={onIgnore}
+          t={t}
         />
       ))}
     </div>
@@ -847,11 +853,17 @@ function RowIconBtn({ onClick, title, children }) {
   );
 }
 
-function FileRow({ file, s, letter, action, onAction, onRevert, onIgnore }) {
+function FileRow({ file, s, letter, action, onAction, onRevert, onIgnore, t }) {
   const [hover, setHover] = useState(false);
   const StageIcon = action === "stage" ? Plus : Minus;
-  const stageTitle = action === "stage" ? "Stage" : "Unstage";
+  const stageTitle = action === "stage"
+    ? (t ? t("git.status.stage") : "Stage")
+    : (t ? t("git.status.unstage") : "Unstage");
   const untracked = file.index === "?";
+  const revertTitle = untracked
+    ? (t ? t("git.status.deleteUntracked") : "Delete (untracked)")
+    : (t ? t("git.status.discardChangesTitle") : "Discard changes");
+  const ignoreTitle = t ? t("git.status.addToGitignore") : "Add to .gitignore";
   return (
     <div
       onMouseEnter={() => setHover(true)}
@@ -866,12 +878,12 @@ function FileRow({ file, s, letter, action, onAction, onRevert, onIgnore }) {
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{file.path}</span>
       <div style={{ display: "flex", gap: 2, visibility: hover ? "visible" : "hidden" }}>
         {onRevert && (
-          <RowIconBtn onClick={() => onRevert(file.path, untracked)} title={untracked ? "Delete (untracked)" : "Discard changes"}>
+          <RowIconBtn onClick={() => onRevert(file.path, untracked)} title={revertTitle}>
             <Undo2 size={12} strokeWidth={1.8} />
           </RowIconBtn>
         )}
         {onIgnore && untracked && (
-          <RowIconBtn onClick={() => onIgnore(file.path)} title="Add to .gitignore">
+          <RowIconBtn onClick={() => onIgnore(file.path)} title={ignoreTitle}>
             <RefreshCwOff size={12} strokeWidth={1.8} />
           </RowIconBtn>
         )}

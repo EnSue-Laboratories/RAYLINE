@@ -528,6 +528,7 @@ export default function ProjectManager() {
               number={selectedItem.number}
               type={selectedItem.type}
               onBack={() => setSelectedItem(null)}
+              locale={locale}
             />
           ) : activeTab === "issues" ? (
             <IssueList
@@ -537,6 +538,7 @@ export default function ProjectManager() {
               onSelectItem={setSelectedItem}
               refreshSignal={refreshSignal}
               freshItem={freshIssue}
+              locale={locale}
             />
           ) : (
             <PRList
@@ -573,6 +575,7 @@ export default function ProjectManager() {
           repos={repos}
           onAdd={handleAddRepo}
           onClose={() => setShowAddRepo(false)}
+          locale={locale}
         />
       )}
 
@@ -595,6 +598,7 @@ export default function ProjectManager() {
             await refreshAuth();
           }}
           onClose={() => setShowAccountManager(false)}
+          locale={locale}
         />
       )}
 

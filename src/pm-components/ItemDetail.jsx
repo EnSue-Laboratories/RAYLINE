@@ -1,20 +1,21 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { ArrowLeft, GitBranch, Plus, Check, CheckCircle2, GitMerge, RotateCcw, Copy } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CommentBox from "./CommentBox";
+import { createTranslator } from "../i18n";
 
-function timeAgo(dateStr) {
+function timeAgo(dateStr, t) {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diff = now - then;
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return t("pm.timeMinutesAgo", { count: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t("pm.timeHoursAgo", { count: hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  return `${Math.floor(days / 30)}mo ago`;
+  if (days < 30) return t("pm.timeDaysAgo", { count: days });
+  return t("pm.timeMonthsAgo", { count: Math.floor(days / 30) });
 }
 
 const smallBtnStyle = {
@@ -80,7 +81,8 @@ const markdownCodeComponents = {
   ),
 };
 
-export default function ItemDetail({ repo, number, type, onBack }) {
+export default function ItemDetail({ repo, number, type, onBack, locale }) {
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [item, setItem] = useState(null);
   const [comments, setComments] = useState([]);
   const [collaborators, setCollaborators] = useState([]);
@@ -196,7 +198,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "rgba(255,255,255,0.4)", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>
-        Loading...
+        {t("pm.loadingItem")}
       </div>
     );
   }
@@ -206,8 +208,8 @@ export default function ItemDetail({ repo, number, type, onBack }) {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, fontFamily: "system-ui, sans-serif" }}>
         <div style={{ color: "rgba(255,100,100,0.8)", fontSize: 13 }}>{error}</div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={fetchAll} style={smallBtnStyle}>Retry</button>
-          <button onClick={onBack} style={{ ...smallBtnStyle, background: "none" }}>Back</button>
+          <button onClick={fetchAll} style={smallBtnStyle}>{t("pm.retry")}</button>
+          <button onClick={onBack} style={{ ...smallBtnStyle, background: "none" }}>{t("pm.back")}</button>
         </div>
       </div>
     );
@@ -215,12 +217,12 @@ export default function ItemDetail({ repo, number, type, onBack }) {
 
   const stateBadge = () => {
     if (type === "pr" && item.merged_at) {
-      return { label: "MERGED", bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
+      return { label: t("pm.mergedState"), bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
     }
     if (item.state === "closed") {
-      return { label: "CLOSED", bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
+      return { label: t("pm.closedState"), bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
     }
-    return { label: "OPEN", bg: "rgba(80,200,120,0.15)", color: "rgba(120,230,150,0.9)" };
+    return { label: t("pm.openState"), bg: "rgba(80,200,120,0.15)", color: "rgba(120,230,150,0.9)" };
   };
 
   const badge = stateBadge();
@@ -241,7 +243,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           transition: "color .15s",
         }}
       >
-        <ArrowLeft size={14} strokeWidth={1.5} /> Back
+        <ArrowLeft size={14} strokeWidth={1.5} /> {t("pm.back")}
       </button>
 
       <div style={{ padding: "0 20px 20px" }}>
@@ -274,7 +276,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
             </span>
           </div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "system-ui, sans-serif", marginTop: 4 }}>
-            {repo} &middot; by {item.user?.login} &middot; opened {timeAgo(item.created_at)}
+            {t("pm.openedBy", { repo, user: item.user?.login || t("pm.unknownUser"), time: timeAgo(item.created_at, t) })}
           </div>
         </div>
 
@@ -302,7 +304,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui, sans-serif",
           position: "relative",
         }}>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Assignees:</span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>{t("pm.assignees")}</span>
           {item.assignees && item.assignees.length > 0 ? (
             item.assignees.map((a) => (
               <div key={a.login} style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -311,7 +313,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               </div>
             ))
           ) : (
-            <span style={{ fontStyle: "italic", fontSize: 11 }}>None</span>
+            <span style={{ fontStyle: "italic", fontSize: 11 }}>{t("pm.none")}</span>
           )}
           <div ref={assignRef} style={{ position: "relative" }}>
           <button
@@ -370,8 +372,8 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               style={smallBtnStyle}
             >
               {copiedCheckout
-                ? <><Check size={11} strokeWidth={1.5} /> Copied!</>
-                : <><Copy size={11} strokeWidth={1.5} /> Checkout</>
+                ? <><Check size={11} strokeWidth={1.5} /> {t("pm.copied")}</>
+                : <><Copy size={11} strokeWidth={1.5} /> {t("pm.checkout")}</>
               }
             </button>
           </div>
@@ -407,12 +409,12 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         {/* Comments */}
         <div style={{ marginTop: 24 }}>
           <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em", marginBottom: 12 }}>
-            {comments.length} COMMENT{comments.length !== 1 ? "S" : ""}
+            {t("pm.commentsCount", { count: comments.length, suffix: comments.length !== 1 ? t("pm.commentPlural") : "" })}
           </div>
           {comments.map((comment) => (
             <div key={comment.id} style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 12, marginBottom: 12 }}>
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui, sans-serif", marginBottom: 6 }}>
-                <span style={{ color: "rgba(255,255,255,0.6)" }}>{comment.user?.login}</span> &middot; {timeAgo(comment.created_at)}
+                <span style={{ color: "rgba(255,255,255,0.6)" }}>{comment.user?.login}</span> &middot; {timeAgo(comment.created_at, t)}
               </div>
               <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, lineHeight: 1.6, fontFamily: "system-ui, sans-serif" }}>
                 <ReactMarkdown
@@ -438,27 +440,28 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         repo={repo}
         number={number}
         onCommentAdded={refreshComments}
+        locale={locale}
         actions={
           <>
             {/* Merge (PR only, open) */}
             {type === "pr" && isOpen && (
               <button onClick={handleMerge} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
                 <GitMerge size={11} strokeWidth={1.5} />
-                {actionLoading ? "Merging..." : "Merge"}
+                {actionLoading ? t("pm.merging") : t("pm.merge")}
               </button>
             )}
             {/* Close (issues only) */}
             {type === "issue" && isOpen && (
               <button onClick={handleClose} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
                 <CheckCircle2 size={11} strokeWidth={1.5} />
-                {actionLoading ? "Closing..." : "Close"}
+                {actionLoading ? t("pm.closing") : t("pm.close")}
               </button>
             )}
             {/* Reopen */}
             {!isOpen && !isMerged && (
               <button onClick={handleReopen} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
                 <RotateCcw size={11} strokeWidth={1.5} />
-                {actionLoading ? "Reopening..." : "Reopen"}
+                {actionLoading ? t("pm.reopening") : t("pm.reopen")}
               </button>
             )}
           </>

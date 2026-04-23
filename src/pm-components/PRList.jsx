@@ -4,18 +4,18 @@ import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/pan
 import HoverIconButton from "../components/HoverIconButton";
 import { createTranslator } from "../i18n";
 
-function timeAgo(dateStr) {
+function timeAgo(dateStr, t) {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diff = now - then;
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return t("pm.timeMinutesAgo", { count: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t("pm.timeHoursAgo", { count: hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return t("pm.timeDaysAgo", { count: days });
   const months = Math.floor(days / 30);
-  return `${months}mo ago`;
+  return t("pm.timeMonthsAgo", { count: months });
 }
 
 export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, refreshSignal, freshItem, locale = "en-US" }) {
@@ -49,7 +49,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
         );
       });
     } catch (err) {
-      setError(err.message || "Failed to load pull requests");
+      setError(err.message || t("pm.failedToLoadPullRequests"));
     } finally {
       setInitialLoad(false);
     }
@@ -216,7 +216,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
               </span>
             </div>
             <div style={{ marginLeft: 26, color: "rgba(255,255,255,0.3)", fontFamily: "system-ui", fontSize: 12, marginTop: 2 }}>
-              {t("pm.byUpdated", { user: item.user?.login || "unknown", time: timeAgo(item.updated_at) })}
+              {t("pm.byUpdated", { user: item.user?.login || t("pm.unknownUser"), time: timeAgo(item.updated_at, t) })}
             </div>
           </div>
         );
