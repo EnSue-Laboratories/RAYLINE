@@ -42,6 +42,7 @@ const SHELL_TERMINAL_TIMEOUT_MS = 15000;
 const LAB_CONTROL_ENDPOINT = "http://127.0.0.1:4001/control";
 const LAB_CONTROL_COMMIT_DELAY_MS = 1000;
 const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
+const EMPTY_CONVERSATION_DATA = { messages: [], isStreaming: false, error: null };
 
 function logSessionState(...args) {
   console.log("[session-state]", ...args);
@@ -1062,6 +1063,8 @@ export default function App() {
   }, []);
   const messageQueue = useRef([]);
   const queueInterruptRequestedRef = useRef(new Set());
+  // Guards the async preflight gap before useAgent flips `isStreaming`.
+  const sendInFlightConversationIdsRef = useRef(new Set());
   const activeConversationIdRef = useRef(null);
   const [queuedMessages, setQueuedMessages] = useState([]);
   const [permissionRequests, setPermissionRequests] = useState([]);
@@ -1423,8 +1426,14 @@ export default function App() {
     window.api.setWindowOpacity(Math.max(0.3, Math.min(1, appOpacity / 100)));
   }, [appOpacity, stateLoaded]);
 
-  const activeConvo = convoList.find((c) => c.id === active);
-  const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
+  const activeConvo = useMemo(
+    () => convoList.find((c) => c.id === active) || null,
+    [active, convoList]
+  );
+  const activeData = useMemo(
+    () => (active ? getConversation(active) : EMPTY_CONVERSATION_DATA),
+    [active, getConversation]
+  );
 
   // The first tab strip only appears for a concurrent streaming burst.
   // Once the strip exists, any newly streaming session joins it immediately.
@@ -2226,299 +2235,310 @@ export default function App() {
   const sendMessageToConversation = useCallback(
     async ({ conversationId, conversation, text, attachments, titleText }) => {
       if (!conversationId || !conversation) return false;
-
-      // Live cwd check (belt-and-suspenders — select-time heal covers most cases
-      // but directory may have vanished between select and send).
-      const recovery = await healConversationCwdIfMissing(conversationId, conversation);
-      const pendingRecovery = conversation?.pendingCwdRecovery || null;
-      let reminderSource = null;
-      if (recovery?.wasMissing) {
-        reminderSource = {
-          originalCwd: recovery.originalCwd,
-          recoveredCwd: recovery.cwd,
-          recoveryReason: recovery.recoveryReason,
-        };
-      } else if (pendingRecovery) {
-        reminderSource = pendingRecovery;
-      }
-      // Clear the pending marker whenever we have one to consume, regardless
-      // of whether the live or pending recovery is what we used — either way
-      // it's accounted for in the current send.
-      if (pendingRecovery) {
-        setConvoList((p) =>
-          p.map((c) => (c.id === conversationId ? { ...c, pendingCwdRecovery: undefined } : c))
-        );
-      }
-      const missingCwdReminder = reminderSource ? buildMissingCwdReminder(reminderSource) : null;
-      const effectiveCwd = recovery
-        ? (recovery.cwd ?? undefined)
-        : getEffectiveConversationCwd(conversation, cwd, draftsPath);
-      const thisConvoData = getConversation(conversationId);
-      const normalizedConversation = normalizeConversationState(conversation);
-      const activeSession = getActiveConversationSession(normalizedConversation);
-      const isFirstMessage = thisConvoData.messages.length === 0;
-      const messageIndex = thisConvoData.messages.length;
-      const syncedMessageCount = thisConvoData.messages.length;
-      const imageAttachments = attachments
-        ?.filter((a) => a.type === "image" && typeof a.dataUrl === "string")
-        .map((a) => ({
-          dataUrl: a.dataUrl,
-          ...(typeof a.name === "string" ? { name: a.name } : {}),
-          ...(typeof a.path === "string" ? { path: a.path } : {}),
-        }));
-      const images = imageAttachments?.map((a) => a.dataUrl);
-      const files = attachments?.filter((a) => a.type === "file");
-      const m = getMOrMulticaFallback(normalizedConversation.model);
-      const currentProvider = m.provider || "claude";
-      // Multica context must be resolved BEFORE prepareMessage so a missing
-      // context doesn't leave an orphan streaming assistant bubble.
-      const multicaSessionPolluted =
-        currentProvider === "multica" &&
-        (
-          conversationHasInjectedPromptMetadata(normalizedConversation.archivedMessages) ||
-          conversationHasInjectedPromptMetadata(thisConvoData.messages)
-        );
-      const previousMulticaContext =
-        currentProvider === "multica"
-          ? (normalizedConversation?._multica || conversation?._multica || null)
-          : null;
-      let multicaContext, multicaToken;
-      if (m.provider === "multica") {
-        ({ context: multicaContext, token: multicaToken } = await ensureMulticaContextForConversation({
-          conversationId,
-          conversation,
-          normalizedConversation,
-          modelId: normalizedConversation.model,
-          title: titleText || conversation?.title || normalizedConversation?.title || text.slice(0, 60),
-          forceNewSession: multicaSessionPolluted,
-        }));
-      }
-      const prevProvider = isFirstMessage
-        ? normalizedConversation.lastProvider || activeSession?.provider || null
-        : await resolveConversationLastProvider(normalizedConversation);
-      const currentProviderSession = await resolveConversationProviderSession(
-        normalizedConversation,
-        currentProvider
-      );
-      const providerSwitched =
-        !isFirstMessage && prevProvider && prevProvider !== currentProvider;
-      const multicaModelSwitched =
-        currentProvider === "multica" &&
-        !isFirstMessage &&
-        prevProvider === "multica" &&
-        Boolean(previousMulticaContext?.agentId) &&
-        Boolean(multicaContext?.agentId) &&
-        previousMulticaContext.agentId !== multicaContext.agentId;
-      const handoffSwitched = providerSwitched || multicaModelSwitched;
-      const multicaSessionReused =
-        currentProvider === "multica" &&
-        !isFirstMessage &&
-        prevProvider === "multica" &&
-        Boolean(previousMulticaContext?.sessionId) &&
-        Boolean(multicaContext?.sessionId) &&
-        previousMulticaContext.sessionId === multicaContext.sessionId &&
-        previousMulticaContext.agentId === multicaContext.agentId;
-      const canResumeExistingSession =
-        !isFirstMessage &&
-        (
-          multicaSessionReused ||
-          (
-            prevProvider === currentProvider &&
-            Boolean(currentProviderSession?.nativeSessionId) &&
-            currentProviderSession.syncedThroughMessageCount === syncedMessageCount
-          )
-        );
-      const needsHistoryPrimeFallback =
-        !isFirstMessage &&
-        currentProvider !== "multica" &&
-        !handoffSwitched &&
-        !canResumeExistingSession;
-      const needsFreshSession =
-        isFirstMessage ||
-        handoffSwitched ||
-        needsHistoryPrimeFallback ||
-        (currentProvider === "multica" && !canResumeExistingSession);
-      const seededSession =
-        needsFreshSession
-          ? (
-              isFirstMessage && activeSession?.provider === currentProvider
-                ? {
-                    ...activeSession,
-                    nativeSessionId:
-                      currentProvider === "claude"
-                        ? activeSession.nativeSessionId || crypto.randomUUID()
-                        : activeSession.nativeSessionId || null,
-                    model: normalizedConversation.model,
-                    syncedThroughMessageCount: syncedMessageCount,
-                    updatedAt: Date.now(),
-                    origin: isFirstMessage ? "initial-send" : (handoffSwitched ? "handoff" : "resync"),
-                  }
-                : createSeedSession(normalizedConversation, currentProvider, {
-                    model: normalizedConversation.model,
-                    syncedThroughMessageCount: syncedMessageCount,
-                    origin: isFirstMessage ? "initial-send" : (handoffSwitched ? "handoff" : "resync"),
-                  })
-            )
-          : null;
-      const initialSessionId =
-        needsFreshSession && currentProvider === "claude"
-          ? seededSession?.nativeSessionId || undefined
-          : undefined;
-      const resumeSessionId = currentProviderSession?.nativeSessionId || undefined;
-      const prime =
-        handoffSwitched
-          ? buildCrossProviderPrime(thisConvoData.messages)
-          : needsHistoryPrimeFallback
-            ? buildConversationPrime(thisConvoData.messages)
-            : null;
-      const primedPrompt = prime ? decoratePromptWithPrime(text, prime) : text;
-      const decoratedPrompt = decoratePromptWithReminder(primedPrompt, missingCwdReminder);
-      let wirePrompt = decoratedPrompt;
-      if (currentProvider === "multica" && needsFreshSession) {
-        wirePrompt = await buildMulticaBootstrapPrompt(effectiveCwd, decoratedPrompt);
-      }
-      const sendStartedAt = Date.now();
-
-      if (isFirstMessage) {
-        const newTitle = deriveConversationTitle(titleText || text, attachments);
-        setConvoList((p) =>
-          p.map((c) => c.id === conversationId ? { ...c, title: newTitle } : c)
-        );
+      if (sendInFlightConversationIdsRef.current.has(conversationId)) {
+        logSendFlow("handleSend:skip-concurrent-start", { conversationId });
+        return false;
       }
 
-      logSendFlow("handleSend:start", {
-        conversationId,
-        effectiveCwd,
-        isFirstMessage,
-        messageIndex,
-        currentProvider,
-        prevProvider: prevProvider || null,
-        providerSwitched,
-        multicaModelSwitched,
-        handoffSwitched,
-        sessionId: normalizedConversation.sessionId || null,
-        sessionProvider: normalizedConversation.sessionProvider || null,
-        providerSessions: normalizedConversation.providerSessions || null,
-        activeSessionId: normalizedConversation.activeSessionId || null,
-        activeSession,
-        currentProviderSession,
-        initialSessionId: initialSessionId || null,
-        resumeSessionId: canResumeExistingSession ? (resumeSessionId || null) : null,
-        primeMode:
-          providerSwitched
-            ? "cross-provider"
-            : multicaModelSwitched
-              ? "multica-model-handoff"
-              : (needsHistoryPrimeFallback ? "history-fallback" : null),
-        multicaSessionPolluted,
-      });
+      sendInFlightConversationIdsRef.current.add(conversationId);
 
-      const pendingId = prepareMessage({
-        conversationId,
-        prompt: text,
-        images: images?.length ? images : undefined,
-        files: files?.length ? files : undefined,
-      });
+      try {
 
-      logSendFlow("handleSend:seeded", {
-        conversationId,
-        pendingId,
-        elapsedMs: Date.now() - sendStartedAt,
-      });
-
-      // Create a git checkpoint before sending (for future edit rewind)
-      if (effectiveCwd && window.api) {
-        const checkpointStartedAt = Date.now();
-        logCheckpoint("checkpointCreate:start", { cwdPath: effectiveCwd, conversationId, messageIndex });
-        try {
-          const cp = await window.api.checkpointCreate(effectiveCwd);
-          logCheckpoint("checkpointCreate:success", {
-            cwdPath: effectiveCwd,
-            conversationId,
-            messageIndex,
-            ref: cp?.ref || null,
-            durationMs: Date.now() - checkpointStartedAt,
-            totalElapsedMs: Date.now() - sendStartedAt,
-          });
-          if (cp?.ref) {
-            setConvoList((p) =>
-              p.map((c) => {
-                if (c.id !== conversationId) return c;
-                const checkpoints = { ...(c.checkpoints || {}) };
-                checkpoints[messageIndex] = cp.ref;
-                return { ...c, checkpoints };
-              })
-            );
-          }
-        } catch (e) {
-          logCheckpoint("checkpointCreate:failed", {
-            cwdPath: effectiveCwd,
-            conversationId,
-            messageIndex,
-            durationMs: Date.now() - checkpointStartedAt,
-            totalElapsedMs: Date.now() - sendStartedAt,
-            error: e.message,
-          });
-          console.warn("Checkpoint creation failed:", e.message);
+        // Live cwd check (belt-and-suspenders — select-time heal covers most cases
+        // but directory may have vanished between select and send).
+        const recovery = await healConversationCwdIfMissing(conversationId, conversation);
+        const pendingRecovery = conversation?.pendingCwdRecovery || null;
+        let reminderSource = null;
+        if (recovery?.wasMissing) {
+          reminderSource = {
+            originalCwd: recovery.originalCwd,
+            recoveredCwd: recovery.cwd,
+            recoveryReason: recovery.recoveryReason,
+          };
+        } else if (pendingRecovery) {
+          reminderSource = pendingRecovery;
         }
-      }
-
-      const started = startPreparedMessage({
-        conversationId,
-        pendingId,
-        sessionId: initialSessionId,
-        resumeSessionId: canResumeExistingSession ? resumeSessionId : undefined,
-        prompt: wirePrompt,
-        model: m.cliFlag,
-        provider: m.provider || "claude",
-        effort: m.effort,
-        cwd: effectiveCwd,
-        images:
+        // Clear the pending marker whenever we have one to consume, regardless
+        // of whether the live or pending recovery is what we used — either way
+        // it's accounted for in the current send.
+        if (pendingRecovery) {
+          setConvoList((p) =>
+            p.map((c) => (c.id === conversationId ? { ...c, pendingCwdRecovery: undefined } : c))
+          );
+        }
+        const missingCwdReminder = reminderSource ? buildMissingCwdReminder(reminderSource) : null;
+        const effectiveCwd = recovery
+          ? (recovery.cwd ?? undefined)
+          : getEffectiveConversationCwd(conversation, cwd, draftsPath);
+        const thisConvoData = getConversation(conversationId);
+        const normalizedConversation = normalizeConversationState(conversation);
+        const activeSession = getActiveConversationSession(normalizedConversation);
+        const isFirstMessage = thisConvoData.messages.length === 0;
+        const messageIndex = thisConvoData.messages.length;
+        const syncedMessageCount = thisConvoData.messages.length;
+        const imageAttachments = attachments
+          ?.filter((a) => a.type === "image" && typeof a.dataUrl === "string")
+          .map((a) => ({
+            dataUrl: a.dataUrl,
+            ...(typeof a.name === "string" ? { name: a.name } : {}),
+            ...(typeof a.path === "string" ? { path: a.path } : {}),
+          }));
+        const images = imageAttachments?.map((a) => a.dataUrl);
+        const files = attachments?.filter((a) => a.type === "file");
+        const m = getMOrMulticaFallback(normalizedConversation.model);
+        const currentProvider = m.provider || "claude";
+        // Multica context must be resolved BEFORE prepareMessage so a missing
+        // context doesn't leave an orphan streaming assistant bubble.
+        const multicaSessionPolluted =
+          currentProvider === "multica" &&
+          (
+            conversationHasInjectedPromptMetadata(normalizedConversation.archivedMessages) ||
+            conversationHasInjectedPromptMetadata(thisConvoData.messages)
+          );
+        const previousMulticaContext =
           currentProvider === "multica"
-            ? (imageAttachments?.length ? imageAttachments : undefined)
-            : (images?.length ? images : undefined),
-        files: files?.length ? files : undefined,
-        multicaContext,
-        multicaToken,
-      });
-
-      if (started) {
-        const providerUsed = m.provider || "claude";
-        setConvoList((p) =>
-          p.map((c) => {
-            if (c.id !== conversationId) return c;
-            let next = normalizeConversationState(c);
-            if (seededSession) {
-              next = upsertConversationSession(next, seededSession, {
-                activate: true,
-                preferPendingActive: true,
-                lastProvider: providerUsed,
-              });
-            } else if (currentProviderSession?.id) {
-              next = normalizeConversationState({
-                ...next,
-                activeSessionId: currentProviderSession.id,
-                lastProvider: providerUsed,
-              });
-            } else {
-              next = normalizeConversationState({
-                ...next,
-                lastProvider: providerUsed,
-              });
-            }
-            return next;
-          })
+            ? (normalizedConversation?._multica || conversation?._multica || null)
+            : null;
+        let multicaContext, multicaToken;
+        if (m.provider === "multica") {
+          ({ context: multicaContext, token: multicaToken } = await ensureMulticaContextForConversation({
+            conversationId,
+            conversation,
+            normalizedConversation,
+            modelId: normalizedConversation.model,
+            title: titleText || conversation?.title || normalizedConversation?.title || text.slice(0, 60),
+            forceNewSession: multicaSessionPolluted,
+          }));
+        }
+        const prevProvider = isFirstMessage
+          ? normalizedConversation.lastProvider || activeSession?.provider || null
+          : await resolveConversationLastProvider(normalizedConversation);
+        const currentProviderSession = await resolveConversationProviderSession(
+          normalizedConversation,
+          currentProvider
         );
+        const providerSwitched =
+          !isFirstMessage && prevProvider && prevProvider !== currentProvider;
+        const multicaModelSwitched =
+          currentProvider === "multica" &&
+          !isFirstMessage &&
+          prevProvider === "multica" &&
+          Boolean(previousMulticaContext?.agentId) &&
+          Boolean(multicaContext?.agentId) &&
+          previousMulticaContext.agentId !== multicaContext.agentId;
+        const handoffSwitched = providerSwitched || multicaModelSwitched;
+        const multicaSessionReused =
+          currentProvider === "multica" &&
+          !isFirstMessage &&
+          prevProvider === "multica" &&
+          Boolean(previousMulticaContext?.sessionId) &&
+          Boolean(multicaContext?.sessionId) &&
+          previousMulticaContext.sessionId === multicaContext.sessionId &&
+          previousMulticaContext.agentId === multicaContext.agentId;
+        const canResumeExistingSession =
+          !isFirstMessage &&
+          (
+            multicaSessionReused ||
+            (
+              prevProvider === currentProvider &&
+              Boolean(currentProviderSession?.nativeSessionId) &&
+              currentProviderSession.syncedThroughMessageCount === syncedMessageCount
+            )
+          );
+        const needsHistoryPrimeFallback =
+          !isFirstMessage &&
+          currentProvider !== "multica" &&
+          !handoffSwitched &&
+          !canResumeExistingSession;
+        const needsFreshSession =
+          isFirstMessage ||
+          handoffSwitched ||
+          needsHistoryPrimeFallback ||
+          (currentProvider === "multica" && !canResumeExistingSession);
+        const seededSession =
+          needsFreshSession
+            ? (
+                isFirstMessage && activeSession?.provider === currentProvider
+                  ? {
+                      ...activeSession,
+                      nativeSessionId:
+                        currentProvider === "claude"
+                          ? activeSession.nativeSessionId || crypto.randomUUID()
+                          : activeSession.nativeSessionId || null,
+                      model: normalizedConversation.model,
+                      syncedThroughMessageCount: syncedMessageCount,
+                      updatedAt: Date.now(),
+                      origin: isFirstMessage ? "initial-send" : (handoffSwitched ? "handoff" : "resync"),
+                    }
+                  : createSeedSession(normalizedConversation, currentProvider, {
+                      model: normalizedConversation.model,
+                      syncedThroughMessageCount: syncedMessageCount,
+                      origin: isFirstMessage ? "initial-send" : (handoffSwitched ? "handoff" : "resync"),
+                    })
+              )
+            : null;
+        const initialSessionId =
+          needsFreshSession && currentProvider === "claude"
+            ? seededSession?.nativeSessionId || undefined
+            : undefined;
+        const resumeSessionId = currentProviderSession?.nativeSessionId || undefined;
+        const prime =
+          handoffSwitched
+            ? buildCrossProviderPrime(thisConvoData.messages)
+            : needsHistoryPrimeFallback
+              ? buildConversationPrime(thisConvoData.messages)
+              : null;
+        const primedPrompt = prime ? decoratePromptWithPrime(text, prime) : text;
+        const decoratedPrompt = decoratePromptWithReminder(primedPrompt, missingCwdReminder);
+        let wirePrompt = decoratedPrompt;
+        if (currentProvider === "multica" && needsFreshSession) {
+          wirePrompt = await buildMulticaBootstrapPrompt(effectiveCwd, decoratedPrompt);
+        }
+        const sendStartedAt = Date.now();
+
+        if (isFirstMessage) {
+          const newTitle = deriveConversationTitle(titleText || text, attachments);
+          setConvoList((p) =>
+            p.map((c) => c.id === conversationId ? { ...c, title: newTitle } : c)
+          );
+        }
+
+        logSendFlow("handleSend:start", {
+          conversationId,
+          effectiveCwd,
+          isFirstMessage,
+          messageIndex,
+          currentProvider,
+          prevProvider: prevProvider || null,
+          providerSwitched,
+          multicaModelSwitched,
+          handoffSwitched,
+          sessionId: normalizedConversation.sessionId || null,
+          sessionProvider: normalizedConversation.sessionProvider || null,
+          providerSessions: normalizedConversation.providerSessions || null,
+          activeSessionId: normalizedConversation.activeSessionId || null,
+          activeSession,
+          currentProviderSession,
+          initialSessionId: initialSessionId || null,
+          resumeSessionId: canResumeExistingSession ? (resumeSessionId || null) : null,
+          primeMode:
+            providerSwitched
+              ? "cross-provider"
+              : multicaModelSwitched
+                ? "multica-model-handoff"
+                : (needsHistoryPrimeFallback ? "history-fallback" : null),
+          multicaSessionPolluted,
+        });
+
+        const pendingId = prepareMessage({
+          conversationId,
+          prompt: text,
+          images: images?.length ? images : undefined,
+          files: files?.length ? files : undefined,
+        });
+
+        logSendFlow("handleSend:seeded", {
+          conversationId,
+          pendingId,
+          elapsedMs: Date.now() - sendStartedAt,
+        });
+
+        // Create a git checkpoint before sending (for future edit rewind)
+        if (effectiveCwd && window.api) {
+          const checkpointStartedAt = Date.now();
+          logCheckpoint("checkpointCreate:start", { cwdPath: effectiveCwd, conversationId, messageIndex });
+          try {
+            const cp = await window.api.checkpointCreate(effectiveCwd);
+            logCheckpoint("checkpointCreate:success", {
+              cwdPath: effectiveCwd,
+              conversationId,
+              messageIndex,
+              ref: cp?.ref || null,
+              durationMs: Date.now() - checkpointStartedAt,
+              totalElapsedMs: Date.now() - sendStartedAt,
+            });
+            if (cp?.ref) {
+              setConvoList((p) =>
+                p.map((c) => {
+                  if (c.id !== conversationId) return c;
+                  const checkpoints = { ...(c.checkpoints || {}) };
+                  checkpoints[messageIndex] = cp.ref;
+                  return { ...c, checkpoints };
+                })
+              );
+            }
+          } catch (e) {
+            logCheckpoint("checkpointCreate:failed", {
+              cwdPath: effectiveCwd,
+              conversationId,
+              messageIndex,
+              durationMs: Date.now() - checkpointStartedAt,
+              totalElapsedMs: Date.now() - sendStartedAt,
+              error: e.message,
+            });
+            console.warn("Checkpoint creation failed:", e.message);
+          }
+        }
+
+        const started = startPreparedMessage({
+          conversationId,
+          pendingId,
+          sessionId: initialSessionId,
+          resumeSessionId: canResumeExistingSession ? resumeSessionId : undefined,
+          prompt: wirePrompt,
+          model: m.cliFlag,
+          provider: m.provider || "claude",
+          effort: m.effort,
+          cwd: effectiveCwd,
+          images:
+            currentProvider === "multica"
+              ? (imageAttachments?.length ? imageAttachments : undefined)
+              : (images?.length ? images : undefined),
+          files: files?.length ? files : undefined,
+          multicaContext,
+          multicaToken,
+        });
+
+        if (started) {
+          const providerUsed = m.provider || "claude";
+          setConvoList((p) =>
+            p.map((c) => {
+              if (c.id !== conversationId) return c;
+              let next = normalizeConversationState(c);
+              if (seededSession) {
+                next = upsertConversationSession(next, seededSession, {
+                  activate: true,
+                  preferPendingActive: true,
+                  lastProvider: providerUsed,
+                });
+              } else if (currentProviderSession?.id) {
+                next = normalizeConversationState({
+                  ...next,
+                  activeSessionId: currentProviderSession.id,
+                  lastProvider: providerUsed,
+                });
+              } else {
+                next = normalizeConversationState({
+                  ...next,
+                  lastProvider: providerUsed,
+                });
+              }
+              return next;
+            })
+          );
+        }
+
+        logSendFlow("handleSend:agent-start", {
+          conversationId,
+          pendingId,
+          started,
+          totalElapsedMs: Date.now() - sendStartedAt,
+        });
+
+        return started;
+      } finally {
+        sendInFlightConversationIdsRef.current.delete(conversationId);
       }
-
-      logSendFlow("handleSend:agent-start", {
-        conversationId,
-        pendingId,
-        started,
-        totalElapsedMs: Date.now() - sendStartedAt,
-      });
-
-      return started;
     },
     [buildMulticaBootstrapPrompt, cwd, draftsPath, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
   );
@@ -2547,7 +2567,7 @@ export default function App() {
       }
 
       // Queue if currently streaming
-      if (activeData.isStreaming && active) {
+      if (active && (activeData.isStreaming || sendInFlightConversationIdsRef.current.has(active))) {
         enqueueQueuedMessage({ conversationId: active, text, attachments });
         return;
       }
@@ -2667,7 +2687,12 @@ export default function App() {
 
   // Process queued messages when streaming ends
   useEffect(() => {
-    if (!active || activeData.isStreaming || messageQueue.current.length === 0) return;
+    if (
+      !active
+      || activeData.isStreaming
+      || sendInFlightConversationIdsRef.current.has(active)
+      || messageQueue.current.length === 0
+    ) return;
     const next = messageQueue.current.find((item) => item?.conversationId === active);
     if (!next) return;
 
