@@ -90,7 +90,7 @@ const ChatTranscript = memo(function ChatTranscript({
   );
 });
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -775,6 +775,112 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         style={{ padding: "12px 28px 24px", display: "flex", justifyContent: "center" }}
       >
         <div style={{ width: "100%", maxWidth: 560 }}>
+          {permissionRequests && permissionRequests.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              {permissionRequests.map((req) => {
+                const actionButtonStyle = {
+                  height: 24,
+                  padding: "0 9px",
+                  borderRadius: 7,
+                  border: "1px solid rgba(255,255,255,0.04)",
+                  background: "transparent",
+                  color: "rgba(255,255,255,0.3)",
+                  cursor: "pointer",
+                  fontSize: s(9),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: ".05em",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                };
+                const labelText = req.isSensitiveFile ? "SENSITIVE" : "PERMISSION";
+                const tool = req.toolName || "Tool";
+                const summary = req.summary || "";
+                return (
+                  <div
+                    key={req.requestId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 8px",
+                      marginBottom: 4,
+                      background: "rgba(255,255,255,0.014)",
+                      border: "1px solid rgba(255,255,255,0.035)",
+                      borderRadius: 12,
+                      fontSize: s(12),
+                      color: "rgba(255,255,255,0.44)",
+                      fontFamily: "system-ui,sans-serif",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        <span style={{
+                          fontSize: s(9),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          color: "rgba(255,255,255,0.14)",
+                          letterSpacing: ".06em",
+                          flexShrink: 0,
+                        }}>
+                          {labelText}
+                        </span>
+                        <span style={{
+                          fontSize: s(9),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          color: "rgba(255,255,255,0.28)",
+                          letterSpacing: ".06em",
+                        }}>
+                          {String(tool).toUpperCase()}
+                        </span>
+                      </div>
+                      <div style={{
+                        flex: 1,
+                        minWidth: 0,
+                        padding: "2px 8px",
+                        transform: "translateY(-1.5px)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        lineHeight: "18px",
+                        color: "rgba(255,255,255,0.62)",
+                      }}
+                        title={summary}
+                      >
+                        {summary}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <button
+                        onClick={() => onRespondPermission?.({ requestId: req.requestId, behavior: "allow", scope: "once" })}
+                        style={{
+                          ...actionButtonStyle,
+                          background: "rgba(255,255,255,0.06)",
+                          color: "rgba(255,255,255,0.54)",
+                        }}
+                        title="Allow this request once"
+                      >
+                        ALLOW ONCE
+                      </button>
+                      <button
+                        onClick={() => onRespondPermission?.({ requestId: req.requestId, behavior: "allow", scope: "session" })}
+                        style={actionButtonStyle}
+                        title="Allow this tool + target for the rest of the session"
+                      >
+                        ALLOW SESSION
+                      </button>
+                      <button
+                        onClick={() => onRespondPermission?.({ requestId: req.requestId, behavior: "deny" })}
+                        style={actionButtonStyle}
+                        title="Deny this request"
+                      >
+                        DENY
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {queuedMessages && queuedMessages.length > 0 && (
             <div style={{ marginBottom: 8 }}>
               {queuedMessages.map((q, i) => {

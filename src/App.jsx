@@ -1064,6 +1064,7 @@ export default function App() {
   const queueInterruptRequestedRef = useRef(new Set());
   const activeConversationIdRef = useRef(null);
   const [queuedMessages, setQueuedMessages] = useState([]);
+  const [permissionRequests, setPermissionRequests] = useState([]);
   const labControlTimersRef = useRef(new Map());
   const persistableConversations = useMemo(
     () =>
@@ -1129,6 +1130,43 @@ export default function App() {
     () => queuedMessages.filter((item) => item?.conversationId === active),
     [active, queuedMessages]
   );
+  const activePermissionRequests = useMemo(
+    () => permissionRequests.filter((item) => item?.conversationId === active),
+    [active, permissionRequests]
+  );
+
+  useEffect(() => {
+    if (!window.api?.onAgentPermissionRequest) return undefined;
+    const offRequest = window.api.onAgentPermissionRequest((data) => {
+      if (!data?.requestId) return;
+      setPermissionRequests((prev) => {
+        if (prev.some((p) => p.requestId === data.requestId)) return prev;
+        return [...prev, data];
+      });
+    });
+    const offCancelled = window.api.onAgentPermissionCancelled?.(({ requestId }) => {
+      if (!requestId) return;
+      setPermissionRequests((prev) => prev.filter((p) => p.requestId !== requestId));
+    });
+    const offDone = window.api.onAgentDone?.(({ conversationId }) => {
+      if (!conversationId) return;
+      setPermissionRequests((prev) => prev.filter((p) => p.conversationId !== conversationId));
+    });
+    return () => {
+      offRequest?.();
+      offCancelled?.();
+      offDone?.();
+    };
+  }, []);
+
+  const respondPermission = useCallback(({ requestId, behavior, scope, message }) => {
+    if (!window.api?.agentPermissionRespond) return;
+    const req = permissionRequests.find((p) => p.requestId === requestId);
+    const conversationId = req?.conversationId;
+    if (!conversationId) return;
+    window.api.agentPermissionRespond({ conversationId, requestId, behavior, scope, message });
+    setPermissionRequests((prev) => prev.filter((p) => p.requestId !== requestId));
+  }, [permissionRequests]);
 
   useEffect(() => {
     activeConversationIdRef.current = active;
@@ -3350,6 +3388,8 @@ export default function App() {
           queuedMessages={activeQueuedMessages}
           onUpdateQueuedMessage={updateQueuedMessage}
           onRemoveQueuedMessage={removeQueuedMessage}
+          permissionRequests={activePermissionRequests}
+          onRespondPermission={respondPermission}
           onToggleTerminal={handleToggleTerminal}
           terminalOpen={terminal.drawerOpen}
           terminalCount={terminal.sessions.length}
