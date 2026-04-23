@@ -1,6 +1,6 @@
 import { memo, useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
-import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
+import { ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
@@ -90,7 +90,7 @@ const ChatTranscript = memo(function ChatTranscript({
   );
 });
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab }) {
   const s = useFontScale();
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -530,42 +530,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               onClose={onCloseTab}
             />
           </div>
-        </div>
-      )}
-
-      {/* Sidebar collapsed: icon buttons below traffic lights */}
-      {!sidebarOpen && (
-        <div style={{
-          position: "fixed", top: WINDOW_DRAG_HEIGHT, left: 34,
-          display: "flex", gap: 4,
-          zIndex: 50, WebkitAppRegion: "no-drag",
-        }}>
-          <button
-            onClick={onToggleSidebar}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 28, height: 28, borderRadius: 7,
-              background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.4)", transition: "all .15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
-          >
-            <PanelLeftOpen size={16} strokeWidth={1.5} />
-          </button>
-          <button
-            onClick={onNew}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 28, height: 28, borderRadius: 7,
-              background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.4)", transition: "all .15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
-          >
-            <Plus size={16} strokeWidth={1.5} />
-          </button>
         </div>
       )}
 
