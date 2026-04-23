@@ -11,6 +11,8 @@ export default function ChromeRail({ sidebarOpen, onToggleSidebar, onNew, showNe
     backdropFilter: "blur(10px)",
     border: "1px solid rgba(255,255,255,0.06)",
     boxShadow: "0 6px 18px rgba(0,0,0,0.18)",
+    WebkitAppRegion: "no-drag",
+    pointerEvents: "auto",
   };
 
   return (
@@ -24,6 +26,7 @@ export default function ChromeRail({ sidebarOpen, onToggleSidebar, onNew, showNe
         gap: CHROME_RAIL_GAP,
         zIndex: 60,
         WebkitAppRegion: "no-drag",
+        pointerEvents: "auto",
       }}
     >
       <HoverIconButton
