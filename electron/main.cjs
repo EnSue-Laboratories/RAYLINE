@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell, clipboard } = require("electron");
+const { initAutoUpdater, handleCheckForUpdates, handleDownloadUpdate, handleInstallUpdate } = require("./auto-updater.cjs");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -152,6 +153,8 @@ function createWindow() {
       shell.openExternal(url);
     }
   });
+
+  initAutoUpdater(mainWindow);
 
   if (isDev) {
     const port = process.env.VITE_PORT || "5173";
@@ -494,6 +497,12 @@ function persistStateToDisk(state) {
 ipcMain.handle("save-state", async (_event, state) => {
   return persistStateToDisk(state);
 });
+
+// ── Auto-updater ────────────────────────────────────────────────────────────
+ipcMain.handle("updater-check",    () => handleCheckForUpdates());
+ipcMain.handle("updater-download", () => handleDownloadUpdate());
+ipcMain.handle("updater-install",  () => handleInstallUpdate());
+ipcMain.handle("get-app-version",  () => app.getVersion());
 
 ipcMain.on("save-state-sync", (event, state) => {
   event.returnValue = persistStateToDisk(state);

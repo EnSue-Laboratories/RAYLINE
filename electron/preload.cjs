@@ -112,6 +112,17 @@ contextBridge.exposeInMainWorld("api", {
   windowClose: () => ipcRenderer.invoke("window-close"),
   writeClipboardImage: (dataUrl) => ipcRenderer.invoke("clipboard-write-image", dataUrl),
 
+  // Auto-updater
+  getAppVersion:    () => ipcRenderer.invoke("get-app-version"),
+  checkForUpdates:  () => ipcRenderer.invoke("updater-check"),
+  downloadUpdate:   () => ipcRenderer.invoke("updater-download"),
+  installUpdate:    () => ipcRenderer.invoke("updater-install"),
+  onUpdaterStatus: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("updater-status", handler);
+    return () => ipcRenderer.removeListener("updater-status", handler);
+  },
+
   // multica
   multicaSendCode: (args) => ipcRenderer.invoke("multica-send-code", args),
   multicaVerifyCode: (args) => ipcRenderer.invoke("multica-verify-code", args),
