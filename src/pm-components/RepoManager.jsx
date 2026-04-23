@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, Loader2 } from "lucide-react";
+import { createTranslator } from "../i18n";
 
-export default function RepoManager({ repos, onAdd, onClose }) {
+export default function RepoManager({ repos, onAdd, onClose, locale }) {
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [userRepos, setUserRepos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -80,7 +82,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
               color: "rgba(255,255,255,0.85)",
             }}
           >
-            Add Repository
+            {t("pm.addRepositoryTitle")}
           </span>
           <button
             onClick={onClose}
@@ -106,7 +108,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
         <div style={{ padding: "12px 20px 8px", flexShrink: 0 }}>
           <input
             type="text"
-            placeholder="Filter repositories..."
+            placeholder={t("pm.filterRepositories")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
@@ -170,7 +172,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
                   cursor: "pointer",
                 }}
               >
-                Retry
+                {t("pm.retry")}
               </button>
             </div>
           ) : filtered.length === 0 ? (
@@ -182,7 +184,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
                 fontSize: 13,
               }}
             >
-              No repositories found
+              {t("pm.noRepositoriesFound")}
             </div>
           ) : (
             filtered.map((r) => {
@@ -198,6 +200,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
                       onClose();
                     }
                   }}
+                  addedLabel={t("pm.added")}
                 />
               );
             })
@@ -208,7 +211,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
   );
 }
 
-function RepoRow({ repo, added, onClick }) {
+function RepoRow({ repo, added, onClick, addedLabel }) {
   const [hovered, setHovered] = useState(false);
   return (
     <button
@@ -271,7 +274,7 @@ function RepoRow({ repo, added, onClick }) {
             flexShrink: 0,
           }}
         >
-          ADDED
+          {addedLabel || "ADDED"}
         </span>
       )}
     </button>

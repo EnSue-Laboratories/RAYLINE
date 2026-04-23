@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X, LogOut, ChevronDown, Loader2, Check, Plus } from "lucide-react";
+import { createTranslator } from "../i18n";
 
 function GitHubGlyph({ size = 18 }) {
   return (
@@ -22,7 +23,9 @@ export default function AccountManager({
   onAccountSwitched,
   onSignedOut,
   onClose,
+  locale,
 }) {
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [accounts, setAccounts] = useState([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -159,7 +162,7 @@ export default function AccountManager({
               color: "rgba(255,255,255,0.85)",
             }}
           >
-            Manage Account
+            {t("pm.manageAccountTitle")}
           </span>
           <button
             onClick={onClose}
@@ -222,7 +225,7 @@ export default function AccountManager({
                         marginBottom: 2,
                       }}
                     >
-                      SIGNED IN AS
+                      {t("pm.signedInAsLabel")}
                     </div>
                     <div
                       style={{
@@ -244,7 +247,7 @@ export default function AccountManager({
                       color: "rgba(255,255,255,0.75)",
                     }}
                   >
-                    {loadingAccounts ? "Loading GitHub accounts…" : "Signed in to GitHub"}
+                    {loadingAccounts ? t("pm.loadingAccounts") : t("pm.signedInGithub")}
                   </div>
                 )}
               </div>
@@ -322,7 +325,7 @@ export default function AccountManager({
                             color: "rgba(255,255,255,0.35)",
                           }}
                         >
-                          {isActive ? "Current account" : "Switch to this account"}
+                          {isActive ? t("pm.currentAccount") : t("pm.switchToAccount")}
                         </span>
                       </span>
                       {isSwitching ? (
@@ -345,8 +348,8 @@ export default function AccountManager({
         <div style={{ padding: "4px 12px 12px" }}>
           <ActionRow
             icon={<Plus size={15} strokeWidth={1.5} />}
-            title="Add account"
-            subtitle="Sign in as another GitHub user"
+            title={t("pm.addAccount")}
+            subtitle={t("pm.addAccountSubtitle")}
             onClick={onAddAccount}
           />
           <ActionRow
@@ -361,8 +364,8 @@ export default function AccountManager({
                 <LogOut size={15} strokeWidth={1.5} />
               )
             }
-            title={signingOut ? "Signing out…" : "Sign out"}
-            subtitle="Log out of the active GitHub account on this device"
+            title={signingOut ? t("pm.signingOut") : t("pm.signOut")}
+            subtitle={t("pm.signOutSubtitle")}
             onClick={signingOut ? null : handleSignOut}
             danger
           />
