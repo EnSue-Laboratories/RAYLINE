@@ -16,6 +16,8 @@ import { useMulticaModels } from "./data/multicaModels.jsx";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
+import { LanguageContext } from "./contexts/LanguageContext";
+import { setLang } from "./i18n";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 import {
@@ -1051,6 +1053,7 @@ export default function App() {
   const [developerMode, setDeveloperMode] = useState(true);
   const [notificationSound, setNotificationSound] = useState("glass");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
+  const [language, setLanguage] = useState("en");
   const [showSettings, setShowSettings] = useState(false);
   const [projects, setProjects] = useState({});
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
@@ -1108,6 +1111,7 @@ export default function App() {
     developerMode,
     notificationSound,
     notificationsMuted,
+    language,
     queuedMessages,
   }), [
     appBlur,
@@ -1120,6 +1124,7 @@ export default function App() {
     developerMode,
     draftsCollapsed,
     fontSize,
+    language,
     notificationSound,
     notificationsMuted,
     persistedActive,
@@ -1352,6 +1357,10 @@ export default function App() {
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
         if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
         if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
+        if (state.language === "zh" || state.language === "en") {
+          setLanguage(state.language);
+          setLang(state.language);
+        }
         if (state.wallpaper) {
           setWallpaper(normalizeWallpaper(state.wallpaper));
           // Reload data URL from disk (not persisted — too large for JSON)
@@ -3241,7 +3250,13 @@ export default function App() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  const handleLanguageChange = (lang) => {
+    setLanguage(lang);
+    setLang(lang);
+  };
+
   return (
+    <LanguageContext.Provider value={{ lang: language, setLang: handleLanguageChange }}>
     <FontSizeContext.Provider value={fontSize}>
     <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative" }}>
       {wallpaper?.dataUrl ? (
@@ -3355,6 +3370,8 @@ export default function App() {
           onNotificationSoundChange={setNotificationSound}
           notificationsMuted={notificationsMuted}
           onNotificationsMutedChange={setNotificationsMuted}
+          language={language}
+          onLanguageChange={handleLanguageChange}
           onClose={() => setShowSettings(false)}
         />
       ) : (
@@ -3450,5 +3467,6 @@ export default function App() {
       </div>
     </div>
     </FontSizeContext.Provider>
+    </LanguageContext.Provider>
   );
 }
