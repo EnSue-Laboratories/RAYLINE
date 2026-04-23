@@ -386,6 +386,21 @@ app.whenReady().then(() => {
   terminalManager.setOutputCallback((name, data) => {
     broadcastToAllWindows("terminal-output", { name, data });
   });
+
+  terminalManager.setSessionStateCallback((payload) => {
+    broadcastToAllWindows("terminal-sessions-state", payload);
+
+    if (payload.sessions.length === 0) {
+      if (isTerminalWindowOpen()) {
+        terminalWindow.close();
+      }
+      return;
+    }
+
+    if (payload.reason === "created") {
+      createTerminalWindow();
+    }
+  });
 });
 
 app.on("window-all-closed", () => {

@@ -5,10 +5,22 @@ import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
 export default function TerminalWindow() {
   const terminal = useTerminal();
-  const { focusActiveSession, hasLoadedSessions } = terminal;
+  const {
+    sessions,
+    activeSession,
+    windowOpen,
+    focusActiveSession,
+    refitActiveSession,
+    hasLoadedSessions,
+  } = terminal;
   const announcedReadyRef = useRef(false);
   const [wallpaper, setWallpaper] = useState(null);
   const [hasLoadedWallpaper, setHasLoadedWallpaper] = useState(false);
+
+  const nudgeActiveTerminalLayout = useCallback(() => {
+    focusActiveSession();
+    refitActiveSession();
+  }, [focusActiveSession, refitActiveSession]);
 
   const loadVisualState = useCallback(async () => {
     if (!window.api?.loadState) {
@@ -40,7 +52,7 @@ export default function TerminalWindow() {
 
   useEffect(() => {
     const handleFocus = () => {
-      focusActiveSession();
+      nudgeActiveTerminalLayout();
       loadVisualState();
     };
 
@@ -52,7 +64,29 @@ export default function TerminalWindow() {
       window.clearTimeout(kickoff);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [focusActiveSession, loadVisualState]);
+  }, [loadVisualState, nudgeActiveTerminalLayout]);
+
+  useEffect(() => {
+    if (!windowOpen || !activeSession || sessions.length === 0) return;
+
+    let cancelled = false;
+    const timers = [];
+    const run = () => {
+      if (cancelled) return;
+      nudgeActiveTerminalLayout();
+    };
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(run);
+    });
+    timers.push(window.setTimeout(run, 60));
+    timers.push(window.setTimeout(run, 180));
+
+    return () => {
+      cancelled = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [activeSession, sessions.length, windowOpen, nudgeActiveTerminalLayout]);
 
   useEffect(() => {
     if (!hasLoadedSessions || !hasLoadedWallpaper || announcedReadyRef.current) return;

@@ -165,6 +165,8 @@ function SessionTerminal({
   const fitAddonRef = useRef(null);
   const roRef = useRef(null); // ResizeObserver
   const lastObservedBoxRef = useRef(null);
+  const fitTimersRef = useRef([]);
+  const lastSyncedPtySizeRef = useRef("");
 
   // Stable refs so the async IIFE captures up-to-date callbacks without
   // restarting the effect every time parent re-renders.
@@ -180,12 +182,16 @@ function SessionTerminal({
   useEffect(() => { activeRef.current = isActive; }, [isActive]);
 
   const teardown = useCallback(() => {
+    fitTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    fitTimersRef.current = [];
+    lastSyncedPtySizeRef.current = "";
     roRef.current?.disconnect();
     roRef.current = null;
 
     if (termRef.current) {
       const prevName = termRef.current.__sessionName;
       if (prevName) unregRef.current(prevName);
+      delete termRef.current.__raylineFit;
       try { termRef.current.dispose(); } catch { /* ignore terminal dispose errors */ }
       termRef.current = null;
     }
@@ -240,6 +246,33 @@ function SessionTerminal({
       term.loadAddon(fitAddon);
       term.__sessionName = sessionName;
 
+      const syncSessionSize = (reason, cols = term.cols, rows = term.rows) => {
+        if (!cols || !rows) return;
+        const sizeKey = `${cols}x${rows}`;
+        if (lastSyncedPtySizeRef.current === sizeKey) return;
+        lastSyncedPtySizeRef.current = sizeKey;
+        resizeRef.current(sessionName, cols, rows);
+        emitTerminalDebug("session:pty-resize-sync", {
+          sessionName,
+          reason,
+          cols,
+          rows,
+          active: activeRef.current,
+          container: measureElementBox(containerRef.current),
+        });
+      };
+
+      term.onResize(({ cols, rows }) => {
+        emitTerminalDebug("session:term-resize", {
+          sessionName,
+          cols,
+          rows,
+          active: activeRef.current,
+          container: measureElementBox(containerRef.current),
+        });
+        syncSessionSize("term-resize", cols, rows);
+      });
+
       term.open(el);
       emitTerminalDebug("session:open", {
         sessionName,
@@ -258,22 +291,38 @@ function SessionTerminal({
         container: measureElementBox(containerRef.current),
         host: measureElementBox(el),
       });
+      syncSessionSize("initial-fit");
 
       fitAddonRef.current = fitAddon;
       termRef.current = term;
+      term.__raylineFit = () => {
+        if (!fitAddonRef.current || !containerRef.current) return;
+        const box = measureElementBox(containerRef.current);
+        if (!box?.clientWidth || !box?.clientHeight) return;
+        try {
+          fitAddonRef.current.fit();
+          syncSessionSize("manual-fit");
+          emitTerminalDebug("session:manual-fit", {
+            sessionName,
+            cols: term.cols,
+            rows: term.rows,
+            container: box,
+          });
+        } catch {
+          // Ignore transient fit failures during reveal/layout transitions.
+        }
+      };
+
+      const scheduleDeferredFits = (delays, phase) => {
+        fitTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+        fitTimersRef.current = delays.map((delay) => window.setTimeout(() => {
+          if (cancelled) return;
+          term.__raylineFit?.();
+          emitTerminalDebug("session:deferred-fit", { sessionName, phase, delay });
+        }, delay));
+      };
 
       term.onData((data) => sendRef.current(sessionName, data));
-
-      term.onResize(({ cols, rows }) => {
-        emitTerminalDebug("session:term-resize", {
-          sessionName,
-          cols,
-          rows,
-          active: activeRef.current,
-          container: measureElementBox(containerRef.current),
-        });
-        resizeRef.current(sessionName, cols, rows);
-      });
 
       registerRef.current(sessionName, term);
 
@@ -288,6 +337,15 @@ function SessionTerminal({
 
       if (activeRef.current) {
         term.focus();
+      }
+
+      term.__raylineFit?.();
+      scheduleDeferredFits([0, 60, 180, 420], "startup");
+      if (document.fonts?.ready) {
+        document.fonts.ready.then(() => {
+          if (cancelled) return;
+          scheduleDeferredFits([0, 80], "fonts-ready");
+        }).catch(() => {});
       }
 
       const ro = new ResizeObserver(() => {
@@ -345,9 +403,11 @@ function SessionTerminal({
 
     window.requestAnimationFrame(() => {
       logActiveState("raf-1");
+      try { termRef.current?.__raylineFit?.(); } catch { /* ignore transient fit failures */ }
       try { termRef.current?.focus(); } catch { /* ignore transient focus failures */ }
       window.requestAnimationFrame(() => {
         logActiveState("raf-2");
+        try { termRef.current?.__raylineFit?.(); } catch { /* ignore transient fit failures */ }
       });
     });
 

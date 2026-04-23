@@ -13,49 +13,34 @@ export default function useTerminal() {
 
   // ── Internal helpers ────────────────────────────────────────────────────────
 
+  const applySessionSnapshot = useCallback((incoming, options = {}) => {
+    const nextSessions = Array.isArray(incoming) ? incoming : [];
+    const incomingNames = new Set(nextSessions.map((s) => s.name));
+    knownSessionNames.current = incomingNames;
+    setSessions(nextSessions);
+    setHasLoadedSessions(true);
+
+    setActiveSession((prev) => {
+      if (options.preferredSessionName && incomingNames.has(options.preferredSessionName)) {
+        return options.preferredSessionName;
+      }
+      if (prev && incomingNames.has(prev)) return prev;
+      return nextSessions[0]?.name ?? null;
+    });
+  }, []);
+
   const refreshSessions = useCallback(async () => {
     if (!window.api?.terminalList) return;
     try {
       const result = await window.api.terminalList();
       // listSessions returns a plain array
       const incoming = Array.isArray(result) ? result : (result?.sessions ?? []);
-      const incomingNames = new Set(incoming.map((s) => s.name));
-
-      // Detect sessions created externally (e.g. by Claude via MCP)
-      let hasNew = false;
-      for (const name of incomingNames) {
-        if (!knownSessionNames.current.has(name)) {
-          hasNew = true;
-          break;
-        }
-      }
-      knownSessionNames.current = incomingNames;
-
-      setSessions(incoming);
-
-      // If new sessions appeared, auto-open the detached terminal window and
-      // focus the newest session.
-      if (hasNew && incoming.length > 0) {
-        window.api?.openTerminalWindow?.();
-        // Focus the newest session (last in list, or one not previously known)
-        const newest = incoming[incoming.length - 1];
-        setActiveSession((prev) => {
-          if (prev && incomingNames.has(prev)) return prev;
-          return newest?.name ?? null;
-        });
-      } else {
-        setActiveSession((prev) => {
-          const still = incoming.some((s) => s.name === prev);
-          if (still) return prev;
-          return incoming[0]?.name ?? null;
-        });
-      }
+      applySessionSnapshot(incoming);
     } catch (e) {
       console.error("[useTerminal] refreshSessions failed:", e);
-    } finally {
       setHasLoadedSessions(true);
     }
-  }, []);
+  }, [applySessionSnapshot]);
 
   const openWindow = useCallback(async () => {
     setWindowOpen(true);
@@ -122,6 +107,20 @@ export default function useTerminal() {
       cleanup?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (!window.api?.onTerminalSessionsState) return;
+
+    const cleanup = window.api.onTerminalSessionsState((payload = {}) => {
+      applySessionSnapshot(payload.sessions, {
+        preferredSessionName: payload.reason === "created" ? payload.name : null,
+      });
+    });
+
+    return () => {
+      cleanup?.();
+    };
+  }, [applySessionSnapshot]);
 
   // Clear any stale saved metadata on mount (we start with zero terminals)
   useEffect(() => {
@@ -194,6 +193,24 @@ export default function useTerminal() {
     focusSession(activeSession);
   }, [activeSession, focusSession]);
 
+  const refitSession = useCallback((name) => {
+    if (!name) return;
+    const term = terminalRefs.current.get(name);
+    if (!term || typeof term.__raylineFit !== "function") return;
+    window.requestAnimationFrame(() => {
+      try {
+        term.__raylineFit();
+      } catch (e) {
+        console.error("[useTerminal] refitSession failed:", e);
+      }
+    });
+  }, []);
+
+  const refitActiveSession = useCallback(() => {
+    if (!activeSession) return;
+    refitSession(activeSession);
+  }, [activeSession, refitSession]);
+
   const registerTerminal = useCallback((name, terminal) => {
     terminalRefs.current.set(name, terminal);
   }, []);
@@ -216,6 +233,8 @@ export default function useTerminal() {
     closeWindow,
     focusSession,
     focusActiveSession,
+    refitSession,
+    refitActiveSession,
     refreshSessions,
     registerTerminal,
     unregisterTerminal,

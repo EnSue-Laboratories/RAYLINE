@@ -80,12 +80,28 @@ let currentPort = null;
 /** @type {((name: string, data: string) => void)|null} */
 let outputCallback = null;
 
+/** @type {((payload: { reason: string, name?: string, exitCode?: number|null, sessions: Array<object> }) => void)|null} */
+let sessionStateCallback = null;
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
 function log(...args) {
   console.log("[terminal-manager]", ...args);
+}
+
+function emitSessionState(reason, details = {}) {
+  if (!sessionStateCallback) return;
+  try {
+    sessionStateCallback({
+      reason,
+      ...details,
+      sessions: listSessions(),
+    });
+  } catch (e) {
+    log("sessionStateCallback error:", e.message);
+  }
 }
 
 function getBundledSupportRoot() {
@@ -311,12 +327,14 @@ function createSession({ name, command, cwd } = {}) {
     log(`session '${name}' exited with code ${exitCode}`);
     session.exitCode = exitCode;
     broadcast({ type: "session_exited", name, exitCode });
-    sessions.delete(name);
+    if (sessions.delete(name)) {
+      emitSessionState("exited", { name, exitCode });
+    }
   });
 
   sessions.set(name, session);
   log(`session '${name}' started (PID ${ptyProcess.pid})`);
-
+  emitSessionState("created", { name });
 
   return { ok: true, name };
 }
@@ -376,7 +394,9 @@ function killSession(name) {
   } catch (err) {
     log(`kill error for '${name}':`, err.message);
   }
-  sessions.delete(name);
+  if (sessions.delete(name)) {
+    emitSessionState("killed", { name });
+  }
   return { ok: true };
 }
 
@@ -438,6 +458,15 @@ function getSessionMetadata() {
  */
 function setOutputCallback(cb) {
   outputCallback = cb;
+}
+
+/**
+ * Set the callback that is invoked whenever the session list changes.
+ *
+ * @param {(payload: { reason: string, name?: string, exitCode?: number|null, sessions: Array<object> }) => void} cb
+ */
+function setSessionStateCallback(cb) {
+  sessionStateCallback = cb;
 }
 
 /**
@@ -601,5 +630,6 @@ module.exports = {
   stopServer,
   getPort,
   setOutputCallback,
+  setSessionStateCallback,
   getSessionMetadata,
 };

@@ -102,6 +102,11 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("terminal-window-state", handler);
     return () => ipcRenderer.removeListener("terminal-window-state", handler);
   },
+  onTerminalSessionsState: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("terminal-sessions-state", handler);
+    return () => ipcRenderer.removeListener("terminal-sessions-state", handler);
+  },
 
   // File operations
   openPath: (dirPath) => ipcRenderer.invoke("open-path", dirPath),
