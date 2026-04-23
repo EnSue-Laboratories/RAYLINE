@@ -66,6 +66,12 @@ if (( ${+widgets[autosuggest-accept]} )); then
   bindkey '^I' rayline_autosuggest_or_complete
 fi
 
+if (( ${+widgets[undo]} )); then
+  bindkey '^_' undo
+  bindkey -M emacs '^_' undo 2>/dev/null
+  bindkey -M viins '^_' undo 2>/dev/null
+fi
+
 : "${FZF_DEFAULT_OPTS:=--height=40% --layout=reverse --border=rounded --color=bg+:#111318,bg:#0d0d10,spinner:#8fd6c2,hl:#89b4fa,fg:#e6edf3,header:#7ed7b9,info:#f5c97a,pointer:#8fd6c2,marker:#f38ba8,fg+:#f5f7fb,hl+:#a6c9ff,prompt:#8fd6c2}"
 
 if [[ -n "${RAYLINE_BOOTSTRAP_ZDOTDIR:-}" && -f "${RAYLINE_BOOTSTRAP_ZDOTDIR:h}/common/smart-cd.sh" ]]; then

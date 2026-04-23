@@ -369,6 +369,7 @@ function SessionTerminal({
   isActive,
   opaqueBackground = false,
   plainClickMovesCursor = false,
+  promptUndoShortcut = false,
   onSendInput,
   onResizeSession,
   registerTerminal,
@@ -461,6 +462,38 @@ function SessionTerminal({
       const fitAddon = new FitAddon();
       term.loadAddon(fitAddon);
       term.__sessionName = sessionName;
+
+      term.attachCustomKeyEventHandler((event) => {
+        if (!promptUndoShortcut || event.type !== "keydown") {
+          return true;
+        }
+
+        const isPromptUndoShortcut = event.metaKey
+          && !event.ctrlKey
+          && !event.altKey
+          && !event.shiftKey
+          && event.code === "KeyZ";
+
+        if (!isPromptUndoShortcut) {
+          return true;
+        }
+
+        if (term.modes.mouseTrackingMode !== "none" || term.buffer.active.type !== "normal") {
+          return true;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        term.clearSelection();
+        term.focus();
+        term.input("\x1f", true);
+        emitTerminalDebug("session:prompt-undo-shortcut", {
+          sessionName,
+          cols: term.cols,
+          rows: term.rows,
+        });
+        return false;
+      });
 
       const syncSessionSize = (reason, cols = term.cols, rows = term.rows) => {
         if (!cols || !rows) return;
@@ -667,7 +700,7 @@ function SessionTerminal({
       emitTerminalDebug("session:teardown", { sessionName });
       teardown();
     };
-  }, [opaqueBackground, plainClickMovesCursor, sessionName, teardown]);
+  }, [opaqueBackground, plainClickMovesCursor, promptUndoShortcut, sessionName, teardown]);
 
   useEffect(() => {
     const logActiveState = (phase) => {
@@ -739,6 +772,7 @@ function TerminalViewport({
   activeSession,
   opaqueBackground = false,
   plainClickMovesCursor = false,
+  promptUndoShortcut = false,
   onSendInput,
   onResizeSession,
   registerTerminal,
@@ -768,6 +802,7 @@ function TerminalViewport({
           isActive={session.name === visibleSession}
           opaqueBackground={opaqueBackground}
           plainClickMovesCursor={plainClickMovesCursor}
+          promptUndoShortcut={promptUndoShortcut}
           onSendInput={onSendInput}
           onResizeSession={onResizeSession}
           registerTerminal={registerTerminal}
@@ -1166,6 +1201,7 @@ export default function TerminalDrawer({
             activeSession={activeSession}
             opaqueBackground={windowMode && !hasWallpaper}
             plainClickMovesCursor={windowMode}
+            promptUndoShortcut={windowMode && isMac}
             onSendInput={onSendInput}
             onResizeSession={onResizeSession}
             registerTerminal={registerTerminal}
