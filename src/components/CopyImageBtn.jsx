@@ -52,28 +52,23 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
     }
     setStatus("loading");
 
-    const ignoredEls = Array.from(
-      target.querySelectorAll('[data-copy-image-ignore="true"]'),
-    ).filter((el) => {
-      let parent = el.parentElement;
-      while (parent && parent !== target) {
-        if (parent.dataset && parent.dataset.copyImageIgnore === "true") return false;
-        parent = parent.parentElement;
-      }
-      return true;
-    });
-    const hiddenRestores = ignoredEls.map((el) => {
-      const original = el.style.display;
-      el.style.display = "none";
-      return { el, original };
-    });
+    const measureHost = target.parentElement || document.body;
+    const measureClone = target.cloneNode(true);
+    measureClone
+      .querySelectorAll('[data-copy-image-ignore="true"]')
+      .forEach((el) => el.remove());
+    measureClone.style.position = "absolute";
+    measureClone.style.top = "-99999px";
+    measureClone.style.left = "0";
+    measureClone.style.visibility = "hidden";
+    measureClone.style.pointerEvents = "none";
+    measureClone.style.width = `${target.getBoundingClientRect().width}px`;
+    measureHost.appendChild(measureClone);
 
     try {
-      const contentWidth = target.scrollWidth;
-      const contentHeight = target.scrollHeight;
-      hiddenRestores.forEach(({ el, original }) => {
-        el.style.display = original;
-      });
+      const contentWidth = measureClone.scrollWidth;
+      const contentHeight = measureClone.scrollHeight;
+      measureHost.removeChild(measureClone);
       const totalWidth = contentWidth + CAPTURE_PADDING_X * 2;
       const totalHeight = contentHeight + CAPTURE_PADDING_TOP + CAPTURE_PADDING_BOTTOM;
 
@@ -126,9 +121,9 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
       console.error("[CopyImageBtn] Failed to copy image", error);
       setStatus("error");
     } finally {
-      hiddenRestores.forEach(({ el, original }) => {
-        if (el.style.display === "none") el.style.display = original;
-      });
+      if (measureClone.parentNode) {
+        measureClone.parentNode.removeChild(measureClone);
+      }
     }
 
     queueReset();
