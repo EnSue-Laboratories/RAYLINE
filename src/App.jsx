@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
+import SidebarChromeRail from "./components/SidebarChromeRail";
 import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
 import useAgent     from "./hooks/useAgent";
@@ -3353,6 +3354,14 @@ export default function App() {
         </div>
       )}
 
+      <SidebarChromeRail
+        sidebarOpen={sidebarOpen}
+        settingsOpen={showSettings}
+        onToggleSidebar={() => setSidebarOpen((o) => !o)}
+        onNew={handleNew}
+        onOpenSettings={() => setShowSettings(true)}
+      />
+
       <div
         style={{
           display: "flex",
@@ -3387,11 +3396,9 @@ export default function App() {
           onNew={handleNew}
           onOpenDispatch={() => setShowDispatchCard(true)}
           onDelete={handleDelete}
-          onToggleSidebar={() => setSidebarOpen((o) => !o)}
           locale={locale}
           cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
           onPickFolder={handlePickFolder}
-          onOpenSettings={() => setShowSettings(true)}
           onOpenProjectManager={() => window.api?.openProjectManager()}
           onOpenNewProject={() => setShowNewProject(true)}
           projects={projects}
@@ -3439,9 +3446,7 @@ export default function App() {
           onSend={handleSend}
           onCancel={handleCancel}
           onEdit={handleEdit}
-          onToggleSidebar={() => setSidebarOpen((o) => !o)}
           sidebarOpen={sidebarOpen}
-          onNew={handleNew}
           onModelChange={handleModelChange}
           defaultModel={defaultModel}
           queuedMessages={activeQueuedMessages}

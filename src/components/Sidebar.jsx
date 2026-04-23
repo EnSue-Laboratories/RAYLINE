@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow, FolderPlus } from "lucide-react";
-import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
+import { Plus, Search, Trash2, FolderOpen, ChevronRight, Workflow, FolderPlus } from "lucide-react";
+import WindowDragSpacer from "./WindowDragSpacer";
 import ProjectGroup from "./ProjectGroup";
 import { getMOrMulticaFallback } from "../data/models";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
@@ -89,7 +89,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], locale = "en-US" }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd, onPickFolder, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], locale = "en-US" }) {
   const s = useFontScale();
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
@@ -132,44 +132,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Drag region + collapse button */}
-      <div
-        style={{
-          height: WINDOW_DRAG_HEIGHT,
-          WebkitAppRegion: "drag",
-          flexShrink: 0,
-          position: "relative",
-        }}
-      >
-        <button
-          onClick={onToggleSidebar}
-          style={{
-            position: "absolute",
-            top: SIDEBAR_TOGGLE_TOP,
-            left: SIDEBAR_TOGGLE_LEFT,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: SIDEBAR_TOGGLE_SIZE,
-            height: SIDEBAR_TOGGLE_SIZE,
-            borderRadius: 6,
-            background: "none",
-            border: "none",
-            color: "rgba(255,255,255,0.4)",
-            cursor: "pointer",
-            transition: "all .2s",
-            WebkitAppRegion: "no-drag",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "rgba(255,255,255,0.7)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "rgba(255,255,255,0.4)";
-          }}
-        >
-          <PanelLeftClose size={14} strokeWidth={1.5} />
-        </button>
-      </div>
+      <WindowDragSpacer />
 
       {/* Menu items */}
       <div style={{ padding: "0 12px 14px", display: "flex", flexDirection: "column", gap: 2, WebkitAppRegion: "no-drag" }}>
@@ -605,27 +568,6 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
         >
           <FolderOpen size={10} strokeWidth={1.5} />
           {cwdShort || "SELECT FOLDER"}
-        </button>
-        <button
-          onClick={onOpenSettings}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 22,
-            height: 22,
-            borderRadius: 5,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "rgba(255,255,255,0.45)",
-            transition: "color .2s",
-            padding: 0,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.72)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
-        >
-          <SettingsIcon size={12} strokeWidth={1.5} />
         </button>
         <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.38)", letterSpacing: ".06em" }}>
           {convos.length} CHATS
