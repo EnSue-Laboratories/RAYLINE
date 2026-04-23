@@ -166,7 +166,6 @@ function TerminalViewport({
         cursorStyle:  "bar",
         allowTransparency: true,
         allowProposedApi: true,
-        scrollbarWidth: "none",
       });
 
       const fitAddon = new FitAddon();

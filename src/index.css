@@ -90,7 +90,7 @@ input:focus         { outline: none; }
   to   { opacity: 1; max-height: 60px; }
 }
 
-/* ── xterm transparent background + hidden scrollbar ── */
+/* ── xterm transparent background + slim overlay scrollbar ── */
 .xterm,
 .xterm .xterm-screen,
 .xterm .xterm-viewport,
@@ -100,6 +100,20 @@ input:focus         { outline: none; }
 }
 .xterm .xterm-viewport::-webkit-scrollbar { display: none; }
 .xterm .xterm-viewport { scrollbar-width: none; }
+
+/* Slim the xterm overlay (VS Code-style) scrollbar */
+.xterm .xterm-scrollable-element > .scrollbar.vertical {
+  width: 6px !important;
+}
+.xterm .xterm-scrollable-element > .scrollbar.vertical .slider {
+  width: 6px !important;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.18) !important;
+  transition: background .15s;
+}
+.xterm .xterm-scrollable-element > .scrollbar.vertical:hover .slider {
+  background: rgba(255,255,255,0.38) !important;
+}
 
 /* ── Range slider ── */
 input[type="range"] {
