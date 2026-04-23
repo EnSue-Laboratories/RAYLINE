@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { Plus, Search, Trash2, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow, FolderPlus } from "lucide-react";
-import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
+import { CHROME_RAIL_BUTTON_SIZE, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
 import { getMOrMulticaFallback } from "../data/models";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
@@ -128,7 +128,15 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
       />
 
       {/* Menu items */}
-      <div style={{ padding: "0 12px 14px", display: "flex", flexDirection: "column", gap: 2, WebkitAppRegion: "no-drag" }}>
+      <div
+        style={{
+          padding: `${CHROME_RAIL_BUTTON_SIZE + 16}px 12px 14px`,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          WebkitAppRegion: "no-drag",
+        }}
+      >
         <button
           onClick={onNew}
           style={{
