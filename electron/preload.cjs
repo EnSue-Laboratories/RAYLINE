@@ -85,11 +85,28 @@ contextBridge.exposeInMainWorld("api", {
   terminalList: () => ipcRenderer.invoke("terminal-list"),
   terminalResize: ({ name, cols, rows }) => ipcRenderer.invoke("terminal-resize", { name, cols, rows }),
   terminalMetadata: () => ipcRenderer.invoke("terminal-metadata"),
+  terminalConsumePreferredSession: () => ipcRenderer.invoke("terminal-consume-preferred-session"),
   terminalSavedMetadata: () => ipcRenderer.invoke("terminal-saved-metadata"),
+  terminalDebugLog: (payload) => ipcRenderer.send("terminal-debug-log", payload),
   onTerminalOutput: (cb) => {
     const handler = (_e, data) => cb(data);
     ipcRenderer.on("terminal-output", handler);
     return () => ipcRenderer.removeListener("terminal-output", handler);
+  },
+  openTerminalWindow: () => ipcRenderer.invoke("open-terminal-window"),
+  closeTerminalWindow: () => ipcRenderer.invoke("close-terminal-window"),
+  isTerminalWindowOpen: () => ipcRenderer.invoke("is-terminal-window-open"),
+  terminalWindowReady: () => ipcRenderer.send("terminal-window-ready"),
+  closeCurrentWindow: () => ipcRenderer.invoke("window-close-current"),
+  onTerminalWindowState: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("terminal-window-state", handler);
+    return () => ipcRenderer.removeListener("terminal-window-state", handler);
+  },
+  onTerminalSessionsState: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("terminal-sessions-state", handler);
+    return () => ipcRenderer.removeListener("terminal-sessions-state", handler);
   },
 
   // File operations

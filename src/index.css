@@ -207,6 +207,32 @@ input:focus         { outline: none; }
   background-color: transparent !important;
 }
 
+.rayline-terminal-host--opaque .xterm,
+.rayline-terminal-host--opaque .xterm .xterm-screen,
+.rayline-terminal-host--opaque .xterm .xterm-viewport,
+.rayline-terminal-host--opaque .xterm .xterm-scrollable-element {
+  background: var(--pane-background) !important;
+  background-color: var(--pane-background) !important;
+}
+
+.rayline-terminal-host .xterm {
+  -webkit-font-smoothing: antialiased;
+}
+
+.rayline-terminal-host .xterm .xterm-cursor-layer .xterm-cursor {
+  transition: background-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+  box-shadow: none;
+}
+
+.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar {
+  width: 3px;
+}
+
+.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+
 /* ── Range slider ── */
 input[type="range"] {
   -webkit-appearance: none;

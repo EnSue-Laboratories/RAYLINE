@@ -3,14 +3,31 @@ import { useState, useCallback, useEffect, useRef } from "react";
 export default function useTerminal() {
   const [sessions, setSessions] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [windowOpen, setWindowOpen] = useState(false);
+  const [hasLoadedSessions, setHasLoadedSessions] = useState(false);
 
   // Maps session name -> xterm.Terminal instance
   const terminalRefs = useRef(new Map());
-  // Track known session names so we can detect new ones from MCP/external creation
-  const knownSessionNames = useRef(new Set());
+  const pendingPreferredSessionRef = useRef(null);
 
   // ── Internal helpers ────────────────────────────────────────────────────────
+
+  const applySessionSnapshot = useCallback((incoming, options = {}) => {
+    const nextSessions = Array.isArray(incoming) ? incoming : [];
+    const incomingNames = new Set(nextSessions.map((s) => s.name));
+    const preferredSessionName = options.preferredSessionName ?? pendingPreferredSessionRef.current ?? null;
+    setSessions(nextSessions);
+    setHasLoadedSessions(true);
+
+    setActiveSession((prev) => {
+      if (preferredSessionName && incomingNames.has(preferredSessionName)) {
+        pendingPreferredSessionRef.current = null;
+        return preferredSessionName;
+      }
+      if (prev && incomingNames.has(prev)) return prev;
+      return nextSessions[0]?.name ?? null;
+    });
+  }, []);
 
   const refreshSessions = useCallback(async () => {
     if (!window.api?.terminalList) return;
@@ -18,40 +35,39 @@ export default function useTerminal() {
       const result = await window.api.terminalList();
       // listSessions returns a plain array
       const incoming = Array.isArray(result) ? result : (result?.sessions ?? []);
-      const incomingNames = new Set(incoming.map((s) => s.name));
-
-      // Detect sessions created externally (e.g. by Claude via MCP)
-      let hasNew = false;
-      for (const name of incomingNames) {
-        if (!knownSessionNames.current.has(name)) {
-          hasNew = true;
-          break;
-        }
-      }
-      knownSessionNames.current = incomingNames;
-
-      setSessions(incoming);
-
-      // If new sessions appeared, auto-open the drawer and focus the newest
-      if (hasNew && incoming.length > 0) {
-        setDrawerOpen(true);
-        // Focus the newest session (last in list, or one not previously known)
-        const newest = incoming[incoming.length - 1];
-        setActiveSession((prev) => {
-          if (prev && incomingNames.has(prev)) return prev;
-          return newest?.name ?? null;
-        });
-      } else {
-        setActiveSession((prev) => {
-          const still = incoming.some((s) => s.name === prev);
-          if (still) return prev;
-          return incoming[0]?.name ?? null;
-        });
-      }
+      applySessionSnapshot(incoming);
     } catch (e) {
       console.error("[useTerminal] refreshSessions failed:", e);
+      setHasLoadedSessions(true);
+    }
+  }, [applySessionSnapshot]);
+
+  const openWindow = useCallback(async () => {
+    setWindowOpen(true);
+    try {
+      await window.api?.openTerminalWindow?.();
+    } catch (e) {
+      console.error("[useTerminal] openWindow failed:", e);
     }
   }, []);
+
+  const closeWindow = useCallback(async () => {
+    setWindowOpen(false);
+    try {
+      await window.api?.closeTerminalWindow?.();
+    } catch (e) {
+      console.error("[useTerminal] closeWindow failed:", e);
+    }
+  }, []);
+
+  const setDrawerOpen = useCallback(async (next) => {
+    const resolved = typeof next === "function" ? next(windowOpen) : next;
+    if (resolved) {
+      await openWindow();
+    } else {
+      await closeWindow();
+    }
+  }, [closeWindow, openWindow, windowOpen]);
 
   // ── Lifecycle effects ───────────────────────────────────────────────────────
 
@@ -71,24 +87,84 @@ export default function useTerminal() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!window.api?.isTerminalWindowOpen) return;
+
+    let cancelled = false;
+
+    window.api.isTerminalWindowOpen().then((open) => {
+      if (!cancelled) setWindowOpen(Boolean(open));
+    }).catch((e) => {
+      console.error("[useTerminal] isTerminalWindowOpen failed:", e);
+    });
+
+    const cleanup = window.api.onTerminalWindowState?.(({ open }) => {
+      setWindowOpen(Boolean(open));
+    });
+
+    return () => {
+      cancelled = true;
+      cleanup?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!window.api?.onTerminalSessionsState) return;
+
+    const cleanup = window.api.onTerminalSessionsState((payload = {}) => {
+      if (payload.reason === "created" && payload.name) {
+        pendingPreferredSessionRef.current = payload.name;
+      }
+      applySessionSnapshot(payload.sessions, {
+        preferredSessionName: payload.reason === "created" ? payload.name : null,
+      });
+    });
+
+    return () => {
+      cleanup?.();
+    };
+  }, [applySessionSnapshot]);
+
   // Clear any stale saved metadata on mount (we start with zero terminals)
   useEffect(() => {
     window.api?.terminalSavedMetadata?.();
   }, []);
+
+  useEffect(() => {
+    const kickoff = window.setTimeout(async () => {
+      try {
+        const preferredSessionName = await window.api?.terminalConsumePreferredSession?.();
+        if (preferredSessionName) {
+          pendingPreferredSessionRef.current = preferredSessionName;
+        }
+      } catch (e) {
+        console.error("[useTerminal] terminalConsumePreferredSession failed:", e);
+      }
+      refreshSessions();
+    }, 0);
+    const interval = window.setInterval(() => {
+      refreshSessions();
+    }, 3000);
+    return () => {
+      window.clearTimeout(kickoff);
+      window.clearInterval(interval);
+    };
+  }, [refreshSessions]);
 
   // ── Exposed functions ───────────────────────────────────────────────────────
 
   const createSession = useCallback(async ({ name, command, cwd }) => {
     if (!window.api?.terminalCreate) return;
     try {
+      pendingPreferredSessionRef.current = name;
       await window.api.terminalCreate({ name, command, cwd });
       await refreshSessions();
       setActiveSession(name);
-      setDrawerOpen(true);
+      await openWindow();
     } catch (e) {
       console.error("[useTerminal] createSession failed:", e);
     }
-  }, [refreshSessions]);
+  }, [openWindow, refreshSessions]);
 
   const sendInput = useCallback((name, text) => {
     if (!window.api?.terminalSend) return;
@@ -129,6 +205,24 @@ export default function useTerminal() {
     focusSession(activeSession);
   }, [activeSession, focusSession]);
 
+  const refitSession = useCallback((name) => {
+    if (!name) return;
+    const term = terminalRefs.current.get(name);
+    if (!term || typeof term.__raylineFit !== "function") return;
+    window.requestAnimationFrame(() => {
+      try {
+        term.__raylineFit();
+      } catch (e) {
+        console.error("[useTerminal] refitSession failed:", e);
+      }
+    });
+  }, []);
+
+  const refitActiveSession = useCallback(() => {
+    if (!activeSession) return;
+    refitSession(activeSession);
+  }, [activeSession, refitSession]);
+
   const registerTerminal = useCallback((name, terminal) => {
     terminalRefs.current.set(name, terminal);
   }, []);
@@ -140,18 +234,27 @@ export default function useTerminal() {
   return {
     sessions,
     activeSession,
-    drawerOpen,
+    drawerOpen: windowOpen,
+    windowOpen,
     terminalRefs,
     createSession,
     sendInput,
     killSession,
     resizeSession,
+    openWindow,
+    closeWindow,
     focusSession,
     focusActiveSession,
+    refitSession,
+    refitActiveSession,
     refreshSessions,
     registerTerminal,
     unregisterTerminal,
-    setActiveSession,
+    setActiveSession: (name) => {
+      pendingPreferredSessionRef.current = null;
+      setActiveSession(name);
+    },
     setDrawerOpen,
+    hasLoadedSessions,
   };
 }

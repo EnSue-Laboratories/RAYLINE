@@ -28,6 +28,7 @@ const isWindows = process.platform === "win32";
 const SHELL_COMMAND_TIMEOUT_MS = 15000;
 const SHELL_OUTPUT_LIMIT = 128 * 1024;
 const WINDOW_BACKGROUND = "#0D0D10";
+const TERMINAL_DEBUG_ENABLED = /^(1|true|yes|on)$/i.test(String(process.env.RAYLINE_TERMINAL_DEBUG || ""));
 const WALLPAPER_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
 const WALLPAPER_MIME_TYPES = {
   png: "image/png",
@@ -53,6 +54,54 @@ if (isDev && isMac) {
 
 let mainWindow;
 let pmWindow;
+let terminalWindow;
+let terminalWindowRevealTimer = null;
+let pendingPreferredTerminalSessionName = null;
+
+function terminalDebug(event, details = {}, meta = {}) {
+  if (!TERMINAL_DEBUG_ENABLED) return;
+  const payload = {
+    ts: new Date().toISOString(),
+    event,
+    ...meta,
+    details,
+  };
+  console.log(`[terminal-debug] ${JSON.stringify(payload)}`);
+}
+
+function broadcastToAllWindows(channel, payload) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win || win.isDestroyed()) continue;
+    win.webContents.send(channel, payload);
+  }
+}
+
+function isTerminalWindowOpen() {
+  return Boolean(terminalWindow && !terminalWindow.isDestroyed());
+}
+
+function broadcastTerminalWindowState() {
+  broadcastToAllWindows("terminal-window-state", { open: isTerminalWindowOpen() });
+}
+
+function clearTerminalWindowRevealTimer() {
+  if (!terminalWindowRevealTimer) return;
+  clearTimeout(terminalWindowRevealTimer);
+  terminalWindowRevealTimer = null;
+}
+
+function revealTerminalWindow(reason = "unknown") {
+  if (!isTerminalWindowOpen()) return;
+  clearTerminalWindowRevealTimer();
+  if (!terminalWindow.isVisible()) {
+    terminalWindow.show();
+  }
+  terminalWindow.focus();
+  terminalDebug("terminal-window:revealed", {
+    reason,
+    ...describeWindow(terminalWindow),
+  }, { source: "main" });
+}
 
 function getCurrentSystemTheme() {
   return nativeTheme.shouldUseDarkColors ? "dark" : "light";
@@ -92,6 +141,54 @@ function getWindowChromeOptions() {
 function applyWindowChromeTweaks(win) {
   if (!win || !isWindows) return;
   win.setMenuBarVisibility(false);
+}
+
+function describeWindow(win) {
+  if (!win || win.isDestroyed()) return null;
+  const bounds = win.getBounds();
+  const [contentWidth, contentHeight] = win.getContentSize();
+  return {
+    bounds,
+    contentSize: { width: contentWidth, height: contentHeight },
+    focused: win.isFocused(),
+    visible: win.isVisible(),
+    minimized: win.isMinimized(),
+  };
+}
+
+function attachTerminalWindowDebug(win) {
+  if (!TERMINAL_DEBUG_ENABLED || !win) return;
+
+  const events = [
+    "ready-to-show",
+    "show",
+    "hide",
+    "focus",
+    "blur",
+    "resize",
+    "move",
+    "maximize",
+    "unmaximize",
+    "enter-full-screen",
+    "leave-full-screen",
+  ];
+
+  for (const eventName of events) {
+    win.on(eventName, () => {
+      terminalDebug(`terminal-window:${eventName}`, describeWindow(win), { source: "main" });
+    });
+  }
+
+  win.webContents.on("did-finish-load", () => {
+    terminalDebug("terminal-window:did-finish-load", {
+      ...describeWindow(win),
+      url: win.webContents.getURL(),
+    }, { source: "main" });
+  });
+
+  win.webContents.on("render-process-gone", (_event, details) => {
+    terminalDebug("terminal-window:render-process-gone", details, { source: "main" });
+  });
 }
 
 function getWallpaperStorageDir() {
@@ -209,9 +306,70 @@ function createProjectManagerWindow() {
   pmWindow.on("closed", () => { pmWindow = null; });
 }
 
+function createTerminalWindow() {
+  if (isTerminalWindowOpen()) {
+    if (terminalWindow.isMinimized()) terminalWindow.restore();
+    revealTerminalWindow("existing-window");
+    broadcastTerminalWindowState();
+    return terminalWindow;
+  }
+
+  terminalWindow = new BrowserWindow({
+    title: "Terminals",
+    width: 960,
+    height: 760,
+    minWidth: 560,
+    minHeight: 320,
+    show: false,
+    backgroundColor: WINDOW_BACKGROUND,
+    icon: path.join(__dirname, "../public/icon.png"),
+    ...getWindowChromeOptions(),
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  applyWindowChromeTweaks(terminalWindow);
+  attachTerminalWindowDebug(terminalWindow);
+
+  terminalWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  if (isDev) {
+    const port = process.env.VITE_PORT || "5173";
+    terminalWindow.loadURL(`http://localhost:${port}/src/terminal-window.html`);
+  } else {
+    terminalWindow.loadFile(path.join(__dirname, "../dist/src/terminal-window.html"));
+  }
+
+  clearTerminalWindowRevealTimer();
+  terminalWindowRevealTimer = setTimeout(() => {
+    revealTerminalWindow("startup-timeout");
+  }, isDev ? 2500 : 1500);
+
+  terminalWindow.on("closed", () => {
+    clearTerminalWindowRevealTimer();
+    terminalWindow = null;
+    broadcastTerminalWindowState();
+  });
+
+  broadcastTerminalWindowState();
+  return terminalWindow;
+}
+
 app.setName("RayLine");
 
 app.whenReady().then(() => {
+  terminalDebug("app:ready", {
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+    platform: process.platform,
+  }, { source: "main" });
+
   // Set dock icon on macOS
   if (isMac) {
     const iconPath = path.join(__dirname, "../public/icon.png");
@@ -239,8 +397,27 @@ app.whenReady().then(() => {
 
   // Forward terminal output to renderer
   terminalManager.setOutputCallback((name, data) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("terminal-output", { name, data });
+    broadcastToAllWindows("terminal-output", { name, data });
+  });
+
+  terminalManager.setSessionStateCallback((payload) => {
+    if (payload.reason === "created" && payload.name) {
+      pendingPreferredTerminalSessionName = payload.name;
+    } else if (!payload.sessions?.some((session) => session.name === pendingPreferredTerminalSessionName)) {
+      pendingPreferredTerminalSessionName = null;
+    }
+
+    broadcastToAllWindows("terminal-sessions-state", payload);
+
+    if (payload.sessions.length === 0) {
+      if (isTerminalWindowOpen()) {
+        terminalWindow.close();
+      }
+      return;
+    }
+
+    if (payload.reason === "created") {
+      createTerminalWindow();
     }
   });
 
@@ -265,6 +442,45 @@ ipcMain.handle("folder-pick", async () => {
 
 ipcMain.on("open-project-manager", () => {
   createProjectManagerWindow();
+});
+
+ipcMain.handle("open-terminal-window", () => {
+  createTerminalWindow();
+  return true;
+});
+
+ipcMain.handle("close-terminal-window", () => {
+  if (isTerminalWindowOpen()) {
+    terminalWindow.close();
+  }
+  return true;
+});
+
+ipcMain.handle("is-terminal-window-open", () => {
+  return isTerminalWindowOpen();
+});
+
+ipcMain.on("terminal-debug-log", (event, payload = {}) => {
+  if (!TERMINAL_DEBUG_ENABLED) return;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  terminalDebug(payload.event || "renderer-log", payload.details || {}, {
+    source: payload.source || "renderer",
+    page: payload.page || event.sender.getURL?.(),
+    windowTitle: win?.getTitle?.() || null,
+  });
+});
+
+ipcMain.on("terminal-window-ready", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed() || win !== terminalWindow) return;
+  revealTerminalWindow("renderer-ready");
+});
+
+ipcMain.handle("window-close-current", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return false;
+  win.close();
+  return true;
 });
 
 ipcMain.handle("set-window-opacity", (event, opacity) => {
@@ -735,6 +951,12 @@ ipcMain.handle("terminal-resize", async (_event, { name, cols, rows }) => {
 
 ipcMain.handle("terminal-metadata", async () => {
   return terminalManager.getSessionMetadata();
+});
+
+ipcMain.handle("terminal-consume-preferred-session", async () => {
+  const preferredSessionName = pendingPreferredTerminalSessionName;
+  pendingPreferredTerminalSessionName = null;
+  return preferredSessionName;
 });
 
 // IPC: saved terminal metadata for restore on launch
