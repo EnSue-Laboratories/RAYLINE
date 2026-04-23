@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
+import { getWallpaperImageFilter } from "../utils/wallpaper";
 import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 
 // ── Shared style helpers ──────────────────────────────────────────────────────
@@ -9,6 +10,15 @@ import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../windowChrom
 const FONT_FAMILY = "'JetBrains Mono','Fira Code',monospace";
 const XTERM_TRANSPARENT = "rgba(0,0,0,0)";
 const TERMINAL_OPAQUE_BG = "#0D0D10";
+
+function getWallpaperOpacityValue(wallpaper) {
+  if (!Number.isFinite(wallpaper?.imgOpacity)) return 1;
+  return Math.min(1, Math.max(0, wallpaper.imgOpacity / 100));
+}
+
+function getTerminalWallpaperOverlayAlpha(wallpaper) {
+  return 0.52 + getWallpaperOpacityValue(wallpaper) * 0.18;
+}
 
 function getTerminalTheme(opaqueBackground) {
   return {
@@ -144,6 +154,7 @@ function SessionTerminal({
   sessionName,
   isActive,
   opaqueBackground = false,
+  wallpaper = null,
   onSendInput,
   onResizeSession,
   registerTerminal,
@@ -347,6 +358,9 @@ function SessionTerminal({
     };
   }, [isActive, sessionName]);
 
+  const hasWallpaper = Boolean(wallpaper?.dataUrl);
+  const overlayAlpha = getTerminalWallpaperOverlayAlpha(wallpaper);
+
   return (
     <div
       style={{
@@ -361,9 +375,39 @@ function SessionTerminal({
         overflow: "hidden",
       }}
     >
+      {hasWallpaper && (
+        <>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 0,
+              pointerEvents: "none",
+              backgroundImage: `url(${wallpaper.dataUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+              filter: getWallpaperImageFilter(wallpaper),
+              opacity: getWallpaperOpacityValue(wallpaper).toFixed(3),
+              transform: wallpaper.imgBlur ? "scale(1.04)" : "none",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 1,
+              pointerEvents: "none",
+              background: `linear-gradient(180deg, rgba(13,13,16,${overlayAlpha.toFixed(2)}), rgba(9,9,11,${Math.min(overlayAlpha + 0.12, 0.84).toFixed(2)}))`,
+            }}
+          />
+        </>
+      )}
       <div
         ref={containerRef}
         style={{
+          position: "relative",
+          zIndex: 2,
           width: "100%",
           height: "100%",
           overflow: "hidden",
@@ -381,6 +425,7 @@ function TerminalViewport({
   sessions,
   activeSession,
   opaqueBackground = false,
+  wallpaper = null,
   onSendInput,
   onResizeSession,
   registerTerminal,
@@ -409,6 +454,7 @@ function TerminalViewport({
           sessionName={session.name}
           isActive={session.name === visibleSession}
           opaqueBackground={opaqueBackground}
+          wallpaper={wallpaper}
           onSendInput={onSendInput}
           onResizeSession={onResizeSession}
           registerTerminal={registerTerminal}
@@ -631,7 +677,9 @@ export default function TerminalDrawer({
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        ...(windowMode ? { background: TERMINAL_OPAQUE_BG } : getPaneSurfaceStyle(hasWallpaper)),
+        ...(windowMode
+          ? { background: hasWallpaper ? "rgba(13, 13, 16, 0.46)" : TERMINAL_OPAQUE_BG }
+          : getPaneSurfaceStyle(hasWallpaper)),
         backdropFilter: windowMode ? "none" : (hasWallpaper ? "saturate(1.1)" : "blur(56px) saturate(1.1)"),
         borderLeft: windowMode ? "none" : "1px solid rgba(255,255,255,0.025)",
         position: "relative",
@@ -736,7 +784,8 @@ export default function TerminalDrawer({
         <TerminalViewport
           sessions={sessions}
           activeSession={activeSession}
-          opaqueBackground={windowMode}
+          opaqueBackground={windowMode && !hasWallpaper}
+          wallpaper={windowMode ? wallpaper : null}
           onSendInput={onSendInput}
           onResizeSession={onResizeSession}
           registerTerminal={registerTerminal}
