@@ -7,6 +7,7 @@ const REDUCED_MOTION_GRAIN_FRAME_MS = 700;
 
 export default function Grain() {
   const ref = useRef(null);
+  const fiRef = useRef(0);
   const { isVisible, isFocused, prefersReducedMotion } = useWindowActivity();
 
   useEffect(() => {
@@ -33,7 +34,6 @@ export default function Grain() {
     };
     gen();
 
-    var fi = 0;
     const frameBudget = prefersReducedMotion
       ? REDUCED_MOTION_GRAIN_FRAME_MS
       : (isFocused ? FOCUSED_GRAIN_FRAME_MS : BACKGROUND_GRAIN_FRAME_MS);
@@ -46,8 +46,8 @@ export default function Grain() {
     const loop = () => {
       if (!isVisible) return;
       if (frames.length > 0) {
-        ctx.putImageData(frames[fi % frames.length], 0, 0);
-        fi++;
+        ctx.putImageData(frames[fiRef.current % frames.length], 0, 0);
+        fiRef.current += 1;
       }
       schedule();
     };

@@ -8,6 +8,8 @@ const REDUCED_MOTION_FRAME_MS = 1000 / 8;
 
 export default function AuroraCanvas() {
   const ref = useRef(null);
+  const tRef = useRef(0);
+  const lastFrameAtRef = useRef(0);
   const { isVisible, isFocused, prefersReducedMotion } = useWindowActivity();
 
   useEffect(() => {
@@ -18,7 +20,6 @@ export default function AuroraCanvas() {
     let w;
     let h;
     let raf = null;
-    let lastFrameAt = 0;
 
     var orbList = [
       { phase: 0,   speedX: 0.3,  speedY: 0.2,  radius: 220, cx: 0.6, cy: 0.35 },
@@ -32,12 +33,12 @@ export default function AuroraCanvas() {
     };
     resize();
 
-    let t = 0;
     const renderFrame = () => {
       ctx.fillStyle = "#0D0D0F";
       ctx.fillRect(0, 0, w, h);
 
       // Compute orb positions
+      const t = tRef.current;
       var orbPositions = [];
       for (var oi = 0; oi < orbList.length; oi++) {
         var ob = orbList[oi];
@@ -67,14 +68,15 @@ export default function AuroraCanvas() {
 
     const draw = (now) => {
       if (!isVisible) return;
+      const lastFrameAt = lastFrameAtRef.current;
       if (lastFrameAt && (now - lastFrameAt) < frameBudget) {
         raf = requestAnimationFrame(draw);
         return;
       }
 
       const delta = lastFrameAt ? (now - lastFrameAt) : frameBudget;
-      lastFrameAt = now;
-      t += delta * T_PER_MS;
+      lastFrameAtRef.current = now;
+      tRef.current += delta * T_PER_MS;
       renderFrame();
 
       raf = requestAnimationFrame(draw);
