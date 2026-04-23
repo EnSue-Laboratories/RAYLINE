@@ -76,8 +76,16 @@ function resolveLaunchCwd({ cwd, sessionId }) {
   throw new Error(`Invalid working directory: ${cwd}`);
 }
 
-function buildClaudeArgs({ model, prompt, sessionId, resumeSessionId, forkSession }) {
-  const args = ["--print", "--output-format=stream-json", "--verbose", "--include-partial-messages", "--dangerously-skip-permissions"];
+function buildClaudeArgs({ model, sessionId, resumeSessionId, forkSession }) {
+  const args = [
+    "--print",
+    "--input-format=stream-json",
+    "--output-format=stream-json",
+    "--verbose",
+    "--include-partial-messages",
+    "--permission-mode", "bypassPermissions",
+    "--permission-prompt-tool", "stdio",
+  ];
 
   args.push("--append-system-prompt", `You are running inside RayLine, a desktop GUI client for Claude Code.
 The user is interacting via a chat interface, not a terminal.
@@ -176,8 +184,29 @@ The user can see and type into these terminals in real time.`);
     args.push("--session-id", sessionId);
   }
 
-  args.push(prompt);
   return args;
+}
+
+function buildPermissionKey(toolName, input, blockedPath) {
+  const key = blockedPath || input?.file_path || input?.path || input?.filePath || input?.command || "";
+  return `${toolName || ""}::${key}`;
+}
+
+function classifyPermissionRequest(req) {
+  const toolName = req?.tool_name || "";
+  const input = req?.input || {};
+  const blockedPath = req?.blocked_path || null;
+  const targetPath = blockedPath || input.file_path || input.path || input.filePath || null;
+  let summary = "";
+  if (targetPath) summary = targetPath;
+  else if (toolName === "Bash" && typeof input.command === "string") summary = input.command;
+  else if (input.url) summary = input.url;
+  return {
+    toolName,
+    targetPath,
+    summary: summary || (toolName ? `${toolName} request` : "Tool request"),
+    isSensitiveFile: Boolean(blockedPath),
+  };
 }
 
 function buildPromptWithAttachments(prompt, images, files) {
@@ -232,6 +261,11 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
 
   const fullPrompt = buildPromptWithAttachments(prompt, images, files);
 
+  const existing = activeAgents.get(conversationId);
+  const sessionAllowlist = existing?.sessionAllowlist instanceof Set
+    ? existing.sessionAllowlist
+    : new Set();
+
   const state = {
     conversationId,
     webContents,
@@ -250,6 +284,9 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     firstEventMs: null,
     firstAssistantTextMs: null,
     firstToolUseMs: null,
+    pendingPermissions: new Map(),
+    sessionAllowlist,
+    stdinClosed: false,
   };
 
   log("Starting agent:", { conversationId, model, cwd: launchCwd, sessionId, resumeSessionId, forkSession });
@@ -262,7 +299,6 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     const runStartedAt = Date.now();
     const args = buildClaudeArgs({
       model,
-      prompt: runPrompt,
       sessionId: runSessionId,
       resumeSessionId: runResumeSessionId,
       forkSession: runForkSession,
@@ -298,17 +334,49 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
       resumeSessionId: runResumeSessionId,
       forkSession: runForkSession,
     });
-    log("Full args:", args.filter((arg) => arg !== runPrompt).join(" "));
+    log("Full args:", args.join(" "));
     log("Prompt:", runPrompt.slice(0, 100));
 
     const child = spawnCli(claudeBin, args, {
       cwd: launchCwd,
       env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     state.child = child;
+    state.stdinClosed = false;
     activeAgents.set(conversationId, state);
+
+    const writeStdinLine = (obj) => {
+      if (!child.stdin || child.stdin.destroyed || state.stdinClosed) return false;
+      try {
+        child.stdin.write(JSON.stringify(obj) + "\n");
+        return true;
+      } catch (err) {
+        log("stdin write failed:", err?.message || err);
+        return false;
+      }
+    };
+
+    const endStdin = () => {
+      if (state.stdinClosed) return;
+      state.stdinClosed = true;
+      try { child.stdin?.end(); } catch {}
+    };
+
+    if (child.stdin) {
+      child.stdin.on("error", (err) => {
+        log("stdin error:", err?.message || err);
+      });
+    }
+
+    writeStdinLine({
+      type: "user",
+      message: { role: "user", content: runPrompt },
+    });
+
+    state.writeStdinLine = writeStdinLine;
+    state.endStdin = endStdin;
 
     log("Spawned PID:", child.pid, "run:", runNumber);
 
@@ -325,6 +393,24 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
 
         markFirstTiming(state, "firstEventMs");
         if (!isThinking) log("Parsed event type:", event.type, "subtype:", event.subtype, "run:", runNumber);
+
+        if (event.type === "control_request" && event.request?.subtype === "can_use_tool") {
+          handleCanUseTool(state, event);
+          return;
+        }
+        if (event.type === "control_cancel_request") {
+          const reqId = event.request_id || event.cancel_request_id;
+          if (reqId && state.pendingPermissions.has(reqId)) {
+            state.pendingPermissions.delete(reqId);
+            if (!webContents.isDestroyed?.()) {
+              webContents.send("agent-permission-cancelled", { conversationId, requestId: reqId });
+            }
+          }
+          return;
+        }
+        if (event.type === "control_response") {
+          return;
+        }
 
         if (event.type === "assistant" && messageHasAssistantText(event.message)) {
           markFirstTiming(state, "firstAssistantTextMs");
@@ -365,6 +451,8 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
           state.latestSessionId = event.session_id || state.latestSessionId;
           log("Result keys:", Object.keys(event));
           log("Result summary:", summarizeResult(event));
+          // Close stdin so the CLI exits cleanly; no further turns in this run.
+          endStdin();
         }
 
         webContents.send("agent-stream", { conversationId, event });
@@ -494,11 +582,100 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
   });
 }
 
+function writeControlResponse(state, requestId, responseBody) {
+  if (!state || !state.writeStdinLine) return false;
+  return state.writeStdinLine({
+    type: "control_response",
+    response: {
+      subtype: "success",
+      request_id: requestId,
+      response: responseBody,
+    },
+  });
+}
+
+function handleCanUseTool(state, event) {
+  const request = event.request || {};
+  const requestId = event.request_id;
+  if (!requestId) return;
+  const classified = classifyPermissionRequest(request);
+  const allowKey = buildPermissionKey(classified.toolName, request.input, request.blocked_path);
+
+  if (state.sessionAllowlist.has(allowKey)) {
+    log("Auto-allowing via session allowlist:", allowKey);
+    writeControlResponse(state, requestId, {
+      behavior: "allow",
+      updatedInput: request.input || {},
+    });
+    return;
+  }
+
+  const payload = {
+    conversationId: state.conversationId,
+    requestId,
+    toolUseId: request.tool_use_id || null,
+    toolName: classified.toolName,
+    input: request.input || {},
+    blockedPath: request.blocked_path || null,
+    description: request.description || null,
+    permissionSuggestions: request.permission_suggestions || null,
+    summary: classified.summary,
+    targetPath: classified.targetPath,
+    isSensitiveFile: classified.isSensitiveFile,
+    allowKey,
+  };
+
+  state.pendingPermissions.set(requestId, { request, allowKey });
+  if (!state.webContents.isDestroyed?.()) {
+    state.webContents.send("agent-permission-request", payload);
+  }
+}
+
+function respondPermission({ conversationId, requestId, behavior, message, updatedInput, scope }) {
+  const state = activeAgents.get(conversationId);
+  if (!state) {
+    log("respondPermission: no active agent for", conversationId);
+    return false;
+  }
+  const pending = state.pendingPermissions.get(requestId);
+  if (!pending) {
+    log("respondPermission: no pending request", requestId);
+    return false;
+  }
+  state.pendingPermissions.delete(requestId);
+
+  if (behavior === "allow") {
+    if (scope === "session" && pending.allowKey) {
+      state.sessionAllowlist.add(pending.allowKey);
+      log("Added to session allowlist:", pending.allowKey);
+    }
+    return writeControlResponse(state, requestId, {
+      behavior: "allow",
+      updatedInput: updatedInput || pending.request.input || {},
+    });
+  }
+
+  return writeControlResponse(state, requestId, {
+    behavior: "deny",
+    message: message || "User denied permission",
+  });
+}
+
 function cancelAgent(conversationId) {
   const state = activeAgents.get(conversationId);
   if (state?.child) {
     log("Cancelling agent:", conversationId);
     state.cancelled = true;
+    if (state.pendingPermissions?.size) {
+      for (const requestId of state.pendingPermissions.keys()) {
+        writeControlResponse(state, requestId, {
+          behavior: "deny",
+          message: "Cancelled",
+        });
+      }
+      state.pendingPermissions.clear();
+    }
+    try { state.endStdin?.(); } catch {}
     state.child.kill("SIGTERM");
   }
 }
@@ -507,6 +684,7 @@ function cancelAll() {
   for (const [, state] of activeAgents) {
     if (!state?.child) continue;
     state.cancelled = true;
+    try { state.endStdin?.(); } catch {}
     state.child.kill("SIGTERM");
   }
 }
@@ -565,4 +743,4 @@ function rewindFiles({ sessionId, messageUuid, cwd }) {
   });
 }
 
-module.exports = { startAgent, cancelAgent, cancelAll, rewindFiles };
+module.exports = { startAgent, cancelAgent, cancelAll, rewindFiles, respondPermission };

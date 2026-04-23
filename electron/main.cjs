@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell, clipboard, nati
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
+const { startAgent, cancelAgent, cancelAll, rewindFiles, respondPermission } = require("./agent-manager.cjs");
 const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
 const {
   startMulticaAgent,
@@ -593,6 +593,14 @@ ipcMain.on("agent-edit-resend", (event, opts) => {
     startCodexAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
   } else {
     startAgent({ ...opts, forkSession: true }, event.sender);
+  }
+});
+
+ipcMain.on("agent-permission-respond", (_event, opts) => {
+  try {
+    respondPermission(opts);
+  } catch (err) {
+    console.error("[agent] permission respond failed:", err?.message || err);
   }
 });
 

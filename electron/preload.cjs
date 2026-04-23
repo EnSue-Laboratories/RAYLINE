@@ -23,6 +23,17 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("agent-error", handler);
     return () => ipcRenderer.removeListener("agent-error", handler);
   },
+  agentPermissionRespond: (opts) => ipcRenderer.send("agent-permission-respond", opts),
+  onAgentPermissionRequest: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("agent-permission-request", handler);
+    return () => ipcRenderer.removeListener("agent-permission-request", handler);
+  },
+  onAgentPermissionCancelled: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("agent-permission-cancelled", handler);
+    return () => ipcRenderer.removeListener("agent-permission-cancelled", handler);
+  },
   pickFolder: () => ipcRenderer.invoke("folder-pick"),
   selectWallpaper: (previousPath) => ipcRenderer.invoke("select-wallpaper", previousPath),
   deleteWallpaper: (filePath) => ipcRenderer.invoke("delete-wallpaper", filePath),
