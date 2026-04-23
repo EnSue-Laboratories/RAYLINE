@@ -4,6 +4,7 @@ export default function useTerminal() {
   const [sessions, setSessions] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
   const [windowOpen, setWindowOpen] = useState(false);
+  const [hasLoadedSessions, setHasLoadedSessions] = useState(false);
 
   // Maps session name -> xterm.Terminal instance
   const terminalRefs = useRef(new Map());
@@ -51,6 +52,8 @@ export default function useTerminal() {
       }
     } catch (e) {
       console.error("[useTerminal] refreshSessions failed:", e);
+    } finally {
+      setHasLoadedSessions(true);
     }
   }, []);
 
@@ -218,5 +221,6 @@ export default function useTerminal() {
     unregisterTerminal,
     setActiveSession,
     setDrawerOpen,
+    hasLoadedSessions,
   };
 }

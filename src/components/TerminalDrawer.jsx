@@ -8,30 +8,65 @@ import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../windowChrom
 
 const FONT_FAMILY = "'JetBrains Mono','Fira Code',monospace";
 const XTERM_TRANSPARENT = "rgba(0,0,0,0)";
-const TERMINAL_THEME = {
-  background: XTERM_TRANSPARENT,
-  foreground: "rgba(244,247,250,0.88)",
-  cursor: "#8fd6c2",
-  cursorAccent: XTERM_TRANSPARENT,
-  selectionBackground: "rgba(120,182,255,0.18)",
-  selectionInactiveBackground: "rgba(120,182,255,0.1)",
-  black: "#0f1116",
-  red: "#f38ba8",
-  green: "#7ed7b9",
-  yellow: "#f5c97a",
-  blue: "#89b4fa",
-  magenta: "#cba6f7",
-  cyan: "#74c7ec",
-  white: "#bac2de",
-  brightBlack: "#585b70",
-  brightRed: "#f7a6bc",
-  brightGreen: "#9ce8cf",
-  brightYellow: "#f8d99c",
-  brightBlue: "#a6c9ff",
-  brightMagenta: "#d9b8fb",
-  brightCyan: "#98dbf3",
-  brightWhite: "#f5f7fb",
-};
+const TERMINAL_OPAQUE_BG = "#0D0D10";
+
+function getTerminalTheme(opaqueBackground) {
+  return {
+    background: opaqueBackground ? TERMINAL_OPAQUE_BG : XTERM_TRANSPARENT,
+    foreground: "rgba(244,247,250,0.88)",
+    cursor: "#8fd6c2",
+    cursorAccent: opaqueBackground ? TERMINAL_OPAQUE_BG : XTERM_TRANSPARENT,
+    selectionBackground: "rgba(120,182,255,0.18)",
+    selectionInactiveBackground: "rgba(120,182,255,0.1)",
+    black: "#0f1116",
+    red: "#f38ba8",
+    green: "#7ed7b9",
+    yellow: "#f5c97a",
+    blue: "#89b4fa",
+    magenta: "#cba6f7",
+    cyan: "#74c7ec",
+    white: "#bac2de",
+    brightBlack: "#585b70",
+    brightRed: "#f7a6bc",
+    brightGreen: "#9ce8cf",
+    brightYellow: "#f8d99c",
+    brightBlue: "#a6c9ff",
+    brightMagenta: "#d9b8fb",
+    brightCyan: "#98dbf3",
+    brightWhite: "#f5f7fb",
+  };
+}
+
+function emitTerminalDebug(event, details = {}) {
+  try {
+    window.api?.terminalDebugLog?.({
+      source: "renderer",
+      page: typeof window !== "undefined" ? window.location.pathname : null,
+      event,
+      details: {
+        perfNow: typeof performance !== "undefined"
+          ? Number(performance.now().toFixed(2))
+          : null,
+        ...details,
+      },
+    });
+  } catch {
+    // Debug logging is best-effort only.
+  }
+}
+
+function measureElementBox(element) {
+  if (!element) return null;
+  const rect = element.getBoundingClientRect();
+  return {
+    clientWidth: element.clientWidth,
+    clientHeight: element.clientHeight,
+    offsetWidth: element.offsetWidth,
+    offsetHeight: element.offsetHeight,
+    rectWidth: Number(rect.width.toFixed(2)),
+    rectHeight: Number(rect.height.toFixed(2)),
+  };
+}
 
 const iconBtnStyle = {
   display: "flex",
@@ -48,6 +83,30 @@ const iconBtnStyle = {
   WebkitAppRegion: "no-drag",
   transition: "background .15s, color .15s",
 };
+
+let xtermLoaderPromise = null;
+
+function loadXtermModules() {
+  if (!xtermLoaderPromise) {
+    xtermLoaderPromise = (async () => {
+      try {
+        await import("@xterm/xterm/css/xterm.css");
+      } catch {
+        // If Vite can't dynamic-import the CSS, a static import in the app entry
+        // is the fallback and this isn't fatal.
+      }
+
+      const [{ Terminal }, { FitAddon }] = await Promise.all([
+        import("@xterm/xterm"),
+        import("@xterm/addon-fit"),
+      ]);
+
+      return { Terminal, FitAddon };
+    })();
+  }
+
+  return xtermLoaderPromise;
+}
 
 function useHover(baseStyle, hoverStyle) {
   return {
@@ -81,36 +140,39 @@ function IconButton({ onClick, title, children }) {
 
 // ── TerminalViewport ──────────────────────────────────────────────────────────
 
-function TerminalViewport({
-  activeSession,
+function SessionTerminal({
+  sessionName,
+  isActive,
+  opaqueBackground = false,
   onSendInput,
   onResizeSession,
   registerTerminal,
   unregisterTerminal,
 }) {
   const containerRef = useRef(null);
-  const xtermElRef   = useRef(null);  // DOM div that xterm mounts into
-  const termRef      = useRef(null);  // current xterm.Terminal instance
-  const fitAddonRef  = useRef(null);
-  const roRef        = useRef(null);  // ResizeObserver
+  const xtermElRef = useRef(null); // DOM div that xterm mounts into
+  const termRef = useRef(null); // current xterm.Terminal instance
+  const fitAddonRef = useRef(null);
+  const roRef = useRef(null); // ResizeObserver
+  const lastObservedBoxRef = useRef(null);
 
   // Stable refs so the async IIFE captures up-to-date callbacks without
   // restarting the effect every time parent re-renders.
-  const sendRef     = useRef(onSendInput);
-  const resizeRef   = useRef(onResizeSession);
+  const sendRef = useRef(onSendInput);
+  const resizeRef = useRef(onResizeSession);
   const registerRef = useRef(registerTerminal);
-  const unregRef    = useRef(unregisterTerminal);
-  useEffect(() => { sendRef.current     = onSendInput;       }, [onSendInput]);
-  useEffect(() => { resizeRef.current   = onResizeSession;   }, [onResizeSession]);
-  useEffect(() => { registerRef.current = registerTerminal;  }, [registerTerminal]);
-  useEffect(() => { unregRef.current    = unregisterTerminal;}, [unregisterTerminal]);
+  const unregRef = useRef(unregisterTerminal);
+  const activeRef = useRef(isActive);
+  useEffect(() => { sendRef.current = onSendInput; }, [onSendInput]);
+  useEffect(() => { resizeRef.current = onResizeSession; }, [onResizeSession]);
+  useEffect(() => { registerRef.current = registerTerminal; }, [registerTerminal]);
+  useEffect(() => { unregRef.current = unregisterTerminal; }, [unregisterTerminal]);
+  useEffect(() => { activeRef.current = isActive; }, [isActive]);
 
   const teardown = useCallback(() => {
-    // Disconnect observer
     roRef.current?.disconnect();
     roRef.current = null;
 
-    // Unregister + dispose previous term
     if (termRef.current) {
       const prevName = termRef.current.__sessionName;
       if (prevName) unregRef.current(prevName);
@@ -118,49 +180,33 @@ function TerminalViewport({
       termRef.current = null;
     }
 
-    // Remove the xterm mount div
-    if (xtermElRef.current && containerRef.current) {
-      try { containerRef.current.removeChild(xtermElRef.current); } catch { /* React may already remove the mount node */ }
+    if (xtermElRef.current?.parentNode) {
+      try { xtermElRef.current.parentNode.removeChild(xtermElRef.current); } catch { /* ignore mount cleanup failures */ }
     }
     xtermElRef.current = null;
     fitAddonRef.current = null;
   }, []);
 
   useEffect(() => {
-    if (!activeSession || !containerRef.current) return;
+    if (!sessionName || !containerRef.current) return;
 
     let cancelled = false;
+    emitTerminalDebug("session:init", { sessionName });
 
     (async () => {
-      // Pull in xterm dynamically so it only loads when the drawer is first used
-      try {
-        await import("@xterm/xterm/css/xterm.css");
-      } catch {
-        // If Vite can't dynamic-import the CSS, a static import in main.jsx is
-        // the fallback — not a fatal error here.
-      }
-
-      const [{ Terminal }, { FitAddon }] = await Promise.all([
-        import("@xterm/xterm"),
-        import("@xterm/addon-fit"),
-      ]);
+      const { Terminal, FitAddon } = await loadXtermModules();
 
       if (cancelled) return;
-
-      // Tear down any previous instance before mounting a new one
-      teardown();
-
       if (!containerRef.current) return;
 
-      // Create a fresh mount point
       const el = document.createElement("div");
-      el.className = "rayline-terminal-host";
-      el.style.cssText = "width:100%;height:100%;background:transparent;";
+      el.className = `rayline-terminal-host${opaqueBackground ? " rayline-terminal-host--opaque" : ""}`;
+      el.style.cssText = `width:100%;height:100%;background:${opaqueBackground ? TERMINAL_OPAQUE_BG : "transparent"};`;
       xtermElRef.current = el;
       containerRef.current.appendChild(el);
 
       const term = new Terminal({
-        theme: TERMINAL_THEME,
+        theme: getTerminalTheme(opaqueBackground),
         fontFamily: FONT_FAMILY,
         fontSize: 13,
         fontWeight: "400",
@@ -177,48 +223,82 @@ function TerminalViewport({
         rescaleOverlappingGlyphs: true,
         scrollback: 5000,
         smoothScrollDuration: 90,
-        allowTransparency: true,
+        allowTransparency: !opaqueBackground,
         allowProposedApi: true,
       });
 
       const fitAddon = new FitAddon();
       term.loadAddon(fitAddon);
-      term.__sessionName = activeSession;
+      term.__sessionName = sessionName;
 
       term.open(el);
+      emitTerminalDebug("session:open", {
+        sessionName,
+        container: measureElementBox(containerRef.current),
+        host: measureElementBox(el),
+      });
 
-      // Small delay lets the element settle in the DOM before we measure
       await new Promise((r) => setTimeout(r, 30));
       if (cancelled) { term.dispose(); return; }
 
       try { fitAddon.fit(); } catch { /* ignore early layout measurement failures */ }
+      emitTerminalDebug("session:initial-fit", {
+        sessionName,
+        cols: term.cols,
+        rows: term.rows,
+        container: measureElementBox(containerRef.current),
+        host: measureElementBox(el),
+      });
 
       fitAddonRef.current = fitAddon;
-      termRef.current     = term;
+      termRef.current = term;
 
-      // Wire up user input
-      term.onData((data) => sendRef.current(activeSession, data));
+      term.onData((data) => sendRef.current(sessionName, data));
 
-      // Propagate size changes to the pty
-      term.onResize(({ cols, rows }) => resizeRef.current(activeSession, cols, rows));
+      term.onResize(({ cols, rows }) => {
+        emitTerminalDebug("session:term-resize", {
+          sessionName,
+          cols,
+          rows,
+          active: activeRef.current,
+          container: measureElementBox(containerRef.current),
+        });
+        resizeRef.current(sessionName, cols, rows);
+      });
 
-      // Register so the IPC listener in useTerminal can write output
-      registerRef.current(activeSession, term);
+      registerRef.current(sessionName, term);
 
-      // Load existing scrollback
       if (window.api?.terminalRead) {
         try {
-          const result = await window.api.terminalRead({ name: activeSession, lines: 500 });
+          const result = await window.api.terminalRead({ name: sessionName, lines: 500 });
           if (!cancelled && result?.ok && result.lines?.length) {
             term.write(result.lines.join("\n"));
           }
         } catch { /* ignore scrollback preload failures */ }
       }
 
-      term.focus();
+      if (activeRef.current) {
+        term.focus();
+      }
 
-      // Observe container size changes and re-fit
       const ro = new ResizeObserver(() => {
+        const nextBox = measureElementBox(containerRef.current);
+        const prevBox = lastObservedBoxRef.current;
+        const changed = !prevBox
+          || prevBox.clientWidth !== nextBox?.clientWidth
+          || prevBox.clientHeight !== nextBox?.clientHeight;
+        lastObservedBoxRef.current = nextBox;
+
+        if (changed) {
+          emitTerminalDebug("session:container-resize", {
+            sessionName,
+            active: activeRef.current,
+            container: nextBox,
+            colsBeforeFit: termRef.current?.cols ?? null,
+            rowsBeforeFit: termRef.current?.rows ?? null,
+          });
+        }
+
         if (fitAddonRef.current) {
           try { fitAddonRef.current.fit(); } catch { /* ignore transient resize fit failures */ }
         }
@@ -229,28 +309,119 @@ function TerminalViewport({
 
     return () => {
       cancelled = true;
+      emitTerminalDebug("session:teardown", { sessionName });
       teardown();
     };
-  }, [activeSession]); // eslint-disable-line react-hooks/exhaustive-deps
-  // teardown is stable (useCallback with no deps), intentionally excluded.
+  }, [opaqueBackground, sessionName, teardown]);
+
+  useEffect(() => {
+    const logActiveState = (phase) => {
+      emitTerminalDebug("session:active-state", {
+        phase,
+        sessionName,
+        isActive,
+        cols: termRef.current?.cols ?? null,
+        rows: termRef.current?.rows ?? null,
+        container: measureElementBox(containerRef.current),
+        host: measureElementBox(xtermElRef.current),
+      });
+    };
+
+    logActiveState("effect");
+    if (!isActive || !termRef.current) return;
+
+    const timeoutId = window.setTimeout(() => {
+      logActiveState("timeout-80ms");
+    }, 80);
+
+    window.requestAnimationFrame(() => {
+      logActiveState("raf-1");
+      try { termRef.current?.focus(); } catch { /* ignore transient focus failures */ }
+      window.requestAnimationFrame(() => {
+        logActiveState("raf-2");
+      });
+    });
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isActive, sessionName]);
 
   return (
     <div
-      ref={containerRef}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: isActive ? 0 : "-200vw",
+        width: "100%",
+        height: "100%",
+        pointerEvents: isActive ? "auto" : "none",
+        zIndex: isActive ? 1 : 0,
+        contain: "layout paint size",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        ref={containerRef}
+        style={{
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+          background: opaqueBackground ? TERMINAL_OPAQUE_BG : "transparent",
+          padding: "10px 6px 8px",
+          boxSizing: "border-box",
+          minHeight: 0,
+        }}
+      />
+    </div>
+  );
+}
+
+function TerminalViewport({
+  sessions,
+  activeSession,
+  opaqueBackground = false,
+  onSendInput,
+  onResizeSession,
+  registerTerminal,
+  unregisterTerminal,
+}) {
+  const visibleSession = activeSession || sessions[0]?.name || null;
+
+  useEffect(() => {
+    emitTerminalDebug("viewport:visible-session", {
+      visibleSession,
+      sessionNames: sessions.map((session) => session.name),
+    });
+  }, [sessions, visibleSession]);
+
+  return (
+    <div
       style={{
         flex: 1,
-        overflow: "hidden",
-        padding: "10px 6px 8px",
-        boxSizing: "border-box",
         minHeight: 0,
+        position: "relative",
       }}
-    />
+    >
+      {sessions.map((session) => (
+        <SessionTerminal
+          key={session.name}
+          sessionName={session.name}
+          isActive={session.name === visibleSession}
+          opaqueBackground={opaqueBackground}
+          onSendInput={onSendInput}
+          onResizeSession={onResizeSession}
+          registerTerminal={registerTerminal}
+          unregisterTerminal={unregisterTerminal}
+        />
+      ))}
+    </div>
   );
 }
 
 // ── EmptyState ────────────────────────────────────────────────────────────────
 
-function EmptyState({ onCreate }) {
+function EmptyState({ onCreate, blank = false }) {
   const s = useFontScale();
   const btnHover = useHover(
     {
@@ -271,6 +442,9 @@ function EmptyState({ onCreate }) {
       color: "rgba(255,255,255,0.75)",
     }
   );
+  if (blank) {
+    return <div style={{ flex: 1, minHeight: 0 }} />;
+  }
 
   return (
     <div
@@ -409,6 +583,7 @@ export default function TerminalDrawer({
 }) {
   const s = useFontScale();
   const [width, setWidth] = useState(480);
+  const hasWallpaper = Boolean(wallpaper?.dataUrl);
   const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || "");
   const dragging = useRef(false);
   const startX = useRef(0);
@@ -456,12 +631,13 @@ export default function TerminalDrawer({
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
-        backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
+        ...(windowMode ? { background: TERMINAL_OPAQUE_BG } : getPaneSurfaceStyle(hasWallpaper)),
+        backdropFilter: windowMode ? "none" : (hasWallpaper ? "saturate(1.1)" : "blur(56px) saturate(1.1)"),
         borderLeft: windowMode ? "none" : "1px solid rgba(255,255,255,0.025)",
         position: "relative",
         zIndex: 10,
         overflow: "hidden",
+        isolation: "isolate",
       }}
     >
       {/* Resize handle */}
@@ -555,11 +731,12 @@ export default function TerminalDrawer({
 
       {/* Content */}
       {sessions.length === 0 ? (
-        <EmptyState onCreate={handleCreate} />
+        <EmptyState onCreate={handleCreate} blank={windowMode} />
       ) : (
         <TerminalViewport
-          key={activeSession}
+          sessions={sessions}
           activeSession={activeSession}
+          opaqueBackground={windowMode}
           onSendInput={onSendInput}
           onResizeSession={onResizeSession}
           registerTerminal={registerTerminal}

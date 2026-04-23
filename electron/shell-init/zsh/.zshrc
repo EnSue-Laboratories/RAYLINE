@@ -68,7 +68,7 @@ rayline_git_segment() {
 if [[ "${RAYLINE_PROMPT_MODE:-compact}" == "minimal" ]]; then
   PROMPT='%B%F{117}%1~%f%b %F{110}›%f '
 else
-  PROMPT='%F{250}ray%f %B%F{117}%1~%f%b$(rayline_git_segment) %F{110}›%f '
+  PROMPT='%F{250}rayline%f %B%F{117}%1~%f%b$(rayline_git_segment) %F{110}›%f '
 fi
 
 PS1="$PROMPT"

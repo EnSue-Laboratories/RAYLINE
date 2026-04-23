@@ -80,5 +80,5 @@ rayline_git_segment() {
 if [ "${RAYLINE_PROMPT_MODE:-compact}" = "minimal" ]; then
   PS1='\[\e[1;38;5;117m\]\W\[\e[0m\] \[\e[38;5;110m\]›\[\e[0m\] '
 else
-  PS1='\[\e[38;5;250m\]ray\[\e[0m\] \[\e[1;38;5;117m\]\W\[\e[0m\]$(rayline_git_segment) \[\e[38;5;110m\]›\[\e[0m\] '
+  PS1='\[\e[38;5;250m\]rayline\[\e[0m\] \[\e[1;38;5;117m\]\W\[\e[0m\]$(rayline_git_segment) \[\e[38;5;110m\]›\[\e[0m\] '
 fi

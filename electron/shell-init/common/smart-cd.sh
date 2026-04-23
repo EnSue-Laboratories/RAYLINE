@@ -404,7 +404,7 @@ rayline_smart_cd() {
     return 1
   }
 
-  printf 'ray: cd -> %s\n' "$(rayline_shorten_path "$resolved")" >&2
+  printf 'rayline: cd -> %s\n' "$(rayline_shorten_path "$resolved")" >&2
   builtin cd -- "$resolved"
 }
 

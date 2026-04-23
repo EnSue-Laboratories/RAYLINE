@@ -28,6 +28,7 @@ const isWindows = process.platform === "win32";
 const SHELL_COMMAND_TIMEOUT_MS = 15000;
 const SHELL_OUTPUT_LIMIT = 128 * 1024;
 const WINDOW_BACKGROUND = "#0D0D10";
+const TERMINAL_DEBUG_ENABLED = /^(1|true|yes|on)$/i.test(String(process.env.RAYLINE_TERMINAL_DEBUG || ""));
 const WALLPAPER_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
 const WALLPAPER_MIME_TYPES = {
   png: "image/png",
@@ -54,6 +55,18 @@ if (isDev && isMac) {
 let mainWindow;
 let pmWindow;
 let terminalWindow;
+let terminalWindowRevealTimer = null;
+
+function terminalDebug(event, details = {}, meta = {}) {
+  if (!TERMINAL_DEBUG_ENABLED) return;
+  const payload = {
+    ts: new Date().toISOString(),
+    event,
+    ...meta,
+    details,
+  };
+  console.log(`[terminal-debug] ${JSON.stringify(payload)}`);
+}
 
 function broadcastToAllWindows(channel, payload) {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -68,6 +81,25 @@ function isTerminalWindowOpen() {
 
 function broadcastTerminalWindowState() {
   broadcastToAllWindows("terminal-window-state", { open: isTerminalWindowOpen() });
+}
+
+function clearTerminalWindowRevealTimer() {
+  if (!terminalWindowRevealTimer) return;
+  clearTimeout(terminalWindowRevealTimer);
+  terminalWindowRevealTimer = null;
+}
+
+function revealTerminalWindow(reason = "unknown") {
+  if (!isTerminalWindowOpen()) return;
+  clearTerminalWindowRevealTimer();
+  if (!terminalWindow.isVisible()) {
+    terminalWindow.show();
+  }
+  terminalWindow.focus();
+  terminalDebug("terminal-window:revealed", {
+    reason,
+    ...describeWindow(terminalWindow),
+  }, { source: "main" });
 }
 
 function getWindowChromeOptions() {
@@ -96,6 +128,54 @@ function getWindowChromeOptions() {
 function applyWindowChromeTweaks(win) {
   if (!win || !isWindows) return;
   win.setMenuBarVisibility(false);
+}
+
+function describeWindow(win) {
+  if (!win || win.isDestroyed()) return null;
+  const bounds = win.getBounds();
+  const [contentWidth, contentHeight] = win.getContentSize();
+  return {
+    bounds,
+    contentSize: { width: contentWidth, height: contentHeight },
+    focused: win.isFocused(),
+    visible: win.isVisible(),
+    minimized: win.isMinimized(),
+  };
+}
+
+function attachTerminalWindowDebug(win) {
+  if (!TERMINAL_DEBUG_ENABLED || !win) return;
+
+  const events = [
+    "ready-to-show",
+    "show",
+    "hide",
+    "focus",
+    "blur",
+    "resize",
+    "move",
+    "maximize",
+    "unmaximize",
+    "enter-full-screen",
+    "leave-full-screen",
+  ];
+
+  for (const eventName of events) {
+    win.on(eventName, () => {
+      terminalDebug(`terminal-window:${eventName}`, describeWindow(win), { source: "main" });
+    });
+  }
+
+  win.webContents.on("did-finish-load", () => {
+    terminalDebug("terminal-window:did-finish-load", {
+      ...describeWindow(win),
+      url: win.webContents.getURL(),
+    }, { source: "main" });
+  });
+
+  win.webContents.on("render-process-gone", (_event, details) => {
+    terminalDebug("terminal-window:render-process-gone", details, { source: "main" });
+  });
 }
 
 function getWallpaperStorageDir() {
@@ -216,7 +296,7 @@ function createProjectManagerWindow() {
 function createTerminalWindow() {
   if (isTerminalWindowOpen()) {
     if (terminalWindow.isMinimized()) terminalWindow.restore();
-    terminalWindow.focus();
+    revealTerminalWindow("existing-window");
     broadcastTerminalWindowState();
     return terminalWindow;
   }
@@ -227,6 +307,7 @@ function createTerminalWindow() {
     height: 760,
     minWidth: 560,
     minHeight: 320,
+    show: false,
     backgroundColor: WINDOW_BACKGROUND,
     icon: path.join(__dirname, "../public/icon.png"),
     ...getWindowChromeOptions(),
@@ -237,6 +318,7 @@ function createTerminalWindow() {
     },
   });
   applyWindowChromeTweaks(terminalWindow);
+  attachTerminalWindowDebug(terminalWindow);
 
   terminalWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -250,7 +332,13 @@ function createTerminalWindow() {
     terminalWindow.loadFile(path.join(__dirname, "../dist/src/terminal-window.html"));
   }
 
+  clearTerminalWindowRevealTimer();
+  terminalWindowRevealTimer = setTimeout(() => {
+    revealTerminalWindow("startup-timeout");
+  }, isDev ? 2500 : 1500);
+
   terminalWindow.on("closed", () => {
+    clearTerminalWindowRevealTimer();
     terminalWindow = null;
     broadcastTerminalWindowState();
   });
@@ -262,6 +350,13 @@ function createTerminalWindow() {
 app.setName("RayLine");
 
 app.whenReady().then(() => {
+  terminalDebug("app:ready", {
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+    platform: process.platform,
+  }, { source: "main" });
+
   // Set dock icon on macOS
   if (isMac) {
     const iconPath = path.join(__dirname, "../public/icon.png");
@@ -327,6 +422,22 @@ ipcMain.handle("close-terminal-window", () => {
 
 ipcMain.handle("is-terminal-window-open", () => {
   return isTerminalWindowOpen();
+});
+
+ipcMain.on("terminal-debug-log", (event, payload = {}) => {
+  if (!TERMINAL_DEBUG_ENABLED) return;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  terminalDebug(payload.event || "renderer-log", payload.details || {}, {
+    source: payload.source || "renderer",
+    page: payload.page || event.sender.getURL?.(),
+    windowTitle: win?.getTitle?.() || null,
+  });
+});
+
+ipcMain.on("terminal-window-ready", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed() || win !== terminalWindow) return;
+  revealTerminalWindow("renderer-ready");
 });
 
 ipcMain.handle("window-close-current", (event) => {

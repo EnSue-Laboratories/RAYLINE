@@ -98,6 +98,14 @@ input:focus         { outline: none; }
   background-color: transparent !important;
 }
 
+.rayline-terminal-host--opaque .xterm,
+.rayline-terminal-host--opaque .xterm .xterm-screen,
+.rayline-terminal-host--opaque .xterm .xterm-viewport,
+.rayline-terminal-host--opaque .xterm .xterm-scrollable-element {
+  background: var(--pane-background) !important;
+  background-color: var(--pane-background) !important;
+}
+
 .rayline-terminal-host .xterm {
   -webkit-font-smoothing: antialiased;
 }
