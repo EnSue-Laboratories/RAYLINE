@@ -4,14 +4,14 @@ const buttonBaseStyle = {
   width: 30,
   height: 24,
   borderRadius: 7,
-  border: "1px solid rgba(255,255,255,0.04)",
-  background: "rgba(255,255,255,0.03)",
-  color: "rgba(255,255,255,0.72)",
+  border: "none",
+  background: "none",
+  color: "rgba(255,255,255,0.45)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   cursor: "pointer",
-  transition: "background .15s ease, border-color .15s ease, color .15s ease",
+  transition: "background .15s ease, color .15s ease",
   padding: 0,
   WebkitAppRegion: "no-drag",
 };
@@ -31,22 +31,19 @@ export default function WindowControls({ visible = false }) {
   const handleHover = (event, role, active) => {
     const target = event.currentTarget;
     if (!active) {
-      target.style.background = "rgba(255,255,255,0.03)";
-      target.style.borderColor = "rgba(255,255,255,0.04)";
-      target.style.color = "rgba(255,255,255,0.72)";
+      target.style.background = "none";
+      target.style.color = "rgba(255,255,255,0.45)";
       return;
     }
 
     if (role === "close") {
-      target.style.background = "rgba(228,76,76,0.92)";
-      target.style.borderColor = "rgba(255,255,255,0.08)";
-      target.style.color = "rgba(255,255,255,0.96)";
+      target.style.background = "rgba(228,76,76,0.18)";
+      target.style.color = "rgba(228,76,76,0.95)";
       return;
     }
 
-    target.style.background = "rgba(255,255,255,0.12)";
-    target.style.borderColor = "rgba(255,255,255,0.08)";
-    target.style.color = "rgba(255,255,255,0.94)";
+    target.style.background = "rgba(255,255,255,0.08)";
+    target.style.color = "rgba(255,255,255,0.9)";
   };
 
   const handleMouseDown = (event) => {

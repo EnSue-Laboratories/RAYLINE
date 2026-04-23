@@ -1,6 +1,6 @@
 import { memo, useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
-import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
+import { Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
@@ -352,7 +352,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
   const showConversationTitle = Boolean(convo && !showNewChatCard);
-  const topTabsLeft = sidebarOpen ? 18 : 104;
+  const topTabsLeft = 18;
   const topTabsRight = windowControlsVisible ? 126 : 24;
   const headerContentOffset = showHeaderTabs ? 8 : 0;
 
@@ -493,12 +493,18 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      {/* Drag region matching sidebar spacer */}
+      {/* Drag region matching sidebar spacer.
+          When window controls are visible (Windows), shrink the drag region on
+          the right so the control buttons are not inside the drag hit-area.
+          Electron processes WebkitAppRegion regions before React event handlers,
+          and a drag region physically covering a button causes clicks to be
+          swallowed by the OS window-move handler even with no-drag on the button. */}
       <div
         style={{
           height: WINDOW_DRAG_HEIGHT,
           WebkitAppRegion: "drag",
           flexShrink: 0,
+          marginRight: windowControlsVisible ? topTabsRight : 0,
         }}
       />
 
@@ -531,42 +537,6 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               onClose={onCloseTab}
             />
           </div>
-        </div>
-      )}
-
-      {/* Sidebar collapsed: icon buttons below traffic lights */}
-      {!sidebarOpen && (
-        <div style={{
-          position: "fixed", top: WINDOW_DRAG_HEIGHT, left: 34,
-          display: "flex", gap: 4,
-          zIndex: 50, WebkitAppRegion: "no-drag",
-        }}>
-          <button
-            onClick={onToggleSidebar}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 28, height: 28, borderRadius: 7,
-              background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.4)", transition: "all .15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
-          >
-            <PanelLeftOpen size={16} strokeWidth={1.5} />
-          </button>
-          <button
-            onClick={onNew}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 28, height: 28, borderRadius: 7,
-              background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.4)", transition: "all .15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
-          >
-            <Plus size={16} strokeWidth={1.5} />
-          </button>
         </div>
       )}
 

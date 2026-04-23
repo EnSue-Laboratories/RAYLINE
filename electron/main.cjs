@@ -64,7 +64,9 @@ function getWindowChromeOptions() {
 
   if (isWindows) {
     return {
-      titleBarStyle: "hidden",
+      // Keep Windows fully in the client area so our custom controls receive
+      // actual pointer events instead of sitting inside the OS title bar.
+      frame: false,
       autoHideMenuBar: true,
     };
   }
@@ -154,6 +156,12 @@ function createWindow() {
   if (isDev) {
     const port = process.env.VITE_PORT || "5173";
     mainWindow.loadURL(`http://localhost:${port}`);
+    mainWindow.webContents.on("before-input-event", (event, input) => {
+      if (input.key === "F12" && input.type === "keyDown") {
+        mainWindow.webContents.toggleDevTools();
+        event.preventDefault();
+      }
+    });
   } else {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }

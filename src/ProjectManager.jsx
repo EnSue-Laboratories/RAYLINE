@@ -291,7 +291,40 @@ export default function ProjectManager() {
         position: "relative",
       }}
     >
-      <WindowControls visible={platform === "win32"} />
+      {/* Close button — always visible, top-right */}
+      <button
+        onClick={() => window.ghApi.windowClose()}
+        title="Close"
+        style={{
+          position: "fixed",
+          top: 12,
+          right: 12,
+          zIndex: 9999,
+          width: 40,
+          height: 40,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "white",
+          border: "none",
+          borderRadius: 8,
+          color: "black",
+          cursor: "pointer",
+          WebkitAppRegion: "no-drag",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "rgba(228,76,76,0.88)";
+          e.currentTarget.style.color = "rgba(255,255,255,0.95)";
+          e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+          e.currentTarget.style.color = "rgba(255,255,255,0.6)";
+          e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
+        }}
+      >
+        <X size={14} strokeWidth={1.9} />
+      </button>
 
       {/* Background — wallpaper or aurora */}
       {wallpaper?.dataUrl ? (
@@ -312,13 +345,13 @@ export default function ProjectManager() {
         </>
       )}
 
-      {/* Drag region */}
+      {/* Drag region — leave right 120px clear for window controls on Windows */}
       <div
         style={{
           position: "fixed",
           top: 0,
           left: 0,
-          right: 0,
+          right: 50,
           height: 52,
           WebkitAppRegion: "drag",
           zIndex: 100,

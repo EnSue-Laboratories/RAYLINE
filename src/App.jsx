@@ -3291,9 +3291,9 @@ export default function App() {
       {/* Sidebar */}
       <div
         style={{
-          width: sidebarOpen ? 264 : 0,
-          minWidth: sidebarOpen ? 264 : 0,
-          borderRight: sidebarOpen ? "1px solid rgba(255,255,255,0.025)" : "none",
+          width: sidebarOpen ? 220 : 52,
+          minWidth: sidebarOpen ? 220 : 52,
+          borderRight: "1px solid rgba(255,255,255,0.025)",
           display: "flex",
           flexDirection: "column",
           position: "relative",
@@ -3315,6 +3315,7 @@ export default function App() {
           onOpenDispatch={() => setShowDispatchCard(true)}
           onDelete={handleDelete}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
+          isOpen={sidebarOpen}
           cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
           onPickFolder={handlePickFolder}
           onOpenSettings={() => setShowSettings(true)}
@@ -3444,6 +3445,7 @@ export default function App() {
         registerTerminal={terminal.registerTerminal}
         unregisterTerminal={terminal.unregisterTerminal}
         wallpaper={wallpaper}
+        windowControlsVisible={showWindowControls}
       />
       </div>
     </div>
