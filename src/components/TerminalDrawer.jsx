@@ -10,6 +10,16 @@ import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../windowChrom
 const FONT_FAMILY = "'JetBrains Mono','Fira Code',monospace";
 const XTERM_TRANSPARENT = "rgba(0,0,0,0)";
 const TERMINAL_OPAQUE_BG = "#0D0D10";
+const ESC = "\x1b";
+const CLICK_CURSOR_MOVE_MAX_MS = 500;
+const CLICK_CURSOR_MOVE_DRAG_PX = 5;
+
+const Direction = Object.freeze({
+  UP: "A",
+  DOWN: "B",
+  RIGHT: "C",
+  LEFT: "D",
+});
 
 function getWallpaperOpacityValue(wallpaper) {
   if (!Number.isFinite(wallpaper?.imgOpacity)) return 1;
@@ -76,6 +86,210 @@ function measureElementBox(element) {
     rectWidth: Number(rect.width.toFixed(2)),
     rectHeight: Number(rect.height.toFixed(2)),
   };
+}
+
+function getCoordsRelativeToElement(event, element) {
+  if (!element) return null;
+  const rect = element.getBoundingClientRect();
+  const elementStyle = window.getComputedStyle(element);
+  const leftPadding = parseInt(elementStyle.getPropertyValue("padding-left"), 10) || 0;
+  const topPadding = parseInt(elementStyle.getPropertyValue("padding-top"), 10) || 0;
+  return [
+    event.clientX - rect.left - leftPadding,
+    event.clientY - rect.top - topPadding,
+  ];
+}
+
+function getTerminalCoords(term, event) {
+  const element = term?.element;
+  const cssCellWidth = term?.dimensions?.css?.cell?.width;
+  const cssCellHeight = term?.dimensions?.css?.cell?.height;
+  if (!element || !cssCellWidth || !cssCellHeight) return null;
+
+  const coords = getCoordsRelativeToElement(event, element);
+  if (!coords) return null;
+
+  const x = Math.min(Math.max(Math.ceil(coords[0] / cssCellWidth), 1), term.cols);
+  const y = Math.min(Math.max(Math.ceil(coords[1] / cssCellHeight), 1), term.rows);
+  return { x: x - 1, y: y - 1 };
+}
+
+function repeatSequence(count, str) {
+  let result = "";
+  for (let i = 0; i < Math.floor(count); i += 1) {
+    result += str;
+  }
+  return result;
+}
+
+function directionSequence(direction, applicationCursor) {
+  return `${ESC}${applicationCursor ? "O" : "["}${direction}`;
+}
+
+function colsFromRowBeginning(currX) {
+  return currX - 1;
+}
+
+function colsFromRowEnd(currX, cols) {
+  return cols - currX;
+}
+
+function getWrappedRowsForAbsoluteRow(bufferService, absoluteRow) {
+  let rowCount = 0;
+  let currentRow = absoluteRow;
+  let line = bufferService?.buffer?.lines?.get(currentRow);
+  let lineWraps = line?.isWrapped;
+
+  while (lineWraps && currentRow >= 0) {
+    rowCount += 1;
+    currentRow -= 1;
+    line = bufferService?.buffer?.lines?.get(currentRow);
+    lineWraps = line?.isWrapped;
+  }
+
+  return rowCount;
+}
+
+function getWrappedRowsCount(startAbsoluteRow, targetAbsoluteRow, bufferService) {
+  let wrappedRows = 0;
+  const startRow = startAbsoluteRow - getWrappedRowsForAbsoluteRow(bufferService, startAbsoluteRow);
+  const endRow = targetAbsoluteRow - getWrappedRowsForAbsoluteRow(bufferService, targetAbsoluteRow);
+  const direction = startAbsoluteRow > targetAbsoluteRow ? -1 : 1;
+
+  for (let i = 0; i < Math.abs(startRow - endRow); i += 1) {
+    const line = bufferService?.buffer?.lines?.get(startRow + (direction * i));
+    if (line?.isWrapped) wrappedRows += 1;
+  }
+
+  return wrappedRows;
+}
+
+function bufferLineBetween(startCol, startAbsoluteRow, endCol, endAbsoluteRow, forward, bufferService) {
+  const buffer = bufferService?.buffer;
+  if (!buffer) return "";
+
+  let currentCol = startCol;
+  let currentRow = startAbsoluteRow;
+  let bufferStr = "";
+  let localStartCol = startCol;
+
+  while ((currentCol !== endCol || currentRow !== endAbsoluteRow)
+    && currentRow >= 0
+    && currentRow < buffer.lines.length) {
+    currentCol += forward ? 1 : -1;
+
+    if (forward && currentCol > bufferService.cols - 1) {
+      bufferStr += buffer.translateBufferLineToString(currentRow, false, localStartCol, currentCol);
+      currentCol = 0;
+      localStartCol = 0;
+      currentRow += 1;
+    } else if (!forward && currentCol < 0) {
+      bufferStr += buffer.translateBufferLineToString(currentRow, false, 0, localStartCol + 1);
+      currentCol = bufferService.cols - 1;
+      localStartCol = currentCol;
+      currentRow -= 1;
+    }
+  }
+
+  return bufferStr + buffer.translateBufferLineToString(currentRow, false, localStartCol, currentCol);
+}
+
+function getHorizontalDirection(startX, startAbsoluteRow, targetX, targetAbsoluteRow, bufferService, applicationCursor) {
+  let startRow;
+  if (moveToRequestedRow(startAbsoluteRow, targetAbsoluteRow, bufferService, applicationCursor).length > 0) {
+    startRow = targetAbsoluteRow - getWrappedRowsForAbsoluteRow(bufferService, targetAbsoluteRow);
+  } else {
+    startRow = startAbsoluteRow;
+  }
+
+  if ((startX < targetX && startRow <= targetAbsoluteRow)
+    || (startX >= targetX && startRow < targetAbsoluteRow)) {
+    return Direction.RIGHT;
+  }
+  return Direction.LEFT;
+}
+
+function moveToRequestedRow(startAbsoluteRow, targetAbsoluteRow, bufferService, applicationCursor) {
+  const startRow = startAbsoluteRow - getWrappedRowsForAbsoluteRow(bufferService, startAbsoluteRow);
+  const endRow = targetAbsoluteRow - getWrappedRowsForAbsoluteRow(bufferService, targetAbsoluteRow);
+  const rowsToMove = Math.abs(startRow - endRow) - getWrappedRowsCount(startAbsoluteRow, targetAbsoluteRow, bufferService);
+  const direction = startAbsoluteRow > targetAbsoluteRow ? Direction.UP : Direction.DOWN;
+  return repeatSequence(rowsToMove, directionSequence(direction, applicationCursor));
+}
+
+function resetStartingRow(startX, startAbsoluteRow, targetX, targetAbsoluteRow, bufferService, applicationCursor) {
+  if (moveToRequestedRow(startAbsoluteRow, targetAbsoluteRow, bufferService, applicationCursor).length === 0) {
+    return "";
+  }
+  return repeatSequence(
+    bufferLineBetween(
+      startX,
+      startAbsoluteRow,
+      startX,
+      startAbsoluteRow - getWrappedRowsForAbsoluteRow(bufferService, startAbsoluteRow),
+      false,
+      bufferService
+    ).length,
+    directionSequence(Direction.LEFT, applicationCursor)
+  );
+}
+
+function moveToRequestedCol(startX, startAbsoluteRow, targetX, targetAbsoluteRow, bufferService, applicationCursor) {
+  const startRow = moveToRequestedRow(startAbsoluteRow, targetAbsoluteRow, bufferService, applicationCursor).length > 0
+    ? targetAbsoluteRow - getWrappedRowsForAbsoluteRow(bufferService, targetAbsoluteRow)
+    : startAbsoluteRow;
+  const direction = getHorizontalDirection(
+    startX,
+    startAbsoluteRow,
+    targetX,
+    targetAbsoluteRow,
+    bufferService,
+    applicationCursor
+  );
+
+  return repeatSequence(
+    bufferLineBetween(
+      startX,
+      startRow,
+      targetX,
+      targetAbsoluteRow,
+      direction === Direction.RIGHT,
+      bufferService
+    ).length,
+    directionSequence(direction, applicationCursor)
+  );
+}
+
+function buildMoveToCellSequence(term, targetX, targetY) {
+  const core = term?._core;
+  const bufferService = core?._bufferService;
+  const buffer = term?.buffer?.active;
+  if (!bufferService || !buffer) return "";
+
+  const startX = buffer.cursorX;
+  const startAbsoluteRow = buffer.baseY + buffer.cursorY;
+  const targetAbsoluteRow = buffer.baseY + targetY;
+  const applicationCursor = Boolean(term?.modes?.applicationCursorKeysMode);
+
+  if (buffer.type !== "alternate") {
+    if (startAbsoluteRow === targetAbsoluteRow) {
+      const direction = startX > targetX ? Direction.LEFT : Direction.RIGHT;
+      return repeatSequence(Math.abs(startX - targetX), directionSequence(direction, applicationCursor));
+    }
+
+    const direction = startAbsoluteRow > targetAbsoluteRow ? Direction.LEFT : Direction.RIGHT;
+    const rowDifference = Math.abs(startAbsoluteRow - targetAbsoluteRow);
+    const cellsToMove = colsFromRowEnd(startAbsoluteRow > targetAbsoluteRow ? targetX : startX, bufferService.cols)
+      + ((rowDifference - 1) * bufferService.cols)
+      + 1
+      + colsFromRowBeginning(startAbsoluteRow > targetAbsoluteRow ? startX : targetX);
+
+    return repeatSequence(cellsToMove, directionSequence(direction, applicationCursor));
+  }
+
+  return resetStartingRow(startX, startAbsoluteRow, targetX, targetAbsoluteRow, bufferService, applicationCursor)
+    + moveToRequestedRow(startAbsoluteRow, targetAbsoluteRow, bufferService, applicationCursor)
+    + moveToRequestedCol(startX, startAbsoluteRow, targetX, targetAbsoluteRow, bufferService, applicationCursor);
 }
 
 const iconBtnStyle = {
@@ -154,6 +368,7 @@ function SessionTerminal({
   sessionName,
   isActive,
   opaqueBackground = false,
+  plainClickMovesCursor = false,
   onSendInput,
   onResizeSession,
   registerTerminal,
@@ -167,6 +382,7 @@ function SessionTerminal({
   const lastObservedBoxRef = useRef(null);
   const fitTimersRef = useRef([]);
   const lastSyncedPtySizeRef = useRef("");
+  const mouseGestureRef = useRef(null);
 
   // Stable refs so the async IIFE captures up-to-date callbacks without
   // restarting the effect every time parent re-renders.
@@ -324,6 +540,77 @@ function SessionTerminal({
 
       term.onData((data) => sendRef.current(sessionName, data));
 
+      const handleMouseDown = (event) => {
+        if (!plainClickMovesCursor || event.button !== 0 || event.detail !== 1) {
+          mouseGestureRef.current = null;
+          return;
+        }
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+          mouseGestureRef.current = null;
+          return;
+        }
+        if (event.target instanceof Element && event.target.closest("a")) {
+          mouseGestureRef.current = null;
+          return;
+        }
+
+        mouseGestureRef.current = {
+          startX: event.clientX,
+          startY: event.clientY,
+          startTime: event.timeStamp,
+          hadSelectionAtMouseDown: term.getSelection().length > 1,
+          dragged: false,
+        };
+      };
+
+      const handleMouseMove = (event) => {
+        const gesture = mouseGestureRef.current;
+        if (!gesture) return;
+        if (
+          Math.abs(event.clientX - gesture.startX) > CLICK_CURSOR_MOVE_DRAG_PX
+          || Math.abs(event.clientY - gesture.startY) > CLICK_CURSOR_MOVE_DRAG_PX
+        ) {
+          gesture.dragged = true;
+        }
+      };
+
+      const handleMouseUp = (event) => {
+        const gesture = mouseGestureRef.current;
+        mouseGestureRef.current = null;
+        if (!gesture || !plainClickMovesCursor) return;
+        if (gesture.dragged || gesture.hadSelectionAtMouseDown) return;
+        if (event.button !== 0 || event.detail !== 1) return;
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        if (event.timeStamp - gesture.startTime > CLICK_CURSOR_MOVE_MAX_MS) return;
+        if (term.modes.mouseTrackingMode !== "none") return;
+        if (term.buffer.active.type !== "normal") return;
+        if (term.buffer.active.baseY !== term.buffer.active.viewportY) return;
+        if (term.getSelection().length > 1) return;
+
+        const coords = getTerminalCoords(term, event);
+        if (!coords) return;
+
+        const sequence = buildMoveToCellSequence(term, coords.x, coords.y);
+        if (!sequence) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        term.clearSelection();
+        term.focus();
+        term.input(sequence, true);
+        emitTerminalDebug("session:plain-click-cursor-move", {
+          sessionName,
+          targetX: coords.x,
+          targetY: coords.y,
+          cols: term.cols,
+          rows: term.rows,
+        });
+      };
+
+      term.element?.addEventListener("mousedown", handleMouseDown);
+      term.element?.addEventListener("mousemove", handleMouseMove);
+      term.element?.addEventListener("mouseup", handleMouseUp);
+
       registerRef.current(sessionName, term);
 
       if (window.api?.terminalRead) {
@@ -376,10 +663,11 @@ function SessionTerminal({
 
     return () => {
       cancelled = true;
+      mouseGestureRef.current = null;
       emitTerminalDebug("session:teardown", { sessionName });
       teardown();
     };
-  }, [opaqueBackground, sessionName, teardown]);
+  }, [opaqueBackground, plainClickMovesCursor, sessionName, teardown]);
 
   useEffect(() => {
     const logActiveState = (phase) => {
@@ -450,6 +738,7 @@ function TerminalViewport({
   sessions,
   activeSession,
   opaqueBackground = false,
+  plainClickMovesCursor = false,
   onSendInput,
   onResizeSession,
   registerTerminal,
@@ -478,6 +767,7 @@ function TerminalViewport({
           sessionName={session.name}
           isActive={session.name === visibleSession}
           opaqueBackground={opaqueBackground}
+          plainClickMovesCursor={plainClickMovesCursor}
           onSendInput={onSendInput}
           onResizeSession={onResizeSession}
           registerTerminal={registerTerminal}
@@ -875,6 +1165,7 @@ export default function TerminalDrawer({
             sessions={sessions}
             activeSession={activeSession}
             opaqueBackground={windowMode && !hasWallpaper}
+            plainClickMovesCursor={windowMode}
             onSendInput={onSendInput}
             onResizeSession={onResizeSession}
             registerTerminal={registerTerminal}
