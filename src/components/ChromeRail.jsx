@@ -1,8 +1,10 @@
 import { PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import HoverIconButton from "./HoverIconButton";
 import { CHROME_RAIL_BUTTON_SIZE, CHROME_RAIL_GAP, CHROME_RAIL_LEFT, CHROME_RAIL_TOP } from "../windowChrome";
+import { createTranslator } from "../i18n";
 
-export default function ChromeRail({ sidebarOpen, onToggleSidebar, onNew, showNewButton = false }) {
+export default function ChromeRail({ sidebarOpen, onToggleSidebar, onNew, showNewButton = false, locale = "en-US" }) {
+  const t = createTranslator(locale);
   const buttonStyle = {
     width: CHROME_RAIL_BUTTON_SIZE,
     height: CHROME_RAIL_BUTTON_SIZE,
@@ -30,8 +32,8 @@ export default function ChromeRail({ sidebarOpen, onToggleSidebar, onNew, showNe
       }}
     >
       <HoverIconButton
-        tooltip={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-        ariaLabel={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+        tooltip={sidebarOpen ? t("chromeRail.collapseSidebar") : t("chromeRail.expandSidebar")}
+        ariaLabel={sidebarOpen ? t("chromeRail.collapseSidebar") : t("chromeRail.expandSidebar")}
         onClick={onToggleSidebar}
         style={buttonStyle}
       >
@@ -40,8 +42,8 @@ export default function ChromeRail({ sidebarOpen, onToggleSidebar, onNew, showNe
 
       {showNewButton ? (
         <HoverIconButton
-          tooltip="New chat"
-          ariaLabel="New chat"
+          tooltip={t("chromeRail.newChat")}
+          ariaLabel={t("chromeRail.newChat")}
           onClick={onNew}
           style={buttonStyle}
         >
