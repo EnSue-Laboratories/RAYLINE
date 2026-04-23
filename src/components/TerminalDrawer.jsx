@@ -13,6 +13,7 @@ const TERMINAL_OPAQUE_BG = "#0D0D10";
 const ESC = "\x1b";
 const CLICK_CURSOR_MOVE_MAX_MS = 500;
 const CLICK_CURSOR_MOVE_DRAG_PX = 5;
+const DELETE_SEQUENCE = `${ESC}[3~`;
 
 const Direction = Object.freeze({
   UP: "A",
@@ -260,7 +261,7 @@ function moveToRequestedCol(startX, startAbsoluteRow, targetX, targetAbsoluteRow
   );
 }
 
-function buildMoveToCellSequence(term, targetX, targetY) {
+function buildMoveToAbsoluteCellSequence(term, targetX, targetAbsoluteRow) {
   const core = term?._core;
   const bufferService = core?._bufferService;
   const buffer = term?.buffer?.active;
@@ -268,7 +269,6 @@ function buildMoveToCellSequence(term, targetX, targetY) {
 
   const startX = buffer.cursorX;
   const startAbsoluteRow = buffer.baseY + buffer.cursorY;
-  const targetAbsoluteRow = buffer.baseY + targetY;
   const applicationCursor = Boolean(term?.modes?.applicationCursorKeysMode);
 
   if (buffer.type !== "alternate") {
@@ -290,6 +290,46 @@ function buildMoveToCellSequence(term, targetX, targetY) {
   return resetStartingRow(startX, startAbsoluteRow, targetX, targetAbsoluteRow, bufferService, applicationCursor)
     + moveToRequestedRow(startAbsoluteRow, targetAbsoluteRow, bufferService, applicationCursor)
     + moveToRequestedCol(startX, startAbsoluteRow, targetX, targetAbsoluteRow, bufferService, applicationCursor);
+}
+
+function buildMoveToCellSequence(term, targetX, targetY) {
+  const buffer = term?.buffer?.active;
+  if (!buffer) return "";
+  return buildMoveToAbsoluteCellSequence(term, targetX, buffer.baseY + targetY);
+}
+
+function getPromptSelectionEditContext(term) {
+  const range = term?.getSelectionPosition?.();
+  const selectionText = term?.getSelection?.() || "";
+  const buffer = term?.buffer?.active;
+  const bufferService = term?._core?._bufferService;
+
+  if (!range || !selectionText || !buffer || !bufferService) {
+    return null;
+  }
+
+  if (term.modes.mouseTrackingMode !== "none") return null;
+  if (buffer.type !== "normal") return null;
+  if (buffer.baseY !== buffer.viewportY) return null;
+
+  const currentAbsoluteRow = buffer.baseY + buffer.cursorY;
+  const currentWrappedStart = currentAbsoluteRow - getWrappedRowsForAbsoluteRow(bufferService, currentAbsoluteRow);
+  const start = range.start;
+  const end = range.end;
+
+  if (!start || !end) return null;
+  if (start.y < currentWrappedStart || end.y > currentAbsoluteRow) return null;
+
+  const deleteCount = bufferLineBetween(start.x, start.y, end.x, end.y, true, bufferService).length;
+  if (!deleteCount) return null;
+
+  return {
+    startX: start.x,
+    startAbsoluteRow: start.y,
+    deleteCount,
+    moveSequence: buildMoveToAbsoluteCellSequence(term, start.x, start.y),
+    deleteSequence: repeatSequence(deleteCount, DELETE_SEQUENCE),
+  };
 }
 
 const iconBtnStyle = {
@@ -370,6 +410,7 @@ function SessionTerminal({
   opaqueBackground = false,
   plainClickMovesCursor = false,
   promptUndoShortcut = false,
+  promptSelectionEditing = false,
   onSendInput,
   onResizeSession,
   registerTerminal,
@@ -465,20 +506,50 @@ function SessionTerminal({
 
       term.attachCustomKeyEventHandler((event) => {
         if (!promptUndoShortcut || event.type !== "keydown") {
+          // continue into other detached-terminal prompt shortcuts below
+        } else {
+          const isPromptUndoShortcut = event.metaKey
+            && !event.ctrlKey
+            && !event.altKey
+            && !event.shiftKey
+            && event.code === "KeyZ";
+
+          if (isPromptUndoShortcut) {
+            if (term.modes.mouseTrackingMode !== "none" || term.buffer.active.type !== "normal") {
+              return true;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            term.clearSelection();
+            term.focus();
+            term.input("\x1f", true);
+            emitTerminalDebug("session:prompt-undo-shortcut", {
+              sessionName,
+              cols: term.cols,
+              rows: term.rows,
+            });
+            return false;
+          }
+        }
+
+        if (event.type !== "keydown") {
           return true;
         }
 
-        const isPromptUndoShortcut = event.metaKey
+        if (!promptSelectionEditing) {
+          return true;
+        }
+
+        const selectionEdit = getPromptSelectionEditContext(term);
+        if (!selectionEdit) return true;
+
+        const isPlainPrintable = event.key.length === 1
+          && !event.metaKey
           && !event.ctrlKey
-          && !event.altKey
-          && !event.shiftKey
-          && event.code === "KeyZ";
-
-        if (!isPromptUndoShortcut) {
-          return true;
-        }
-
-        if (term.modes.mouseTrackingMode !== "none" || term.buffer.active.type !== "normal") {
+          && !event.altKey;
+        const isDeleteKey = event.key === "Backspace" || event.key === "Delete";
+        if (!isPlainPrintable && !isDeleteKey) {
           return true;
         }
 
@@ -486,11 +557,13 @@ function SessionTerminal({
         event.stopPropagation();
         term.clearSelection();
         term.focus();
-        term.input("\x1f", true);
-        emitTerminalDebug("session:prompt-undo-shortcut", {
+        term.input(`${selectionEdit.moveSequence}${selectionEdit.deleteSequence}${isPlainPrintable ? event.key : ""}`, true);
+        emitTerminalDebug("session:prompt-selection-edit", {
           sessionName,
-          cols: term.cols,
-          rows: term.rows,
+          action: isDeleteKey ? "delete-selection" : "replace-selection",
+          deleteCount: selectionEdit.deleteCount,
+          startX: selectionEdit.startX,
+          startAbsoluteRow: selectionEdit.startAbsoluteRow,
         });
         return false;
       });
@@ -700,7 +773,7 @@ function SessionTerminal({
       emitTerminalDebug("session:teardown", { sessionName });
       teardown();
     };
-  }, [opaqueBackground, plainClickMovesCursor, promptUndoShortcut, sessionName, teardown]);
+  }, [opaqueBackground, plainClickMovesCursor, promptSelectionEditing, promptUndoShortcut, sessionName, teardown]);
 
   useEffect(() => {
     const logActiveState = (phase) => {
@@ -773,6 +846,7 @@ function TerminalViewport({
   opaqueBackground = false,
   plainClickMovesCursor = false,
   promptUndoShortcut = false,
+  promptSelectionEditing = false,
   onSendInput,
   onResizeSession,
   registerTerminal,
@@ -803,6 +877,7 @@ function TerminalViewport({
           opaqueBackground={opaqueBackground}
           plainClickMovesCursor={plainClickMovesCursor}
           promptUndoShortcut={promptUndoShortcut}
+          promptSelectionEditing={promptSelectionEditing}
           onSendInput={onSendInput}
           onResizeSession={onResizeSession}
           registerTerminal={registerTerminal}
@@ -1202,6 +1277,7 @@ export default function TerminalDrawer({
             opaqueBackground={windowMode && !hasWallpaper}
             plainClickMovesCursor={windowMode}
             promptUndoShortcut={windowMode && isMac}
+            promptSelectionEditing={windowMode}
             onSendInput={onSendInput}
             onResizeSession={onResizeSession}
             registerTerminal={registerTerminal}
