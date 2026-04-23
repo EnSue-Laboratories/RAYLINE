@@ -178,6 +178,31 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const [chooseHover, setChooseHover] = useState(false);
   const [removeHover, setRemoveHover] = useState(false);
 
+  // ── Auto-updater state ──────────────────────────────────────────────────
+  const [appVersion, setAppVersion] = useState(null);
+  const [updaterPhase, setUpdaterPhase] = useState("idle"); // idle|checking|available|not-available|downloading|ready|error
+  const [updateVersion, setUpdateVersion] = useState(null);
+  const [downloadPct, setDownloadPct] = useState(0);
+  const [updateError, setUpdateError] = useState(null);
+
+  useEffect(() => {
+    window.api?.getAppVersion?.().then(setAppVersion).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const unsub = window.api?.onUpdaterStatus?.((data) => {
+      setUpdaterPhase(data.phase);
+      if (data.version) setUpdateVersion(data.version);
+      if (data.percent != null) setDownloadPct(data.percent);
+      if (data.error) setUpdateError(data.error);
+      // After "not-available", reset to idle after 3 s
+      if (data.phase === "not-available") {
+        setTimeout(() => setUpdaterPhase("idle"), 3000);
+      }
+    });
+    return () => unsub?.();
+  }, []);
+
   return (
     <div
       style={{
@@ -1092,6 +1117,139 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* UPDATES section */}
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: s(10),
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.25)",
+              letterSpacing: ".12em",
+              textTransform: "uppercase",
+              marginBottom: 20,
+              marginTop: 12,
+            }}
+          >
+            {t("section_updates")}
+          </div>
+
+          <div style={{ marginBottom: 32 }}>
+            {appVersion && (
+              <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono',monospace", marginBottom: 14, letterSpacing: ".04em" }}>
+                {t("current_version")}  v{appVersion}
+              </div>
+            )}
+
+            {/* Status text */}
+            {updaterPhase === "available" && updateVersion && (
+              <div style={{ fontSize: s(12), color: "rgba(165,255,210,0.82)", marginBottom: 10 }}>
+                {t("update_available", updateVersion)}
+              </div>
+            )}
+            {updaterPhase === "not-available" && (
+              <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.38)", marginBottom: 10 }}>
+                {t("up_to_date")}
+              </div>
+            )}
+            {updaterPhase === "ready" && (
+              <div style={{ fontSize: s(12), color: "rgba(165,255,210,0.82)", marginBottom: 10 }}>
+                {t("ready_to_install")}
+              </div>
+            )}
+            {updaterPhase === "error" && (
+              <div style={{ fontSize: s(12), color: "rgba(255,120,100,0.82)", marginBottom: 10 }}>
+                {t("update_error")}
+                {updateError && <span style={{ opacity: 0.6, marginLeft: 6, fontFamily: "'JetBrains Mono',monospace", fontSize: s(10) }}>{updateError.slice(0, 80)}</span>}
+              </div>
+            )}
+
+            {/* Progress bar when downloading */}
+            {updaterPhase === "downloading" && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.55)", marginBottom: 6 }}>
+                  {t("downloading", downloadPct)}
+                </div>
+                <div style={{ height: 3, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${downloadPct}%`, background: "rgba(255,255,255,0.4)", transition: "width .3s ease", borderRadius: 2 }} />
+                </div>
+              </div>
+            )}
+
+            {/* Action button */}
+            <div style={{ display: "flex", gap: 8 }}>
+              {(updaterPhase === "idle" || updaterPhase === "not-available") && (
+                <button
+                  type="button"
+                  onClick={() => { setUpdateError(null); window.api?.checkForUpdates?.(); }}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7,
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.75)", fontSize: s(12), cursor: "pointer",
+                    transition: "all .2s", fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  {t("check_updates")}
+                </button>
+              )}
+              {updaterPhase === "checking" && (
+                <button
+                  type="button"
+                  disabled
+                  style={{
+                    padding: "6px 14px", borderRadius: 7,
+                    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.38)", fontSize: s(12), cursor: "not-allowed",
+                    fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  {t("checking")}
+                </button>
+              )}
+              {updaterPhase === "available" && (
+                <button
+                  type="button"
+                  onClick={() => window.api?.downloadUpdate?.()}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7,
+                    background: "rgba(165,255,210,0.12)", border: "1px solid rgba(165,255,210,0.2)",
+                    color: "rgba(165,255,210,0.9)", fontSize: s(12), cursor: "pointer",
+                    transition: "all .2s", fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  {t("check_updates")}
+                </button>
+              )}
+              {updaterPhase === "ready" && (
+                <button
+                  type="button"
+                  onClick={() => window.api?.installUpdate?.()}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7,
+                    background: "rgba(165,255,210,0.18)", border: "1px solid rgba(165,255,210,0.28)",
+                    color: "rgba(165,255,210,0.95)", fontSize: s(12), cursor: "pointer",
+                    transition: "all .2s", fontFamily: "system-ui, sans-serif", fontWeight: 600,
+                  }}
+                >
+                  {t("install_restart")}
+                </button>
+              )}
+              {updaterPhase === "error" && (
+                <button
+                  type="button"
+                  onClick={() => { setUpdateError(null); window.api?.checkForUpdates?.(); }}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7,
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.6)", fontSize: s(12), cursor: "pointer",
+                    transition: "all .2s", fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  {t("retry")}
+                </button>
+              )}
             </div>
           </div>
         </div>

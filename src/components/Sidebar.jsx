@@ -100,7 +100,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, hasUpdate = false }) {
   const s = useFontScale();
   // Consume language context so we re-render when language changes
   useLanguage();
@@ -179,7 +179,22 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
         {/* Footer icons */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 0 14px" }}>
           <IconRailBtn onClick={onPickFolder} title={cwdShort || t("select_folder")}><FolderOpen size={16} strokeWidth={1.5} /></IconRailBtn>
-          <IconRailBtn onClick={onOpenSettings} title={t("settings")}><SettingsIcon size={16} strokeWidth={1.5} /></IconRailBtn>
+          <div style={{ position: "relative" }}>
+            <IconRailBtn onClick={onOpenSettings} title={t("settings")}><SettingsIcon size={16} strokeWidth={1.5} /></IconRailBtn>
+            {hasUpdate && (
+              <span style={{
+                position: "absolute",
+                top: 4,
+                right: 4,
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: "#FF8C42",
+                boxShadow: "0 0 5px rgba(255,140,66,0.8)",
+                pointerEvents: "none",
+              }} />
+            )}
+          </div>
         </div>
       </div>
     );
@@ -657,6 +672,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
         <button
           onClick={onOpenSettings}
           style={{
+            position: "relative",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -674,6 +690,19 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
         >
           <SettingsIcon size={12} strokeWidth={1.5} />
+          {hasUpdate && (
+            <span style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: "#FF8C42",
+              boxShadow: "0 0 4px rgba(255,140,66,0.7)",
+              pointerEvents: "none",
+            }} />
+          )}
         </button>
         <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.38)", letterSpacing: ".06em" }}>
           {t("chats", convos.length)}

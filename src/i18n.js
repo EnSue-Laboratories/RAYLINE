@@ -52,6 +52,19 @@ const translations = {
     lang_en: "English",
     lang_zh: "中文",
 
+    // Updates
+    section_updates: "UPDATES",
+    current_version: "Current version",
+    check_updates: "Check for Updates",
+    checking: "Checking...",
+    up_to_date: "Up to date",
+    update_available: (v) => `v${v} available`,
+    downloading: (pct) => `Downloading ${pct}%`,
+    ready_to_install: "Ready to install",
+    install_restart: "Install & Restart",
+    update_error: "Update check failed",
+    retry: "Retry",
+
     // Sidebar
     new_chat: "New Chat",
     dispatch: "Dispatch",
@@ -143,6 +156,19 @@ const translations = {
     language_label: "界面语言",
     lang_en: "English",
     lang_zh: "中文",
+
+    // Updates
+    section_updates: "更新",
+    current_version: "当前版本",
+    check_updates: "检查更新",
+    checking: "检查中...",
+    up_to_date: "已是最新",
+    update_available: (v) => `发现新版本 v${v}`,
+    downloading: (pct) => `下载中 ${pct}%`,
+    ready_to_install: "下载完成，准备安装",
+    install_restart: "安装并重启",
+    update_error: "更新检查失败",
+    retry: "重试",
 
     // Sidebar
     new_chat: "新对话",

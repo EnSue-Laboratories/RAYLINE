@@ -1055,6 +1055,7 @@ export default function App() {
   const [notificationsMuted, setNotificationsMuted] = useState(false);
   const [language, setLanguage] = useState("en");
   const [showSettings, setShowSettings] = useState(false);
+  const [hasUpdate, setHasUpdate] = useState(false);
   const [projects, setProjects] = useState({});
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
   const [draftsPath, setDraftsPath] = useState(null);
@@ -1376,6 +1377,14 @@ export default function App() {
       setStateLoaded(true);
     });
     window.api.getDraftsPath?.().then((p) => { if (p) setDraftsPath(p); });
+  }, []);
+
+  // Listen for auto-updater status to drive the Sidebar badge
+  useEffect(() => {
+    const unsub = window.api?.onUpdaterStatus?.((data) => {
+      setHasUpdate(data.phase === "available" || data.phase === "ready");
+    });
+    return () => unsub?.();
   }, []);
 
   // Persist state to file on changes (skip until initial load is done)
@@ -3344,6 +3353,7 @@ export default function App() {
           onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
           developerMode={developerMode}
           multicaModels={multicaModels}
+          hasUpdate={hasUpdate}
         />
       </div>
 
