@@ -418,6 +418,29 @@ function normalizeProjectsMeta(projectsMeta) {
   return normalized;
 }
 
+function getProjectChooserSignature(entries) {
+  return entries
+    .map(([projectPath, meta]) => [
+      projectPath,
+      meta?.name || "",
+      meta?.hidden ? "1" : "0",
+      meta?.manual ? "1" : "0",
+    ].join("\u0000"))
+    .join("\u0001");
+}
+
+function buildProjectChooserProjects(entries) {
+  const chooserProjects = {};
+  for (const [projectPath, meta] of entries) {
+    chooserProjects[projectPath] = {
+      ...(meta?.name ? { name: meta.name } : {}),
+      ...(meta?.hidden ? { hidden: true } : {}),
+      ...(meta?.manual ? { manual: true } : {}),
+    };
+  }
+  return chooserProjects;
+}
+
 function extractLoadedSessionMeta(result) {
   const msgs = result?.messages || result;
   return {
@@ -875,6 +898,23 @@ function getMessageTextPreview(message) {
     .join(" ");
 }
 
+function getSidebarMessagePreview(message, limit = 45) {
+  if (!message) return null;
+  if (typeof message.text === "string") return message.text.slice(0, limit);
+  if (!Array.isArray(message.parts)) return null;
+
+  let preview = "";
+  for (const part of message.parts) {
+    if (part?.type !== "text" || typeof part.text !== "string" || part.text.length === 0) continue;
+    if (preview) preview += " ";
+    const remaining = limit - preview.length;
+    if (remaining <= 0) break;
+    preview += part.text.slice(0, remaining);
+    if (preview.length >= limit) break;
+  }
+  return preview || null;
+}
+
 function isPersistableLiveMessage(message) {
   if (!message) return false;
   if (message.role !== "assistant") return true;
@@ -1080,6 +1120,18 @@ export default function App() {
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const [showMulticaSetup, setShowMulticaSetup] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
+  const projectChooserProjectsRef = useRef({ signature: null, value: {} });
+  const projectChooserProjects = useMemo(() => {
+    const entries = Object.entries(projects || {}).sort(([a], [b]) => a.localeCompare(b));
+    const signature = getProjectChooserSignature(entries);
+    if (projectChooserProjectsRef.current.signature === signature) {
+      return projectChooserProjectsRef.current.value;
+    }
+
+    const value = buildProjectChooserProjects(entries);
+    projectChooserProjectsRef.current = { signature, value };
+    return value;
+  }, [projects]);
   useEffect(() => {
     const h = () => setShowMulticaSetup(true);
     window.addEventListener("open-multica-setup", h);
@@ -1937,21 +1989,26 @@ export default function App() {
     setShowNewChatCard(true);
   };
 
-  const handleToggleProjectCollapse = (cwdRoot) => {
+  const handleToggleProjectCollapse = useCallback((cwdRoot, nextCollapsed) => {
     const projectRoot = getMainRepoRoot(cwdRoot);
-    setProjects((prev) => ({
-      ...prev,
-      [projectRoot]: { ...prev[projectRoot], collapsed: !prev[projectRoot]?.collapsed },
-    }));
-  };
+    setProjects((prev) => {
+      const current = prev[projectRoot]?.collapsed ?? false;
+      const collapsed = typeof nextCollapsed === "boolean" ? nextCollapsed : !current;
+      if (current === collapsed) return prev;
+      return {
+        ...prev,
+        [projectRoot]: { ...prev[projectRoot], collapsed },
+      };
+    });
+  }, []);
 
-  const handleHideProject = (cwdRoot) => {
+  const handleHideProject = useCallback((cwdRoot) => {
     const projectRoot = getMainRepoRoot(cwdRoot);
     setProjects((prev) => ({
       ...prev,
       [projectRoot]: { ...prev[projectRoot], hidden: true },
     }));
-  };
+  }, []);
 
   const registerManualProject = useCallback((projectPath) => {
     if (!projectPath) return;
@@ -1974,7 +2031,7 @@ export default function App() {
     if (clonedPath) registerManualProject(clonedPath);
   }, [registerManualProject]);
 
-  const handleNewInProject = (cwdRoot) => {
+  const handleNewInProject = useCallback((cwdRoot) => {
     const id = "c" + Date.now();
     const n = createConversationDraft({
       id,
@@ -1986,15 +2043,35 @@ export default function App() {
     setConvoList((p) => [n, ...p]);
     setActive(id);
     setShowNewChatCard(false);
-    if (cwdRoot && projects[cwdRoot]?.hidden) {
-      setProjects((prev) => ({
-        ...prev,
-        [cwdRoot]: { ...prev[cwdRoot], hidden: false },
-      }));
+    if (cwdRoot) {
+      setProjects((prev) => (
+        prev[cwdRoot]?.hidden
+          ? { ...prev, [cwdRoot]: { ...prev[cwdRoot], hidden: false } }
+          : prev
+      ));
     }
-  };
+  }, [createConversationDraft, defaultModel]);
 
-  const handleDelete = (id, e) => {
+  const pinnedTabs = useMemo(() => {
+    return convoList
+      .filter((c) => c.tab?.pinned)
+      .sort((a, b) => {
+        const aPinnedAt = Number(a.tab?.pinnedAt) || 0;
+        const bPinnedAt = Number(b.tab?.pinnedAt) || 0;
+        if (aPinnedAt !== bPinnedAt) return aPinnedAt - bPinnedAt;
+        return (a.ts || 0) - (b.ts || 0);
+      })
+      .map((c) => {
+        const data = getConversation(c.id);
+        return {
+          id: c.id,
+          title: c.title || "Untitled",
+          state: computeTabState(c, { isStreaming: Boolean(data.isStreaming) }),
+        };
+      });
+  }, [convoList, getConversation]);
+
+  const handleDelete = useCallback((id, e) => {
     e.stopPropagation();
     cancelMessage(id);
     const remaining = convoList.filter((c) => c.id !== id);
@@ -2019,26 +2096,7 @@ export default function App() {
         setActive(null);
       }
     }
-  };
-
-  const pinnedTabs = useMemo(() => {
-    return convoList
-      .filter((c) => c.tab?.pinned)
-      .sort((a, b) => {
-        const aPinnedAt = Number(a.tab?.pinnedAt) || 0;
-        const bPinnedAt = Number(b.tab?.pinnedAt) || 0;
-        if (aPinnedAt !== bPinnedAt) return aPinnedAt - bPinnedAt;
-        return (a.ts || 0) - (b.ts || 0);
-      })
-      .map((c) => {
-        const data = getConversation(c.id);
-        return {
-          id: c.id,
-          title: c.title || "Untitled",
-          state: computeTabState(c, { isStreaming: Boolean(data.isStreaming) }),
-        };
-      });
-  }, [convoList, getConversation]);
+  }, [active, cancelMessage, convoList, handleSelect, pinnedTabs]);
 
   const handleCloseTab = useCallback((id) => {
     const closingIndex = pinnedTabs.findIndex((tab) => tab.id === id);
@@ -3249,33 +3307,35 @@ export default function App() {
   }, [active, activeData.isStreaming, activeData.messages]);
 
   // Build convo object for ChatArea
-  const convo = activeConvo
-    ? {
-        ...activeConvo,
-        msgs: activeData.messages,
-        isStreaming: activeData.isStreaming,
-        error: activeData.error,
-      }
-    : null;
+  const convo = useMemo(
+    () => activeConvo
+      ? {
+          ...activeConvo,
+          msgs: activeData.messages,
+          isStreaming: activeData.isStreaming,
+          error: activeData.error,
+        }
+      : null,
+    [activeConvo, activeData.error, activeData.isStreaming, activeData.messages]
+  );
 
   // Build convos for Sidebar
-  const convosForSidebar = convoList.map((c) => {
-    const data = getConversation(c.id);
-    const msgs = data.messages;
-    const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
-    const lastText = lastMsg?.parts
-      ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
-      : (lastMsg?.text || "");
-    const preview = lastText ? lastText.slice(0, 45) : null;
-    return {
-      ...c,
-      msgs,
-      lastPreview: preview || c.lastPreview || "Empty",
-      isStreaming: data.isStreaming,
-    };
-  }).filter((conversation) => (
-    conversation.id === active || hasConversationMessages(conversation, { messages: conversation.msgs })
-  ));
+  const convosForSidebar = useMemo(() => {
+    const rows = [];
+    for (const c of convoList) {
+      const data = getConversation(c.id);
+      if (c.id !== active && !hasConversationMessages(c, data)) continue;
+
+      const msgs = data.messages || [];
+      const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+      rows.push({
+        ...c,
+        lastPreview: getSidebarMessagePreview(lastMsg) || c.lastPreview || "Empty",
+        isStreaming: data.isStreaming,
+      });
+    }
+    return rows;
+  }, [active, convoList, getConversation]);
 
   const tabs = useMemo(
     () => (pinnedTabs.length > 1 ? pinnedTabs : []),
@@ -3288,12 +3348,12 @@ export default function App() {
       const root = getMainRepoRoot(c.cwd);
       if (root && !isDraftProjectRoot(root, draftsPath)) roots.add(root);
     });
-    Object.keys(projects).forEach((r) => {
+    Object.keys(projectChooserProjects).forEach((r) => {
       const root = getMainRepoRoot(r);
       if (root && !isDraftProjectRoot(root, draftsPath)) roots.add(root);
     });
     return [...roots].filter((r) => r && !r.includes("/.worktrees/"));
-  }, [convoList, draftsPath, projects]);
+  }, [convoList, draftsPath, projectChooserProjects]);
 
   const newChatDefaultCwd = useMemo(() => {
     const activeCwd = activeConvo?.cwd;
@@ -3503,7 +3563,7 @@ export default function App() {
           onCreateChat={handleCreateChat}
           onCancelNewChat={() => setShowNewChatCard(false)}
           allCwdRoots={allCwdRoots}
-          projects={projects}
+          projects={projectChooserProjects}
           defaultPrBranch={defaultPrBranch}
           newChatDefaultCwd={newChatDefaultCwd}
           coauthorEnabled={coauthorEnabled}
@@ -3520,7 +3580,7 @@ export default function App() {
           onClose={() => setShowDispatchCard(false)}
           onDispatch={handleDispatch}
           currentCwd={newChatDefaultCwd || undefined}
-          projects={projects}
+          projects={projectChooserProjects}
           defaultModel={defaultModel}
           availableModels={dispatchAvailableModels}
           locale={locale}

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { Plus, Search, Trash2, FolderOpen, ChevronRight, Workflow, FolderPlus } from "lucide-react";
 import WindowDragSpacer from "./WindowDragSpacer";
@@ -6,6 +6,8 @@ import ProjectGroup from "./ProjectGroup";
 import { getMOrMulticaFallback } from "../data/models";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 import { createTranslator } from "../i18n";
+
+const COLLAPSE_PERSIST_DELAY_MS = 1200;
 
 function getMainRepoRoot(dir) {
   if (!dir) return dir;
@@ -38,9 +40,11 @@ function groupConvosByProject(convos, projectsMeta, draftsPath) {
         collapsed: meta.collapsed ?? false,
         hidden: meta.hidden ?? false,
         convos: [],
+        latestTs: null,
       };
     }
     groups[root].convos.push(c);
+    groups[root].latestTs = Math.max(groups[root].latestTs || 0, c.ts || 0);
   }
   // Also include manually added projects with 0 convos
   for (const [projectPath, meta] of Object.entries(projectsMeta || {})) {
@@ -53,12 +57,13 @@ function groupConvosByProject(convos, projectsMeta, draftsPath) {
         collapsed: meta.collapsed ?? false,
         hidden: meta.hidden ?? false,
         convos: [],
+        latestTs: null,
       };
     }
   }
   const sorted = Object.values(groups).sort((a, b) => {
-    const aTs = a.convos.length ? Math.max(...a.convos.map(c => c.ts)) : 0;
-    const bTs = b.convos.length ? Math.max(...b.convos.map(c => c.ts)) : 0;
+    const aTs = a.latestTs || 0;
+    const bTs = b.latestTs || 0;
     return bTs - aTs;
   });
 
@@ -71,11 +76,6 @@ function groupConvosByProject(convos, projectsMeta, draftsPath) {
       const parent = parts.length >= 2 ? parts[parts.length - 2] : "";
       if (parent) g.name = `${g.name} (${parent})`;
     }
-  });
-
-  // Add latest timestamp for header display
-  sorted.forEach(g => {
-    g.latestTs = g.convos.length ? Math.max(...g.convos.map(c => c.ts)) : null;
   });
 
   return { projectGroups: sorted, drafts };
@@ -96,29 +96,69 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
   const [searchOpen, setSearchOpen] = useState(false);
   const [draftsHeaderHovered, setDraftsHeaderHovered] = useState(false);
   const t = useMemo(() => createTranslator(locale), [locale]);
+  const projectsRef = useRef(projects);
+  const collapsedOverridesRef = useRef({});
+  const pendingCollapsePersistRef = useRef({});
+  const collapsePersistTimerRef = useRef(null);
+  const [collapsedOverrides, setCollapsedOverrides] = useState({});
 
-  const filtered = convos.filter((c) =>
-    c.title.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
+
+  useEffect(() => {
+    collapsedOverridesRef.current = collapsedOverrides;
+  }, [collapsedOverrides]);
+
+  useEffect(() => (
+    () => {
+      if (collapsePersistTimerRef.current) {
+        clearTimeout(collapsePersistTimerRef.current);
+      }
+    }
+  ), []);
+
+  const searchQuery = search.toLowerCase();
+  const filtered = useMemo(
+    () => convos.filter((c) => c.title.toLowerCase().includes(searchQuery)),
+    [convos, searchQuery]
   );
 
-  const folderOrderRef = useRef([]);
   const { projectGroups, drafts } = useMemo(() => {
-    const result = groupConvosByProject(filtered, projects, draftsPath);
-    const currentRoots = new Set(result.projectGroups.map(g => g.cwdRoot));
-    const prevOrder = folderOrderRef.current.filter(r => currentRoots.has(r));
-    const known = new Set(prevOrder);
-    const newcomers = result.projectGroups
-      .filter(g => !known.has(g.cwdRoot))
-      .sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0))
-      .map(g => g.cwdRoot);
-    const nextOrder = [...newcomers, ...prevOrder];
-    folderOrderRef.current = nextOrder;
-    const byRoot = new Map(result.projectGroups.map(g => [g.cwdRoot, g]));
-    return {
-      projectGroups: nextOrder.map(r => byRoot.get(r)).filter(Boolean),
-      drafts: result.drafts,
-    };
+    return groupConvosByProject(filtered, projects, draftsPath);
   }, [draftsPath, filtered, projects]);
+  const renderedProjectGroups = useMemo(
+    () => projectGroups.map((proj) => {
+      if (!Object.prototype.hasOwnProperty.call(collapsedOverrides, proj.cwdRoot)) return proj;
+      const collapsed = collapsedOverrides[proj.cwdRoot];
+      return collapsed === proj.collapsed ? proj : { ...proj, collapsed };
+    }),
+    [collapsedOverrides, projectGroups]
+  );
+  const handleProjectCollapse = useCallback((cwdRoot) => {
+    const root = getMainRepoRoot(cwdRoot);
+    const current =
+      collapsedOverridesRef.current[root] ??
+      projectsRef.current?.[root]?.collapsed ??
+      false;
+    const collapsed = !current;
+    const nextOverrides = { ...collapsedOverridesRef.current, [root]: collapsed };
+    collapsedOverridesRef.current = nextOverrides;
+    setCollapsedOverrides(nextOverrides);
+
+    pendingCollapsePersistRef.current[root] = collapsed;
+    if (collapsePersistTimerRef.current) {
+      clearTimeout(collapsePersistTimerRef.current);
+    }
+    collapsePersistTimerRef.current = setTimeout(() => {
+      const pending = pendingCollapsePersistRef.current;
+      pendingCollapsePersistRef.current = {};
+      collapsePersistTimerRef.current = null;
+      for (const [projectRoot, nextCollapsed] of Object.entries(pending)) {
+        onToggleProjectCollapse(projectRoot, nextCollapsed);
+      }
+    }, COLLAPSE_PERSIST_DELAY_MS);
+  }, [onToggleProjectCollapse]);
   const searchActive = search.length > 0;
 
   const cwdShort = cwd ? (() => {
@@ -289,7 +329,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
           </div>
         )}
         {/* Project groups */}
-        {projectGroups
+        {renderedProjectGroups
           .filter(proj => searchActive ? proj.convos.length > 0 : (proj.convos.length > 0 || projects?.[proj.cwdRoot]?.manual))
           .map((proj) => (
           <ProjectGroup
@@ -299,7 +339,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
             onSelect={onSelect}
             onDelete={onDelete}
             onNewInProject={onNewInProject}
-            onToggleCollapse={onToggleProjectCollapse}
+            onToggleCollapse={handleProjectCollapse}
             onHideProject={onHideProject}
             searchActive={searchActive}
             multicaModels={multicaModels}
