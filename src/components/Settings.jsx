@@ -1057,10 +1057,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         <option value="openai">{t("settings.byokOpenAI")}</option>
                         <option value="custom">{t("settings.byokCustom")}</option>
                         <option value="opencode">{t("settings.byokOpenCode")}</option>
+                        <option value="opencode-cli">{t("settings.byokOpenCodeCLI")}</option>
                       </select>
                     </div>
 
-                    {(byokDraftType === "custom" || byokDraftType === "opencode") && (
+                    {(byokDraftType === "custom" || byokDraftType === "opencode" || byokDraftType === "opencode-cli") && (
                       <>
                         <div style={{ marginBottom: 10 }}>
                           <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
@@ -1070,7 +1071,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                             type="text"
                             value={byokDraftName}
                             onChange={(e) => setByokDraftName(e.target.value)}
-                            placeholder={t("settings.byokCustomNamePlaceholder") || "e.g., My Local Inference"}
+                            placeholder={byokDraftType.startsWith("opencode") ? "e.g., OpenCode" : (t("settings.byokCustomNamePlaceholder") || "e.g., My Local Inference")}
                             spellCheck={false}
                             style={{
                               width: "100%",
@@ -1089,13 +1090,13 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         </div>
                         <div style={{ marginBottom: 10 }}>
                           <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
-                            {t("settings.byokCustomModelId")}
+                            {byokDraftType === "opencode-cli" ? "Binary Path / Command" : t("settings.byokCustomModelId")}
                           </div>
                           <input
                             type="text"
                             value={byokDraftModelId}
                             onChange={(e) => setByokDraftModelId(e.target.value)}
-                            placeholder={byokDraftType === "opencode" ? "e.g., default" : "e.g., llama3, qwen-coder"}
+                            placeholder={byokDraftType === "opencode-cli" ? "e.g., opencode (must be in PATH)" : (byokDraftType === "opencode" ? "e.g., default" : "e.g., llama3, qwen-coder")}
                             spellCheck={false}
                             style={{
                               width: "100%",
@@ -1190,9 +1191,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                             type="button"
                             disabled={
                               !byokDraftType ||
-                              (byokDraftType !== "custom" && byokDraftType !== "opencode" && !byokDraftKey && !byokDraftId) ||
+                              (byokDraftType !== "custom" && !byokDraftType.startsWith("opencode") && !byokDraftKey && !byokDraftId) ||
                               ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) ||
-                              (byokDraftType === "custom" && !byokDraftModelId) ||
+                              ((byokDraftType === "custom" || byokDraftType === "opencode-cli") && !byokDraftModelId) ||
                               byokTestStatus?.loading
                             }
                             onClick={async () => {
@@ -1228,9 +1229,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                             type="button"
                             disabled={
                               !byokDraftType ||
-                              (byokDraftType !== "custom" && byokDraftType !== "opencode" && !byokDraftKey && !byokDraftId) ||
+                              (byokDraftType !== "custom" && !byokDraftType.startsWith("opencode") && !byokDraftKey && !byokDraftId) ||
                               ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) ||
-                              (byokDraftType === "custom" && !byokDraftModelId)
+                              ((byokDraftType === "custom" || byokDraftType === "opencode-cli") && !byokDraftModelId)
                             }
                             onClick={async () => {
                               if (!window.api?.byokSaveProviders) return;
@@ -1271,11 +1272,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                             style={{
                               padding: "6px 14px",
                               borderRadius: 7,
-                              background: (!(!byokDraftType || (byokDraftType !== "custom" && byokDraftType !== "opencode" && !byokDraftKey && !byokDraftId) || ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) || (byokDraftType === "custom" && !byokDraftModelId))) ? "rgba(180,220,255,0.15)" : "rgba(255,255,255,0.03)",
+                              background: (!(!byokDraftType || (byokDraftType !== "custom" && !byokDraftType.startsWith("opencode") && !byokDraftKey && !byokDraftId) || ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) || ((byokDraftType === "custom" || byokDraftType === "opencode-cli") && !byokDraftModelId))) ? "rgba(180,220,255,0.15)" : "rgba(255,255,255,0.03)",
                               border: "1px solid rgba(255,255,255,0.06)",
-                              color: (!(!byokDraftType || (byokDraftType !== "custom" && byokDraftType !== "opencode" && !byokDraftKey && !byokDraftId) || ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) || (byokDraftType === "custom" && !byokDraftModelId))) ? "rgba(180,220,255,0.9)" : "rgba(255,255,255,0.2)",
+                              color: (!(!byokDraftType || (byokDraftType !== "custom" && !byokDraftType.startsWith("opencode") && !byokDraftKey && !byokDraftId) || ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) || ((byokDraftType === "custom" || byokDraftType === "opencode-cli") && !byokDraftModelId))) ? "rgba(180,220,255,0.9)" : "rgba(255,255,255,0.2)",
                               fontSize: s(12),
-                              cursor: (!(!byokDraftType || (byokDraftType !== "custom" && byokDraftType !== "opencode" && !byokDraftKey && !byokDraftId) || ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) || (byokDraftType === "custom" && !byokDraftModelId))) ? "pointer" : "default",
+                              cursor: (!(!byokDraftType || (byokDraftType !== "custom" && !byokDraftType.startsWith("opencode") && !byokDraftKey && !byokDraftId) || ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) || ((byokDraftType === "custom" || byokDraftType === "opencode-cli") && !byokDraftModelId))) ? "pointer" : "default",
                               fontFamily: "system-ui, sans-serif",
                             }}
                           >
