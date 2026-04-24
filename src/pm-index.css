@@ -1,25 +1,59 @@
 @import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 :root {
-  --pane-background: #0D0D10;
-  --pane-background-rgb: 13, 13, 16;
-  --pane-overlay-alpha: 0.82;
-  --pane-background-overlay: rgba(var(--pane-background-rgb), var(--pane-overlay-alpha));
-  --pane-hover-overlay: rgba(11, 11, 13, var(--pane-overlay-alpha));
-  --pane-active-overlay: rgba(9, 9, 11, var(--pane-overlay-alpha));
-  --pane-elevated-rgb: 16, 16, 18;
-  --pane-elevated: rgba(var(--pane-elevated-rgb), 0.5);
-  --pm-modal-backdrop: rgba(0,0,0,0.45);
+  --app-background: hsl(240 10% 6%);
+  --text-primary: color-mix(in srgb, white 92%, transparent);
+  --text-secondary: color-mix(in srgb, white 84%, transparent);
+  --text-tertiary: color-mix(in srgb, white 74%, transparent);
+  --text-muted: color-mix(in srgb, white 55%, transparent);
+  --text-subtle: color-mix(in srgb, white 42%, transparent);
+  --text-disabled: color-mix(in srgb, white 35%, transparent);
+  --text-faint: color-mix(in srgb, white 30%, transparent);
+  --text-ghost: color-mix(in srgb, white 25%, transparent);
+  --control-bg: color-mix(in srgb, white 4%, transparent);
+  --control-bg-soft: color-mix(in srgb, white 2.5%, transparent);
+  --control-bg-hover: color-mix(in srgb, white 5%, transparent);
+  --control-bg-strong: color-mix(in srgb, white 8%, transparent);
+  --control-bg-active: color-mix(in srgb, white 10%, transparent);
+  --control-bg-selected: color-mix(in srgb, white 18%, transparent);
+  --control-border: color-mix(in srgb, white 8%, transparent);
+  --control-border-soft: color-mix(in srgb, white 5%, transparent);
+  --control-border-strong: color-mix(in srgb, white 12%, transparent);
+  --divider: var(--control-bg);
+  --divider-soft: var(--control-bg-soft);
+  --overlay-surface: color-mix(in srgb, black 95%, white 5%);
+  --overlay-backdrop: color-mix(in srgb, black 45%, transparent);
+  --code-bg: color-mix(in srgb, black 25%, transparent);
+  --link-text: hsl(222 100% 78%);
+  --link-text-hover: hsl(222 100% 82%);
+  --success-text: hsl(137 75% 78%);
+  --success-text-strong: hsl(137 85% 82%);
+  --success-bg: color-mix(in srgb, hsl(137 75% 78%) 14%, transparent);
+  --success-border: color-mix(in srgb, hsl(137 75% 78%) 22%, transparent);
+  --success-ring: color-mix(in srgb, hsl(137 75% 78%) 6%, transparent);
+  --danger-text: hsl(0 70% 78%);
+  --danger-text-strong: hsl(0 75% 82%);
+  --danger-bg: color-mix(in srgb, hsl(0 70% 70%) 12%, transparent);
+  --danger-bg-soft: color-mix(in srgb, hsl(0 70% 70%) 7%, transparent);
+  --danger-border: color-mix(in srgb, hsl(0 70% 70%) 22%, transparent);
+  --accent-text: hsl(263 100% 78%);
+  --accent-bg: color-mix(in srgb, hsl(263 100% 76%) 20%, transparent);
+  --pane-background: var(--app-background);
+  --pane-background-overlay: color-mix(in srgb, var(--app-background) 82%, transparent);
+  --pane-hover-overlay: color-mix(in srgb, var(--app-background) 82%, transparent);
+  --pane-active-overlay: color-mix(in srgb, var(--app-background) 82%, transparent);
+  --pane-elevated: color-mix(in srgb, var(--app-background) 50%, transparent);
+  --pm-modal-backdrop: var(--overlay-backdrop);
   --pm-modal-backdrop-blur: 6px;
-  --pane-hover: #121214;
-  --pane-active: #141416;
+  --pane-hover: hsl(240 5% 7.5%);
+  --pane-active: hsl(240 5% 8.2%);
   --pane-interaction-hover-fill: var(--pane-hover);
   --pane-interaction-active-fill: var(--pane-active);
   --pane-interaction-hover-filter: none;
   --pane-interaction-active-filter: none;
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
-  --pane-border: rgba(255,255,255,0.06);
+  --pane-border: color-mix(in srgb, white 6%, transparent);
 }
 
 *, *::before, *::after {
@@ -35,14 +69,13 @@ html, body, #root {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar               { width: 3px; }
-::-webkit-scrollbar-track         { background: transparent; }
-::-webkit-scrollbar-thumb         { background: rgba(255,255,255,0.15); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover   { background: rgba(255,255,255,0.35); }
+::-webkit-scrollbar        { width: 2px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--control-bg-soft); border-radius: 2px; }
 
 /* ── Form resets ── */
 textarea::placeholder,
-input::placeholder  { color: rgba(255, 255, 255, 0.25); }
+input::placeholder  { color: var(--text-ghost); }
 textarea:focus,
 input:focus         { outline: none; }
 
