@@ -1989,12 +1989,17 @@ export default function App() {
     setShowNewChatCard(true);
   };
 
-  const handleToggleProjectCollapse = useCallback((cwdRoot) => {
+  const handleToggleProjectCollapse = useCallback((cwdRoot, nextCollapsed) => {
     const projectRoot = getMainRepoRoot(cwdRoot);
-    setProjects((prev) => ({
-      ...prev,
-      [projectRoot]: { ...prev[projectRoot], collapsed: !prev[projectRoot]?.collapsed },
-    }));
+    setProjects((prev) => {
+      const current = prev[projectRoot]?.collapsed ?? false;
+      const collapsed = typeof nextCollapsed === "boolean" ? nextCollapsed : !current;
+      if (current === collapsed) return prev;
+      return {
+        ...prev,
+        [projectRoot]: { ...prev[projectRoot], collapsed },
+      };
+    });
   }, []);
 
   const handleHideProject = useCallback((cwdRoot) => {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback, useTransition } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { Plus, Search, Trash2, FolderOpen, ChevronRight, Workflow, FolderPlus } from "lucide-react";
 import WindowDragSpacer from "./WindowDragSpacer";
@@ -94,6 +94,18 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
   const [searchOpen, setSearchOpen] = useState(false);
   const [draftsHeaderHovered, setDraftsHeaderHovered] = useState(false);
   const t = useMemo(() => createTranslator(locale), [locale]);
+  const [, startCollapsePersistTransition] = useTransition();
+  const projectsRef = useRef(projects);
+  const collapsedOverridesRef = useRef({});
+  const [collapsedOverrides, setCollapsedOverrides] = useState({});
+
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
+
+  useEffect(() => {
+    collapsedOverridesRef.current = collapsedOverrides;
+  }, [collapsedOverrides]);
 
   const searchQuery = search.toLowerCase();
   const filtered = useMemo(
@@ -104,6 +116,36 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
   const { projectGroups, drafts } = useMemo(() => {
     return groupConvosByProject(filtered, projects, draftsPath);
   }, [draftsPath, filtered, projects]);
+  const renderedProjectGroups = useMemo(
+    () => projectGroups.map((proj) => {
+      if (!Object.prototype.hasOwnProperty.call(collapsedOverrides, proj.cwdRoot)) return proj;
+      const collapsed = collapsedOverrides[proj.cwdRoot];
+      return collapsed === proj.collapsed ? proj : { ...proj, collapsed };
+    }),
+    [collapsedOverrides, projectGroups]
+  );
+  const handleProjectCollapse = useCallback((cwdRoot) => {
+    const root = getMainRepoRoot(cwdRoot);
+    const current =
+      collapsedOverridesRef.current[root] ??
+      projectsRef.current?.[root]?.collapsed ??
+      false;
+    const collapsed = !current;
+    const nextOverrides = { ...collapsedOverridesRef.current, [root]: collapsed };
+    collapsedOverridesRef.current = nextOverrides;
+    setCollapsedOverrides(nextOverrides);
+
+    const persist = () => {
+      startCollapsePersistTransition(() => {
+        onToggleProjectCollapse(root, collapsed);
+      });
+    };
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(persist);
+    } else {
+      setTimeout(persist, 0);
+    }
+  }, [onToggleProjectCollapse, startCollapsePersistTransition]);
   const searchActive = search.length > 0;
 
   const cwdShort = cwd ? (() => {
@@ -274,7 +316,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
           </div>
         )}
         {/* Project groups */}
-        {projectGroups
+        {renderedProjectGroups
           .filter(proj => searchActive ? proj.convos.length > 0 : (proj.convos.length > 0 || projects?.[proj.cwdRoot]?.manual))
           .map((proj) => (
           <ProjectGroup
@@ -284,7 +326,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
             onSelect={onSelect}
             onDelete={onDelete}
             onNewInProject={onNewInProject}
-            onToggleCollapse={onToggleProjectCollapse}
+            onToggleCollapse={handleProjectCollapse}
             onHideProject={onHideProject}
             searchActive={searchActive}
             multicaModels={multicaModels}
