@@ -19,7 +19,9 @@
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
   --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255, 255, 255, 0.6);
   --text-muted: rgba(255, 255, 255, 0.25);
+  --text-disabled: rgba(255, 255, 255, 0.18);
   --bg-secondary: var(--pane-elevated);
   --scrollbar-thumb: rgba(255,255,255,.08);
   --scrollbar-track: transparent;
@@ -27,7 +29,9 @@
 
 :root[data-theme="light"] {
   --text-primary: rgba(0, 0, 0, 0.9);
-  --text-muted: rgba(0, 0, 0, 0.35);
+  --text-secondary: rgba(0, 0, 0, 0.65);
+  --text-muted: rgba(0, 0, 0, 0.45);
+  --text-disabled: rgba(0, 0, 0, 0.3);
   --scrollbar-thumb: rgba(0,0,0,.08);
 }
 

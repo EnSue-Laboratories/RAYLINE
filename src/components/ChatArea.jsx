@@ -1197,7 +1197,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
               marginTop: 8,
               fontSize: s(8),
               fontFamily: "'JetBrains Mono',monospace",
-              color: "rgba(255,255,255,0.30)",
+              color: "var(--text-muted)",
               letterSpacing: ".1em",
             }}
           >
