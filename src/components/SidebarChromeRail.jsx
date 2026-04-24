@@ -81,7 +81,6 @@ export default function SidebarChromeRail({ sidebarOpen, settingsOpen, onToggleS
       <RailButton
         label={sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
         onClick={onToggleSidebar}
-        active={sidebarOpen}
       >
         {sidebarOpen ? (
           <PanelLeftClose size={15} strokeWidth={1.55} />
