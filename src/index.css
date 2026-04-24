@@ -18,6 +18,24 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
+  --mermaid-bg: #0a0a0a;
+  --mermaid-node-bg: #1a1a1a;
+  --mermaid-node-border: rgba(255,255,255,0.25);
+  --mermaid-text: rgba(255,255,255,0.85);
+  --mermaid-line: rgba(255,255,255,0.35);
+  --mermaid-cluster-bg: #111111;
+  --mermaid-edge-label-bg: #0a0a0a;
+}
+
+:root[data-theme="light"],
+:root.light {
+  --mermaid-bg: #ffffff;
+  --mermaid-node-bg: #ffffff;
+  --mermaid-node-border: #cbd5e1;
+  --mermaid-text: #1f2937;
+  --mermaid-line: #475569;
+  --mermaid-cluster-bg: #f8fafc;
+  --mermaid-edge-label-bg: #ffffff;
 }
 
 *, *::before, *::after {
