@@ -60,7 +60,7 @@ function PreBlock({ rawText, s = (x) => x, children }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         background: "rgba(0,0,0,0.4)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        border: "1px solid var(--pane-border)",
         borderRadius: 8,
         padding: "12px 14px",
         overflow: "auto",
@@ -188,7 +188,7 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
   thead: ({ children }) => <thead style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>{children}</thead>,
   th: ({ children }) => <th style={{ textAlign: "left", padding: "6px 12px 6px 0", fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>{children}</th>,
   td: ({ children }) => <td style={{ padding: "4px 12px 4px 0", color: "rgba(255,255,255,0.55)" }}>{children}</td>,
-  hr: () => <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: "16px 0" }} />,
+  hr: () => <hr style={{ border: "none", borderTop: "1px solid var(--control-border)", margin: "16px 0" }} />,
 });
 
 // Escape non-standard HTML tags that rehype-raw would try to parse (e.g. <thinking>, </thinking>)
@@ -361,7 +361,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
               autoFocus
               style={{
                 width: "100%",
-                background: "rgba(255,255,255,0.04)",
+                background: "var(--control-bg)",
                 border: "1px solid rgba(255,255,255,0.1)",
                 borderRadius: 8,
                 color: "rgba(255,255,255,0.9)",
@@ -421,8 +421,8 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                 alignItems: "center",
                 gap: 5,
                 padding: "4px 10px",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: "var(--control-bg)",
+                border: "1px solid var(--control-border)",
                 borderRadius: 6,
                 fontSize: s(11),
                 fontFamily: "'JetBrains Mono',monospace",
@@ -449,7 +449,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                     maxWidth: "85%",
                     padding: "10px 12px",
                     borderRadius: 12,
-                    border: "1px solid rgba(255,255,255,0.08)",
+                    border: "1px solid var(--control-border)",
                     background: "linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))",
                     color: "rgba(255,255,255,0.85)",
                     fontSize: s(12),
@@ -465,7 +465,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
               </div>
             ) : (
               <div style={{
-                color: "rgba(255,255,255,0.92)",
+                color: "var(--text-primary)",
                 fontSize: s(15),
                 lineHeight: 1.7,
                 fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
@@ -513,7 +513,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
             maxWidth: "88%",
             padding: "14px 16px 12px",
             borderRadius: 14,
-            border: "1px solid rgba(255,255,255,0.08)",
+            border: "1px solid var(--control-border)",
             background: "linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
             boxShadow: "0 20px 40px rgba(0,0,0,0.18)",
           }}
@@ -636,8 +636,8 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                   margin: "10px 0 14px",
                   padding: "10px 12px",
                   borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  background: isPaused ? "rgba(255,214,153,0.08)" : "rgba(255,255,255,0.04)",
+                  border: "1px solid var(--control-border)",
+                  background: isPaused ? "rgba(255,214,153,0.08)" : "var(--control-bg)",
                   color: "rgba(255,255,255,0.72)",
                   maxWidth: "80%",
                 }}
