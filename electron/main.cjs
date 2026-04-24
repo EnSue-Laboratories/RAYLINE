@@ -27,6 +27,7 @@ const isMac = process.platform === "darwin";
 const isWindows = process.platform === "win32";
 const SHELL_COMMAND_TIMEOUT_MS = 15000;
 const SHELL_OUTPUT_LIMIT = 128 * 1024;
+const DISPATCH_PLAN_TIMEOUT_MS = 90000;
 const WINDOW_BACKGROUND = "#0D0D10";
 const TERMINAL_DEBUG_ENABLED = /^(1|true|yes|on)$/i.test(String(process.env.RAYLINE_TERMINAL_DEBUG || ""));
 const WALLPAPER_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
@@ -759,6 +760,236 @@ ipcMain.handle("system-info", () => ({
   memory: Math.round(os.totalmem() / (1024 * 1024 * 1024)) + " GB",
   shell: (process.env.SHELL || process.env.COMSPEC || "unknown").split("/").pop(),
 }));
+
+const DISPATCH_PLANNER_SYSTEM_PROMPT = `You are RayLine's Dispatch auto-fill planner.
+
+Turn the user's high-level request into editable Custom Dispatch rows.
+
+Output only valid JSON with this shape:
+{"rows":[{"title":"short label","prompt":"self-contained agent task","branch":"kebab-case-branch","model":"exact-model-id","reason":"brief routing reason"}]}
+
+Rules:
+- Create 1 to 6 rows. Use one row when the work is not safely parallelizable.
+- Do not create GitHub issue rows. This planner only fills the Custom dispatch screen.
+- Each prompt must be self-contained, specific, and ready to send to an agent in its own worktree.
+- Branch names must be lowercase kebab-case and unique.
+- Choose model ids only from the provided target model list.
+- Prefer Codex/GPT models for bug finding, regressions, CI/test failures, correctness checks, code review, refactors, and repo-wide reasoning.
+- Prefer Claude models for creative/product work, UX strategy, new feature design, frontend implementation, visual polish, copy, and exploratory UI iteration.
+- Prefer higher-reasoning variants for architecture, risky migrations, or unclear requirements; prefer medium/default variants for straightforward implementation.
+- If no exact model is clearly best, use the user's default target model.`;
+
+function compactDispatchModel(model = {}) {
+  const id = typeof model.id === "string" ? model.id : "";
+  if (!id) return null;
+  const provider = typeof model.provider === "string" ? model.provider : "claude";
+  const name = typeof model.name === "string"
+    ? model.name
+    : (typeof model.label === "string" ? model.label : id);
+  const lower = `${id} ${name} ${provider}`.toLowerCase();
+  let guide = "General coding agent.";
+  if (provider === "codex" || lower.includes("gpt")) {
+    guide = "Strong for bug checking, repo reasoning, tests, regressions, correctness, refactors, and code review.";
+  } else if (provider === "claude") {
+    guide = "Strong for creative/product work, UX, frontend design, visual polish, copy, and feature implementation.";
+  } else if (provider === "multica") {
+    guide = "Use only when the agent name or runtime clearly matches the task.";
+  }
+  return {
+    id,
+    name,
+    tag: typeof model.tag === "string" ? model.tag : undefined,
+    provider,
+    effort: typeof model.effort === "string" ? model.effort : undefined,
+    guide,
+  };
+}
+
+function buildDispatchPlannerPrompt({ instructions, cwd, targetModels, defaultTargetModel }) {
+  const models = (Array.isArray(targetModels) ? targetModels : [])
+    .map(compactDispatchModel)
+    .filter(Boolean);
+  return [
+    `Working directory: ${cwd || "(none selected)"}`,
+    `Default target model id: ${defaultTargetModel || "(none)"}`,
+    "Available target models:",
+    JSON.stringify(models, null, 2),
+    "User batch brief:",
+    String(instructions || "").trim(),
+  ].join("\n\n");
+}
+
+function parseDispatchPlanJson(text) {
+  const raw = String(text || "").trim();
+  if (!raw) throw new Error("Planner returned no output.");
+
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = (fenced ? fenced[1].trim() : raw).trim();
+  const arrayStart = candidate.indexOf("[");
+  const arrayEnd = candidate.lastIndexOf("]");
+  const objectStart = candidate.indexOf("{");
+  const objectEnd = candidate.lastIndexOf("}");
+  const jsonText = arrayStart >= 0 && (arrayStart < objectStart || objectStart === -1) && arrayEnd > arrayStart
+    ? candidate.slice(arrayStart, arrayEnd + 1)
+    : (objectStart >= 0 && objectEnd > objectStart ? candidate.slice(objectStart, objectEnd + 1) : candidate);
+  const parsed = JSON.parse(jsonText);
+  const rows = Array.isArray(parsed) ? parsed : parsed?.rows;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("Planner did not return any dispatch rows.");
+  }
+  return {
+    rows: rows.slice(0, 8).map((row) => ({
+      title: String(row?.title || "").trim(),
+      prompt: String(row?.prompt || "").trim(),
+      branch: String(row?.branch || "").trim(),
+      model: String(row?.model || "").trim(),
+      reason: String(row?.reason || "").trim(),
+    })).filter((row) => row.prompt || row.title),
+  };
+}
+
+function runClaudeDispatchPlanner({ prompt, plannerModel, cwd }) {
+  return new Promise((resolve, reject) => {
+    const claudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
+    if (!claudeBin) {
+      reject(new Error("Unable to locate the Claude CLI binary"));
+      return;
+    }
+
+    const args = [
+      "--print",
+      "--output-format", "text",
+      "--tools", "",
+      "--model", plannerModel?.cliFlag || plannerModel?.id || "sonnet",
+      "--no-session-persistence",
+      "--system-prompt", DISPATCH_PLANNER_SYSTEM_PROMPT,
+      prompt,
+    ];
+    const launchCwd = cwd && fs.existsSync(cwd) ? cwd : process.cwd();
+    const child = spawnCli(claudeBin, args, {
+      cwd: launchCwd,
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let settled = false;
+    let out = "";
+    let err = "";
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(reject, new Error("Dispatch planner timed out."));
+    }, DISPATCH_PLAN_TIMEOUT_MS);
+
+    child.stdout.on("data", (c) => { out += c.toString(); });
+    child.stderr.on("data", (c) => { err += c.toString(); });
+    child.on("close", (code) => {
+      if (code !== 0 && !out.trim()) {
+        finish(reject, new Error(err.trim() || `Claude planner exited with code ${code}.`));
+        return;
+      }
+      finish(resolve, out.trim());
+    });
+    child.on("error", (error) => finish(reject, error));
+  });
+}
+
+function runCodexDispatchPlanner({ prompt, plannerModel, cwd }) {
+  return new Promise((resolve, reject) => {
+    const codexBin = resolveCliBin("codex", { envVarName: "CODEX_BIN" });
+    if (!codexBin) {
+      reject(new Error("Unable to locate the Codex CLI binary"));
+      return;
+    }
+
+    const outputPath = path.join(
+      os.tmpdir(),
+      `rayline-dispatch-plan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`
+    );
+    const fullPrompt = `${DISPATCH_PLANNER_SYSTEM_PROMPT}\n\n${prompt}`;
+    const args = [
+      "exec",
+      "--ephemeral",
+      "--sandbox", "read-only",
+      "--skip-git-repo-check",
+      "-m", plannerModel?.cliFlag || plannerModel?.id || "gpt-5.4",
+      "-o", outputPath,
+    ];
+    if (plannerModel?.effort) {
+      args.push("-c", `model_reasoning_effort="${plannerModel.effort}"`);
+    }
+    args.push("--", fullPrompt);
+
+    const launchCwd = cwd && fs.existsSync(cwd) ? cwd : process.cwd();
+    const child = spawnCli(codexBin, args, {
+      cwd: launchCwd,
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let settled = false;
+    let out = "";
+    let err = "";
+    const cleanup = () => {
+      fs.promises.unlink(outputPath).catch(() => {});
+    };
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+      fn(value);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(reject, new Error("Dispatch planner timed out."));
+    }, DISPATCH_PLAN_TIMEOUT_MS);
+
+    child.stdout.on("data", (c) => { out += c.toString(); });
+    child.stderr.on("data", (c) => { err += c.toString(); });
+    child.on("close", (code) => {
+      let finalText = "";
+      try {
+        if (fs.existsSync(outputPath)) finalText = fs.readFileSync(outputPath, "utf-8");
+      } catch {}
+      if (!finalText.trim()) finalText = out.trim();
+      if (code !== 0 && !finalText.trim()) {
+        finish(reject, new Error(err.trim() || `Codex planner exited with code ${code}.`));
+        return;
+      }
+      finish(resolve, finalText.trim());
+    });
+    child.on("error", (error) => finish(reject, error));
+  });
+}
+
+async function runDispatchPlanner(opts = {}) {
+  const plannerModel = opts.plannerModel || {};
+  const prompt = buildDispatchPlannerPrompt({
+    instructions: opts.instructions,
+    cwd: opts.cwd,
+    targetModels: opts.targetModels,
+    defaultTargetModel: opts.defaultTargetModel,
+  });
+
+  const provider = plannerModel.provider === "codex" ? "codex" : "claude";
+  const text = provider === "codex"
+    ? await runCodexDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd })
+    : await runClaudeDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd });
+  return parseDispatchPlanJson(text);
+}
+
+ipcMain.handle("dispatch-plan", async (_event, opts = {}) => {
+  if (!String(opts.instructions || "").trim()) {
+    throw new Error("Add a batch brief before auto-filling dispatch.");
+  }
+  return runDispatchPlanner(opts);
+});
 
 // IPC: quick explain (one-shot, not in chat history)
 ipcMain.handle("quick-explain", async (_event, { text, model }) => {

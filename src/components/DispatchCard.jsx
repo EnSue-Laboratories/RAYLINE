@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, GitBranch, FileText, Check, ChevronRight, ChevronDown, Paperclip, Plus } from "lucide-react";
+import { X, GitBranch, FileText, Check, ChevronRight, ChevronDown, Paperclip, Plus, Sparkles } from "lucide-react";
 import ImagePreview from "./ImagePreview";
 import { createTranslator } from "../i18n";
 
@@ -85,6 +85,60 @@ function makeCustomRow(index) {
   };
 }
 
+function sanitizeBranchName(text, fallbackIndex) {
+  const slug = (text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-+|-+$)/g, "")
+    .slice(0, 48);
+  return slug || defaultCustomBranch(fallbackIndex);
+}
+
+function uniqueBranchName(base, used) {
+  let next = base;
+  let i = 2;
+  while (used.has(next)) {
+    const suffix = `-${i}`;
+    next = `${base.slice(0, Math.max(1, 48 - suffix.length))}${suffix}`;
+    i += 1;
+  }
+  used.add(next);
+  return next;
+}
+
+function makeCustomRowFromPlan(plan, index, validModelIds, usedBranches) {
+  const branchBase = sanitizeBranchName(plan.branch || plan.title || plan.prompt, index);
+  return {
+    key: "r" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+    prompt: String(plan.prompt || plan.title || "").trim(),
+    branch: uniqueBranchName(branchBase, usedBranches),
+    model: validModelIds.has(plan.model) ? plan.model : "",
+    attachments: [],
+    autoReason: String(plan.reason || "").trim(),
+  };
+}
+
+function getDefaultPlannerModelId(availableModels, defaultModel) {
+  const plannerModels = (availableModels || []).filter((m) => m.provider === "claude" || m.provider === "codex");
+  if (plannerModels.some((m) => m.id === defaultModel)) return defaultModel;
+  return plannerModels.find((m) => m.id === "gpt55-med")?.id
+    || plannerModels.find((m) => m.provider === "claude" && m.id === "sonnet")?.id
+    || plannerModels[0]?.id
+    || "";
+}
+
+function modelPayload(model) {
+  if (!model) return null;
+  return {
+    id: model.id,
+    name: model.name || model.label || model.id,
+    tag: model.tag,
+    provider: model.provider,
+    cliFlag: model.cliFlag,
+    effort: model.effort,
+  };
+}
+
 function buildIssuePrompt(issue) {
   const body = issue.body ? `\n\n${issue.body}` : "";
   return `Fix issue #${issue.number}: ${issue.title}${body}`;
@@ -116,9 +170,28 @@ export default function DispatchCard({
   const [globalModel, setGlobalModel] = useState(defaultModel);
   const [customRows, setCustomRows] = useState([]);
   const [issueRows, setIssueRows] = useState([]);
+  const [customMode, setCustomMode] = useState("manual");
+  const [autoBrief, setAutoBrief] = useState("");
+  const [autoPlannerModel, setAutoPlannerModel] = useState(() =>
+    getDefaultPlannerModelId(availableModels, defaultModel)
+  );
+  const [autoLoading, setAutoLoading] = useState(false);
+  const [autoError, setAutoError] = useState(null);
+  const [autoNote, setAutoNote] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({}); // rowKey -> message
   const [banner, setBanner] = useState(null);
+
+  const plannerModels = useMemo(
+    () => (availableModels || []).filter((m) => m.provider === "claude" || m.provider === "codex"),
+    [availableModels]
+  );
+
+  useEffect(() => {
+    if (!plannerModels.length) return;
+    if (plannerModels.some((m) => m.id === autoPlannerModel)) return;
+    setAutoPlannerModel(getDefaultPlannerModelId(availableModels, defaultModel));
+  }, [plannerModels, autoPlannerModel, availableModels, defaultModel]);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
@@ -132,9 +205,59 @@ export default function DispatchCard({
 
   const activeRows = tab === "issues"
     ? issueRows.filter((r) => r.enabled)
-    : customRows;
+    : (customMode === "auto" ? [] : customRows);
   const canDispatch = activeRows.length > 0 && !submitting
     && (tab === "issues" || !!currentCwd);
+
+  const handleAutoFill = useCallback(async () => {
+    const brief = autoBrief.trim();
+    if (!brief) {
+      setAutoError(t("dispatch.autoErrorBriefEmpty"));
+      return;
+    }
+    if (!window.api?.dispatchPlan) {
+      setAutoError(t("dispatch.autoErrorUnavailable"));
+      return;
+    }
+
+    const plannerModel = plannerModels.find((m) => m.id === autoPlannerModel) || plannerModels[0];
+    if (!plannerModel) {
+      setAutoError(t("dispatch.autoErrorNoPlanner"));
+      return;
+    }
+
+    setAutoLoading(true);
+    setAutoError(null);
+    setAutoNote(null);
+    try {
+      const result = await window.api.dispatchPlan({
+        instructions: brief,
+        cwd: currentCwd,
+        plannerModel: modelPayload(plannerModel),
+        targetModels: availableModels.map(modelPayload).filter(Boolean),
+        defaultTargetModel: globalModel,
+      });
+      const validModelIds = new Set(availableModels.map((m) => m.id));
+      const usedBranches = new Set();
+      const rows = (result?.rows || [])
+        .map((row, index) => makeCustomRowFromPlan(row, index, validModelIds, usedBranches))
+        .filter((row) => row.prompt.trim());
+
+      if (rows.length === 0) {
+        setAutoError(t("dispatch.autoErrorNoRows"));
+        return;
+      }
+
+      setCustomRows(rows);
+      setErrors({});
+      setAutoNote(t("dispatch.autoFilled", { count: rows.length }));
+      setCustomMode("manual");
+    } catch (e) {
+      setAutoError(e?.message || t("dispatch.autoErrorFailed"));
+    } finally {
+      setAutoLoading(false);
+    }
+  }, [autoBrief, autoPlannerModel, plannerModels, currentCwd, availableModels, globalModel, t]);
 
   const handleSubmit = useCallback(async () => {
     const rowsToRun = tab === "issues"
@@ -254,7 +377,18 @@ export default function DispatchCard({
               setRows={setCustomRows}
               currentCwd={currentCwd}
               availableModels={availableModels}
+              plannerModels={plannerModels}
               errors={errors}
+              mode={customMode}
+              setMode={setCustomMode}
+              autoBrief={autoBrief}
+              setAutoBrief={setAutoBrief}
+              autoPlannerModel={autoPlannerModel}
+              setAutoPlannerModel={setAutoPlannerModel}
+              autoLoading={autoLoading}
+              autoError={autoError}
+              autoNote={autoNote}
+              onAutoFill={handleAutoFill}
               t={t}
             />
           )}
@@ -485,7 +619,25 @@ function IssueRow({ row, availableModels, error, onChange, t }) {
   );
 }
 
-function CustomTab({ rows, setRows, currentCwd, availableModels, errors, t }) {
+function CustomTab({
+  rows,
+  setRows,
+  currentCwd,
+  availableModels,
+  plannerModels,
+  errors,
+  mode,
+  setMode,
+  autoBrief,
+  setAutoBrief,
+  autoPlannerModel,
+  setAutoPlannerModel,
+  autoLoading,
+  autoError,
+  autoNote,
+  onAutoFill,
+  t,
+}) {
   const addRow = () => setRows((prev) => [...prev, makeCustomRow(prev.length)]);
   const removeRow = (key) => setRows((prev) => prev.filter((r) => r.key !== key));
   const updateRow = (key, patch) => setRows((prev) =>
@@ -499,27 +651,132 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors, t }) {
           {t("dispatch.selectFolderNotice")}
         </div>
       )}
-      {rows.map((r, i) => (
-        <CustomRow
-          key={r.key}
-          row={r}
-          index={i}
-          availableModels={availableModels}
-          error={errors[r.key]}
-          onChange={(patch) => updateRow(r.key, patch)}
-          onRemove={() => removeRow(r.key)}
+      <div style={customModeBarStyle}>
+        <div style={customModeSwitchStyle} role="tablist" aria-label={t("dispatch.customMode")}>
+          <button
+            type="button"
+            onClick={() => setMode("manual")}
+            style={customModeButtonStyle(mode === "manual")}
+          >
+            <FileText size={12} />
+            {t("dispatch.manualMode")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("auto")}
+            style={customModeButtonStyle(mode === "auto")}
+          >
+            <Sparkles size={12} />
+            {t("dispatch.autoMode")}
+          </button>
+        </div>
+        {autoNote && mode === "manual" && (
+          <div style={autoNoteStyle}>{autoNote}</div>
+        )}
+      </div>
+
+      {mode === "auto" ? (
+        <AutoComposer
+          brief={autoBrief}
+          setBrief={setAutoBrief}
+          plannerModel={autoPlannerModel}
+          setPlannerModel={setAutoPlannerModel}
+          plannerModels={plannerModels}
+          loading={autoLoading}
+          error={autoError}
+          onAutoFill={onAutoFill}
           t={t}
         />
-      ))}
-      <button
-        onClick={addRow}
-        style={addBtnStyle}
-        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.8)"; e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "transparent"; }}
-      >
-        <Plus size={13} strokeWidth={2} />
-        <span>{t("dispatch.addSession")}</span>
-      </button>
+      ) : (
+        <>
+          {rows.map((r, i) => (
+            <CustomRow
+              key={r.key}
+              row={r}
+              index={i}
+              availableModels={availableModels}
+              error={errors[r.key]}
+              onChange={(patch) => updateRow(r.key, patch)}
+              onRemove={() => removeRow(r.key)}
+              t={t}
+            />
+          ))}
+          <button
+            onClick={addRow}
+            style={addBtnStyle}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.8)"; e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "transparent"; }}
+          >
+            <Plus size={13} strokeWidth={2} />
+            <span>{t("dispatch.addSession")}</span>
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AutoComposer({
+  brief,
+  setBrief,
+  plannerModel,
+  setPlannerModel,
+  plannerModels,
+  loading,
+  error,
+  onAutoFill,
+  t,
+}) {
+  const canFill = !!brief.trim() && plannerModels.length > 0 && !loading;
+  return (
+    <div style={autoPanelStyle}>
+      <div style={autoPanelHeaderStyle}>
+        <div style={autoTitleStyle}>
+          <Sparkles size={14} />
+          <span>{t("dispatch.autoComposerTitle")}</span>
+        </div>
+        <DispatchDropdown
+          ariaLabel={t("dispatch.autoPlannerModel")}
+          value={plannerModel}
+          onChange={setPlannerModel}
+          options={plannerModels.map((m) => ({
+            value: m.id,
+            label: m.name || m.label || m.id,
+            triggerLabel: m.tag || m.label || m.id,
+            sublabel: m.tag,
+            group: (m.provider || "MODEL").toUpperCase(),
+          }))}
+          grouped
+        />
+      </div>
+      <textarea
+        value={brief}
+        onChange={(e) => setBrief(e.target.value)}
+        placeholder={t("dispatch.autoBriefPlaceholder")}
+        rows={7}
+        style={autoTextareaStyle}
+        {...fieldHoverProps}
+      />
+      <div style={autoGuideStyle}>{t("dispatch.autoModelGuide")}</div>
+      {error && <div style={autoErrorStyle}>{error}</div>}
+      <div style={autoActionsStyle}>
+        <button
+          type="button"
+          onClick={onAutoFill}
+          disabled={!canFill}
+          style={autoFillBtnStyle(canFill, loading)}
+        >
+          <span style={{ visibility: loading ? "hidden" : "visible", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Sparkles size={13} />
+            {t("dispatch.autoFill")}
+          </span>
+          {loading && (
+            <span style={{ position: "absolute", inset: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+              <DispatchLoadingDots ariaLabel={t("dispatch.autoFilling")} />
+            </span>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -565,6 +822,12 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove, t }
       {attachments.length > 0 && (
         <div style={{ padding: "0 12px 8px" }}>
           <ImagePreview items={attachments} onRemove={removeAttachment} />
+        </div>
+      )}
+      {row.autoReason && (
+        <div style={customReasonStyle}>
+          <Sparkles size={11} />
+          <span>{row.autoReason}</span>
         </div>
       )}
       <div style={customControlsStyle}>
@@ -977,6 +1240,114 @@ const addBtnStyle = {
   transition: "color .15s, background .15s",
 };
 
+const customModeBarStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  marginBottom: 12,
+};
+const customModeSwitchStyle = {
+  display: "inline-flex",
+  padding: 3,
+  border: "1px solid rgba(255,255,255,0.06)",
+  borderRadius: 8,
+  background: "rgba(255,255,255,0.018)",
+};
+const customModeButtonStyle = (active) => ({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "6px 9px",
+  border: "none",
+  borderRadius: 6,
+  background: active ? "rgba(255,255,255,0.08)" : "transparent",
+  color: active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.48)",
+  cursor: "pointer",
+  fontSize: 11,
+  fontFamily: "'JetBrains Mono', monospace",
+  letterSpacing: ".04em",
+  transition: "background .15s, color .15s",
+});
+const autoNoteStyle = {
+  color: "rgba(180,255,200,0.78)",
+  fontSize: 11,
+  fontFamily: "'JetBrains Mono', monospace",
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+const autoPanelStyle = {
+  border: "1px solid rgba(255,255,255,0.07)",
+  borderRadius: 8,
+  background: "rgba(255,255,255,0.018)",
+  overflow: "hidden",
+};
+const autoPanelHeaderStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  padding: "10px 12px",
+  borderBottom: "1px solid rgba(255,255,255,0.05)",
+};
+const autoTitleStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+  color: "rgba(255,255,255,0.82)",
+  fontSize: 12,
+  fontWeight: 500,
+};
+const autoTextareaStyle = {
+  width: "100%",
+  minHeight: 132,
+  resize: "vertical",
+  background: "rgba(0,0,0,0.12)",
+  color: "rgba(255,255,255,0.86)",
+  border: "1px solid rgba(255,255,255,0.04)",
+  borderRadius: 7,
+  padding: "11px 12px",
+  fontSize: 12,
+  fontFamily: "inherit",
+  lineHeight: 1.45,
+  outline: "none",
+  boxSizing: "border-box",
+  transition: "border-color .2s",
+};
+const autoGuideStyle = {
+  color: "rgba(255,255,255,0.42)",
+  fontSize: 11,
+  lineHeight: 1.45,
+  padding: "9px 12px 0",
+};
+const autoErrorStyle = {
+  color: "rgba(255,180,180,0.9)",
+  fontSize: 11,
+  padding: "9px 12px 0",
+};
+const autoActionsStyle = {
+  display: "flex",
+  justifyContent: "flex-end",
+  padding: 12,
+};
+const autoFillBtnStyle = (enabled, loading) => ({
+  position: "relative",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minWidth: 128,
+  padding: "8px 12px",
+  borderRadius: 6,
+  border: "none",
+  background: loading ? "rgba(255,255,255,0.86)" : (enabled ? "white" : "rgba(255,255,255,0.08)"),
+  color: loading ? "black" : (enabled ? "black" : "rgba(255,255,255,0.38)"),
+  cursor: loading ? "progress" : (enabled ? "pointer" : "not-allowed"),
+  fontSize: 12,
+  fontWeight: 500,
+});
+
 const customRowStyle = (hasError) => ({
   border: "1px solid " + (hasError ? "rgba(255,180,180,0.35)" : "var(--pane-border)"),
   borderRadius: 8,
@@ -997,6 +1368,15 @@ const customTextareaStyle = {
   fontFamily: "inherit",
   outline: "none",
   boxSizing: "border-box",
+};
+const customReasonStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  color: "rgba(180,220,255,0.72)",
+  fontSize: 11,
+  lineHeight: 1.35,
+  padding: "0 12px 9px",
 };
 const customControlsStyle = {
   display: "flex",

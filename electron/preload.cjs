@@ -57,6 +57,7 @@ contextBridge.exposeInMainWorld("api", {
     try { return webUtils.getPathForFile(file); } catch { return null; }
   },
   quickExplain: (opts) => ipcRenderer.invoke("quick-explain", opts),
+  dispatchPlan: (opts) => ipcRenderer.invoke("dispatch-plan", opts),
   getSystemInfo: () => ipcRenderer.invoke("system-info"),
   getDraftsPath: () => ipcRenderer.invoke("get-drafts-path"),
   pathExists: (p) => ipcRenderer.invoke("path-exists", p),
