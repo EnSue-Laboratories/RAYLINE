@@ -6,6 +6,7 @@ import SidebarChromeRail from "./components/SidebarChromeRail";
 import { IS_MAC } from "./windowChrome";
 import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
+import TerminalDrawer from "./components/TerminalDrawer";
 import WindowControls from "./components/WindowControls";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
