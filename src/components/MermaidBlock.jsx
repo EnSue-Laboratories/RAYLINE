@@ -2,18 +2,110 @@ import { useEffect, useRef, useState } from "react";
 import mermaid from "mermaid";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-let mermaidInitialized = false;
 let renderCounter = 0;
 
-function initMermaid() {
-  if (mermaidInitialized) return;
-  mermaid.initialize({
+function getMermaidConfig(theme) {
+  if (theme === "light") {
+    return {
+      startOnLoad: false,
+      theme: "neutral",
+      suppressErrorRendering: true,
+      themeVariables: {
+        darkMode: false,
+        background: "transparent",
+        mainBkg: "#f0f4f8",
+        nodeBorder: "rgba(41,51,65,0.25)",
+        clusterBkg: "#e8edf3",
+        clusterBorder: "rgba(41,51,65,0.18)",
+        titleColor: "rgba(20,30,45,0.85)",
+
+        // Text colors
+        primaryTextColor: "rgba(20,30,45,0.85)",
+        secondaryTextColor: "rgba(20,30,45,0.6)",
+        tertiaryTextColor: "rgba(20,30,45,0.5)",
+
+        // Line/edge colors
+        lineColor: "rgba(41,51,65,0.4)",
+        textColor: "rgba(20,30,45,0.8)",
+
+        // Node colors
+        primaryColor: "#dbeafe",
+        primaryBorderColor: "#3b82f6",
+        secondaryColor: "#e0f2fe",
+        secondaryBorderColor: "#0ea5e9",
+        tertiaryColor: "#ede9fe",
+        tertiaryBorderColor: "#8b5cf6",
+
+        // Git graph
+        git0: "#1e3a5f",
+        git1: "#555555",
+        git2: "#444444",
+        git3: "#666666",
+        git4: "#333333",
+        git5: "#777777",
+        git6: "#888888",
+        git7: "#222222",
+        gitBranchLabel0: "#ffffff",
+        gitBranchLabel1: "#ffffff",
+        gitBranchLabel2: "#ffffff",
+        gitBranchLabel3: "#ffffff",
+        gitBranchLabel4: "#ffffff",
+        gitBranchLabel5: "#ffffff",
+        gitBranchLabel6: "#ffffff",
+        gitBranchLabel7: "#ffffff",
+        gitInv0: "#ffffff",
+        commitLabelColor: "rgba(20,30,45,0.7)",
+        commitLabelBackground: "rgba(41,51,65,0.08)",
+
+        // Pie chart
+        pie1: "#3b82f6",
+        pie2: "#6ab04c",
+        pie3: "#e2b93d",
+        pie4: "#e07b4c",
+        pie5: "#9b59b6",
+        pie6: "#1abc9c",
+        pie7: "#e67e22",
+        pie8: "#2ecc71",
+        pieTitleTextColor: "rgba(20,30,45,0.85)",
+        pieSectionTextColor: "rgba(20,30,45,0.9)",
+        pieLegendTextColor: "rgba(20,30,45,0.7)",
+        pieStrokeColor: "rgba(41,51,65,0.15)",
+        pieSectionTextSize: "14px",
+        pieOuterStrokeColor: "rgba(41,51,65,0.15)",
+
+        // Notes
+        noteBkgColor: "#fef9c3",
+        noteTextColor: "rgba(20,30,45,0.8)",
+        noteBorderColor: "rgba(41,51,65,0.2)",
+
+        // Sequence diagram
+        actorBkg: "#e0f2fe",
+        actorBorder: "rgba(41,51,65,0.25)",
+        actorTextColor: "rgba(20,30,45,0.85)",
+        signalColor: "rgba(41,51,65,0.6)",
+        labelBoxBkgColor: "#f0f4f8",
+
+        // Flowchart
+        edgeLabelBackground: "#f8fafc",
+
+        // Class diagram
+        classText: "rgba(20,30,45,0.8)",
+
+        // Font
+        fontFamily: "system-ui,-apple-system,sans-serif",
+        fontSize: "13px",
+      },
+    };
+  }
+
+  // dark theme (default)
+  return {
     startOnLoad: false,
     theme: "base",
     suppressErrorRendering: true,
     themeVariables: {
       darkMode: true,
-      background: "#0a0a0a",
+      background: "transparent",
       mainBkg: "#1a1a1a",
       nodeBorder: "rgba(255,255,255,0.25)",
       clusterBkg: "#111111",
@@ -87,7 +179,7 @@ function initMermaid() {
       labelBoxBkgColor: "#1a2530",
 
       // Flowchart
-      edgeLabelBackground: "#0a0a0a",
+      edgeLabelBackground: "transparent",
 
       // Class diagram
       classText: "rgba(255,255,255,0.8)",
@@ -96,18 +188,39 @@ function initMermaid() {
       fontFamily: "system-ui,-apple-system,sans-serif",
       fontSize: "13px",
     },
-  });
-  mermaidInitialized = true;
+  };
+}
+
+function getCurrentTheme() {
+  if (typeof document === "undefined") return "dark";
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
 }
 
 export default function MermaidBlock({ code }) {
   const s = useFontScale();
   const [svg, setSvg] = useState(null);
   const [error, setError] = useState(false);
+  const [themeKey, setThemeKey] = useState(() => getCurrentTheme());
   const lastRendered = useRef("");
   const timerRef = useRef(null);
   const containerRef = useRef(null);
   const lastHeight = useRef(null);
+
+  // Re-initialize mermaid and force re-render when data-theme changes
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.attributeName === "data-theme") {
+          const newTheme = getCurrentTheme();
+          mermaid.initialize(getMermaidConfig(newTheme));
+          lastRendered.current = ""; // invalidate cache so diagram re-renders
+          setThemeKey(newTheme);
+        }
+      }
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const trimmed = code?.trim();
@@ -118,7 +231,7 @@ export default function MermaidBlock({ code }) {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       lastRendered.current = trimmed;
-      initMermaid();
+      mermaid.initialize(getMermaidConfig(getCurrentTheme()));
       setError(false);
 
       const id = `mmd-${++renderCounter}-${Date.now()}`;
@@ -136,13 +249,13 @@ export default function MermaidBlock({ code }) {
     }, 600);
 
     return () => clearTimeout(timerRef.current);
-  }, [code]);
+  }, [code, themeKey]);
 
   if (error) {
     return (
       <pre style={{
-        background: "rgba(0,0,0,0.4)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--pane-background)",
+        border: "1px solid var(--pane-border)",
         borderRadius: 8,
         padding: "12px 14px",
         overflow: "auto",
@@ -150,7 +263,7 @@ export default function MermaidBlock({ code }) {
         fontFamily: "'JetBrains Mono',monospace",
         margin: "8px 0 12px",
         lineHeight: 1.6,
-        color: "rgba(255,255,255,0.5)",
+        color: "var(--text-tertiary)",
       }}>
         <code>{code}</code>
       </pre>
@@ -167,13 +280,13 @@ export default function MermaidBlock({ code }) {
   if (!svg) {
     return (
       <div style={{
-        background: "rgba(0,0,0,0.2)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--pane-background)",
+        border: "1px solid var(--pane-border)",
         borderRadius: 8,
         padding: "24px",
         margin: "8px 0 12px",
         textAlign: "center",
-        color: "rgba(255,255,255,0.25)",
+        color: "var(--text-faint)",
         fontSize: s(11),
         fontFamily: "'JetBrains Mono',monospace",
         // Preserve last known height to prevent scroll jumps
@@ -191,8 +304,8 @@ export default function MermaidBlock({ code }) {
     <div
       ref={containerRef}
       style={{
-        background: "rgba(0,0,0,0.2)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--pane-background)",
+        border: "1px solid var(--pane-border)",
         borderRadius: 8,
         padding: "16px",
         margin: "8px 0 12px",

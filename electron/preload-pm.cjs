@@ -36,4 +36,9 @@ contextBridge.exposeInMainWorld("ghApi", {
     ipcRenderer.on("gh-auth-event", listener);
     return () => ipcRenderer.removeListener("gh-auth-event", listener);
   },
+  onThemeMode: (cb) => {
+    const handler = (_e, mode) => cb(mode);
+    ipcRenderer.on("theme-mode", handler);
+    return () => ipcRenderer.removeListener("theme-mode", handler);
+  },
 });

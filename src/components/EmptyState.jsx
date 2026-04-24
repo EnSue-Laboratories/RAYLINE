@@ -1,15 +1,24 @@
 import { useState, useEffect } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-const ACCENT = "#FF4422";
-const PRIMARY = "rgb(200, 200, 200)";
-
 export default function EmptyState() {
   const s = useFontScale();
   const [info, setInfo] = useState(null);
+  const [brandColor, setBrandColor] = useState("#FF4422");
 
   useEffect(() => {
     window.api?.getSystemInfo?.().then(setInfo).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue("--brand-slash").trim();
+    if (v) setBrandColor(v);
+    const obs = new MutationObserver(() => {
+      const nv = getComputedStyle(document.documentElement).getPropertyValue("--brand-slash").trim();
+      if (nv) setBrandColor(nv);
+    });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
   }, []);
 
   return (
@@ -71,10 +80,10 @@ export default function EmptyState() {
         style={{ width: 420, height: 126, overflow: "visible" }}
         aria-label="RayLine"
       >
-        <g fill={PRIMARY} fontFamily="'Inter Tight', 'Inter', system-ui, sans-serif" fontWeight="600" fontSize="100">
+        <g style={{ fill: "var(--empty-lockup)" }} fontFamily="'Inter Tight', 'Inter', system-ui, sans-serif" fontWeight="600" fontSize="100">
           <text className="rl-letter" x="0"       y="120">R</text>
           <line className="rl-slash" x1="111.04" x2="85.12" y1="53.76" y2="114.24"
-                stroke={ACCENT} strokeWidth="11.52" strokeLinecap="square" />
+                stroke={brandColor} strokeWidth="11.52" strokeLinecap="square" />
           <text className="rl-letter" x="134.8"   y="120">Y</text>
           <text className="rl-letter" x="219.55"  y="120">L</text>
           <text className="rl-letter" x="290.41"  y="120">I</text>
@@ -84,7 +93,7 @@ export default function EmptyState() {
             <rect x="420.52" y="78.24"  width="38.39"  height="11.52" />
             <rect x="420.52" y="108.48" width="44.64"  height="11.52" />
           </g>
-          <circle className="rl-dot" cx="489.64" cy="113.52" r="6.48" fill={ACCENT} />
+          <circle className="rl-dot" cx="489.64" cy="113.52" r="6.48" fill={brandColor} />
         </g>
       </svg>
 
@@ -99,19 +108,19 @@ export default function EmptyState() {
         }}>
           <div className="rl-sys-1" style={{
             fontSize: s(13),
-            color: "rgba(255,255,255,0.55)",
+            color: "var(--text-tertiary)",
             letterSpacing: ".06em",
             fontWeight: 500,
           }}>
             {info.user}@{info.hostname}
           </div>
-          <div className="rl-sys-2" style={{ fontSize: s(11), color: "rgba(255,255,255,0.32)", letterSpacing: ".04em" }}>
+          <div className="rl-sys-2" style={{ fontSize: s(11), color: "var(--text-muted)", letterSpacing: ".04em" }}>
             {info.platform} {info.arch} · {info.cpus} cores · {info.memory}
           </div>
-          <div className="rl-sys-3" style={{ fontSize: s(11), color: "rgba(255,255,255,0.22)", letterSpacing: ".04em" }}>
+          <div className="rl-sys-3" style={{ fontSize: s(11), color: "var(--text-faint)", letterSpacing: ".04em" }}>
             node {info.nodeVersion} · electron {info.electronVersion}
           </div>
-          <div className="rl-sys-4" style={{ fontSize: s(11), color: "rgba(255,255,255,0.16)", letterSpacing: ".04em" }}>
+          <div className="rl-sys-4" style={{ fontSize: s(11), color: "var(--text-faint)", letterSpacing: ".04em" }}>
             {info.shell}
           </div>
         </div>

@@ -1,6 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 :root {
+  color-scheme: dark;
+
+  /* ── Pane surfaces ── */
   --pane-background: #0D0D10;
   --pane-background-rgb: 13, 13, 16;
   --pane-overlay-alpha: 0.82;
@@ -9,17 +12,206 @@
   --pane-active-overlay: rgba(9, 9, 11, var(--pane-overlay-alpha));
   --pane-elevated-rgb: 16, 16, 18;
   --pane-elevated: rgba(var(--pane-elevated-rgb), 0.5);
-  --pm-modal-backdrop: rgba(0,0,0,0.45);
-  --pm-modal-backdrop-blur: 6px;
-  --pane-hover: #121214;
-  --pane-active: #141416;
-  --pane-interaction-hover-fill: var(--pane-hover);
-  --pane-interaction-active-fill: var(--pane-active);
-  --pane-interaction-hover-filter: none;
+  --pane-hover:   #121214;
+  --pane-active:  #141416;
+  --pane-border:  rgba(255,255,255,0.06);
+  --pane-interaction-hover-fill:   var(--pane-hover);
+  --pane-interaction-active-fill:  var(--pane-active);
+  --pane-interaction-hover-filter:  none;
   --pane-interaction-active-filter: none;
-  --pane-interaction-hover-shadow: none;
+  --pane-interaction-hover-shadow:  none;
   --pane-interaction-active-shadow: none;
-  --pane-border: rgba(255,255,255,0.06);
+  --pane-interaction-rgb: 255, 255, 255;
+  --app-background: #0D0D10;
+
+  /* ── Typography ── */
+  --text-primary:   rgba(255,255,255,0.92);
+  --text-secondary: rgba(255,255,255,0.78);
+  --text-tertiary:  rgba(255,255,255,0.58);
+  --text-muted:     rgba(255,255,255,0.38);
+  --text-faint:     rgba(255,255,255,0.22);
+  --text-inverse:   #0D0D10;
+
+  /* ── Controls ── */
+  --control-bg:            rgba(255,255,255,0.04);
+  --control-bg-soft:       rgba(255,255,255,0.02);
+  --control-bg-strong:     rgba(255,255,255,0.08);
+  --control-bg-hover:      rgba(255,255,255,0.10);
+  --control-bg-active:     rgba(255,255,255,0.14);
+  --control-border:        rgba(255,255,255,0.08);
+  --control-border-soft:   rgba(255,255,255,0.04);
+  --control-border-strong: rgba(255,255,255,0.12);
+  --control-shadow: 0 12px 36px rgba(0,0,0,0.2);
+  --panel-shadow:   0 20px 60px rgba(0,0,0,0.6);
+  --modal-shadow:   0 20px 60px rgba(0,0,0,0.5);
+
+  /* ── Semantic accent ── */
+  --accent-link:        rgba(140,180,255,0.82);
+  --accent-soft-bg:     rgba(140,180,255,0.10);
+  --accent-soft-border: rgba(140,180,255,0.16);
+  --accent-soft-text:   rgba(190,220,255,0.86);
+
+  /* ── Semantic status ── */
+  --success-soft-bg:     rgba(130,220,160,0.14);
+  --success-soft-border: rgba(130,220,160,0.22);
+  --success-soft-text:   rgba(170,240,190,0.92);
+  --danger-soft-bg:      rgba(220,120,120,0.12);
+  --danger-soft-border:  rgba(220,120,120,0.20);
+  --danger-soft-text:    rgba(236,170,170,0.92);
+
+  /* ── Buttons ── */
+  --button-primary-bg:          rgba(255,255,255,0.92);
+  --button-primary-bg-disabled: rgba(255,255,255,0.12);
+  --button-primary-fg:          #0D0D10;
+  --button-primary-fg-disabled: rgba(255,255,255,0.40);
+  --button-secondary-fg:        rgba(255,255,255,0.72);
+
+  /* ── Modal backdrop ── */
+  --pm-modal-backdrop:      rgba(4,6,10,0.36);
+  --pm-modal-backdrop-blur: 10px;
+
+  /* ── Misc chrome ── */
+  --scrollbar-thumb:   rgba(255,255,255,0.03);
+  --placeholder-color: rgba(255,255,255,0.25);
+
+  /* ── Slider ── */
+  --slider-track-fill: rgba(255,255,255,0.50);
+  --slider-track-rest: rgba(255,255,255,0.08);
+  --slider-thumb:      rgba(255,255,255,0.90);
+
+  /* ── Icons ── */
+  --icon-primary:   rgba(255,255,255,0.78);
+  --icon-secondary: rgba(255,255,255,0.50);
+  --icon-faint:     rgba(255,255,255,0.22);
+  --icon-on-accent: #0D0D10;
+
+  /* ── Tooltip ── */
+  --tooltip-bg:     rgba(14,14,18,0.95);
+  --tooltip-border: rgba(255,255,255,0.08);
+  --tooltip-text:   rgba(255,255,255,0.80);
+  --tooltip-shadow: 0 4px 12px rgba(0,0,0,0.40);
+
+  /* ── Row / list ── */
+  --row-separator: rgba(255,255,255,0.03);
+  --row-hover-bg:  rgba(255,255,255,0.04);
+
+  /* ── Badge (PR / Issue state) ── */
+  --badge-open-bg:     rgba(63,185,80,0.12);
+  --badge-open-text:   rgba(63,185,80,0.85);
+  --badge-merged-bg:   rgba(130,80,223,0.12);
+  --badge-merged-text: rgba(160,120,240,0.90);
+  --badge-closed-bg:   rgba(255,100,100,0.10);
+  --badge-closed-text: rgba(255,100,100,0.70);
+
+  /* ── Search / input focus ── */
+  --search-focus-border: rgba(255,255,255,0.12);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* ── Pane surfaces ── */
+  --pane-background: #f4efe7;
+  --pane-background-rgb: 244, 239, 231;
+  --pane-overlay-alpha: 0.80;
+  --pane-background-overlay: rgba(255,255,255,0.72);
+  --pane-hover-overlay:  rgba(255,255,255,0.90);
+  --pane-active-overlay: rgba(255,255,255,0.96);
+  --pane-elevated-rgb: 255, 255, 255;
+  --pane-elevated: rgba(255,255,255,0.78);
+  --pane-hover:   rgba(31,41,55,0.05);
+  --pane-active:  rgba(31,41,55,0.09);
+  --pane-border:  rgba(41,51,65,0.12);
+  --pane-interaction-hover-fill:   var(--pane-hover);
+  --pane-interaction-active-fill:  var(--pane-active);
+  --pane-interaction-hover-filter:  none;
+  --pane-interaction-active-filter: none;
+  --pane-interaction-hover-shadow:  none;
+  --pane-interaction-active-shadow: none;
+  --pane-interaction-rgb: 31, 41, 55;
+  --app-background: #f4efe7;
+
+  /* ── Typography ── */
+  --text-primary:   rgba(26,33,43,0.92);
+  --text-secondary: rgba(26,33,43,0.84);
+  --text-tertiary:  rgba(26,33,43,0.68);
+  --text-muted:     rgba(26,33,43,0.52);
+  --text-faint:     rgba(26,33,43,0.34);
+  --text-inverse:   #ffffff;
+
+  /* ── Controls ── */
+  --control-bg:            rgba(255,255,255,0.82);
+  --control-bg-soft:       rgba(255,250,244,0.74);
+  --control-bg-strong:     rgba(255,255,255,0.94);
+  --control-bg-hover:      rgba(255,255,255,0.98);
+  --control-bg-active:     rgba(255,255,255,0.98);
+  --control-border:        rgba(31,41,55,0.14);
+  --control-border-soft:   rgba(31,41,55,0.10);
+  --control-border-strong: rgba(31,41,55,0.24);
+  --control-shadow: 0 16px 40px rgba(122,98,75,0.12);
+  --panel-shadow:   0 24px 60px rgba(122,98,75,0.18);
+  --modal-shadow:   0 24px 60px rgba(122,98,75,0.20);
+
+  /* ── Semantic accent ── */
+  --accent-link:        rgba(41,98,255,0.88);
+  --accent-soft-bg:     rgba(41,98,255,0.10);
+  --accent-soft-border: rgba(41,98,255,0.16);
+  --accent-soft-text:   rgba(28,82,209,0.92);
+
+  /* ── Semantic status ── */
+  --success-soft-bg:     rgba(39,174,96,0.12);
+  --success-soft-border: rgba(39,174,96,0.20);
+  --success-soft-text:   rgba(27,132,72,0.92);
+  --danger-soft-bg:      rgba(201,72,72,0.10);
+  --danger-soft-border:  rgba(201,72,72,0.18);
+  --danger-soft-text:    rgba(170,56,56,0.92);
+
+  /* ── Buttons ── */
+  --button-primary-bg:          rgba(32,44,61,0.94);
+  --button-primary-bg-disabled: rgba(31,41,55,0.14);
+  --button-primary-fg:          #ffffff;
+  --button-primary-fg-disabled: rgba(26,33,43,0.42);
+  --button-secondary-fg:        rgba(26,33,43,0.76);
+
+  /* ── Modal backdrop ── */
+  --pm-modal-backdrop:      rgba(131,111,92,0.14);
+  --pm-modal-backdrop-blur: 12px;
+
+  /* ── Misc chrome ── */
+  --scrollbar-thumb:   rgba(31,41,55,0.12);
+  --placeholder-color: rgba(26,33,43,0.34);
+
+  /* ── Slider ── */
+  --slider-track-fill: rgba(31,41,55,0.28);
+  --slider-track-rest: rgba(31,41,55,0.08);
+  --slider-thumb:      rgba(31,41,55,0.90);
+
+  /* ── Icons ── */
+  --icon-primary:   rgba(26,33,43,0.82);
+  --icon-secondary: rgba(26,33,43,0.54);
+  --icon-faint:     rgba(26,33,43,0.26);
+  --icon-on-accent: #ffffff;
+
+  /* ── Tooltip ── */
+  --tooltip-bg:     rgba(26,33,43,0.94);
+  --tooltip-border: rgba(31,41,55,0.14);
+  --tooltip-text:   rgba(255,255,255,0.88);
+  --tooltip-shadow: 0 4px 12px rgba(122,98,75,0.18);
+
+  /* ── Row / list ── */
+  --row-separator: rgba(31,41,55,0.06);
+  --row-hover-bg:  rgba(31,41,55,0.045);
+
+  /* ── Badge (PR / Issue state) ── */
+  --badge-open-bg:     rgba(39,174,96,0.12);
+  --badge-open-text:   rgba(27,132,72,0.90);
+  --badge-merged-bg:   rgba(130,80,223,0.10);
+  --badge-merged-text: rgba(110,60,190,0.90);
+  --badge-closed-bg:   rgba(201,72,72,0.10);
+  --badge-closed-text: rgba(170,56,56,0.85);
+
+  /* ── Search / input focus ── */
+  --search-focus-border: rgba(31,41,55,0.22);
 }
 
 *, *::before, *::after {
@@ -37,11 +229,11 @@ html, body, #root {
 /* ── Scrollbar ── */
 ::-webkit-scrollbar        { width: 2px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.03); border-radius: 2px; }
+::-webkit-scrollbar-thumb  { background: var(--scrollbar-thumb); border-radius: 2px; }
 
 /* ── Form resets ── */
 textarea::placeholder,
-input::placeholder  { color: rgba(255, 255, 255, 0.25); }
+input::placeholder  { color: var(--placeholder-color); }
 textarea:focus,
 input:focus         { outline: none; }
 

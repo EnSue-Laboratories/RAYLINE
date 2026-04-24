@@ -1058,6 +1058,28 @@ export default function App() {
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const [showMulticaSetup, setShowMulticaSetup] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [themeMode, setThemeMode] = useState("auto");
+
+  useEffect(() => {
+    const resolveTheme = (mode) => {
+      if (mode === "light") return "light";
+      if (mode === "dark") return "dark";
+      return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    };
+    const apply = (mode) => {
+      const resolved = resolveTheme(mode);
+      document.documentElement.dataset.theme = resolved;
+      window.api?.setThemeMode?.(mode);
+    };
+    apply(themeMode);
+    if (themeMode === "auto") {
+      const mq = window.matchMedia("(prefers-color-scheme: light)");
+      const onChange = () => apply("auto");
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    }
+  }, [themeMode]);
+
   useEffect(() => {
     const h = () => setShowMulticaSetup(true);
     window.addEventListener("open-multica-setup", h);
@@ -1112,6 +1134,7 @@ export default function App() {
     notificationSound,
     notificationsMuted,
     queuedMessages,
+    themeMode,
   }), [
     appBlur,
     appOpacity,
@@ -1131,6 +1154,7 @@ export default function App() {
     projects,
     queuedMessages,
     sidebarActiveOpacity,
+    themeMode,
     wallpaper,
   ]);
   const activeQueuedMessages = useMemo(
@@ -1398,6 +1422,7 @@ export default function App() {
         }
         if (state.projects) setProjects(normalizeProjectsMeta(state.projects));
         if (state.draftsCollapsed != null) setDraftsCollapsed(state.draftsCollapsed);
+        if (state.themeMode) setThemeMode(state.themeMode);
       }
       setStateLoaded(true);
     });
@@ -3405,6 +3430,8 @@ export default function App() {
           onNotificationsMutedChange={setNotificationsMuted}
           locale={locale}
           onLocaleChange={setLocale}
+          themeMode={themeMode}
+          onThemeModeChange={setThemeMode}
           onClose={() => setShowSettings(false)}
         />
       ) : (

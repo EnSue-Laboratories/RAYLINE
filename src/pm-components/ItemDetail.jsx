@@ -21,12 +21,12 @@ const smallBtnStyle = {
   display: "inline-flex",
   alignItems: "center",
   gap: 5,
-  background: "rgba(255,255,255,0.05)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  background: "var(--control-bg-hover)",
+  border: "1px solid var(--control-border)",
   borderRadius: 6,
   padding: "4px 10px",
   cursor: "pointer",
-  color: "rgba(255,255,255,0.55)",
+  color: "var(--text-tertiary)",
   fontSize: 11,
   fontFamily: "'JetBrains Mono', monospace",
   letterSpacing: ".04em",
@@ -42,7 +42,7 @@ const markdownCodeComponents = {
       return (
         <code
           style={{
-            background: "rgba(255,255,255,0.06)",
+            background: "var(--control-bg-hover)",
             padding: "1px 5px",
             borderRadius: 4,
             fontSize: 12,
@@ -67,8 +67,8 @@ const markdownCodeComponents = {
   pre: ({ children }) => (
     <pre
       style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--control-bg)",
+        border: "1px solid var(--control-border-soft)",
         borderRadius: 6,
         padding: 12,
         overflowX: "auto",
@@ -195,7 +195,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "rgba(255,255,255,0.4)", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>
         Loading...
       </div>
     );
@@ -204,7 +204,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
   if (error) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, fontFamily: "system-ui, sans-serif" }}>
-        <div style={{ color: "rgba(255,100,100,0.8)", fontSize: 13 }}>{error}</div>
+        <div style={{ color: "var(--danger-soft-text)", fontSize: 13 }}>{error}</div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={fetchAll} style={smallBtnStyle}>Retry</button>
           <button onClick={onBack} style={{ ...smallBtnStyle, background: "none" }}>Back</button>
@@ -215,12 +215,12 @@ export default function ItemDetail({ repo, number, type, onBack }) {
 
   const stateBadge = () => {
     if (type === "pr" && item.merged_at) {
-      return { label: "MERGED", bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
+      return { label: "MERGED", bg: "var(--badge-merged-bg)", color: "var(--badge-merged-text)" };
     }
     if (item.state === "closed") {
-      return { label: "CLOSED", bg: "rgba(160,100,255,0.2)", color: "rgba(190,140,255,0.9)" };
+      return { label: "CLOSED", bg: "var(--badge-closed-bg)", color: "var(--badge-closed-text)" };
     }
-    return { label: "OPEN", bg: "rgba(80,200,120,0.15)", color: "rgba(120,230,150,0.9)" };
+    return { label: "OPEN", bg: "var(--badge-open-bg)", color: "var(--badge-open-text)" };
   };
 
   const badge = stateBadge();
@@ -236,7 +236,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         style={{
           display: "flex", alignItems: "center", gap: 6,
           background: "none", border: "none", cursor: "pointer",
-          color: "rgba(255,255,255,0.5)", fontSize: 13,
+          color: "var(--text-tertiary)", fontSize: 13,
           fontFamily: "system-ui, sans-serif", padding: "16px 20px",
           transition: "color .15s",
         }}
@@ -248,7 +248,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         {/* Title — clickable link to GitHub */}
         <div style={{ marginBottom: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: "rgba(255,255,255,0.35)" }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, color: "var(--text-muted)" }}>
               #{number}
             </span>
             <a
@@ -256,12 +256,12 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                fontSize: 18, fontWeight: 600, color: "rgba(255,255,255,0.95)",
+                fontSize: 18, fontWeight: 600, color: "var(--text-primary)",
                 fontFamily: "system-ui, sans-serif", textDecoration: "none",
                 transition: "color .15s", cursor: "pointer",
               }}
               onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(140,180,255,0.95)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.95)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
             >
               {item.title}
             </a>
@@ -273,7 +273,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               {badge.label}
             </span>
           </div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: "system-ui, sans-serif", marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "system-ui, sans-serif", marginTop: 4 }}>
             {repo} &middot; by {item.user?.login} &middot; opened {timeAgo(item.created_at)}
           </div>
         </div>
@@ -299,15 +299,15 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         {/* Assignees — compact with + button */}
         <div style={{
           display: "flex", alignItems: "center", gap: 8, marginTop: 12,
-          fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui, sans-serif",
+          fontSize: 12, color: "var(--text-muted)", fontFamily: "system-ui, sans-serif",
           position: "relative",
         }}>
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>Assignees:</span>
+          <span style={{ fontSize: 11, color: "var(--text-faint)" }}>Assignees:</span>
           {item.assignees && item.assignees.length > 0 ? (
             item.assignees.map((a) => (
               <div key={a.login} style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <img src={a.avatar_url} alt={a.login} style={{ width: 20, height: 20, borderRadius: 10 }} />
-                <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{a.login}</span>
+                <span style={{ color: "var(--text-tertiary)", fontSize: 11 }}>{a.login}</span>
               </div>
             ))
           ) : (
@@ -320,7 +320,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 20, height: 20, borderRadius: 10,
               background: "none", border: "none",
-              cursor: "pointer", color: "rgba(255,255,255,0.35)", padding: 0,
+              cursor: "pointer", color: "var(--text-muted)", padding: 0,
               transition: "all .15s",
             }}
           >
@@ -330,7 +330,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           {showAssignMenu && (
             <div style={{
               position: "absolute", top: "100%", left: 0, marginTop: 4,
-              background: "rgba(15,15,15,0.95)", border: "1px solid rgba(255,255,255,0.1)",
+              background: "var(--pane-background)", border: "1px solid var(--pane-border)",
               borderRadius: 8, padding: "4px 0", minWidth: 180, zIndex: 100,
               maxHeight: 220, overflowY: "auto", backdropFilter: "blur(20px)",
             }}>
@@ -342,13 +342,13 @@ export default function ItemDetail({ repo, number, type, onBack }) {
                     style={{
                       display: "flex", alignItems: "center", gap: 8, width: "100%",
                       background: "none", border: "none", padding: "6px 12px",
-                      cursor: "pointer", color: "rgba(255,255,255,0.7)", fontSize: 12,
+                      cursor: "pointer", color: "var(--text-secondary)", fontSize: 12,
                       fontFamily: "system-ui, sans-serif", textAlign: "left",
                     }}
                   >
                     <img src={c.avatar_url} alt={c.login} style={{ width: 18, height: 18, borderRadius: 9 }} />
                     <span style={{ flex: 1 }}>{c.login}</span>
-                    {isAssigned && <Check size={12} strokeWidth={2} style={{ color: "rgba(120,230,150,0.8)" }} />}
+                    {isAssigned && <Check size={12} strokeWidth={2} style={{ color: "var(--success-soft-text)" }} />}
                   </button>
                 );
               })}
@@ -381,8 +381,8 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         <div
           style={{
             marginTop: 16, paddingTop: 16,
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            color: "rgba(255,255,255,0.75)", fontSize: 13,
+            borderTop: "1px solid var(--pane-border)",
+            color: "var(--text-secondary)", fontSize: 13,
             lineHeight: 1.7, fontFamily: "system-ui, sans-serif",
           }}
         >
@@ -394,9 +394,9 @@ export default function ItemDetail({ repo, number, type, onBack }) {
               li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
               a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: "rgba(140,180,255,0.9)", textDecoration: "none" }}>{children}</a>,
               p: ({ children }) => <p style={{ margin: "8px 0" }}>{children}</p>,
-              h1: ({ children }) => <h1 style={{ fontSize: 20, fontWeight: 600, margin: "16px 0 8px", color: "rgba(255,255,255,0.9)" }}>{children}</h1>,
-              h2: ({ children }) => <h2 style={{ fontSize: 17, fontWeight: 600, margin: "14px 0 6px", color: "rgba(255,255,255,0.85)" }}>{children}</h2>,
-              h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 600, margin: "12px 0 4px", color: "rgba(255,255,255,0.85)" }}>{children}</h3>,
+              h1: ({ children }) => <h1 style={{ fontSize: 20, fontWeight: 600, margin: "16px 0 8px", color: "var(--text-primary)" }}>{children}</h1>,
+              h2: ({ children }) => <h2 style={{ fontSize: 17, fontWeight: 600, margin: "14px 0 6px", color: "var(--text-primary)" }}>{children}</h2>,
+              h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 600, margin: "12px 0 4px", color: "var(--text-primary)" }}>{children}</h3>,
               ...markdownCodeComponents,
             }}
           >
@@ -406,15 +406,15 @@ export default function ItemDetail({ repo, number, type, onBack }) {
 
         {/* Comments */}
         <div style={{ marginTop: 24 }}>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em", marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em", marginBottom: 12 }}>
             {comments.length} COMMENT{comments.length !== 1 ? "S" : ""}
           </div>
           {comments.map((comment) => (
-            <div key={comment.id} style={{ borderTop: "1px solid rgba(255,255,255,0.04)", paddingTop: 12, marginBottom: 12 }}>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui, sans-serif", marginBottom: 6 }}>
-                <span style={{ color: "rgba(255,255,255,0.6)" }}>{comment.user?.login}</span> &middot; {timeAgo(comment.created_at)}
+            <div key={comment.id} style={{ borderTop: "1px solid var(--row-separator)", paddingTop: 12, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "system-ui, sans-serif", marginBottom: 6 }}>
+                <span style={{ color: "var(--text-secondary)" }}>{comment.user?.login}</span> &middot; {timeAgo(comment.created_at)}
               </div>
-              <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, lineHeight: 1.6, fontFamily: "system-ui, sans-serif" }}>
+              <div style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.6, fontFamily: "system-ui, sans-serif" }}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -442,21 +442,21 @@ export default function ItemDetail({ repo, number, type, onBack }) {
           <>
             {/* Merge (PR only, open) */}
             {type === "pr" && isOpen && (
-              <button onClick={handleMerge} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
+              <button onClick={handleMerge} disabled={actionLoading} style={{ ...smallBtnStyle, color: "var(--text-tertiary)" }}>
                 <GitMerge size={11} strokeWidth={1.5} />
                 {actionLoading ? "Merging..." : "Merge"}
               </button>
             )}
             {/* Close (issues only) */}
             {type === "issue" && isOpen && (
-              <button onClick={handleClose} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
+              <button onClick={handleClose} disabled={actionLoading} style={{ ...smallBtnStyle, color: "var(--text-tertiary)" }}>
                 <CheckCircle2 size={11} strokeWidth={1.5} />
                 {actionLoading ? "Closing..." : "Close"}
               </button>
             )}
             {/* Reopen */}
             {!isOpen && !isMerged && (
-              <button onClick={handleReopen} disabled={actionLoading} style={{ ...smallBtnStyle, color: "rgba(255,255,255,0.5)" }}>
+              <button onClick={handleReopen} disabled={actionLoading} style={{ ...smallBtnStyle, color: "var(--text-tertiary)" }}>
                 <RotateCcw size={11} strokeWidth={1.5} />
                 {actionLoading ? "Reopening..." : "Reopen"}
               </button>

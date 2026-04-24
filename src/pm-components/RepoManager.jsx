@@ -53,7 +53,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
           background: "var(--pane-elevated)",
           backdropFilter: "blur(48px) saturate(1.2)",
           WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          boxShadow: "var(--modal-shadow)",
           borderRadius: 12,
           border: "1px solid var(--pane-border)",
           display: "flex",
@@ -69,7 +69,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: "1px solid var(--row-separator)",
             flexShrink: 0,
           }}
         >
@@ -77,7 +77,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
             style={{
               fontSize: 14,
               fontWeight: 500,
-              color: "rgba(255,255,255,0.85)",
+              color: "var(--text-primary)",
             }}
           >
             Add Repository
@@ -90,7 +90,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
               borderRadius: 7,
               border: "1px solid var(--pane-border)",
               background: "var(--pane-hover)",
-              color: "rgba(255,255,255,0.5)",
+              color: "var(--text-tertiary)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -116,7 +116,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
               borderRadius: 7,
               border: "1px solid var(--pane-border)",
               background: "var(--pane-hover)",
-              color: "rgba(255,255,255,0.85)",
+              color: "var(--text-primary)",
               fontSize: 13,
               fontFamily: "system-ui, sans-serif",
               outline: "none",
@@ -134,7 +134,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
                 alignItems: "center",
                 justifyContent: "center",
                 padding: 40,
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-faint)",
               }}
             >
               <Loader2
@@ -154,7 +154,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
               }}
             >
               <div
-                style={{ fontSize: 13, color: "rgba(200,80,80,0.7)" }}
+                style={{ fontSize: 13, color: "var(--danger-soft-text)" }}
               >
                 {error}
               </div>
@@ -164,7 +164,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
                   background: "var(--pane-hover)",
                   border: "1px solid var(--pane-border)",
                   borderRadius: 6,
-                  color: "rgba(255,255,255,0.6)",
+                  color: "var(--text-secondary)",
                   fontSize: 12,
                   padding: "6px 14px",
                   cursor: "pointer",
@@ -178,7 +178,7 @@ export default function RepoManager({ repos, onAdd, onClose }) {
               style={{
                 padding: 40,
                 textAlign: "center",
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-faint)",
                 fontSize: 13,
               }}
             >
@@ -235,7 +235,7 @@ function RepoRow({ repo, added, onClick }) {
         <div
           style={{
             fontSize: 13,
-            color: "rgba(255,255,255,0.85)",
+            color: "var(--text-primary)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -248,7 +248,7 @@ function RepoRow({ repo, added, onClick }) {
           <div
             style={{
               fontSize: 11,
-              color: "rgba(255,255,255,0.3)",
+              color: "var(--text-faint)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -265,7 +265,7 @@ function RepoRow({ repo, added, onClick }) {
           style={{
             fontSize: 10,
             fontFamily: "'JetBrains Mono', monospace",
-            color: "rgba(255,255,255,0.3)",
+            color: "var(--text-faint)",
             letterSpacing: ".06em",
             marginLeft: 8,
             flexShrink: 0,

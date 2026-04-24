@@ -3,8 +3,8 @@ import { X } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
 const DOT_COLORS = {
-  streaming: "rgba(120, 200, 255, 0.9)",
-  done: "rgba(255, 190, 120, 0.95)",
+  streaming: "var(--dot-streaming)",
+  done: "var(--dot-done)",
   seen: "transparent",
 };
 
@@ -29,10 +29,10 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
         height: 28,
         padding: "0 9px 0 11px",
         background: active
-          ? "rgba(255,255,255,0.07)"
+          ? "var(--tab-bg-active)"
           : hover
-            ? "rgba(255,255,255,0.04)"
-            : "rgba(255,255,255,0.018)",
+            ? "var(--tab-bg-hover)"
+            : "var(--tab-bg-rest)",
         border: "none",
         borderRadius: 7,
         cursor: "pointer",
@@ -60,7 +60,7 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
         style={{
           flex: 1,
           fontSize: s(11.5),
-          color: active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.66)",
+          color: active ? "var(--tab-text-active)" : "var(--tab-text-rest)",
           fontFamily: "system-ui, sans-serif",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -85,7 +85,7 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
           borderRadius: 5,
           background: "transparent",
           border: "none",
-          color: active ? "rgba(255,255,255,0.48)" : "rgba(255,255,255,0.34)",
+          color: active ? "var(--tab-close-active)" : "var(--tab-close-rest)",
           cursor: "pointer",
           flexShrink: 0,
           opacity: showClose ? 1 : 0,
@@ -93,12 +93,12 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
           transition: "opacity .15s, background .15s, color .15s",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-          e.currentTarget.style.color = "rgba(255,255,255,0.78)";
+          e.currentTarget.style.background = "var(--tab-close-hover-bg)";
+          e.currentTarget.style.color = "var(--tab-close-hover-text)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "transparent";
-          e.currentTarget.style.color = active ? "rgba(255,255,255,0.48)" : "rgba(255,255,255,0.34)";
+          e.currentTarget.style.color = active ? "var(--tab-close-active)" : "var(--tab-close-rest)";
         }}
       >
         <X size={10} strokeWidth={1.75} />

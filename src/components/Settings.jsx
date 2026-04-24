@@ -7,7 +7,7 @@ import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
 import { createTranslator } from "../i18n";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, themeMode = "auto", onThemeModeChange, onClose }) {
   const s = useFontScale();
   const t = createTranslator(locale);
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
@@ -157,7 +157,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
 
   // Slider track style helper
   const sliderTrack = (pct) =>
-    `linear-gradient(to right, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.5) ${pct}%, rgba(255,255,255,0.08) ${pct}%, rgba(255,255,255,0.08) 100%)`;
+    `linear-gradient(to right, var(--slider-track-fill) 0%, var(--slider-track-fill) ${pct}%, var(--slider-track-rest) ${pct}%, var(--slider-track-rest) 100%)`;
 
   const sliderStyle = (pct) => ({
     width: "100%",
@@ -186,7 +186,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         position: "relative",
         zIndex: 10,
         ...getPaneSurfaceStyle(Boolean(local.dataUrl)),
-        color: "rgba(255,255,255,0.85)",
+        color: "var(--text-primary)",
         fontFamily: "system-ui, sans-serif",
       }}
     >
@@ -216,12 +216,12 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             height: 28,
             borderRadius: 7,
             background: backHover
-              ? "rgba(255,255,255,0.05)"
-              : "rgba(255,255,255,0.02)",
-            border: "1px solid rgba(255,255,255,0.04)",
+              ? "var(--control-bg-hover)"
+              : "var(--control-bg-soft)",
+            border: "1px solid var(--control-border-soft)",
             color: backHover
-              ? "rgba(255,255,255,0.75)"
-              : "rgba(255,255,255,0.5)",
+              ? "var(--text-secondary)"
+              : "var(--text-tertiary)",
             cursor: "pointer",
             transition: "all .2s",
           }}
@@ -232,7 +232,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
           style={{
             fontSize: s(14),
             fontWeight: 600,
-            color: "rgba(255,255,255,0.85)",
+            color: "var(--text-primary)",
           }}
         >
           {t("settings.title")}
@@ -255,7 +255,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: s(10),
               fontWeight: 600,
-              color: "rgba(255,255,255,0.25)",
+              color: "var(--text-faint)",
               letterSpacing: ".12em",
               textTransform: "uppercase",
               marginBottom: 20,
@@ -264,11 +264,42 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             {t("settings.appearance")}
           </div>
 
+          {/* Theme mode */}
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: s(13), color: "var(--text-secondary)", marginBottom: 8 }}>
+              {t("settings.language") === "Language" ? "Theme" : "主题"}
+            </div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => onThemeModeChange?.(val)}
+                  style={{
+                    flex: 1,
+                    padding: "5px 0",
+                    borderRadius: 7,
+                    border: "1px solid",
+                    borderColor: themeMode === val ? "var(--control-border-strong)" : "var(--control-border-soft)",
+                    background: themeMode === val ? "var(--control-bg-strong)" : "var(--control-bg-soft)",
+                    color: themeMode === val ? "var(--text-primary)" : "var(--text-muted)",
+                    fontSize: s(11),
+                    fontFamily: "'JetBrains Mono',monospace",
+                    cursor: "pointer",
+                    transition: "all .15s",
+                    letterSpacing: ".04em",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div style={{ marginBottom: 24 }}>
             <div
               style={{
                 fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
+                color: "var(--text-secondary)",
                 marginBottom: 2,
               }}
             >
@@ -277,7 +308,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(11),
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-muted)",
                 marginBottom: 10,
               }}
             >
@@ -291,10 +322,10 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   width: "100%",
                   height: 32,
                   padding: "0 28px 0 10px",
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "var(--control-bg)",
+                  border: "1px solid var(--control-border)",
                   borderRadius: 7,
-                  color: "rgba(255,255,255,0.9)",
+                  color: "var(--text-primary)",
                   fontFamily: "system-ui, sans-serif",
                   fontSize: s(12),
                   outline: "none",
@@ -314,7 +345,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   right: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  color: "rgba(255,255,255,0.5)",
+                  color: "var(--icon-secondary)",
                   pointerEvents: "none",
                 }}
               />
@@ -326,7 +357,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
+                color: "var(--text-secondary)",
                 marginBottom: 2,
               }}
             >
@@ -335,7 +366,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(11),
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-muted)",
                 marginBottom: 12,
               }}
             >
@@ -357,10 +388,10 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   width: 120,
                   height: 72,
                   borderRadius: 8,
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  border: "1px solid var(--control-border)",
                   background: local.dataUrl
                     ? `url("${local.dataUrl}") center/cover no-repeat`
-                    : "rgba(255,255,255,0.03)",
+                    : "var(--control-bg-soft)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -372,7 +403,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   <Image
                     size={24}
                     strokeWidth={1.2}
-                    color="rgba(255,255,255,0.12)"
+                    color="var(--icon-faint)"
                   />
                 )}
               </div>
@@ -387,10 +418,10 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     padding: "6px 14px",
                     borderRadius: 7,
                     background: chooseHover
-                      ? "rgba(255,255,255,0.1)"
-                      : "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    color: "rgba(255,255,255,0.75)",
+                      ? "var(--control-bg-hover)"
+                      : "var(--control-bg)",
+                    border: "1px solid var(--control-border-soft)",
+                    color: "var(--text-secondary)",
                     fontSize: s(12),
                     cursor: "pointer",
                     transition: "all .2s",
@@ -408,10 +439,10 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       padding: "6px 14px",
                       borderRadius: 7,
                       background: removeHover
-                        ? "rgba(255,255,255,0.07)"
-                        : "rgba(255,255,255,0.03)",
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      color: "rgba(255,255,255,0.45)",
+                        ? "var(--control-bg-hover)"
+                        : "var(--control-bg-soft)",
+                      border: "1px solid var(--control-border-soft)",
+                      color: "var(--text-muted)",
                       fontSize: s(12),
                       cursor: "pointer",
                       transition: "all .2s",
@@ -430,7 +461,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 style={{
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: s(10),
-                  color: "rgba(255,255,255,0.15)",
+                  color: "var(--text-faint)",
                   marginTop: 4,
                   marginLeft: 2,
                 }}
@@ -445,7 +476,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
+                color: "var(--text-secondary)",
                 marginBottom: 10,
               }}
             >
@@ -466,7 +497,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
+                color: "var(--text-secondary)",
                 marginBottom: 10,
               }}
             >
@@ -483,7 +514,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(10),
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-muted)",
                 marginTop: 8,
               }}
             >
@@ -496,7 +527,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
+                color: "var(--text-secondary)",
                 marginBottom: 10,
               }}
             >
@@ -513,7 +544,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(10),
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-muted)",
                 marginTop: 8,
               }}
             >
@@ -526,7 +557,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
+                color: "var(--text-secondary)",
                 marginBottom: 10,
               }}
             >
@@ -543,7 +574,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(10),
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-muted)",
                 marginTop: 8,
               }}
             >
@@ -557,7 +588,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: s(10),
               fontWeight: 600,
-              color: "rgba(255,255,255,0.25)",
+              color: "var(--text-faint)",
               letterSpacing: ".12em",
               textTransform: "uppercase",
               marginBottom: 20,
@@ -572,7 +603,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
+                color: "var(--text-secondary)",
                 marginBottom: 10,
               }}
             >
@@ -594,7 +625,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: s(10),
               fontWeight: 600,
-              color: "rgba(255,255,255,0.25)",
+              color: "var(--text-faint)",
               letterSpacing: ".12em",
               textTransform: "uppercase",
               marginBottom: 20,
@@ -608,7 +639,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
+                color: "var(--text-secondary)",
                 marginBottom: 2,
               }}
             >
@@ -617,7 +648,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             <div
               style={{
                 fontSize: s(11),
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-muted)",
                 marginBottom: 12,
               }}
             >
@@ -628,7 +659,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               <div
                 style={{
                   fontSize: s(12),
-                  color: multicaConnected ? "rgba(205,255,214,0.88)" : "rgba(255,255,255,0.72)",
+                  color: multicaConnected ? "var(--success-soft-text)" : "var(--text-secondary)",
                   marginBottom: 4,
                 }}
               >
@@ -638,7 +669,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 <div
                   style={{
                     fontSize: s(11),
-                    color: "rgba(255,255,255,0.42)",
+                    color: "var(--text-tertiary)",
                     marginBottom: 2,
                   }}
                 >
@@ -649,7 +680,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 <div
                   style={{
                     fontSize: s(11),
-                    color: "rgba(255,255,255,0.42)",
+                    color: "var(--text-tertiary)",
                   }}
                 >
                   {t("settings.workspace", { value: multica.workspaceSlug || multica.workspaceId })}
@@ -661,7 +692,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               <div
                 style={{
                   fontSize: s(13),
-                  color: "rgba(255,255,255,0.8)",
+                  color: "var(--text-secondary)",
                   marginBottom: 2,
                 }}
               >
@@ -670,7 +701,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               <div
                 style={{
                   fontSize: s(11),
-                  color: "rgba(255,255,255,0.3)",
+                  color: "var(--text-muted)",
                   marginBottom: 10,
                 }}
               >
@@ -687,10 +718,10 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   boxSizing: "border-box",
                   height: 32,
                   padding: "0 10px",
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "var(--control-bg)",
+                  border: "1px solid var(--control-border)",
                   borderRadius: 7,
-                  color: "rgba(255,255,255,0.9)",
+                  color: "var(--text-primary)",
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: s(12),
                   outline: "none",
@@ -706,9 +737,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 style={{
                   padding: "6px 14px",
                   borderRadius: 7,
-                  background: multicaServerDirty ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  color: multicaServerDirty ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.38)",
+                  background: multicaServerDirty ? "var(--control-bg-hover)" : "var(--control-bg-soft)",
+                  border: "1px solid var(--control-border-soft)",
+                  color: multicaServerDirty ? "var(--text-secondary)" : "var(--text-muted)",
                   fontSize: s(12),
                   cursor: multicaServerDirty ? "pointer" : "not-allowed",
                   transition: "all .2s",
@@ -723,9 +754,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 style={{
                   padding: "6px 14px",
                   borderRadius: 7,
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  color: "rgba(255,255,255,0.75)",
+                  background: "var(--control-bg)",
+                  border: "1px solid var(--control-border-soft)",
+                  color: "var(--text-secondary)",
                   fontSize: s(12),
                   cursor: "pointer",
                   transition: "all .2s",
@@ -741,9 +772,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   style={{
                     padding: "6px 14px",
                     borderRadius: 7,
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    color: "rgba(255,255,255,0.65)",
+                    background: "var(--control-bg-soft)",
+                    border: "1px solid var(--control-border-soft)",
+                    color: "var(--text-tertiary)",
                     fontSize: s(12),
                     cursor: "pointer",
                     transition: "all .2s",
@@ -762,7 +793,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: s(10),
               fontWeight: 600,
-              color: "rgba(255,255,255,0.25)",
+              color: "var(--text-faint)",
               letterSpacing: ".12em",
               textTransform: "uppercase",
               marginBottom: 20,
@@ -786,7 +817,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 <div
                   style={{
                     fontSize: s(13),
-                    color: "rgba(255,255,255,0.8)",
+                    color: "var(--text-secondary)",
                     marginBottom: 2,
                   }}
                 >
@@ -795,7 +826,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 <div
                   style={{
                     fontSize: s(11),
-                    color: "rgba(255,255,255,0.3)",
+                    color: "var(--text-muted)",
                   }}
                 >
                   {t("settings.developerModeDescription")}
@@ -811,8 +842,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   width: 38,
                   height: 22,
                   borderRadius: 999,
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: developerMode ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                  border: "1px solid var(--control-border-strong)",
+                  background: developerMode ? "var(--accent-soft-bg)" : "var(--control-bg)",
                   position: "relative",
                   cursor: "pointer",
                   padding: 0,
@@ -827,7 +858,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     width: 16,
                     height: 16,
                     borderRadius: "50%",
-                    background: "rgba(255,255,255,0.9)",
+                    background: "var(--slider-thumb)",
                     transition: "left 120ms ease",
                   }}
                 />
@@ -843,7 +874,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: s(10),
                   fontWeight: 600,
-                  color: "rgba(255,255,255,0.25)",
+                  color: "var(--text-faint)",
                   letterSpacing: ".12em",
                   textTransform: "uppercase",
                   marginBottom: 20,
@@ -854,10 +885,10 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               </div>
 
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)", marginBottom: 2 }}>
+                <div style={{ fontSize: s(13), color: "var(--text-secondary)", marginBottom: 2 }}>
                   {t("settings.completionChime")}
                 </div>
-                <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.3)", marginBottom: 10 }}>
+                <div style={{ fontSize: s(11), color: "var(--text-muted)", marginBottom: 10 }}>
                   {t("settings.completionChimeDescription")}
                 </div>
 
@@ -871,10 +902,10 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         width: "100%",
                         height: 32,
                         padding: "0 28px 0 10px",
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.08)",
+                        background: "var(--control-bg)",
+                        border: "1px solid var(--control-border)",
                         borderRadius: 7,
-                        color: "rgba(255,255,255,0.9)",
+                        color: "var(--text-primary)",
                         fontFamily: "system-ui, sans-serif",
                         fontSize: s(12),
                         outline: "none",
@@ -896,7 +927,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         right: 10,
                         top: "50%",
                         transform: "translateY(-50%)",
-                        color: "rgba(255,255,255,0.5)",
+                        color: "var(--icon-secondary)",
                         pointerEvents: "none",
                         opacity: notificationsMuted ? 0.4 : 1,
                       }}
@@ -909,10 +940,10 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     style={{
                       height: 32,
                       padding: "0 12px",
-                      background: "rgba(255,255,255,0.04)",
-                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: "var(--control-bg)",
+                      border: "1px solid var(--control-border)",
                       borderRadius: 7,
-                      color: "rgba(255,255,255,0.8)",
+                      color: "var(--text-secondary)",
                       fontSize: s(12),
                       cursor: notificationsMuted ? "not-allowed" : "pointer",
                       opacity: notificationsMuted ? 0.4 : 1,
@@ -950,12 +981,12 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     width: 18,
                     height: 18,
                     borderRadius: 5,
-                    border: "1px solid rgba(255,255,255,0.18)",
+                    border: "1px solid var(--control-border-strong)",
                     background: "transparent",
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    boxShadow: notificationsMuted ? "inset 0 0 0 1px rgba(255,255,255,0.06)" : "none",
+                    boxShadow: notificationsMuted ? "inset 0 0 0 1px var(--control-border-soft)" : "none",
                     flexShrink: 0,
                     transition: "border-color .15s, background .15s, box-shadow .15s",
                   }}
@@ -963,7 +994,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   <Check
                     size={12}
                     strokeWidth={2.2}
-                    color="rgba(255,255,255,0.86)"
+                    color="var(--text-primary)"
                     style={{
                       opacity: notificationsMuted ? 1 : 0,
                       transform: notificationsMuted ? "scale(1)" : "scale(0.75)",
@@ -971,7 +1002,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     }}
                   />
                 </span>
-                <span style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)" }}>
+                <span style={{ fontSize: s(13), color: "var(--text-secondary)" }}>
                   {t("settings.muteCompletionChime")}
                 </span>
               </label>
@@ -982,7 +1013,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: s(10),
                   fontWeight: 600,
-                  color: "rgba(255,255,255,0.25)",
+                  color: "var(--text-faint)",
                   letterSpacing: ".12em",
                   textTransform: "uppercase",
                   marginBottom: 20,
@@ -997,7 +1028,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 <div
                   style={{
                     fontSize: s(13),
-                    color: "rgba(255,255,255,0.8)",
+                    color: "var(--text-secondary)",
                     marginBottom: 2,
                   }}
                   >
@@ -1006,7 +1037,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 <div
                   style={{
                     fontSize: s(11),
-                    color: "rgba(255,255,255,0.3)",
+                    color: "var(--text-muted)",
                     marginBottom: 10,
                   }}
                   >
@@ -1027,10 +1058,10 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     boxSizing: "border-box",
                     height: 32,
                     padding: "0 10px",
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.08)",
+                    background: "var(--control-bg)",
+                    border: "1px solid var(--control-border)",
                     borderRadius: 7,
-                    color: "rgba(255,255,255,0.9)",
+                    color: "var(--text-primary)",
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: s(12),
                     outline: "none",
@@ -1052,7 +1083,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     <div
                       style={{
                         fontSize: s(13),
-                        color: "rgba(255,255,255,0.8)",
+                        color: "var(--text-secondary)",
                         marginBottom: 2,
                       }}
                       >
@@ -1061,7 +1092,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     <div
                       style={{
                         fontSize: s(11),
-                        color: "rgba(255,255,255,0.3)",
+                        color: "var(--text-muted)",
                       }}
                     >
                       {t("settings.autoCoauthorDescription")}
@@ -1077,8 +1108,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       width: 38,
                       height: 22,
                       borderRadius: 999,
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: coauthorEnabled ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                      border: "1px solid var(--control-border-strong)",
+                      background: coauthorEnabled ? "var(--accent-soft-bg)" : "var(--control-bg)",
                       position: "relative",
                       cursor: "pointer",
                       padding: 0,
@@ -1093,7 +1124,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         width: 16,
                         height: 16,
                         borderRadius: "50%",
-                        background: "rgba(255,255,255,0.9)",
+                        background: "var(--slider-thumb)",
                         transition: "left 120ms ease",
                       }}
                     />

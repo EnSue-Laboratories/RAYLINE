@@ -12,9 +12,9 @@ function IconActionButton({
   onClick,
   disabled = false,
   visible = true,
-  hoverColor = "rgba(255,255,255,0.72)",
-  baseColor = "rgba(255,255,255,0.45)",
-  disabledColor = "rgba(255,255,255,0.12)",
+  hoverColor = "var(--icon-primary)",
+  baseColor = "var(--icon-secondary)",
+  disabledColor = "var(--icon-faint)",
   ariaLabel,
 }) {
   const btnRef = useRef(null);
@@ -72,17 +72,17 @@ function IconActionButton({
             top: tipPos.top - 6,
             transform: "translate(-50%, -100%)",
             padding: "3px 7px",
-            background: "rgba(14,14,18,0.95)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--tooltip-bg)",
+            border: "1px solid var(--tooltip-border)",
             borderRadius: 4,
-            color: "rgba(255,255,255,0.8)",
+            color: "var(--tooltip-text)",
             fontSize: 9,
             fontFamily: "'JetBrains Mono',monospace",
             letterSpacing: ".04em",
             whiteSpace: "nowrap",
             pointerEvents: "none",
             zIndex: 600,
-            boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+            boxShadow: "var(--tooltip-shadow)",
           }}
         >
           {tooltip}

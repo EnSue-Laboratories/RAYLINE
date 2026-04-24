@@ -21,9 +21,6 @@ const DEFAULT_CONTEXT_WINDOW = 200_000;
 
 const PHRASE_INTERVAL_MS = 2400;
 
-// Muted spinner ink — keeps the logo's slash+dot geometry but drops the red
-// accent so the indicator stays quiet in the message vibe.
-const SPINNER_INK = "rgba(255,255,255,0.55)";
 
 function formatCompact(n) {
   if (!n && n !== 0) return "0";
@@ -90,7 +87,7 @@ function SlashSpinner() {
           y1="1.5"
           x2="2"
           y2="12.5"
-          stroke={SPINNER_INK}
+          stroke="var(--spinner-ink)"
           strokeWidth="2"
           strokeLinecap="square"
           style={{ animation: "slashPulse 1.4s ease-in-out infinite" }}
@@ -100,7 +97,7 @@ function SlashSpinner() {
           cx="13"
           cy="11.5"
           r="1.5"
-          fill={SPINNER_INK}
+          fill="var(--spinner-ink)"
           style={{
             animation: "slashDot 1.4s ease-in-out 0.35s infinite",
             transformOrigin: "center",
@@ -188,14 +185,14 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
   const pctLabel = contextPct.toFixed(contextPct >= 10 || contextPct === 0 ? 0 : 1) + "%";
 
   const primary = isStreaming ? PHRASES[phraseIdx] : "Done";
-  const primaryColor = isStreaming ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.38)";
-  const secondaryColor = "rgba(255,255,255,0.32)";
+  const primaryColor = isStreaming ? "var(--text-secondary)" : "var(--text-muted)";
+  const secondaryColor = "var(--text-faint)";
   // Stat separator — subtle skewed slash glyph in neutral dim.
   const sep = (
     <span
       aria-hidden="true"
       style={{
-        color: "rgba(255,255,255,0.22)",
+        color: "var(--text-faint)",
         margin: "0 6px",
         transform: "skewX(-18deg)",
         display: "inline-block",
@@ -240,7 +237,7 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
         <span style={{ color: primaryColor }}>
           {primary}
           {isStreaming && (
-            <span style={{ color: "rgba(255,255,255,0.35)", marginLeft: 2 }}>…</span>
+            <span style={{ color: "var(--text-muted)", marginLeft: 2 }}>…</span>
           )}
         </span>
         <span style={{ color: secondaryColor, fontVariantNumeric: "tabular-nums" }}>
@@ -249,7 +246,7 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
         {isStreaming && compacting && (
           <span
             title="Claude Code is auto-compacting earlier context."
-            style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "rgba(255,255,255,0.55)" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--text-tertiary)" }}
           >
             <span style={{ display: "inline-block", animation: "compactSpin 1.6s linear infinite" }}>↻</span>
             compacting
@@ -261,29 +258,29 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
       {hasUsage && (
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", color: secondaryColor, fontVariantNumeric: "tabular-nums" }}>
           <span>
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>in </span>
+            <span style={{ color: "var(--text-faint)" }}>in </span>
             {formatCompact(inputTokens)}
           </span>
           {sep}
           <span>
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>out </span>
+            <span style={{ color: "var(--text-faint)" }}>out </span>
             {formatCompact(outputTokens)}
           </span>
           {(cacheRead + cacheCreate) > 0 && (
             <>
               {sep}
               <span>
-                <span style={{ color: "rgba(255,255,255,0.22)" }}>cached </span>
+                <span style={{ color: "var(--text-faint)" }}>cached </span>
                 {formatCompact(cacheRead + cacheCreate)}
               </span>
             </>
           )}
           {sep}
           <span>
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>ctx </span>
+            <span style={{ color: "var(--text-faint)" }}>ctx </span>
             {formatCompact(contextUsed)}
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>/{formatCompact(contextWindow)}</span>
-            <span style={{ marginLeft: 5, color: "rgba(255,255,255,0.42)" }}>{pctLabel}</span>
+            <span style={{ color: "var(--text-faint)" }}>/{formatCompact(contextWindow)}</span>
+            <span style={{ marginLeft: 5, color: "var(--text-muted)" }}>{pctLabel}</span>
           </span>
         </div>
       )}
@@ -312,14 +309,14 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
 // within the existing muted palette — no full red.
 function PlanQuota({ label, pct, resetIn }) {
   const saturated = pct >= 95;
-  const pctInk = saturated ? "rgba(255,180,180,0.78)" : "rgba(255,255,255,0.55)";
+  const pctInk = saturated ? "var(--danger-soft-text)" : "var(--text-tertiary)";
   const pctLabel = pct.toFixed(pct >= 10 || pct === 0 ? 0 : 1) + "%";
   return (
     <span>
-      <span style={{ color: "rgba(255,255,255,0.22)" }}>{label} </span>
+      <span style={{ color: "var(--text-faint)" }}>{label} </span>
       <span style={{ color: pctInk }}>{pctLabel}</span>
       {resetIn && (
-        <span style={{ color: "rgba(255,255,255,0.22)", marginLeft: 6 }}>
+        <span style={{ color: "var(--text-faint)", marginLeft: 6 }}>
           resets {resetIn}
         </span>
       )}

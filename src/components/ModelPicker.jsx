@@ -176,18 +176,18 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
           justifyContent: "space-between",
           gap: 6,
           padding: "4px 12px",
-          background: "rgba(255,255,255,0.02)",
-          border: "1px solid rgba(255,255,255,0.04)",
+          background: "var(--control-bg-soft)",
+          border: "1px solid var(--control-border-soft)",
           borderRadius: 7,
-          color: "rgba(255,255,255,0.4)",
+          color: "var(--icon-secondary)",
           fontSize: s(10),
           fontFamily: "'JetBrains Mono',monospace",
           cursor: "pointer",
           transition: "all .2s",
           letterSpacing: ".06em",
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--control-border)"; e.currentTarget.style.color = "var(--icon-primary)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--control-border-soft)"; e.currentTarget.style.color = "var(--icon-secondary)"; }}
       >
         {m.tag} <ChevronDown size={11} strokeWidth={2} />
       </button>
@@ -203,9 +203,9 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
             width: menuStyle.width,
             maxHeight: menuStyle.maxHeight,
             overflowY: "auto",
-            background: "rgba(8,8,12,0.55)",
+            background: "var(--pane-background-overlay)",
             backdropFilter: "blur(48px) saturate(1.2)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            border: "1px solid var(--pane-border)",
             borderRadius: 10,
             padding: 3,
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
@@ -224,8 +224,8 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
               const cliMissing = Boolean(guide) && cliKnown && cliInstalled[provider] === false;
               return (
                 <div key={provider}>
-                  {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
-                  <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
+                  {gi > 0 && <div style={{ height: 1, background: "var(--row-separator)", margin: "4px 8px" }} />}
+                  <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "var(--text-faint)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace" }}>
                     {provider.toUpperCase()}
                   </div>
                   {cliUnknown && (
@@ -241,7 +241,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                         background: "transparent",
                         border: "none",
                         borderRadius: 7,
-                        color: "rgba(255,255,255,0.4)",
+                        color: "var(--text-muted)",
                         fontSize: s(11),
                         fontFamily: "'JetBrains Mono',monospace",
                         cursor: "default",
@@ -269,14 +269,14 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                         background: "transparent",
                         border: "none",
                         borderRadius: 7,
-                        color: "rgba(255,255,255,0.4)",
+                        color: "var(--text-muted)",
                         fontSize: s(11),
                         fontFamily: "'JetBrains Mono',monospace",
                         cursor: "pointer",
                         textAlign: "left",
                         transition: "all .12s",
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--row-hover-bg)"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                     >
                       {guide.label}
@@ -298,7 +298,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                             background: "transparent",
                             border: "none",
                             borderRadius: 7,
-                            color: "rgba(255,255,255,0.4)",
+                            color: "var(--text-muted)",
                             fontSize: s(11),
                             fontFamily: "'JetBrains Mono',monospace",
                             cursor: "default",
@@ -328,14 +328,14 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                             background: "transparent",
                             border: "none",
                             borderRadius: 7,
-                            color: "rgba(255,255,255,0.4)",
+                            color: "var(--text-muted)",
                             fontSize: s(11),
                             fontFamily: "'JetBrains Mono',monospace",
                             cursor: "pointer",
                             textAlign: "left",
                             transition: "all .12s",
                           }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--row-hover-bg)"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                         >
                           {"Session expired \u2014 reconnect"}
@@ -358,7 +358,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                             background: "transparent",
                             border: "none",
                             borderRadius: 7,
-                            color: "rgba(255,255,255,0.4)",
+                            color: "var(--text-muted)",
                             fontSize: s(11),
                             fontFamily: "'JetBrains Mono',monospace",
                             cursor: "not-allowed",
@@ -390,7 +390,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                             background: "transparent",
                             border: "none",
                             borderRadius: 7,
-                            color: "rgba(255,255,255,0.4)",
+                            color: "var(--text-muted)",
                             fontSize: s(11),
                             fontFamily: "'JetBrains Mono',monospace",
                             cursor: "not-allowed",
@@ -423,14 +423,14 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                           background: "transparent",
                           border: "none",
                           borderRadius: 7,
-                          color: "rgba(255,255,255,0.4)",
+                          color: "var(--text-muted)",
                           fontSize: s(11),
                           fontFamily: "'JetBrains Mono',monospace",
                           cursor: "pointer",
                           textAlign: "left",
                           transition: "all .12s",
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "var(--row-hover-bg)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                       >
                         {"Connect Multica\u2026"}
@@ -447,17 +447,17 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                         justifyContent: "space-between",
                         width: "100%",
                         padding: "9px 13px",
-                        background: mm.id === value ? "rgba(255,255,255,0.04)" : "transparent",
+                        background: mm.id === value ? "var(--row-hover-bg)" : "transparent",
                         border: "none",
                         borderRadius: 7,
-                        color: mm.id === value ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+                        color: mm.id === value ? "var(--text-primary)" : "var(--text-muted)",
                         fontSize: s(11),
                         fontFamily: "'JetBrains Mono',monospace",
                         cursor: "pointer",
                         textAlign: "left",
                         transition: "all .12s",
                       }}
-                      onMouseEnter={(e) => { if (mm.id !== value) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                      onMouseEnter={(e) => { if (mm.id !== value) e.currentTarget.style.background = "var(--row-hover-bg)"; }}
                       onMouseLeave={(e) => { if (mm.id !== value) e.currentTarget.style.background = "transparent"; }}
                     >
                       {mm.name}

@@ -4,8 +4,14 @@ function clampOpacity(value, fallback) {
   return Math.min(100, Math.max(0, numeric));
 }
 
+function getTheme() {
+  if (typeof document === "undefined") return "dark";
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
+}
+
 function alphaFill(alphaPercent) {
-  return `rgba(255, 255, 255, ${(alphaPercent / 100).toFixed(3)})`;
+  const base = getTheme() === "light" ? "31, 41, 55" : "255, 255, 255";
+  return `rgba(${base}, ${(alphaPercent / 100).toFixed(3)})`;
 }
 
 const INTERACTION_STYLES = {
@@ -68,14 +74,16 @@ export function getPaneSurfaceStyle(hasWallpaper, options = {}) {
     "--pane-elevated": "var(--pane-elevated)",
     "--pane-hover": hoverFill,
     "--pane-active": activeFill,
-    "--pane-border": "rgba(255, 255, 255, 0.06)",
+    "--pane-border": getTheme() === "light" ? "rgba(41,51,65,0.14)" : "rgba(255,255,255,0.06)",
     "--pane-interaction-hover": hoverFill,
     "--pane-interaction-active": activeFill,
     "--pane-interaction-hover-fill": hoverFill,
     "--pane-interaction-active-fill": activeFill,
     "--pane-interaction-hover-filter": "none",
     "--pane-interaction-active-filter": "none",
-    "--pane-interaction-hover-shadow": "inset 0 0 0 1px rgba(255,255,255,0.035)",
+    "--pane-interaction-hover-shadow": getTheme() === "light"
+      ? "inset 0 0 0 1px rgba(41,51,65,0.06)"
+      : "inset 0 0 0 1px rgba(255,255,255,0.035)",
     "--pane-interaction-active-shadow": "none",
   };
 }

@@ -546,10 +546,10 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 28, height: 28, borderRadius: 7,
               background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.4)", transition: "all .15s",
+              color: "var(--icon-secondary)", transition: "all .15s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--icon-primary)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--icon-secondary)"; }}
           >
             <PanelLeftOpen size={16} strokeWidth={1.5} />
           </button>
@@ -559,10 +559,10 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 28, height: 28, borderRadius: 7,
               background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.4)", transition: "all .15s",
+              color: "var(--icon-secondary)", transition: "all .15s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--icon-primary)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--icon-secondary)"; }}
           >
             <Plus size={16} strokeWidth={1.5} />
           </button>
@@ -600,7 +600,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
             <div style={{ animation: "dropIn .2s ease", minWidth: 0 }}>
               <div style={{
                 fontSize: s(12.5),
-                color: "rgba(255,255,255,0.88)",
+                color: "var(--text-primary)",
                 fontFamily: "system-ui,sans-serif",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -614,7 +614,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 style={{
                   fontSize: s(9),
                   fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.28)",
+                  color: "var(--text-faint)",
                   marginTop: 2,
                   letterSpacing: ".1em",
                 }}
@@ -659,14 +659,14 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 height: 23,
                 padding: terminalCount > 0 ? "0 8px" : 0,
                 borderRadius: 7,
-                background: terminalOpen ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
-                border: "1px solid " + (terminalOpen ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)"),
-                color: terminalOpen ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)",
+                background: terminalOpen ? "var(--control-bg-strong)" : "var(--control-bg-soft)",
+                border: "1px solid " + (terminalOpen ? "var(--control-border)" : "var(--control-border-soft)"),
+                color: terminalOpen ? "var(--icon-primary)" : "var(--icon-secondary)",
                 cursor: "pointer",
                 transition: "all .2s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = terminalOpen ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)"; e.currentTarget.style.color = terminalOpen ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--control-bg-hover)"; e.currentTarget.style.color = "var(--icon-primary)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = terminalOpen ? "var(--control-bg-strong)" : "var(--control-bg-soft)"; e.currentTarget.style.color = terminalOpen ? "var(--icon-primary)" : "var(--icon-secondary)"; }}
             >
               <TerminalIcon size={14} strokeWidth={1.5} />
               {terminalCount > 0 && (

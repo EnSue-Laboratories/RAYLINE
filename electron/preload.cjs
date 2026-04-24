@@ -133,6 +133,10 @@ contextBridge.exposeInMainWorld("api", {
   openProjectManager: () => ipcRenderer.send("open-project-manager"),
   cloneRepo: ({ url, parentDir }) => ipcRenderer.invoke("project-clone", { url, parentDir }),
 
+  // Theme mode
+  setThemeMode: (mode) => ipcRenderer.send("set-theme-mode", mode),
+  getThemeMode: () => ipcRenderer.invoke("get-theme-mode"),
+
   // Window appearance
   setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
   writeClipboardImage: (dataUrl) => ipcRenderer.invoke("clipboard-write-image", dataUrl),

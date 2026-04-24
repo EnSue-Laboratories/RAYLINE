@@ -156,7 +156,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
           background: "var(--pane-elevated)",
           backdropFilter: "blur(48px) saturate(1.2)",
           WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          boxShadow: "var(--modal-shadow)",
           borderRadius: 12,
           border: "1px solid var(--pane-border)",
           display: "flex",
@@ -172,10 +172,10 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: "1px solid var(--row-separator)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "rgba(255,255,255,0.85)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-primary)" }}>
             <GitHubGlyph size={18} />
             <span style={{ fontSize: 14, fontWeight: 500 }}>
               {isAddAccount ? t("pm.addGithubAccount") : t("pm.signInGithub")}
@@ -189,7 +189,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
               borderRadius: 7,
               border: "1px solid var(--pane-border)",
               background: "var(--pane-hover)",
-              color: "rgba(255,255,255,0.5)",
+              color: "var(--text-tertiary)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -207,12 +207,12 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
             <div
               style={{
                 fontSize: 12,
-                color: "rgba(255,255,255,0.45)",
+                color: "var(--text-muted)",
                 marginBottom: 14,
               }}
             >
               {t("pm.currentlySignedIn")}{" "}
-              <span style={{ color: "rgba(255,255,255,0.75)", fontFamily: "'JetBrains Mono', monospace" }}>
+              <span style={{ color: "var(--text-secondary)", fontFamily: "'JetBrains Mono', monospace" }}>
                 @{currentUser}
               </span>
             </div>
@@ -220,7 +220,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
 
           {phase === "starting" && (
             <Center>
-              <Loader2 size={22} style={{ animation: "spin 1s linear infinite", color: "rgba(255,255,255,0.5)" }} />
+              <Loader2 size={22} style={{ animation: "spin 1s linear infinite", color: "var(--text-tertiary)" }} />
               <Label>{t("pm.startingAuth")}</Label>
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
             </Center>
@@ -249,7 +249,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: 22,
                     letterSpacing: ".18em",
-                    color: "rgba(255,255,255,0.9)",
+                    color: "var(--text-primary)",
                     textAlign: "center",
                   }}
                 >
@@ -264,7 +264,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                     background: "var(--pane-interaction-hover-fill, var(--pane-hover))",
                     border: "1px solid var(--pane-border)",
                     borderRadius: 6,
-                    color: copied ? "rgba(130, 220, 160, 0.9)" : "rgba(255,255,255,0.6)",
+                    color: copied ? "var(--success-soft-text)" : "var(--icon-secondary)",
                     fontSize: 11,
                     fontFamily: "'JetBrains Mono', monospace",
                     padding: "6px 10px",
@@ -280,12 +280,12 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                 {t("pm.pasteCodeInBrowser")}
               </Label>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-                <ExternalLink size={12} style={{ color: "rgba(255,255,255,0.35)" }} />
+                <ExternalLink size={12} style={{ color: "var(--text-muted)" }} />
                 <span
                   style={{
                     fontSize: 12,
                     fontFamily: "'JetBrains Mono', monospace",
-                    color: "rgba(255,255,255,0.55)",
+                    color: "var(--text-tertiary)",
                   }}
                 >
                   github.com/login/device
@@ -306,7 +306,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                   size={16}
                   style={{
                     animation: "spin 1s linear infinite",
-                    color: "rgba(255,255,255,0.35)",
+                    color: "var(--text-muted)",
                     flexShrink: 0,
                   }}
                 />
@@ -322,16 +322,16 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                   width: 36,
                   height: 36,
                   borderRadius: "50%",
-                  background: "rgba(130, 220, 160, 0.15)",
+                  background: "var(--success-soft-bg)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "rgba(130, 220, 160, 0.9)",
+                  color: "var(--success-soft-text)",
                 }}
               >
                 <Check size={18} />
               </div>
-              <div style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", marginTop: 10 }}>
+              <div style={{ fontSize: 14, color: "var(--text-primary)", marginTop: 10 }}>
                 {user ? <>{t("pm.signedInAs")} <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>@{user}</span></> : t("pm.signedIn")}
               </div>
             </Center>
@@ -345,11 +345,11 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                     width: 28,
                     height: 28,
                     borderRadius: "50%",
-                    background: "rgba(220,120,120,0.12)",
+                    background: "var(--danger-soft-bg)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: "rgba(230,140,140,0.9)",
+                    color: "var(--danger-soft-text)",
                     flexShrink: 0,
                   }}
                 >
@@ -359,7 +359,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                   style={{
                     fontSize: 14,
                     fontWeight: 500,
-                    color: "rgba(255,255,255,0.85)",
+                    color: "var(--text-primary)",
                   }}
                 >
                   {t("pm.authFailed")}
@@ -370,11 +370,11 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                   marginTop: 10,
                   padding: "10px 12px",
                   borderRadius: 7,
-                  border: "1px solid rgba(255,255,255,0.05)",
-                  background: "rgba(255,255,255,0.025)",
+                  border: "1px solid var(--control-border)",
+                  background: "var(--control-bg)",
                   fontSize: 12,
                   fontFamily: "system-ui, sans-serif",
-                  color: "rgba(255,255,255,0.55)",
+                  color: "var(--text-tertiary)",
                   lineHeight: 1.45,
                   maxHeight: 140,
                   overflow: "auto",
@@ -389,7 +389,7 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                   style={{
                     marginTop: 8,
                     fontSize: 11,
-                    color: "rgba(255,255,255,0.4)",
+                    color: "var(--text-muted)",
                     fontFamily: "system-ui, sans-serif",
                   }}
                 >
@@ -399,11 +399,11 @@ export default function AuthModal({ mode = "signin", currentUser, onClose, onAut
                       marginTop: 6,
                       padding: "8px 10px",
                       borderRadius: 6,
-                      border: "1px solid rgba(255,255,255,0.05)",
-                      background: "rgba(0,0,0,0.25)",
+                      border: "1px solid var(--control-border)",
+                      background: "var(--control-bg)",
                       fontSize: 11,
                       fontFamily: "'JetBrains Mono', monospace",
-                      color: "rgba(255,255,255,0.55)",
+                      color: "var(--text-tertiary)",
                       maxHeight: 160,
                       overflow: "auto",
                       whiteSpace: "pre-wrap",
@@ -460,7 +460,7 @@ function Label({ children, style }) {
         fontSize: 12,
         fontFamily: "'JetBrains Mono', monospace",
         letterSpacing: ".06em",
-        color: "rgba(255,255,255,0.55)",
+        color: "var(--text-tertiary)",
         ...(style || {}),
       }}
     >
@@ -470,10 +470,10 @@ function Label({ children, style }) {
 }
 
 const primaryBtn = {
-  background: "rgba(255,255,255,0.18)",
-  border: "1px solid rgba(255,255,255,0.12)",
+  background: "var(--control-bg-strong)",
+  border: "1px solid var(--control-border)",
   borderRadius: 6,
-  color: "rgba(255,255,255,0.95)",
+  color: "var(--text-primary)",
   fontSize: 12,
   fontWeight: 500,
   fontFamily: "system-ui, sans-serif",
@@ -485,7 +485,7 @@ const secondaryBtn = {
   background: "transparent",
   border: "1px solid var(--pane-border)",
   borderRadius: 6,
-  color: "rgba(255,255,255,0.5)",
+  color: "var(--text-tertiary)",
   fontSize: 12,
   fontFamily: "system-ui, sans-serif",
   padding: "7px 14px",

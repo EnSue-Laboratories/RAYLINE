@@ -143,16 +143,16 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             borderRadius: 6,
             background: "none",
             border: "none",
-            color: "rgba(255,255,255,0.4)",
+            color: "var(--text-muted)",
             cursor: "pointer",
             transition: "all .2s",
             WebkitAppRegion: "no-drag",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+            e.currentTarget.style.color = "var(--text-primary)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = "rgba(255,255,255,0.4)";
+            e.currentTarget.style.color = "var(--text-muted)";
           }}
         >
           <PanelLeftClose size={14} strokeWidth={1.5} />
@@ -167,12 +167,12 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             display: "flex", alignItems: "center", gap: 10,
             padding: "8px 10px", borderRadius: 7,
             background: "none", border: "none", cursor: "pointer",
-            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            color: "var(--text-tertiary)", fontSize: s(12),
             fontFamily: "system-ui, sans-serif", transition: "all .15s",
             textAlign: "left",
           }}
-          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "var(--text-primary)"; }}
+          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "var(--text-tertiary)"; }}
         >
           <Plus size={15} strokeWidth={1.5} />
           {t("sidebar.newChat")}
@@ -183,12 +183,12 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             display: "flex", alignItems: "center", gap: 10,
             padding: "8px 10px", borderRadius: 7,
             background: "none", border: "none", cursor: "pointer",
-            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            color: "var(--text-tertiary)", fontSize: s(12),
             fontFamily: "system-ui, sans-serif", transition: "all .15s",
             textAlign: "left",
           }}
-          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "var(--text-primary)"; }}
+          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "var(--text-tertiary)"; }}
         >
           <Workflow size={15} strokeWidth={1.5} />
           {t("sidebar.dispatch")}
@@ -199,12 +199,12 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             display: "flex", alignItems: "center", gap: 10,
             padding: "8px 10px", borderRadius: 7,
             background: "none", border: "none", cursor: "pointer",
-            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            color: "var(--text-tertiary)", fontSize: s(12),
             fontFamily: "system-ui, sans-serif", transition: "all .15s",
             textAlign: "left",
           }}
-          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "var(--text-primary)"; }}
+          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "var(--text-tertiary)"; }}
         >
           <FolderPlus size={15} strokeWidth={1.5} />
           {t("sidebar.newProject")}
@@ -216,12 +216,12 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               display: "flex", alignItems: "center", gap: 10,
               padding: "8px 10px", borderRadius: 7,
               background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.55)", fontSize: s(12),
+              color: "var(--text-tertiary)", fontSize: s(12),
               fontFamily: "system-ui, sans-serif", transition: "all .15s",
               textAlign: "left",
             }}
-            onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-            onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+            onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "var(--text-primary)"; }}
+            onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "var(--text-tertiary)"; }}
           >
             <GitHubIcon size={15} />
             {t("sidebar.githubProjects")}
@@ -233,12 +233,12 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             display: "flex", alignItems: "center", gap: 10,
             padding: "8px 10px", borderRadius: 7,
             background: "none", border: "none", cursor: "pointer",
-            color: "rgba(255,255,255,0.55)", fontSize: s(12),
+            color: "var(--text-tertiary)", fontSize: s(12),
             fontFamily: "system-ui, sans-serif", transition: "all .15s",
             textAlign: "left",
           }}
-          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "rgba(255,255,255,0.8)"; }}
-          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+          onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "var(--text-primary)"; }}
+          onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "var(--text-tertiary)"; }}
         >
           <Search size={15} strokeWidth={1.5} />
           {t("sidebar.search")}
@@ -250,7 +250,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             gap: 7,
             marginTop: 6,
             padding: "6px 10px",
-            border: "1px solid " + (searchFocused ? "rgba(255,255,255,0.12)" : "var(--pane-border)"),
+            border: "1px solid " + (searchFocused ? "var(--search-focus-border)" : "var(--pane-border)"),
             borderRadius: 8,
             transition: "background .2s, color .2s, border-color .2s, box-shadow .2s, backdrop-filter .2s",
             ...(searchFocused ? getPaneInteractionStyle("active") : {
@@ -260,7 +260,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             }),
           }}
         >
-          <span style={{ color: "rgba(255,255,255,0.45)", flexShrink: 0, display: "flex" }}>
+          <span style={{ color: "var(--text-muted)", flexShrink: 0, display: "flex" }}>
             <Search size={13} strokeWidth={1.5} />
           </span>
           <input
@@ -275,7 +275,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               flex: 1,
               background: "transparent",
               border: "none",
-              color: "rgba(255,255,255,0.8)",
+              color: "var(--text-primary)",
               fontSize: s(11),
               fontFamily: "'JetBrains Mono',monospace",
             }}
@@ -299,14 +299,14 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             <div style={{
               fontSize: s(11),
               fontFamily: "'JetBrains Mono',monospace",
-              color: "rgba(255,255,255,0.15)",
+              color: "var(--icon-faint)",
               letterSpacing: ".08em",
             }}>
               {t("sidebar.noConversations")}
             </div>
             <div style={{
               fontSize: s(10),
-              color: "rgba(255,255,255,0.1)",
+              color: "var(--icon-faint)",
               fontFamily: "system-ui,sans-serif",
             }}>
               {t("sidebar.noConversationsHint")}
@@ -355,7 +355,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  color: "rgba(255,255,255,0.25)",
+                  color: "var(--text-faint)",
                   transform: `rotate(${(searchActive || !draftsCollapsed) ? 90 : 0}deg)`,
                   transition: "transform .15s",
                   flexShrink: 0,
@@ -367,7 +367,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                 style={{
                   fontSize: s(11),
                   fontFamily: "'JetBrains Mono', monospace",
-                  color: "rgba(255,255,255,0.4)",
+                  color: "var(--text-muted)",
                   letterSpacing: ".04em",
                 }}
               >
@@ -417,7 +417,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                         <span
                           style={{
                             fontSize: s(12.5),
-                            color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
+                            color: isActive ? "var(--text-primary)" : "var(--text-muted)",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
@@ -431,7 +431,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                         {(c.tags || []).slice(0, 2).map((t) => (
                           <span key={t} style={{
                             fontSize: 9, padding: "1px 5px", borderRadius: 4, marginLeft: 4,
-                            background: "rgba(180,220,255,0.12)", color: "rgba(180,220,255,0.85)",
+                            background: "var(--accent-soft-bg)", color: "var(--accent-soft-text)",
                             fontFamily: "monospace", flexShrink: 0,
                           }}>{t}</span>
                         ))}
@@ -439,7 +439,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                       <div
                         style={{
                           fontSize: s(11),
-                          color: "rgba(255,255,255,0.3)",
+                          color: "var(--text-faint)",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -454,9 +454,9 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                     <div className="convo-actions" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, opacity: 0, transition: "opacity .15s" }}>
                       <button
                         onClick={(e) => onDelete(c.id, e)}
-                        style={{ background: "none", border: "none", color: "rgba(255,255,255,0.25)", cursor: "pointer", padding: 1, transition: "color .15s", display: "flex" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(200,80,80,0.5)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+                        style={{ background: "none", border: "none", color: "var(--text-faint)", cursor: "pointer", padding: 1, transition: "color .15s", display: "flex" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = "var(--danger-soft-text)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-faint)"; }}
                       >
                         <Trash2 size={12} strokeWidth={1.5} />
                       </button>
@@ -476,7 +476,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                       style={{
                         fontSize: s(9),
                         fontFamily: "'JetBrains Mono',monospace",
-                        color: "rgba(255,255,255,0.35)",
+                        color: "var(--text-muted)",
                         letterSpacing: ".08em",
                         minWidth: 0,
                       }}
@@ -521,7 +521,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
       <div
         style={{
           padding: "12px 20px",
-          borderTop: "1px solid rgba(255,255,255,0.02)",
+          borderTop: "1px solid var(--pane-border)",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -538,13 +538,13 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             cursor: "pointer",
             fontSize: s(8),
             fontFamily: "'JetBrains Mono',monospace",
-            color: "rgba(255,255,255,0.45)",
+            color: "var(--text-muted)",
             letterSpacing: ".08em",
             padding: 0,
             transition: "color .2s",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.72)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
         >
           <FolderOpen size={10} strokeWidth={1.5} />
           {cwdShort || "SELECT FOLDER"}
@@ -561,16 +561,16 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             background: "none",
             border: "none",
             cursor: "pointer",
-            color: "rgba(255,255,255,0.45)",
+            color: "var(--text-muted)",
             transition: "color .2s",
             padding: 0,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.72)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
         >
           <SettingsIcon size={12} strokeWidth={1.5} />
         </button>
-        <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.38)", letterSpacing: ".06em" }}>
+        <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "var(--text-muted)", letterSpacing: ".06em" }}>
           {convos.length} CHATS
         </span>
       </div>

@@ -291,6 +291,9 @@ function createProjectManagerWindow() {
     pmWindow.loadFile(path.join(__dirname, "../dist/src/project-manager.html"));
   }
 
+  pmWindow.webContents.on("did-finish-load", () => {
+    pmWindow.webContents.send("theme-mode", currentThemeMode);
+  });
   pmWindow.on("closed", () => { pmWindow = null; });
 }
 
@@ -425,6 +428,17 @@ ipcMain.handle("folder-pick", async () => {
   });
   return result.canceled ? null : result.filePaths[0];
 });
+
+let currentThemeMode = "auto";
+
+ipcMain.on("set-theme-mode", (_event, mode) => {
+  currentThemeMode = mode;
+  if (pmWindow && !pmWindow.isDestroyed()) {
+    pmWindow.webContents.send("theme-mode", mode);
+  }
+});
+
+ipcMain.handle("get-theme-mode", () => currentThemeMode);
 
 ipcMain.on("open-project-manager", () => {
   createProjectManagerWindow();
