@@ -7,13 +7,15 @@ import {
   SIDEBAR_CHROME_RAIL_WIDTH,
 } from "../windowChrome";
 
-function RailButton({ label, onClick, active = false, children }) {
+function RailButton({ label, onClick, active = false, visible = true, children }) {
   const [hovered, setHovered] = useState(false);
 
   return (
     <button
       type="button"
       aria-label={label}
+      aria-hidden={!visible}
+      tabIndex={visible ? 0 : -1}
       title={label}
       onClick={onClick}
       onMouseDownCapture={(event) => event.stopPropagation()}
@@ -36,8 +38,10 @@ function RailButton({ label, onClick, active = false, children }) {
         color: hovered || active ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.42)",
         cursor: "pointer",
         padding: 0,
-        transition: "background .16s ease, color .16s ease",
-        pointerEvents: "auto",
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(-2px)",
+        transition: "background .16s ease, color .16s ease, opacity .14s ease, transform .14s ease",
+        pointerEvents: visible ? "auto" : "none",
         WebkitAppRegion: "no-drag",
         userSelect: "none",
       }}
@@ -55,10 +59,15 @@ function RailButton({ label, onClick, active = false, children }) {
   );
 }
 
-export default function SidebarChromeRail({ sidebarOpen, settingsOpen, onToggleSidebar, onNew, onOpenSettings }) {
+export default function SidebarChromeRail({ sidebarOpen, settingsOpen, controlsOnHover = false, onToggleSidebar, onNew, onOpenSettings }) {
+  const [railHovered, setRailHovered] = useState(false);
+  const controlsVisible = !controlsOnHover || railHovered;
+
   return (
     <div
       aria-label="Window controls"
+      onMouseEnter={() => setRailHovered(true)}
+      onMouseLeave={() => setRailHovered(false)}
       style={{
         position: "fixed",
         top: SIDEBAR_CHROME_RAIL_TOP,
@@ -70,7 +79,7 @@ export default function SidebarChromeRail({ sidebarOpen, settingsOpen, onToggleS
         alignItems: "right",
         justifyContent: "right",
         gap: 0.1,
-        pointerEvents: "none",
+        pointerEvents: controlsOnHover ? "auto" : "none",
         WebkitAppRegion: "no-drag",
         userSelect: "none",
         isolation: "isolate",
@@ -81,6 +90,7 @@ export default function SidebarChromeRail({ sidebarOpen, settingsOpen, onToggleS
       <RailButton
         label={sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
         onClick={onToggleSidebar}
+        visible={controlsVisible}
       >
         {sidebarOpen ? (
           <PanelLeftClose size={15} strokeWidth={1.55} />
@@ -89,11 +99,11 @@ export default function SidebarChromeRail({ sidebarOpen, settingsOpen, onToggleS
         )}
       </RailButton>
 
-      <RailButton label="New chat" onClick={onNew}>
+      <RailButton label="New chat" onClick={onNew} visible={controlsVisible}>
         <Plus size={15} strokeWidth={1.6} />
       </RailButton>
 
-      <RailButton label={settingsOpen ? "Close settings" : "Settings"} onClick={onOpenSettings} active={settingsOpen}>
+      <RailButton label={settingsOpen ? "Close settings" : "Settings"} onClick={onOpenSettings} active={settingsOpen} visible={controlsVisible}>
         <Settings size={14} strokeWidth={1.55} />
       </RailButton>
     </div>

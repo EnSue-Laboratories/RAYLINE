@@ -1069,6 +1069,7 @@ export default function App() {
   const [appBlur, setAppBlur] = useState(0);
   const [appOpacity, setAppOpacity] = useState(100);
   const [developerMode, setDeveloperMode] = useState(true);
+  const [chromeControlsOnHover, setChromeControlsOnHover] = useState(false);
   const [notificationSound, setNotificationSound] = useState("glass");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -1130,6 +1131,7 @@ export default function App() {
     appBlur,
     appOpacity,
     developerMode,
+    chromeControlsOnHover,
     notificationSound,
     notificationsMuted,
     queuedMessages,
@@ -1138,6 +1140,7 @@ export default function App() {
     appOpacity,
     coauthorEnabled,
     coauthorTrailer,
+    chromeControlsOnHover,
     cwd,
     defaultModel,
     defaultPrBranch,
@@ -1406,6 +1409,7 @@ export default function App() {
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
+        if (typeof state.chromeControlsOnHover === "boolean") setChromeControlsOnHover(state.chromeControlsOnHover);
         if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
         if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
         if (state.wallpaper) {
@@ -3363,6 +3367,7 @@ export default function App() {
       <SidebarChromeRail
         sidebarOpen={sidebarOpen}
         settingsOpen={showSettings}
+        controlsOnHover={chromeControlsOnHover}
         onToggleSidebar={() => setSidebarOpen((o) => !o)}
         onNew={handleNew}
         onOpenSettings={() => setShowSettings((open) => !open)}
@@ -3449,6 +3454,8 @@ export default function App() {
           onAppOpacityChange={setAppOpacity}
           developerMode={developerMode}
           onDeveloperModeChange={setDeveloperMode}
+          chromeControlsOnHover={chromeControlsOnHover}
+          onChromeControlsOnHoverChange={setChromeControlsOnHover}
           notificationSound={notificationSound}
           onNotificationSoundChange={setNotificationSound}
           notificationsMuted={notificationsMuted}
