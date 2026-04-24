@@ -339,9 +339,9 @@ const iconBtnStyle = {
   width: 24,
   height: 24,
   borderRadius: 6,
-  background: "transparent",
-  border: "none",
-  color: "rgba(255,255,255,0.4)",
+  background: "var(--bg-tertiary)",
+  border: "1px solid var(--border)",
+  color: "var(--text-muted)",
   cursor: "pointer",
   flexShrink: 0,
   WebkitAppRegion: "no-drag",
@@ -391,8 +391,8 @@ function useHover(baseStyle, hoverStyle) {
 
 function IconButton({ onClick, title, children }) {
   const hover = useHover(iconBtnStyle, {
-    background: "rgba(255,255,255,0.07)",
-    color: "rgba(255,255,255,0.8)",
+    background: "var(--hover-overlay)",
+    color: "var(--text-primary)",
   });
 
   return (
@@ -897,9 +897,9 @@ function EmptyState({ onCreate, blank = false }) {
       marginTop: 12,
       padding: "6px 14px",
       borderRadius: 7,
-      background: "rgba(255,255,255,0.06)",
-      border: "1px solid rgba(255,255,255,0.1)",
-      color: "rgba(255,255,255,0.45)",
+      background: "var(--bg-tertiary)",
+      border: "1px solid var(--border)",
+      color: "var(--text-muted)",
       cursor: "pointer",
       fontSize: s(11),
       fontFamily: FONT_FAMILY,
@@ -907,8 +907,8 @@ function EmptyState({ onCreate, blank = false }) {
       transition: "background .15s, color .15s",
     },
     {
-      background: "rgba(255,255,255,0.11)",
-      color: "rgba(255,255,255,0.75)",
+      background: "var(--hover-overlay)",
+      color: "var(--text-primary)",
     }
   );
   if (blank) {
@@ -927,13 +927,13 @@ function EmptyState({ onCreate, blank = false }) {
         userSelect: "none",
       }}
     >
-      <TerminalIcon size={32} strokeWidth={1} color="rgba(255,255,255,0.08)" />
+      <TerminalIcon size={32} strokeWidth={1} color="var(--text-muted)" />
       <div
         style={{
           marginTop: 8,
           fontSize: s(11),
           fontFamily: FONT_FAMILY,
-          color: "rgba(255,255,255,0.2)",
+          color: "var(--text-muted)",
           letterSpacing: ".06em",
         }}
       >
@@ -964,7 +964,7 @@ function TabBar({
         gap: 7,
         overflowX: "auto",
         background,
-        borderBottom: "1px solid rgba(255,255,255,0.04)",
+        borderBottom: "1px solid var(--border)",
         flexShrink: 0,
         scrollbarWidth: "none",
         padding: "5px 8px 4px",
@@ -984,13 +984,13 @@ function TabBar({
               cursor: "pointer",
               flexShrink: 0,
               background: isActive
-                ? "rgba(255,255,255,0.08)"
-                : "rgba(255,255,255,0.018)",
+                ? "var(--bg-tertiary)"
+                : "transparent",
               borderRadius: 7,
               transition: "background .15s, color .15s",
             }}
             onMouseEnter={(e) => {
-              if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+              if (!isActive) e.currentTarget.style.background = "var(--hover-overlay)";
             }}
             onMouseLeave={(e) => {
               if (!isActive) e.currentTarget.style.background = "transparent";
@@ -1001,7 +1001,7 @@ function TabBar({
               style={{
                 fontSize: s(11),
                 fontFamily: FONT_FAMILY,
-                color: isActive ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)",
+                color: isActive ? "var(--text-secondary)" : "var(--text-muted)",
                 maxWidth: 120,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -1026,14 +1026,14 @@ function TabBar({
                 borderRadius: 3,
                 background: "transparent",
                 border: "none",
-                color: "rgba(255,255,255,0.2)",
+                color: "var(--text-muted)",
                 cursor: "pointer",
                 padding: 0,
                 flexShrink: 0,
                 transition: "color .15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(220,80,80,0.7)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
             >
               <X size={10} strokeWidth={2} />
             </button>
@@ -1116,10 +1116,10 @@ export default function TerminalDrawer({
         flexDirection: "column",
         height: "100%",
         ...(windowMode
-          ? { background: TERMINAL_OPAQUE_BG }
+          ? { background: "var(--bg-primary)" }
           : getPaneSurfaceStyle(hasWallpaper)),
         backdropFilter: windowMode ? "none" : (hasWallpaper ? "saturate(1.1)" : "blur(56px) saturate(1.1)"),
-        borderLeft: windowMode ? "none" : "1px solid rgba(255,255,255,0.025)",
+        borderLeft: windowMode ? "none" : "1px solid var(--border)",
         position: "relative",
         zIndex: 10,
         overflow: "hidden",
@@ -1149,7 +1149,7 @@ export default function TerminalDrawer({
               inset: 0,
               zIndex: 1,
               pointerEvents: "none",
-              background: `linear-gradient(180deg, rgba(13,13,16,${overlayAlpha.toFixed(2)}), rgba(9,9,11,${Math.min(overlayAlpha + 0.12, 0.84).toFixed(2)}))`,
+              background: `linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) ${(overlayAlpha * 100).toFixed(0)}%, transparent), color-mix(in srgb, var(--bg-primary) ${(Math.min(overlayAlpha + 0.12, 0.84) * 100).toFixed(0)}%, transparent))`,
             }}
           />
         </>
@@ -1208,11 +1208,11 @@ export default function TerminalDrawer({
                 </IconButton>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 7, WebkitAppRegion: "drag" }}>
-                  <TerminalIcon size={13} strokeWidth={1.5} color="rgba(255,255,255,0.35)" />
+                  <TerminalIcon size={13} strokeWidth={1.5} color="var(--text-muted)" />
                   <span style={{
                     fontSize: s(10),
                     fontFamily: FONT_FAMILY,
-                    color: "rgba(255,255,255,0.35)",
+                    color: "var(--text-muted)",
                     letterSpacing: ".08em",
                     userSelect: "none",
                   }}>

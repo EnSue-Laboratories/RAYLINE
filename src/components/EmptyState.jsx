@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-const ACCENT = "#FF4422";
-const PRIMARY = "rgb(200, 200, 200)";
+const ACCENT = "var(--accent)";
+const PRIMARY = "var(--text-secondary)";
 
 export default function EmptyState() {
   const s = useFontScale();
@@ -99,19 +99,19 @@ export default function EmptyState() {
         }}>
           <div className="rl-sys-1" style={{
             fontSize: s(13),
-            color: "rgba(255,255,255,0.55)",
+            color: "var(--text-secondary)",
             letterSpacing: ".06em",
             fontWeight: 500,
           }}>
             {info.user}@{info.hostname}
           </div>
-          <div className="rl-sys-2" style={{ fontSize: s(11), color: "rgba(255,255,255,0.32)", letterSpacing: ".04em" }}>
+          <div className="rl-sys-2" style={{ fontSize: s(11), color: "var(--text-muted)", letterSpacing: ".04em" }}>
             {info.platform} {info.arch} · {info.cpus} cores · {info.memory}
           </div>
-          <div className="rl-sys-3" style={{ fontSize: s(11), color: "rgba(255,255,255,0.22)", letterSpacing: ".04em" }}>
+          <div className="rl-sys-3" style={{ fontSize: s(11), color: "var(--text-muted)", letterSpacing: ".04em" }}>
             node {info.nodeVersion} · electron {info.electronVersion}
           </div>
-          <div className="rl-sys-4" style={{ fontSize: s(11), color: "rgba(255,255,255,0.16)", letterSpacing: ".04em" }}>
+          <div className="rl-sys-4" style={{ fontSize: s(11), color: "var(--text-muted)", letterSpacing: ".04em" }}>
             {info.shell}
           </div>
         </div>
