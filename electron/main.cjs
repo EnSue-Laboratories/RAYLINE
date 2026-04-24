@@ -766,7 +766,7 @@ const DISPATCH_PLANNER_SYSTEM_PROMPT = `You are RayLine's Dispatch auto-fill pla
 Turn the user's high-level request into editable Custom Dispatch rows.
 
 Output only valid JSON with this shape:
-{"rows":[{"title":"short label","prompt":"self-contained agent task","branch":"kebab-case-branch","model":"exact-model-id","reason":"brief routing reason"}]}
+{"rows":[{"title":"short label","prompt":"self-contained agent task","branch":"kebab-case-branch","model":"exact-model-id"}]}
 
 Rules:
 - Create 1 to 6 rows. Use one row when the work is not safely parallelizable.
@@ -843,7 +843,6 @@ function parseDispatchPlanJson(text) {
       prompt: String(row?.prompt || "").trim(),
       branch: String(row?.branch || "").trim(),
       model: String(row?.model || "").trim(),
-      reason: String(row?.reason || "").trim(),
     })).filter((row) => row.prompt || row.title),
   };
 }

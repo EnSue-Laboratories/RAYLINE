@@ -62,7 +62,6 @@ function makeCustomRowFromPlan(plan, index, validModelIds, usedBranches) {
     branch: uniqueBranchName(branchBase, usedBranches),
     model: validModelIds.has(plan.model) ? plan.model : "",
     attachments: [],
-    autoReason: String(plan.reason || "").trim(),
   };
 }
 
@@ -305,35 +304,37 @@ export default function DispatchCard({
           )}
         </div>
 
-        <footer style={footerStyle}>
-          <DispatchDropdown
-            ariaLabel={t("dispatch.defaultModel")}
-            value={globalModel}
-            onChange={setGlobalModel}
-            options={availableModels.map((m) => ({
-              value: m.id,
-              label: m.name || m.label || m.id,
-              triggerLabel: m.tag || m.label || m.id,
-              sublabel: m.tag,
-              group: (m.provider || "MODEL").toUpperCase(),
-            }))}
-            grouped
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={!canDispatch}
-            style={primaryBtnStyle(canDispatch, submitting)}
-          >
-            <span style={{ visibility: submitting ? "hidden" : "visible" }}>
-              {t(activeRows.length === 1 ? "dispatch.dispatchOne" : "dispatch.dispatchMany", { count: activeRows.length || 0 })}
-            </span>
-            {submitting && (
-              <span style={{ position: "absolute", inset: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                <DispatchLoadingDots ariaLabel={t("dispatch.dispatching")} />
+        {tab !== "auto" && (
+          <footer style={footerStyle}>
+            <DispatchDropdown
+              ariaLabel={t("dispatch.defaultModel")}
+              value={globalModel}
+              onChange={setGlobalModel}
+              options={availableModels.map((m) => ({
+                value: m.id,
+                label: m.name || m.label || m.id,
+                triggerLabel: m.tag || m.label || m.id,
+                sublabel: m.tag,
+                group: (m.provider || "MODEL").toUpperCase(),
+              }))}
+              grouped
+            />
+            <button
+              onClick={handleSubmit}
+              disabled={!canDispatch}
+              style={primaryBtnStyle(canDispatch, submitting)}
+            >
+              <span style={{ visibility: submitting ? "hidden" : "visible" }}>
+                {t(activeRows.length === 1 ? "dispatch.dispatchOne" : "dispatch.dispatchMany", { count: activeRows.length || 0 })}
               </span>
-            )}
-          </button>
-        </footer>
+              {submitting && (
+                <span style={{ position: "absolute", inset: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  <DispatchLoadingDots ariaLabel={t("dispatch.dispatching")} />
+                </span>
+              )}
+            </button>
+          </footer>
+        )}
       </div>
     </div>
   );
@@ -606,11 +607,6 @@ function CustomRow({ row, index, availableModels, issueOptions, issues, error, o
       {attachments.length > 0 && (
         <div style={{ padding: "0 12px 8px" }}>
           <ImagePreview items={attachments} onRemove={removeAttachment} />
-        </div>
-      )}
-      {row.autoReason && (
-        <div style={customReasonStyle}>
-          <span>{row.autoReason}</span>
         </div>
       )}
       <div style={customControlsStyle}>
@@ -1049,7 +1045,7 @@ const addBtnStyle = {
 };
 
 const autoNoteStyle = {
-  color: "rgba(180,255,200,0.78)",
+  color: "rgba(255,255,255,0.68)",
   fontSize: 11,
   fontFamily: "'JetBrains Mono', monospace",
   marginBottom: 10,
@@ -1142,15 +1138,6 @@ const customTextareaStyle = {
   fontFamily: "inherit",
   outline: "none",
   boxSizing: "border-box",
-};
-const customReasonStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  color: "rgba(180,220,255,0.72)",
-  fontSize: 11,
-  lineHeight: 1.35,
-  padding: "0 12px 9px",
 };
 const customControlsStyle = {
   display: "flex",
