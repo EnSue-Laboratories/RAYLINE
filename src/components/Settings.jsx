@@ -7,7 +7,7 @@ import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, onClose }) {
   const s = useFontScale();
   const t = createTranslator(locale);
   const showUpdaterSettings = platform === "win32";
@@ -808,6 +808,84 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
 
           {developerMode && (
             <>
+              {/* TERMINAL section */}
+              <div
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: s(10),
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.25)",
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                  marginBottom: 20,
+                  marginTop: 12,
+                }}
+              >
+                {t("settings.terminal")}
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: s(13),
+                        color: "rgba(255,255,255,0.8)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {t("settings.sidebarTerminal")}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: s(11),
+                        color: "rgba(255,255,255,0.3)",
+                      }}
+                    >
+                      {t("settings.sidebarTerminalDescription")}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={sidebarTerminalEnabled}
+                    onClick={() => onSidebarTerminalEnabledChange?.(!sidebarTerminalEnabled)}
+                    style={{
+                      flexShrink: 0,
+                      width: 38,
+                      height: 22,
+                      borderRadius: 999,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: sidebarTerminalEnabled ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                      position: "relative",
+                      cursor: "pointer",
+                      padding: 0,
+                      transition: "background 120ms ease",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        left: sidebarTerminalEnabled ? 18 : 2,
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        background: "rgba(255,255,255,0.9)",
+                        transition: "left 120ms ease",
+                      }}
+                    />
+                  </button>
+                </div>
+              </div>
+
               {/* NOTIFICATIONS section */}
               <div
                 style={{

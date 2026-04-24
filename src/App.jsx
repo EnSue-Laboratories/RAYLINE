@@ -1146,6 +1146,7 @@ export default function App() {
     markMulticaConnected,
   } = useAgent();
   const terminal = useTerminal();
+  const { closeWindow: closeTerminalWindow } = terminal;
   const { prefersReducedMotion } = useWindowActivity();
   const { models: multicaModels } = useMulticaModels();
 
@@ -1169,6 +1170,8 @@ export default function App() {
   const [appBlur, setAppBlur] = useState(0);
   const [appOpacity, setAppOpacity] = useState(100);
   const [developerMode, setDeveloperMode] = useState(true);
+  const [sidebarTerminalEnabled, setSidebarTerminalEnabled] = useState(false);
+  const [sidebarTerminalOpen, setSidebarTerminalOpen] = useState(false);
   const [chromeControlsOnHover, setChromeControlsOnHover] = useState(false);
   const [notificationSound, setNotificationSound] = useState("glass");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
@@ -1244,6 +1247,7 @@ export default function App() {
     appBlur,
     appOpacity,
     developerMode,
+    sidebarTerminalEnabled,
     chromeControlsOnHover,
     notificationSound,
     notificationsMuted,
@@ -1268,6 +1272,7 @@ export default function App() {
     projects,
     queuedMessages,
     sidebarActiveOpacity,
+    sidebarTerminalEnabled,
     wallpaper,
   ]);
   const activeQueuedMessages = useMemo(
@@ -1534,6 +1539,7 @@ export default function App() {
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
+        if (typeof state.sidebarTerminalEnabled === "boolean") setSidebarTerminalEnabled(state.sidebarTerminalEnabled);
         if (typeof state.chromeControlsOnHover === "boolean") setChromeControlsOnHover(state.chromeControlsOnHover);
         if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
         if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
@@ -3479,8 +3485,37 @@ export default function App() {
 
   const terminalCwd = activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd);
 
+  useEffect(() => {
+    if (sidebarTerminalEnabled) {
+      closeTerminalWindow();
+    } else {
+      setSidebarTerminalOpen(false);
+    }
+  }, [closeTerminalWindow, sidebarTerminalEnabled]);
+
+  const createSidebarTerminalSession = useCallback(
+    (opts = {}) => terminal.createSession({ ...opts, reveal: false }),
+    [terminal]
+  );
+
   const handleToggleTerminal = async () => {
-    if (terminal.drawerOpen) {
+    if (sidebarTerminalEnabled) {
+      if (sidebarTerminalOpen) {
+        setSidebarTerminalOpen(false);
+        return;
+      }
+
+      if (terminal.windowOpen) {
+        await terminal.closeWindow();
+      }
+      setSidebarTerminalOpen(true);
+      if (terminal.sessions.length === 0) {
+        await terminal.createSession({ name: `shell-${Date.now()}`, cwd: terminalCwd, reveal: false });
+      }
+      return;
+    }
+
+    if (terminal.windowOpen) {
       await terminal.closeWindow();
       return;
     }
@@ -3491,6 +3526,14 @@ export default function App() {
     }
 
     await terminal.openWindow();
+  };
+
+  const handleRefocusTerminal = () => {
+    if (sidebarTerminalEnabled) {
+      setSidebarTerminalOpen(true);
+      return;
+    }
+    terminal.openWindow();
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -3634,6 +3677,8 @@ export default function App() {
           onAppOpacityChange={setAppOpacity}
           developerMode={developerMode}
           onDeveloperModeChange={setDeveloperMode}
+          sidebarTerminalEnabled={sidebarTerminalEnabled}
+          onSidebarTerminalEnabledChange={setSidebarTerminalEnabled}
           chromeControlsOnHover={chromeControlsOnHover}
           onChromeControlsOnHoverChange={setChromeControlsOnHover}
           notificationSound={notificationSound}
@@ -3660,7 +3705,7 @@ export default function App() {
           permissionRequests={activePermissionRequests}
           onRespondPermission={respondPermission}
           onToggleTerminal={handleToggleTerminal}
-          terminalOpen={terminal.drawerOpen}
+          terminalOpen={sidebarTerminalEnabled ? sidebarTerminalOpen : terminal.windowOpen}
           terminalCount={terminal.sessions.length}
           tabs={tabs}
           activeTabId={active}
@@ -3669,7 +3714,7 @@ export default function App() {
           wallpaper={wallpaper}
           cwd={terminalCwd}
           draftsPath={draftsPath}
-          onRefocusTerminal={terminal.openWindow}
+          onRefocusTerminal={handleRefocusTerminal}
           onCwdChange={(newCwd) => {
             setCwd(newCwd);
             if (active) {
@@ -3721,23 +3766,25 @@ export default function App() {
         onPickedLocalFolder={registerManualProject}
       />
 
-      {/* Terminal drawer */}
-      <TerminalDrawer
-        sessions={terminal.sessions}
-        activeSession={terminal.activeSession}
-        onSelectSession={terminal.setActiveSession}
-        onCreateSession={terminal.createSession}
-        cwd={terminalCwd}
-        onKillSession={terminal.killSession}
-        onSendInput={terminal.sendInput}
-        onResizeSession={terminal.resizeSession}
-        drawerOpen={terminal.drawerOpen}
-        onToggleDrawer={() => terminal.setDrawerOpen((o) => !o)}
-        registerTerminal={terminal.registerTerminal}
-        unregisterTerminal={terminal.unregisterTerminal}
-        wallpaper={wallpaper}
-        windowControlsVisible={showWindowControls}
-      />
+      {/* Optional in-app terminal drawer. The default terminal surface is the dedicated window. */}
+      {sidebarTerminalEnabled && (
+        <TerminalDrawer
+          sessions={terminal.sessions}
+          activeSession={terminal.activeSession}
+          onSelectSession={terminal.setActiveSession}
+          onCreateSession={createSidebarTerminalSession}
+          cwd={terminalCwd}
+          onKillSession={terminal.killSession}
+          onSendInput={terminal.sendInput}
+          onResizeSession={terminal.resizeSession}
+          drawerOpen={sidebarTerminalOpen}
+          onToggleDrawer={() => setSidebarTerminalOpen((o) => !o)}
+          registerTerminal={terminal.registerTerminal}
+          unregisterTerminal={terminal.unregisterTerminal}
+          wallpaper={wallpaper}
+          windowControlsVisible={showWindowControls}
+        />
+      )}
       </div>
     </div>
     </FontSizeContext.Provider>

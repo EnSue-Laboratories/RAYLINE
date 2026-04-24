@@ -415,7 +415,7 @@ app.whenReady().then(() => {
       return;
     }
 
-    if (payload.reason === "created") {
+    if (payload.reason === "created" && payload.reveal !== false) {
       createTerminalWindow();
     }
   });

@@ -11,12 +11,13 @@
  */
 
 const { app } = require("electron");
-const { autoUpdater } = require("electron-updater");
 
 const isDev = !app.isPackaged;
 const isWindows = process.platform === "win32";
 
 let _win = null;
+let _autoUpdater = null;
+let _autoUpdaterLoadError = null;
 
 function send(payload) {
   try {
@@ -26,11 +27,36 @@ function send(payload) {
   } catch {}
 }
 
+function getAutoUpdater() {
+  if (_autoUpdater) return _autoUpdater;
+  if (_autoUpdaterLoadError) return null;
+
+  try {
+    ({ autoUpdater: _autoUpdater } = require("electron-updater"));
+    return _autoUpdater;
+  } catch (err) {
+    _autoUpdaterLoadError = err;
+    return null;
+  }
+}
+
+function sendAutoUpdaterUnavailable() {
+  const msg = _autoUpdaterLoadError?.message || "electron-updater is unavailable";
+  send({ phase: "error", error: msg });
+  console.error("[auto-updater] unavailable:", msg);
+}
+
 function initAutoUpdater(mainWindow) {
   _win = mainWindow;
 
   if (isDev || !isWindows) {
     // The Windows release channel is the only updater-backed channel for now.
+    return;
+  }
+
+  const autoUpdater = getAutoUpdater();
+  if (!autoUpdater) {
+    sendAutoUpdaterUnavailable();
     return;
   }
 
@@ -70,6 +96,11 @@ async function handleCheckForUpdates() {
     setTimeout(() => send({ phase: "not-available" }), 400);
     return;
   }
+  const autoUpdater = getAutoUpdater();
+  if (!autoUpdater) {
+    sendAutoUpdaterUnavailable();
+    return;
+  }
   try {
     await autoUpdater.checkForUpdates();
   } catch (err) {
@@ -79,6 +110,11 @@ async function handleCheckForUpdates() {
 
 async function handleDownloadUpdate() {
   if (isDev || !isWindows) return;
+  const autoUpdater = getAutoUpdater();
+  if (!autoUpdater) {
+    sendAutoUpdaterUnavailable();
+    return;
+  }
   try {
     await autoUpdater.downloadUpdate();
   } catch (err) {
@@ -88,6 +124,11 @@ async function handleDownloadUpdate() {
 
 function handleInstallUpdate() {
   if (isDev || !isWindows) return;
+  const autoUpdater = getAutoUpdater();
+  if (!autoUpdater) {
+    sendAutoUpdaterUnavailable();
+    return;
+  }
   autoUpdater.quitAndInstall(false, true);
 }
 
