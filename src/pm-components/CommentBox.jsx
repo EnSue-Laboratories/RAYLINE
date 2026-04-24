@@ -13,7 +13,7 @@ export default function CommentBox({ repo, number, onCommentAdded, actions, loca
       await window.ghApi.addComment(repo, number, body.trim());
       setBody("");
       onCommentAdded();
-    } catch {}
+    } catch { /* ignore */ }
     setSubmitting(false);
   };
 

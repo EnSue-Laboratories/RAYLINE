@@ -17,6 +17,8 @@ const {
   subscribeMulticaAgent,
 } = require("./multica-manager.cjs");
 const { buildSpawnPath, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
+const { saveByokProviders, getMaskedProviders, deleteByokProvider, testByokKey } = require("./byok-store.cjs");
+const { startByokAgent, cancelByokAgent, cancelAllByok, testByokConnectivity, getOpenCodeMetadata } = require("./byok-agent-manager.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
@@ -550,7 +552,9 @@ ipcMain.handle("read-image", async (_event, filePath) => {
 
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
-  if (opts.provider === "multica") {
+  if (opts.provider === "byok") {
+    startByokAgent(opts, event.sender);
+  } else if (opts.provider === "multica") {
     startMulticaAgent(opts, event.sender).catch((err) => {
       event.sender.send("agent-stream", {
         conversationId: opts.conversationId,
@@ -568,13 +572,16 @@ ipcMain.on("agent-start", (event, opts) => {
 ipcMain.on("agent-cancel", (_event, { conversationId }) => {
   cancelAgent(conversationId);
   cancelCodexAgent(conversationId);
+  cancelByokAgent(conversationId);
   cancelMulticaAgent(conversationId).catch((err) => {
     console.error("[multica] cancel failed", { conversationId, error: err?.message || String(err) });
   });
 });
 
 ipcMain.on("agent-edit-resend", (event, opts) => {
-  if (opts.provider === "codex") {
+  if (opts.provider === "byok") {
+    startByokAgent(opts, event.sender);
+  } else if (opts.provider === "codex") {
     startCodexAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
   } else {
     startAgent({ ...opts, forkSession: true }, event.sender);
@@ -598,6 +605,14 @@ ipcMain.handle("multica-ensure-session", (_e, args) => multicaEnsureSession(args
 ipcMain.handle("multica-send-message", (_e, args) => multicaSendMessage(args));
 ipcMain.handle("multica-list-messages", (_e, args) => multicaListMessages(args));
 ipcMain.handle("multica-subscribe", (event, args) => subscribeMulticaAgent(args, event.sender));
+
+// IPC: BYOK key management
+ipcMain.handle("byok-save-providers", (_e, providers) => saveByokProviders(providers));
+ipcMain.handle("byok-load-providers", () => getMaskedProviders());
+ipcMain.handle("byok-delete-provider", (_e, providerId) => deleteByokProvider(providerId));
+ipcMain.handle("byok-test-key", (_e, providerId) => testByokKey(providerId));
+ipcMain.handle("byok-test-connectivity", (_e, opts) => testByokConnectivity(opts));
+ipcMain.handle("get-opencode-metadata", (_e, binary) => getOpenCodeMetadata(binary));
 
 ipcMain.handle("rewind-files", async (_event, opts) => {
   return rewindFiles(opts);

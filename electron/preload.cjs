@@ -138,6 +138,13 @@ contextBridge.exposeInMainWorld("api", {
   setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
   writeClipboardImage: (dataUrl) => ipcRenderer.invoke("clipboard-write-image", dataUrl),
 
+  // BYOK key management
+  byokSaveProviders: (providers) => ipcRenderer.invoke("byok-save-providers", providers),
+  byokLoadProviders: () => ipcRenderer.invoke("byok-load-providers"),
+  byokDeleteProvider: (providerId) => ipcRenderer.invoke("byok-delete-provider", providerId),
+  byokTestKey: (providerId) => ipcRenderer.invoke("byok-test-key", providerId),
+  byokTestConnectivity: (opts) => ipcRenderer.invoke("byok-test-connectivity", opts),
+
   // multica
   multicaSendCode: (args) => ipcRenderer.invoke("multica-send-code", args),
   multicaVerifyCode: (args) => ipcRenderer.invoke("multica-verify-code", args),
@@ -147,4 +154,5 @@ contextBridge.exposeInMainWorld("api", {
   multicaSendMessage: (args) => ipcRenderer.invoke("multica-send-message", args),
   multicaListMessages: (args) => ipcRenderer.invoke("multica-list-messages", args),
   multicaSubscribe: (args) => ipcRenderer.invoke("multica-subscribe", args),
+  getOpenCodeMetadata: (binary) => ipcRenderer.invoke("get-opencode-metadata", binary),
 });

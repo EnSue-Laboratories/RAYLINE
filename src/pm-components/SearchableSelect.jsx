@@ -36,9 +36,11 @@ export default function SearchableSelect({ options, value, onChange, placeholder
   }, []);
 
   // Reset highlight when filtered list changes
-  useEffect(() => {
+  const [prevFilteredLength, setPrevFilteredLength] = useState(filtered.length);
+  if (filtered.length !== prevFilteredLength) {
+    setPrevFilteredLength(filtered.length);
     setHighlightIdx(0);
-  }, [filtered.length]);
+  }
 
   // Scroll highlighted item into view
   useEffect(() => {

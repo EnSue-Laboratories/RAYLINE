@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
@@ -317,6 +317,19 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
     );
   }
 
+  return (
+    <ValueControlBlockInner
+      json={json}
+      normalized={normalized}
+      onAnswer={onAnswer}
+      onControlChange={onControlChange}
+      canControlTarget={canControlTarget}
+      s={s}
+    />
+  );
+}
+
+function ValueControlBlockInner({ json, normalized, onAnswer, onControlChange, canControlTarget, s }) {
   const { control, config } = normalized;
   const cachedDraftValue = controlDraftCache.get(json);
   const [sliderValue, setSliderValue] = useState(
@@ -328,14 +341,16 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
   const [submitted, setSubmitted] = useState(false);
   const [buttonHovered, setButtonHovered] = useState(false);
 
-  useEffect(() => {
+  const [prevJson, setPrevJson] = useState(json);
+  if (json !== prevJson) {
+    setPrevJson(json);
     const nextValue = Number.isFinite(controlDraftCache.get(json))
       ? controlDraftCache.get(json)
       : config.initial;
     setSliderValue(nextValue);
     setValueDraft(formatNumber(config.getValue(nextValue)));
     setSubmitted(false);
-  }, [json, config.initial]);
+  }
 
   const value = useMemo(() => config.getValue(sliderValue), [config, sliderValue]);
   const valueText = `${formatNumber(value)}${control.unit || ""}`;

@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { loadMulticaState, saveMulticaState } from "../multica/store";
+import { getByokPresetsForEndpoints } from "./byok-models";
 import ModelPicker from "../components/ModelPicker";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function multicaAgentToModel(agent, state) {
   return {
     id: `multica:${agent.id}`,
@@ -16,6 +18,7 @@ export function multicaAgentToModel(agent, state) {
   };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useMulticaModels() {
   const [state, setState] = useState(() => loadMulticaState());
   const [models, setModels] = useState(() => (state.agentsCache || []).map((a) => multicaAgentToModel(a, state)));
@@ -67,7 +70,49 @@ export function useMulticaModels() {
   return { models, loading, error, refresh, state };
 }
 
+function useByokModels() {
+  const [models, setModels] = useState([]);
+
+  const refresh = useCallback(async () => {
+    if (!window.api?.byokLoadProviders) { setModels([]); return; }
+    try {
+      const providers = await window.api.byokLoadProviders();
+      const endpointIds = providers.map((p) => p.id);
+      const presets = getByokPresetsForEndpoints(endpointIds);
+      const customModels = providers
+        .filter(p => p.id.startsWith("custom-") || p.type?.startsWith("opencode") || p.id.startsWith("opencode"))
+        .map(p => {
+          // If defaultModelId isn't set, default to a fallback.
+          return {
+            id: `byok:${p.id}:${p.defaultModelId || "default"}`,
+            name: p.name || (p.type === "opencode-cli" ? "OpenCode CLI" : "OpenCode"),
+            tag: (p.defaultModelId || "DEFAULT").toUpperCase(),
+            provider: "byok",
+            endpoint: p.id,
+            modelId: p.defaultModelId || "default",
+            contextWindow: 200_000,
+          };
+        });
+      setModels([...presets, ...customModels]);
+    } catch {
+      setModels([]);
+    }
+  }, []);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const h = () => { void refresh(); };
+    window.addEventListener("byok-refresh", h);
+    return () => window.removeEventListener("byok-refresh", h);
+  }, [refresh]);
+
+  return models;
+}
+
 export function ModelPickerWithMultica({ value, onChange }) {
   const { models, error, loading } = useMulticaModels();
-  return <ModelPicker value={value} onChange={onChange} extraModels={models} extraError={error} extraLoading={loading} />;
+  const byokModels = useByokModels();
+  return <ModelPicker value={value} onChange={onChange} extraModels={[...models, ...byokModels]} extraError={error} extraLoading={loading} />;
 }

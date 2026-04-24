@@ -8,19 +8,44 @@ import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from ".
 import { createTranslator } from "../i18n";
 import WindowDragSpacer from "./WindowDragSpacer";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, byokProviders = [], onByokProvidersChange, onClose }) {
   const s = useFontScale();
   const t = createTranslator(locale);
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
   const [multica, setMultica] = useState(() => loadMulticaState());
   const [multicaServerDraft, setMulticaServerDraft] = useState(() => loadMulticaState().serverUrl || "");
 
-  // Sync from parent when wallpaper prop changes externally
-  useEffect(() => {
-    // Local edits should reset when the persisted wallpaper changes outside this panel.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  // BYOK state
+  const [byokAddOpen, setByokAddOpen] = useState(false);
+  const [byokDraftType, setByokDraftType] = useState("");
+  const [byokDraftKey, setByokDraftKey] = useState("");
+  const [byokDraftBaseUrl, setByokDraftBaseUrl] = useState("");
+  const [byokDraftName, setByokDraftName] = useState("");
+  const [byokDraftModelId, setByokDraftModelId] = useState("");
+  const [byokDraftUsername, setByokDraftUsername] = useState("");
+  const [byokDraftPath, setByokDraftPath] = useState("");
+  const [byokDraftProvider, setByokDraftProvider] = useState("");
+  const [byokDraftId, setByokDraftId] = useState(null); // null means adding new
+  const [byokTestStatus, setByokTestStatus] = useState(null); // { ok: boolean, message?: string, loading: boolean }
+  const [openCodeProviders, setOpenCodeProviders] = useState([]);
+  const [openCodeAgents, setOpenCodeAgents] = useState([]);
+
+  const [prevWallpaper, setPrevWallpaper] = useState(wallpaper);
+  if (wallpaper !== prevWallpaper) {
+    setPrevWallpaper(wallpaper);
     setLocal(normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
-  }, [wallpaper]);
+  }
+
+  useEffect(() => {
+    if ((byokDraftType === "opencode" || byokDraftType === "opencode-cli") && window.api?.getOpenCodeMetadata) {
+      window.api.getOpenCodeMetadata(byokDraftType === "opencode-cli" ? byokDraftPath : "opencode").then(res => {
+        if (res.success) {
+          setOpenCodeProviders(res.providers);
+          setOpenCodeAgents(res.agents || []);
+        }
+      });
+    }
+  }, [byokDraftType, byokDraftPath]);
 
   // Load data URL when path is set but dataUrl is missing (e.g. after app restart)
   useEffect(() => {
@@ -36,6 +61,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
       });
     }
   }, [local.path]); // eslint-disable-line react-hooks/exhaustive-deps
+  
+
 
   const propagate = useCallback(
     (next) => {
@@ -899,6 +926,574 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
 
           {developerMode && (
             <>
+              {/* BYOK section */}
+              <div
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: s(10),
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.25)",
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                  marginBottom: 20,
+                  marginTop: 12,
+                }}
+              >
+                {t("settings.byok")}
+              </div>
+
+              <div style={{ marginBottom: 28 }}>
+                {byokProviders.length === 0 && !byokAddOpen && (
+                  <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.35)", marginBottom: 12 }}>
+                    {t("settings.byokNoProviders")}
+                  </div>
+                )}
+
+                {byokProviders.map((p) => (
+                  <div
+                    key={p.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 12px",
+                      marginBottom: 6,
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: 7,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.8)" }}>
+                        {p.name}
+                      </div>
+                      <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace" }}>
+                        {p.apiKey || "(no key)"}
+                        {p.baseUrl ? ` · ${p.baseUrl}` : ""}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setByokDraftId(p.id);
+                        setByokDraftType(p.type || (p.id.startsWith("custom-") ? "custom" : p.id));
+                        setByokDraftName(p.name || "");
+                        setByokDraftKey(""); // Keep empty to avoid showing masked key, but handle in save
+                        setByokDraftBaseUrl(p.baseUrl || "");
+                        setByokDraftModelId(p.defaultModelId || "");
+                        setByokDraftUsername(p.username || "");
+                        setByokDraftPath(p.path || "");
+                        setByokDraftProvider(p.provider || "");
+                        setByokAddOpen(true);
+                      }}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 5,
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        color: "rgba(255,255,255,0.8)",
+                        fontSize: s(11),
+                        cursor: "pointer",
+                        marginRight: 6,
+                        flexShrink: 0,
+                        fontFamily: "system-ui, sans-serif",
+                      }}
+                    >
+                      {t("common.edit")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.api?.byokDeleteProvider) {
+                          await window.api.byokDeleteProvider(p.id);
+                          const updated = await window.api.byokLoadProviders();
+                          onByokProvidersChange?.(updated);
+                        }
+                      }}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 5,
+                        background: "rgba(255,180,180,0.08)",
+                        border: "1px solid rgba(255,180,180,0.15)",
+                        color: "rgba(255,180,180,0.7)",
+                        fontSize: s(11),
+                        cursor: "pointer",
+                        flexShrink: 0,
+                        fontFamily: "system-ui, sans-serif",
+                      }}
+                    >
+                      {t("settings.byokDelete")}
+                    </button>
+                  </div>
+                ))}
+
+                {byokAddOpen ? (
+                  <div
+                    style={{
+                      padding: 12,
+                      background: "rgba(255,255,255,0.02)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: 7,
+                      marginTop: 8,
+                    }}
+                  >
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                        {t("settings.byokProviderType")}
+                      </div>
+                      <select
+                        value={byokDraftType}
+                        onChange={(e) => {
+                          setByokDraftType(e.target.value);
+                          setByokDraftBaseUrl(
+                            e.target.value === "anthropic" ? "https://api.anthropic.com" :
+                            e.target.value === "openai" ? "https://api.openai.com" : ""
+                          );
+                          setByokDraftName(
+                            e.target.value === "anthropic" ? "Anthropic" :
+                            e.target.value === "openai" ? "OpenAI" : ""
+                          );
+                          setByokDraftPath(e.target.value === "opencode" ? "/acp" : "");
+                          setByokDraftProvider("");
+                          setByokTestStatus(null);
+                        }}
+                        style={{
+                          width: "100%",
+                          height: 32,
+                          padding: "0 10px",
+                          background: "rgba(255,255,255,0.04)",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          borderRadius: 7,
+                          color: "rgba(255,255,255,0.9)",
+                          fontFamily: "system-ui, sans-serif",
+                          fontSize: s(12),
+                          outline: "none",
+                          WebkitAppearance: "none",
+                          MozAppearance: "none",
+                          appearance: "none",
+                        }}
+                      >
+                        <option value="">{t("settings.byokSelectProvider")}</option>
+                        <option value="anthropic">{t("settings.byokAnthropic")}</option>
+                        <option value="openai">{t("settings.byokOpenAI")}</option>
+                        <option value="custom">{t("settings.byokCustom")}</option>
+                        <option value="opencode">{t("settings.byokOpenCode")}</option>
+                        <option value="opencode-cli">{t("settings.byokOpenCodeCLI")}</option>
+                      </select>
+                    </div>
+
+                    {(byokDraftType === "custom" || byokDraftType === "opencode" || byokDraftType === "opencode-cli") && (
+                      <>
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                            {t("settings.byokCustomName")}
+                          </div>
+                          <input
+                            type="text"
+                            value={byokDraftName}
+                            onChange={(e) => setByokDraftName(e.target.value)}
+                            placeholder={byokDraftType.startsWith("opencode") ? "e.g., OpenCode" : (t("settings.byokCustomNamePlaceholder") || "e.g., My Local Inference")}
+                            spellCheck={false}
+                            style={{
+                              width: "100%",
+                              boxSizing: "border-box",
+                              height: 32,
+                              padding: "0 10px",
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: 7,
+                              color: "rgba(255,255,255,0.9)",
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: s(12),
+                              outline: "none",
+                            }}
+                          />
+                        </div>
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                            {byokDraftType === "opencode-cli" ? "Binary Path / Command" : t("settings.byokCustomModelId")}
+                          </div>
+                          <input
+                            type="text"
+                            value={byokDraftModelId}
+                            onChange={(e) => setByokDraftModelId(e.target.value)}
+                            placeholder={byokDraftType === "opencode-cli" ? "e.g., opencode (must be in PATH)" : (byokDraftType === "opencode" ? "e.g., default" : "e.g., llama3, qwen-coder")}
+                            spellCheck={false}
+                            style={{
+                              width: "100%",
+                              boxSizing: "border-box",
+                              height: 32,
+                              padding: "0 10px",
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: 7,
+                              color: "rgba(255,255,255,0.9)",
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: s(12),
+                              outline: "none",
+                            }}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {byokDraftType.startsWith("opencode") && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                          Username (Optional)
+                        </div>
+                        <input
+                          type="text"
+                          value={byokDraftUsername}
+                          onChange={(e) => setByokDraftUsername(e.target.value)}
+                          placeholder="e.g., opencode"
+                          spellCheck={false}
+                          style={{
+                            width: "100%",
+                            boxSizing: "border-box",
+                            height: 32,
+                            padding: "0 10px",
+                            background: "rgba(255,255,255,0.04)",
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            borderRadius: 7,
+                            color: "rgba(255,255,255,0.9)",
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: s(12),
+                            outline: "none",
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {byokDraftType && (
+                      <>
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                            {t("settings.byokApiKey")}
+                          </div>
+                          <input
+                            type="password"
+                            value={byokDraftKey}
+                            onChange={(e) => setByokDraftKey(e.target.value)}
+                            placeholder="sk-..."
+                            spellCheck={false}
+                            autoComplete="off"
+                            style={{
+                              width: "100%",
+                              boxSizing: "border-box",
+                              height: 32,
+                              padding: "0 10px",
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: 7,
+                              color: "rgba(255,255,255,0.9)",
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: s(12),
+                              outline: "none",
+                            }}
+                          />
+                        </div>
+
+                        {(byokDraftType === "custom" || byokDraftType === "opencode") && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                              {byokDraftType === "opencode" ? "OpenCode Server URL" : t("settings.byokBaseUrl")}
+                            </div>
+                            <input
+                              type="text"
+                              value={byokDraftBaseUrl}
+                              onChange={(e) => setByokDraftBaseUrl(e.target.value)}
+                              placeholder={byokDraftType === "opencode" ? "http://localhost:4096" : t("settings.byokBaseUrlPlaceholder")}
+                              spellCheck={false}
+                              style={{
+                                width: "100%",
+                                boxSizing: "border-box",
+                                height: 32,
+                                padding: "0 10px",
+                                background: "rgba(255,255,255,0.04)",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                borderRadius: 7,
+                                color: "rgba(255,255,255,0.9)",
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: s(12),
+                                outline: "none",
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        {byokDraftType === "opencode" && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                              ACP Path
+                            </div>
+                            <input
+                              type="text"
+                              value={byokDraftPath}
+                              onChange={(e) => setByokDraftPath(e.target.value)}
+                              placeholder="/acp (default)"
+                              spellCheck={false}
+                              style={{
+                                width: "100%",
+                                boxSizing: "border-box",
+                                height: 32,
+                                padding: "0 10px",
+                                background: "rgba(255,255,255,0.04)",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                borderRadius: 7,
+                                color: "rgba(255,255,255,0.9)",
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: s(12),
+                                outline: "none",
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        {byokTestStatus && (
+                          <div style={{
+                            marginBottom: 10,
+                            fontSize: s(11),
+                            color: byokTestStatus.ok ? "rgba(100,255,150,0.8)" : "rgba(255,100,100,0.8)",
+                            padding: "4px 8px",
+                            background: "rgba(0,0,0,0.2)",
+                            borderRadius: 4,
+                          }}>
+                            {byokTestStatus.loading ? t("settings.byokTesting") : (byokTestStatus.ok ? t("settings.byokTestSuccessful") : t("settings.byokTestFailed", { error: byokTestStatus.message }))}
+                          </div>
+                        )}
+                        {(byokDraftType === "opencode" || byokDraftType === "opencode-cli") && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                              OpenCode AI Provider
+                            </div>
+                            <select
+                              value={byokDraftProvider}
+                              onChange={(e) => setByokDraftProvider(e.target.value)}
+                              style={{
+                                width: "100%",
+                                boxSizing: "border-box",
+                                height: 32,
+                                padding: "0 10px",
+                                background: "rgba(255,255,255,0.04)",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                borderRadius: 7,
+                                color: "rgba(255,255,255,0.9)",
+                                fontSize: s(12),
+                                outline: "none",
+                                WebkitAppearance: "none",
+                                MozAppearance: "none",
+                                appearance: "none",
+                              }}
+                            >
+                              <option value="">Default (from OpenCode config)</option>
+                              {openCodeProviders.map(p => (
+                                <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+                              ))}
+                              {openCodeProviders.length === 0 && (
+                                <>
+                                  <option value="openai">OpenAI</option>
+                                  <option value="anthropic">Anthropic</option>
+                                  <option value="deepseek">DeepSeek</option>
+                                  <option value="google">Google (Gemini)</option>
+                                </>
+                              )}
+                            </select>
+                          </div>
+                        )}
+
+                        {(byokDraftType === "opencode" || byokDraftType === "opencode-cli") && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                              OpenCode Agent (e.g., coder, researcher)
+                            </div>
+                            <select
+                              value={byokDraftModelId}
+                              onChange={(e) => setByokDraftModelId(e.target.value)}
+                              style={{
+                                width: "100%",
+                                boxSizing: "border-box",
+                                height: 32,
+                                padding: "0 10px",
+                                background: "rgba(255,255,255,0.04)",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                borderRadius: 7,
+                                color: "rgba(255,255,255,0.9)",
+                                fontSize: s(12),
+                                outline: "none",
+                                WebkitAppearance: "none",
+                                MozAppearance: "none",
+                                appearance: "none",
+                              }}
+                            >
+                              <option value="">Default Agent</option>
+                              {openCodeAgents.map(a => (
+                                <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)}</option>
+                              ))}
+                              {openCodeAgents.length === 0 && (
+                                <>
+                                  <option value="coder">Coder</option>
+                                  <option value="researcher">Researcher</option>
+                                  <option value="open-interpreter">Interpreter</option>
+                                </>
+                              )}
+                            </select>
+                          </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            type="button"
+                            disabled={
+                              !byokDraftType ||
+                              (byokDraftType !== "custom" && !byokDraftType.startsWith("opencode") && !byokDraftKey && !byokDraftId) ||
+                              ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) ||
+                              ((byokDraftType === "custom" || byokDraftType === "opencode-cli") && !byokDraftModelId) ||
+                              byokTestStatus?.loading
+                            }
+                            onClick={async () => {
+                              if (!window.api?.byokTestConnectivity) return;
+                              setByokTestStatus({ loading: true });
+                              try {
+                                const res = await window.api.byokTestConnectivity({
+                                  apiKey: byokDraftKey,
+                                  baseUrl: byokDraftBaseUrl,
+                                  username: byokDraftUsername,
+                                  path: byokDraftPath,
+                                  modelId: byokDraftModelId,
+                                  providerId: byokDraftId,
+                                  provider: byokDraftProvider,
+                                  endpoint: byokDraftType,
+                                });
+                                setByokTestStatus({ ok: res.ok, message: res.error, loading: false });
+                              } catch (err) {
+                                setByokTestStatus({ ok: false, message: err.message, loading: false });
+                              }
+                            }}
+                            style={{
+                              padding: "6px 14px",
+                              borderRadius: 7,
+                              background: "rgba(255,255,255,0.05)",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              color: "rgba(255,255,255,0.8)",
+                              fontSize: s(12),
+                              cursor: "pointer",
+                              fontFamily: "system-ui, sans-serif",
+                            }}
+                          >
+                            {t("settings.byokTest")}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={
+                              !byokDraftType ||
+                              (byokDraftType !== "custom" && !byokDraftType.startsWith("opencode") && !byokDraftKey && !byokDraftId) ||
+                              ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) ||
+                              ((byokDraftType === "custom" || byokDraftType === "opencode-cli") && !byokDraftModelId)
+                            }
+                            onClick={async () => {
+                              if (!window.api?.byokSaveProviders) return;
+                              const id = byokDraftId || (byokDraftType === "custom"
+                                ? `custom-${(byokDraftName || "provider").toLowerCase().replace(/\s+/g, "-")}-${new Date().getTime()}`
+                                : byokDraftType);
+                              const name = byokDraftName || byokDraftType;
+                              
+                              const existing = byokProviders.map((p) => ({ ...p }));
+                              const idx = existing.findIndex((p) => p.id === id);
+                              
+                                const newEntry = { 
+                                  id, 
+                                  name, 
+                                  type: byokDraftType,
+                                  apiKey: byokDraftKey, 
+                                  baseUrl: byokDraftBaseUrl, 
+                                  defaultModelId: byokDraftModelId,
+                                  username: byokDraftUsername,
+                                  path: byokDraftPath,
+                                  provider: byokDraftProvider
+                                };
+
+                              if (idx >= 0) {
+                                // If key is empty and we are editing, the backend handler will preserve the old key
+                                existing[idx] = newEntry;
+                              } else {
+                                existing.push(newEntry);
+                              }
+                              
+                              await window.api.byokSaveProviders(existing);
+                              const updated = await window.api.byokLoadProviders();
+                              onByokProvidersChange?.(updated);
+                              setByokAddOpen(false);
+                              setByokDraftId(null);
+                              setByokDraftType("");
+                              setByokDraftKey("");
+                              setByokDraftBaseUrl("");
+                              setByokDraftName("");
+                              setByokDraftModelId("");
+                            }}
+                            style={{
+                              padding: "6px 14px",
+                              borderRadius: 7,
+                              background: (!(!byokDraftType || (byokDraftType !== "custom" && !byokDraftType.startsWith("opencode") && !byokDraftKey && !byokDraftId) || ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) || ((byokDraftType === "custom" || byokDraftType === "opencode-cli") && !byokDraftModelId))) ? "rgba(180,220,255,0.15)" : "rgba(255,255,255,0.03)",
+                              border: "1px solid rgba(255,255,255,0.06)",
+                              color: (!(!byokDraftType || (byokDraftType !== "custom" && !byokDraftType.startsWith("opencode") && !byokDraftKey && !byokDraftId) || ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) || ((byokDraftType === "custom" || byokDraftType === "opencode-cli") && !byokDraftModelId))) ? "rgba(180,220,255,0.9)" : "rgba(255,255,255,0.2)",
+                              fontSize: s(12),
+                              cursor: (!(!byokDraftType || (byokDraftType !== "custom" && !byokDraftType.startsWith("opencode") && !byokDraftKey && !byokDraftId) || ((byokDraftType === "custom" || byokDraftType === "opencode") && !byokDraftBaseUrl) || ((byokDraftType === "custom" || byokDraftType === "opencode-cli") && !byokDraftModelId))) ? "pointer" : "default",
+                              fontFamily: "system-ui, sans-serif",
+                            }}
+                          >
+                            {t("settings.byokSave")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setByokAddOpen(false);
+                              setByokDraftId(null);
+                              setByokDraftType("");
+                              setByokDraftKey("");
+                              setByokDraftBaseUrl("");
+                              setByokDraftName("");
+                              setByokDraftModelId("");
+                            }}
+                            style={{
+                              padding: "6px 14px",
+                              borderRadius: 7,
+                              background: "rgba(255,255,255,0.03)",
+                              border: "1px solid rgba(255,255,255,0.06)",
+                              color: "rgba(255,255,255,0.65)",
+                              fontSize: s(12),
+                              cursor: "pointer",
+                              fontFamily: "system-ui, sans-serif",
+                            }}
+                          >
+                            {t("settings.byokCancel")}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setByokAddOpen(true)}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 7,
+                      background: "rgba(255,255,255,0.06)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      color: "rgba(255,255,255,0.75)",
+                      fontSize: s(12),
+                      cursor: "pointer",
+                      transition: "all .2s",
+                      fontFamily: "system-ui, sans-serif",
+                      marginTop: 4,
+                    }}
+                  >
+                    {t("settings.byokAddProvider")}
+                  </button>
+                )}
+              </div>
+
               {/* NOTIFICATIONS section */}
               <div
                 style={{

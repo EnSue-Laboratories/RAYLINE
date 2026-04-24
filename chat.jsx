@@ -66,14 +66,14 @@ function AuroraCanvas() {
       { phase: 3.5, speedX: 0.18, speedY: 0.35, radius: 160, cx: 0.8, cy: 0.2 },
     ];
 
-    var cols, rows, dots;
+    var cols, rows;
 
     const resize = () => {
       w = c.width = window.innerWidth;
       h = c.height = window.innerHeight;
       cols = Math.ceil(w / gap) + 1;
       rows = Math.ceil(h / gap) + 1;
-      dots = cols * rows;
+      rows = Math.ceil(h / gap) + 1;
     };
     resize();
 

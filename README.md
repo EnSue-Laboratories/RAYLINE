@@ -111,3 +111,7 @@ Windows and Linux builds are **experimental**
 ## Contributing & Issues
 
 Bug reports, feature requests, and PRs are welcome at [github.com/EnSue-Laboratories/RAYLINE](https://github.com/EnSue-Laboratories/RAYLINE).
+
+## Contributors
+
+[![Contributors](https://contrib.rocks/image?repo=EnSue-Laboratories/RAYLINE)](https://github.com/EnSue-Laboratories/RAYLINE/graphs/contributors)

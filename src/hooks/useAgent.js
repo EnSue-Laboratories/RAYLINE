@@ -176,7 +176,7 @@ function normalizeCodexToolArgs(payload) {
     if (parsed && typeof parsed === "object") {
       return parsed.cmd && !parsed.command ? { ...parsed, command: parsed.cmd } : parsed;
     }
-  } catch {}
+  } catch { /* ignore */ }
 
   return payload?.type === "custom_tool_call" ? { input: raw } : { value: raw };
 }
@@ -195,6 +195,10 @@ function normalizeCodexToolResult(output) {
 
 export default function useAgent() {
   const [conversations, setConversations] = useState(new Map());
+  const conversationsRef = useRef(conversations);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
   const cleanupRefs = useRef([]);
   const pendingStartsRef = useRef(new Map());
   const usageHydrationTimersRef = useRef(new Set());
@@ -453,7 +457,7 @@ export default function useAgent() {
               if (toolIdx >= 0) {
                 const newJson = (parts[toolIdx].argsJson || "") + (delta.partial_json || "");
                 let newArgs = parts[toolIdx].args;
-                try { newArgs = JSON.parse(newJson); } catch {}
+                try { newArgs = JSON.parse(newJson); } catch { /* ignore */ }
                 parts[toolIdx] = { ...parts[toolIdx], argsJson: newJson, args: newArgs };
               }
               updateAssistant({ parts, isStreaming: true, _streamState: streamState });
@@ -487,7 +491,7 @@ export default function useAgent() {
           // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
           // Usage here is per-API-call, not cumulative — skip it to avoid flicker;
           // the `result` event below owns the authoritative cumulative usage.
-          const am = ensureAssistant();
+          ensureAssistant();
           const parts = cloneParts(lastMsg.parts);
           const hasStreamParts = parts.length > 0;
           if (!hasStreamParts && event.message?.content) {
@@ -868,10 +872,12 @@ export default function useAgent() {
     });
 
     cleanupRefs.current = [offStream, offDone, offError];
+    const cleanups = cleanupRefs.current;
+    const timers = usageHydrationTimersRef.current;
     return () => {
-      cleanupRefs.current.forEach((fn) => fn?.());
-      usageHydrationTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
-      usageHydrationTimersRef.current.clear();
+      cleanups.forEach((fn) => fn?.());
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+      timers.clear();
     };
   }, []);
 
@@ -926,6 +932,19 @@ export default function useAgent() {
         payload._multica = multicaContext;
         payload._multicaToken = multicaToken;
       }
+      if (provider === "byok") {
+        // BYOK direct API calls need conversation history since there's no CLI session
+        const convo = conversationsRef.current.get(conversationId);
+        if (convo?.messages) {
+          payload.messages = convo.messages
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => ({
+              role: m.role,
+              text: m.text || (m.parts || []).filter((p) => p.type === "text").map((p) => p.text).join("\n"),
+            }))
+            .filter((m) => m.text);
+        }
+      }
       window.api.agentStart(payload);
     }
     return true;
@@ -954,12 +973,14 @@ export default function useAgent() {
   }, []);
 
   const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, cwd, multicaContext, multicaToken }) => {
+    let newMessages = [];
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId);
       if (convo) {
         const msgs = convo.messages.slice(0, messageIndex);
         msgs.push({ id: uid(), role: "user", text: newText });
+        newMessages = [...msgs];
         msgs.push({ id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false, _startedAt: Date.now(), _usage: null });
         next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       }
@@ -977,6 +998,25 @@ export default function useAgent() {
           cwd,
           _multica: multicaContext,
           _multicaToken: multicaToken,
+        });
+        return true;
+      }
+      if (provider === "byok") {
+        const msgs = newMessages
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            role: m.role,
+            text: m.text || (m.parts || []).filter((p) => p.type === "text").map((p) => p.text).join("\n"),
+          }))
+          .filter((m) => m.text) || [];
+        window.api.agentEditAndResend({
+          conversationId,
+          prompt: wirePrompt ?? newText,
+          model,
+          provider,
+          effort,
+          cwd,
+          messages: msgs,
         });
         return true;
       }

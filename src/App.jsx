@@ -1120,6 +1120,7 @@ export default function App() {
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const [showMulticaSetup, setShowMulticaSetup] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [byokProviders, setByokProviders] = useState([]);
   const projectChooserProjectsRef = useRef({ signature: null, value: {} });
   const projectChooserProjects = useMemo(() => {
     const entries = Object.entries(projects || {}).sort(([a], [b]) => a.localeCompare(b));
@@ -1136,6 +1137,11 @@ export default function App() {
     const h = () => setShowMulticaSetup(true);
     window.addEventListener("open-multica-setup", h);
     return () => window.removeEventListener("open-multica-setup", h);
+  }, []);
+  useEffect(() => {
+    const h = () => setShowSettings(true);
+    window.addEventListener("open-settings-byok", h);
+    return () => window.removeEventListener("open-settings-byok", h);
   }, []);
   const messageQueue = useRef([]);
   const queueInterruptRequestedRef = useRef(new Set());
@@ -1479,6 +1485,7 @@ export default function App() {
       setStateLoaded(true);
     });
     window.api.getDraftsPath?.().then((p) => { if (p) setDraftsPath(p); });
+    window.api.byokLoadProviders?.().then((providers) => { if (providers) setByokProviders(providers); });
   }, []);
 
   // Persist state to file on changes (skip until initial load is done)
@@ -2574,7 +2581,7 @@ export default function App() {
           sessionId: initialSessionId,
           resumeSessionId: canResumeExistingSession ? resumeSessionId : undefined,
           prompt: wirePrompt,
-          model: m.cliFlag,
+          model: m.cliFlag || m.id,
           provider: m.provider || "claude",
           effort: m.effort,
           cwd: effectiveCwd,
@@ -3157,7 +3164,7 @@ export default function App() {
         messageIndex,
         newText,
         wirePrompt,
-        model: m.cliFlag,
+        model: m.cliFlag || m.id,
         provider: currentProvider,
         effort: m.effort,
         cwd: convoCwd,
@@ -3522,6 +3529,11 @@ export default function App() {
           onNotificationsMutedChange={setNotificationsMuted}
           locale={locale}
           onLocaleChange={setLocale}
+          byokProviders={byokProviders}
+          onByokProvidersChange={(providers) => {
+            setByokProviders(providers);
+            window.dispatchEvent(new CustomEvent("byok-refresh"));
+          }}
           onClose={() => setShowSettings(false)}
         />
       ) : (

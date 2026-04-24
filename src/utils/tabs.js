@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars */
+
 // Shape of conversation.tab:
 //   { pinned: boolean, pinnedAt: number, lastSeenAt: number, runEndedAt: number|null }
 
