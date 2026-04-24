@@ -1,51 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Check, ChevronRight, ChevronDown, Paperclip, Plus } from "lucide-react";
+import { X, ChevronDown, Paperclip, Plus } from "lucide-react";
 import ImagePreview from "./ImagePreview";
 import { createTranslator } from "../i18n";
-
-function TransparentCheckbox({ checked, onChange, ariaLabel }) {
-  return (
-    <label style={{ display: "inline-flex", alignItems: "center", cursor: "pointer", flexShrink: 0 }}>
-      <input
-        type="checkbox"
-        checked={!!checked}
-        onChange={(e) => onChange(e.target.checked)}
-        aria-label={ariaLabel}
-        style={{ opacity: 0, width: 0, height: 0, margin: 0, pointerEvents: "none" }}
-      />
-      <span
-        aria-hidden
-        style={{
-          width: 16, height: 16, borderRadius: 4,
-          border: "1px solid rgba(255,255,255,0.18)",
-          background: checked ? "rgba(255,255,255,0.08)" : "transparent",
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
-          transition: "border-color .15s, background .15s",
-        }}
-      >
-        <Check
-          size={11}
-          strokeWidth={2.4}
-          color="rgba(255,255,255,0.86)"
-          style={{
-            opacity: checked ? 1 : 0,
-            transform: checked ? "scale(1)" : "scale(0.75)",
-            transition: "opacity .12s ease, transform .12s ease",
-          }}
-        />
-      </span>
-    </label>
-  );
-}
-
-const sectionLabelStyle = {
-  fontSize: 9,
-  color: "rgba(255,255,255,0.35)",
-  fontFamily: "'JetBrains Mono', monospace",
-  letterSpacing: ".12em",
-  textTransform: "uppercase",
-};
 
 const onFieldHoverIn = (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; };
 const onFieldHoverOut = (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; };
@@ -55,15 +12,6 @@ const fieldHoverProps = {
   onFocus: onFieldHoverIn,
   onBlur: onFieldHoverOut,
 };
-
-function slugifyBranch(text, fallbackIndex) {
-  const slug = (text || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-+|-+$)/g, "")
-    .slice(0, 32);
-  return slug || `task-${fallbackIndex + 1}`;
-}
 
 function defaultCustomBranch(index) {
   const d = new Date();
@@ -139,38 +87,18 @@ function modelPayload(model) {
   };
 }
 
-function buildIssuePrompt(issue) {
-  const body = issue.body ? `\n\n${issue.body}` : "";
-  return `Fix issue #${issue.number}: ${issue.title}${body}`;
-}
-
-function makeIssueRow(issue) {
-  return {
-    key: `issue-${issue.number}`,
-    enabled: false,
-    issue,
-    prompt: buildIssuePrompt(issue),
-    branch: `issue-${issue.number}-${slugifyBranch(issue.title, issue.number)}`,
-    model: "",
-    expanded: false,
-  };
-}
-
 export default function DispatchCard({
   onClose,
   onDispatch,
   currentCwd,
-  projects,
   defaultModel = "sonnet",
   availableModels = [],
   locale,
 }) {
   const t = useMemo(() => createTranslator(locale), [locale]);
-  const [tab, setTab] = useState("auto"); // "auto" | "issues" | "custom"
-  const [lastMenuTab, setLastMenuTab] = useState("custom");
+  const [tab, setTab] = useState("auto"); // "auto" | "custom"
   const [globalModel, setGlobalModel] = useState(defaultModel);
   const [customRows, setCustomRows] = useState([]);
-  const [issueRows, setIssueRows] = useState([]);
   const [autoBrief, setAutoBrief] = useState("");
   const [autoPlannerModel, setAutoPlannerModel] = useState(() =>
     getDefaultPlannerModelId(availableModels, defaultModel)
@@ -203,16 +131,9 @@ export default function DispatchCard({
     setBanner(null);
   }, [tab]);
 
-  const activeRows = tab === "issues"
-    ? issueRows.filter((r) => r.enabled)
-    : (tab === "custom" ? customRows : []);
+  const activeRows = tab === "custom" ? customRows : [];
   const canDispatch = activeRows.length > 0 && !submitting
-    && (tab === "issues" || (tab === "custom" && !!currentCwd));
-
-  const selectMenuTab = useCallback((nextTab) => {
-    setLastMenuTab(nextTab);
-    setTab(nextTab);
-  }, []);
+    && tab === "custom" && !!currentCwd;
 
   const handleAutoFill = useCallback(async () => {
     const brief = autoBrief.trim();
@@ -256,7 +177,6 @@ export default function DispatchCard({
       setCustomRows(rows);
       setErrors({});
       setAutoNote(t("dispatch.autoFilled", { count: rows.length }));
-      setLastMenuTab("custom");
       setTab("custom");
     } catch (e) {
       setAutoError(e?.message || t("dispatch.autoErrorFailed"));
@@ -267,9 +187,7 @@ export default function DispatchCard({
 
   const handleSubmit = useCallback(async () => {
     if (tab === "auto") return;
-    const rowsToRun = tab === "issues"
-      ? issueRows.filter((r) => r.enabled)
-      : customRows;
+    const rowsToRun = customRows;
 
     const rowErrors = {};
     const seenBranches = new Set();
@@ -328,14 +246,8 @@ export default function DispatchCard({
     }));
 
     const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
-    if (tab === "issues") {
-      setIssueRows((prev) => prev.map((r) =>
-        successBranches.has(r.branch.trim()) ? { ...r, enabled: false } : r
-      ));
-    } else {
-      setCustomRows((prev) => prev.filter((r) => !successBranches.has(r.branch.trim())));
-    }
-  }, [tab, issueRows, customRows, currentCwd, globalModel, onDispatch, onClose, t]);
+    setCustomRows((prev) => prev.filter((r) => !successBranches.has(r.branch.trim())));
+  }, [tab, customRows, currentCwd, globalModel, onDispatch, onClose, t]);
 
   return (
     <div style={backdropStyle} onClick={onClose}>
@@ -362,33 +274,10 @@ export default function DispatchCard({
           <TabBtn active={tab === "auto"} onClick={() => setTab("auto")}>
             {t("dispatch.tabAuto")}
           </TabBtn>
-          <TabBtn active={tab !== "auto"} onClick={() => setTab(lastMenuTab)}>
+          <TabBtn active={tab === "custom"} onClick={() => setTab("custom")}>
             {t("dispatch.tabMenu")}
           </TabBtn>
         </div>
-
-        {tab !== "auto" && (
-          <div style={menuTabsStyle} role="tablist" aria-label={t("dispatch.tabMenu")}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === "issues"}
-              onClick={() => selectMenuTab("issues")}
-              style={menuTabButtonStyle(tab === "issues")}
-            >
-              {t("dispatch.tabIssues")}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === "custom"}
-              onClick={() => selectMenuTab("custom")}
-              style={menuTabButtonStyle(tab === "custom")}
-            >
-              {t("dispatch.tabCustom")}
-            </button>
-          </div>
-        )}
 
         <div style={bodyStyle}>
           {tab === "auto" ? (
@@ -401,16 +290,6 @@ export default function DispatchCard({
               autoLoading={autoLoading}
               autoError={autoError}
               onAutoFill={handleAutoFill}
-              t={t}
-            />
-          ) : tab === "issues" ? (
-            <IssueTab
-              rows={issueRows}
-              setRows={setIssueRows}
-              projects={projects}
-              currentCwd={currentCwd}
-              availableModels={availableModels}
-              errors={errors}
               t={t}
             />
           ) : (
@@ -497,160 +376,6 @@ function TabBtn({ active, onClick, children }) {
   );
 }
 
-function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors, t }) {
-  const [selectedPath, setSelectedPath] = useState(currentCwd || "");
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState(null);
-
-  const projectPaths = useMemo(
-    () => Object.keys(projects || {}).filter((p) => !projects[p]?.hidden),
-    [projects]
-  );
-
-  useEffect(() => {
-    if (!selectedPath) { setRows([]); return; }
-    let cancelled = false;
-    setLoading(true); setLoadError(null);
-    (async () => {
-      try {
-        const s = await window.api.gitRemoteSlug(selectedPath);
-        if (cancelled) return;
-        if (!s) {
-          setRows([]); setLoadError(t("dispatch.noGithubRemote"));
-          return;
-        }
-        const issues = await window.api.ghListIssues(s, "open");
-        if (cancelled) return;
-        setRows((issues || []).map((iss) => ({ ...makeIssueRow(iss), cwd: selectedPath })));
-      } catch (e) {
-        if (!cancelled) setLoadError(e?.message || t("dispatch.failedToLoadIssues"));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [selectedPath, setRows, t]);
-
-  const toggleAll = (checked) => setRows((prev) => prev.map((r) => ({ ...r, enabled: checked })));
-  const updateRow = (key, patch) => setRows((prev) =>
-    prev.map((r) => (r.key === key ? { ...r, ...patch } : r))
-  );
-
-  const allChecked = rows.length > 0 && rows.every((r) => r.enabled);
-
-  return (
-    <div style={{ padding: "24px 14px 14px" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-        <label style={sectionLabelStyle}>{t("dispatch.workingDirectory")}</label>
-        <DispatchDropdown
-          fullWidth
-          ariaLabel={t("dispatch.workingDirectory")}
-          value={selectedPath}
-          onChange={setSelectedPath}
-          placeholder={t("dispatch.select")}
-          options={[
-            { value: "", label: t("dispatch.select") },
-            ...projectPaths.map((p) => ({ value: p, label: p })),
-          ]}
-        />
-      </div>
-
-      {selectedPath && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <span style={sectionLabelStyle}>{t("dispatch.issues")}</span>
-          {rows.length > 0 && (
-            <span style={{ ...sectionLabelStyle, color: "rgba(255,255,255,0.25)" }}>
-              {rows.filter((r) => r.enabled).length}/{rows.length}
-            </span>
-          )}
-        </div>
-      )}
-
-      {loading && <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>{t("dispatch.loadingIssues")}</div>}
-      {loadError && <div style={errorStyle}>{loadError}</div>}
-      {!loading && !loadError && rows.length === 0 && selectedPath && (
-        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{t("dispatch.noOpenIssues")}</div>
-      )}
-
-      {rows.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderBottom: "1px solid var(--pane-border)" }}>
-          <TransparentCheckbox
-            checked={allChecked}
-            onChange={toggleAll}
-            ariaLabel={t("dispatch.selectAllIssues")}
-          />
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-            {t("dispatch.selectAll")}
-          </span>
-        </div>
-      )}
-
-      {rows.map((r) => (
-        <IssueRow
-          key={r.key}
-          row={r}
-          availableModels={availableModels}
-          error={errors[r.key]}
-          onChange={(patch) => updateRow(r.key, patch)}
-          t={t}
-        />
-      ))}
-    </div>
-  );
-}
-
-function IssueRow({ row, availableModels, error, onChange, t }) {
-  const { issue } = row;
-  return (
-    <div style={{ ...rowStyle(!!error), flexDirection: "column", gap: 6 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <TransparentCheckbox
-          checked={row.enabled}
-          onChange={(v) => onChange({ enabled: v })}
-          ariaLabel={t("dispatch.selectIssue", { number: issue.number })}
-        />
-        <button
-          onClick={() => onChange({ expanded: !row.expanded })}
-          style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
-          aria-label={t("dispatch.toggleDetails")}
-        >
-          {row.expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        </button>
-        <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, fontFamily: "monospace" }}>
-          #{issue.number}
-        </span>
-        <span style={{ fontSize: 12, color: "white", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {issue.title}
-        </span>
-        <input
-          type="text"
-          value={row.branch}
-          onChange={(e) => onChange({ branch: e.target.value })}
-          style={{ ...inputStyle, width: 180, flex: "none" }}
-          {...fieldHoverProps}
-        />
-        <DispatchDropdown
-          ariaLabel={t("dispatch.modelForIssue", { number: issue.number })}
-          value={row.model}
-          onChange={(v) => onChange({ model: v })}
-          options={modelOptionsWithDefault(availableModels, t)}
-          grouped
-        />
-      </div>
-      {row.expanded && (
-        <textarea
-          value={row.prompt}
-          onChange={(e) => onChange({ prompt: e.target.value })}
-          rows={6}
-          style={textareaStyle}
-          {...fieldHoverProps}
-        />
-      )}
-      {error && <div style={errorStyle}>{error}</div>}
-    </div>
-  );
-}
-
 function AutoTab({
   autoBrief,
   setAutoBrief,
@@ -693,6 +418,48 @@ function CustomTab({
   const updateRow = (key, patch) => setRows((prev) =>
     prev.map((r) => (r.key === key ? { ...r, ...patch } : r))
   );
+  const [issues, setIssues] = useState([]);
+  const [issuesLoading, setIssuesLoading] = useState(false);
+  const [issuesError, setIssuesError] = useState(null);
+
+  useEffect(() => {
+    if (!currentCwd || !window.api?.gitRemoteSlug || !window.api?.ghListIssues) {
+      setIssues([]);
+      setIssuesError(null);
+      setIssuesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIssuesLoading(true);
+    setIssuesError(null);
+    (async () => {
+      try {
+        const slug = await window.api.gitRemoteSlug(currentCwd);
+        if (cancelled) return;
+        if (!slug) {
+          setIssues([]);
+          return;
+        }
+        const loaded = await window.api.ghListIssues(slug, "open");
+        if (!cancelled) setIssues(Array.isArray(loaded) ? loaded : []);
+      } catch (e) {
+        if (!cancelled) {
+          setIssues([]);
+          setIssuesError(e?.message || t("dispatch.failedToLoadIssues"));
+        }
+      } finally {
+        if (!cancelled) setIssuesLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [currentCwd, t]);
+
+  const issueOptions = useMemo(
+    () => issueOptionsWithDefault(issues, issuesLoading, issuesError, t),
+    [issues, issuesLoading, issuesError, t]
+  );
 
   return (
     <div style={{ padding: "24px 14px 14px" }}>
@@ -710,6 +477,8 @@ function CustomTab({
           row={r}
           index={i}
           availableModels={availableModels}
+          issueOptions={issueOptions}
+          issues={issues}
           error={errors[r.key]}
           onChange={(patch) => updateRow(r.key, patch)}
           onRemove={() => removeRow(r.key)}
@@ -791,7 +560,7 @@ function AutoComposer({
   );
 }
 
-function CustomRow({ row, index, availableModels, error, onChange, onRemove, t }) {
+function CustomRow({ row, index, availableModels, issueOptions, issues, error, onChange, onRemove, t }) {
   const attachments = row.attachments || [];
 
   const addAttachments = (items) => {
@@ -801,6 +570,11 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove, t }
 
   const removeAttachment = (i) => {
     onChange({ attachments: attachments.filter((_, idx) => idx !== i) });
+  };
+
+  const handleIssueChange = (value) => {
+    const issue = issues.find((iss) => String(iss.number) === value);
+    onChange({ issue: issue || undefined });
   };
 
   const handlePaste = (e) => {
@@ -846,6 +620,15 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove, t }
           placeholder={t("dispatch.branchNamePlaceholder")}
           onChange={(e) => onChange({ branch: e.target.value })}
           style={customBranchStyle}
+        />
+        <span style={customDividerStyle} aria-hidden />
+        <DispatchDropdown
+          compact
+          ariaLabel={t("dispatch.attachIssue")}
+          value={row.issue?.number ? String(row.issue.number) : ""}
+          onChange={handleIssueChange}
+          options={issueOptions}
+          grouped
         />
         <span style={customDividerStyle} aria-hidden />
         <DispatchDropdown
@@ -1141,6 +924,49 @@ function modelOptionsWithDefault(availableModels, t) {
   ];
 }
 
+function issueOptionsWithDefault(issues, loading, error, t) {
+  const issueGroup = t ? t("dispatch.issueGroup") : "ISSUE";
+  const options = [
+    {
+      value: "",
+      label: t ? t("dispatch.noIssue") : "No issue",
+      triggerLabel: t ? t("dispatch.noIssueShort") : "Issue",
+      group: issueGroup,
+    },
+  ];
+
+  if (loading) {
+    options.push({
+      value: "__loading",
+      label: t ? t("dispatch.loadingIssues") : "Loading issues...",
+      triggerLabel: "...",
+      group: issueGroup,
+    });
+    return options;
+  }
+
+  if (error) {
+    options.push({
+      value: "__error",
+      label: error,
+      triggerLabel: t ? t("dispatch.noIssueShort") : "Issue",
+      group: issueGroup,
+    });
+    return options;
+  }
+
+  return [
+    ...options,
+    ...(issues || []).map((issue) => ({
+      value: String(issue.number),
+      label: `#${issue.number} ${issue.title}`,
+      triggerLabel: `#${issue.number}`,
+      sublabel: "ISSUE",
+      group: issueGroup,
+    })),
+  ];
+}
+
 // Styles — mirror NewChatCard.jsx conventions
 const backdropStyle = {
   position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
@@ -1174,7 +1000,7 @@ const closeBtnStyle = {
   cursor: "pointer", padding: 4,
 };
 const tabsStyle = {
-  display: "flex", gap: 4, padding: "10px 14px 0",
+  display: "flex", alignItems: "flex-end", gap: 4, padding: "10px 14px 0",
   borderBottom: "1px solid var(--pane-border)",
 };
 const tabBtnStyle = (active, hovered) => ({
@@ -1208,33 +1034,6 @@ const noticeStyle = {
   color: "rgba(255,200,150,0.9)", borderRadius: 6, padding: "8px 10px",
   fontSize: 12, marginBottom: 10,
 };
-const rowStyle = (hasError) => ({
-  border: "1px solid " + (hasError ? "rgba(255,180,180,0.35)" : "var(--pane-border)"),
-  borderRadius: 8, padding: 10, marginBottom: 10,
-  display: "flex", flexDirection: "column", gap: 8,
-  background: "rgba(255,255,255,0.015)",
-});
-const textareaStyle = {
-  width: "100%", minHeight: 48, resize: "vertical",
-  background: "rgba(255,255,255,0.02)", color: "rgba(255,255,255,0.8)",
-  border: "1px solid rgba(255,255,255,0.04)", borderRadius: 7,
-  padding: "8px 10px", fontSize: 12, fontFamily: "inherit",
-  outline: "none",
-  transition: "border-color .2s",
-};
-const inputStyle = {
-  flex: 1,
-  background: "rgba(255,255,255,0.02)",
-  color: "rgba(255,255,255,0.6)",
-  border: "1px solid rgba(255,255,255,0.04)",
-  borderRadius: 7,
-  padding: "8px 12px",
-  fontSize: 10,
-  fontFamily: "'JetBrains Mono', monospace",
-  letterSpacing: ".06em",
-  outline: "none",
-  transition: "border-color .2s",
-};
 const addBtnStyle = {
   display: "inline-flex", alignItems: "center", gap: 6,
   background: "transparent",
@@ -1249,28 +1048,6 @@ const addBtnStyle = {
   transition: "color .15s, background .15s",
 };
 
-const menuTabsStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  padding: "10px 14px",
-  borderBottom: "1px solid var(--pane-border)",
-};
-const menuTabButtonStyle = (active) => ({
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "7px 10px",
-  border: "1px solid " + (active ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.05)"),
-  borderRadius: 6,
-  background: active ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.015)",
-  color: active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.48)",
-  cursor: "pointer",
-  fontSize: 11,
-  fontFamily: "'JetBrains Mono', monospace",
-  letterSpacing: ".04em",
-  transition: "background .15s, color .15s",
-});
 const autoNoteStyle = {
   color: "rgba(180,255,200,0.78)",
   fontSize: 11,
@@ -1334,7 +1111,7 @@ const autoFillBtnStyle = (enabled, loading) => ({
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  minWidth: 128,
+  minWidth: 60,
   padding: "8px 12px",
   borderRadius: 6,
   border: "none",
@@ -1403,7 +1180,4 @@ const customDividerStyle = {
 const customErrorStyle = {
   color: "rgba(255,180,180,0.9)", fontSize: 11,
   padding: "0 12px 8px",
-};
-const errorStyle = {
-  color: "rgba(255,180,180,0.9)", fontSize: 11, marginTop: 2,
 };
