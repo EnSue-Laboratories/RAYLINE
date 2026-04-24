@@ -5,7 +5,7 @@ function clampOpacity(value, fallback) {
 }
 
 function alphaFill(alphaPercent) {
-  return `rgba(255, 255, 255, ${(alphaPercent / 100).toFixed(3)})`;
+  return `color-mix(in srgb, var(--text-primary) ${alphaPercent.toFixed(3)}%, transparent)`;
 }
 
 const INTERACTION_STYLES = {
@@ -68,14 +68,14 @@ export function getPaneSurfaceStyle(hasWallpaper, options = {}) {
     "--pane-elevated": "var(--pane-elevated)",
     "--pane-hover": hoverFill,
     "--pane-active": activeFill,
-    "--pane-border": "rgba(255, 255, 255, 0.06)",
+    "--pane-border": "var(--border)",
     "--pane-interaction-hover": hoverFill,
     "--pane-interaction-active": activeFill,
     "--pane-interaction-hover-fill": hoverFill,
     "--pane-interaction-active-fill": activeFill,
     "--pane-interaction-hover-filter": "none",
     "--pane-interaction-active-filter": "none",
-    "--pane-interaction-hover-shadow": "inset 0 0 0 1px rgba(255,255,255,0.035)",
+    "--pane-interaction-hover-shadow": "inset 0 0 0 1px var(--border)",
     "--pane-interaction-active-shadow": "none",
   };
 }
