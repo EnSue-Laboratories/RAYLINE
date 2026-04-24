@@ -151,7 +151,7 @@ export default function AccountManager({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: "1px solid var(--control-bg)",
             flexShrink: 0,
           }}
         >
@@ -159,7 +159,7 @@ export default function AccountManager({
             style={{
               fontSize: 14,
               fontWeight: 500,
-              color: "rgba(255,255,255,0.85)",
+              color: "var(--text-secondary)",
             }}
           >
             {t("pm.manageAccountTitle")}
@@ -172,7 +172,7 @@ export default function AccountManager({
               borderRadius: 7,
               border: "1px solid var(--pane-border)",
               background: "var(--pane-hover)",
-              color: "rgba(255,255,255,0.5)",
+              color: "var(--text-muted)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -205,12 +205,12 @@ export default function AccountManager({
                 padding: activeUser ? "12px 14px" : "14px",
                 border: "none",
                 background: "transparent",
-                color: "rgba(255,255,255,0.85)",
+                color: "var(--text-secondary)",
                 textAlign: "left",
                 cursor: loadingAccounts || signingOut ? "default" : "pointer",
               }}
             >
-              <div style={{ color: "rgba(255,255,255,0.6)", display: "flex" }}>
+              <div style={{ color: "var(--text-muted)", display: "flex" }}>
                 <GitHubGlyph size={18} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -220,7 +220,7 @@ export default function AccountManager({
                       style={{
                         fontSize: 10,
                         fontFamily: "'JetBrains Mono', monospace",
-                        color: "rgba(255,255,255,0.35)",
+                        color: "var(--text-disabled)",
                         letterSpacing: ".08em",
                         marginBottom: 2,
                       }}
@@ -231,7 +231,7 @@ export default function AccountManager({
                       style={{
                         fontSize: 13,
                         fontFamily: "'JetBrains Mono', monospace",
-                        color: "rgba(255,255,255,0.85)",
+                        color: "var(--text-secondary)",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -244,7 +244,7 @@ export default function AccountManager({
                   <div
                     style={{
                       fontSize: 13,
-                      color: "rgba(255,255,255,0.75)",
+                      color: "var(--text-tertiary)",
                     }}
                   >
                     {loadingAccounts ? t("pm.loadingAccounts") : t("pm.signedInGithub")}
@@ -255,14 +255,14 @@ export default function AccountManager({
                 <Loader2
                   size={14}
                   strokeWidth={1.5}
-                  style={{ animation: "spin 1s linear infinite", color: "rgba(255,255,255,0.45)" }}
+                  style={{ animation: "spin 1s linear infinite", color: "var(--text-subtle)" }}
                 />
               ) : (
                 <ChevronDown
                   size={15}
                   strokeWidth={1.5}
                   style={{
-                    color: "rgba(255,255,255,0.4)",
+                    color: "var(--text-subtle)",
                     transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
                     transition: "transform .18s ease",
                   }}
@@ -273,7 +273,7 @@ export default function AccountManager({
             {menuOpen && (
               <div
                 style={{
-                  borderTop: "1px solid rgba(255,255,255,0.05)",
+                  borderTop: "1px solid var(--control-border-soft)",
                   background: "var(--pane-hover)",
                 }}
               >
@@ -295,15 +295,15 @@ export default function AccountManager({
                         gap: 10,
                         padding: "10px 12px",
                         border: "none",
-                        borderTop: "1px solid rgba(255,255,255,0.04)",
-                        background: !isSwitching && isHovered ? "rgba(255,255,255,0.05)" : "transparent",
-                        color: "rgba(255,255,255,0.82)",
+                        borderTop: "1px solid var(--control-bg)",
+                        background: !isSwitching && isHovered ? "var(--control-border-soft)" : "transparent",
+                        color: "var(--text-secondary)",
                         textAlign: "left",
                         cursor: isActive || isSwitching || signingOut ? "default" : "pointer",
                         opacity: isSwitching ? 0.8 : 1,
                       }}
                     >
-                      <span style={{ display: "flex", color: "rgba(255,255,255,0.45)" }}>
+                      <span style={{ display: "flex", color: "var(--text-subtle)" }}>
                         <GitHubGlyph size={16} />
                       </span>
                       <span style={{ flex: 1, minWidth: 0 }}>
@@ -312,7 +312,7 @@ export default function AccountManager({
                             display: "block",
                             fontSize: 13,
                             fontFamily: "'JetBrains Mono', monospace",
-                            color: isActive ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.78)",
+                            color: isActive ? "var(--text-primary)" : "var(--text-tertiary)",
                           }}
                         >
                           @{account.login}
@@ -322,7 +322,7 @@ export default function AccountManager({
                             display: "block",
                             marginTop: 2,
                             fontSize: 11,
-                            color: "rgba(255,255,255,0.35)",
+                            color: "var(--text-disabled)",
                           }}
                         >
                           {isActive ? t("pm.currentAccount") : t("pm.switchToAccount")}
@@ -332,10 +332,10 @@ export default function AccountManager({
                         <Loader2
                           size={14}
                           strokeWidth={1.5}
-                          style={{ animation: "spin 1s linear infinite", color: "rgba(255,255,255,0.45)" }}
+                          style={{ animation: "spin 1s linear infinite", color: "var(--text-subtle)" }}
                         />
                       ) : isActive ? (
-                        <Check size={14} strokeWidth={1.8} style={{ color: "rgba(255,255,255,0.6)" }} />
+                        <Check size={14} strokeWidth={1.8} style={{ color: "var(--text-muted)" }} />
                       ) : null}
                     </button>
                   );
@@ -377,10 +377,10 @@ export default function AccountManager({
                 marginTop: 8,
                 padding: "8px 12px",
                 borderRadius: 7,
-                border: "1px solid rgba(220,120,120,0.22)",
-                background: "rgba(220,120,120,0.07)",
+                border: "1px solid var(--danger-border)",
+                background: "var(--danger-bg-soft)",
                 fontSize: 12,
-                color: "rgba(230,180,180,0.82)",
+                color: "var(--danger-text)",
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",
               }}
@@ -417,9 +417,9 @@ function ActionRow({ icon, title, subtitle, onClick, danger }) {
         textAlign: "left",
         color: danger
           ? hovered
-            ? "rgba(230,140,140,0.95)"
-            : "rgba(220,140,140,0.8)"
-          : "rgba(255,255,255,0.8)",
+            ? "var(--danger-text-strong)"
+            : "var(--danger-text)"
+          : "var(--text-secondary)",
         opacity: disabled ? 0.6 : 1,
       }}
     >
@@ -431,9 +431,9 @@ function ActionRow({ icon, title, subtitle, onClick, danger }) {
           flexShrink: 0,
           color: danger
             ? hovered
-              ? "rgba(230,140,140,0.95)"
-              : "rgba(220,140,140,0.7)"
-            : "rgba(255,255,255,0.55)",
+              ? "var(--danger-text-strong)"
+              : "var(--danger-text)"
+            : "var(--text-muted)",
         }}
       >
         {icon}
@@ -454,7 +454,7 @@ function ActionRow({ icon, title, subtitle, onClick, danger }) {
             display: "block",
             fontSize: 11,
             fontFamily: "system-ui, sans-serif",
-            color: "rgba(255,255,255,0.35)",
+            color: "var(--text-disabled)",
             marginTop: 2,
           }}
         >
