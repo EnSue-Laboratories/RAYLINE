@@ -1120,6 +1120,7 @@ export default function App() {
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const [showMulticaSetup, setShowMulticaSetup] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [byokProviders, setByokProviders] = useState([]);
   const projectChooserProjectsRef = useRef({ signature: null, value: {} });
   const projectChooserProjects = useMemo(() => {
     const entries = Object.entries(projects || {}).sort(([a], [b]) => a.localeCompare(b));
@@ -1479,6 +1480,7 @@ export default function App() {
       setStateLoaded(true);
     });
     window.api.getDraftsPath?.().then((p) => { if (p) setDraftsPath(p); });
+    window.api.byokLoadProviders?.().then((providers) => { if (providers) setByokProviders(providers); });
   }, []);
 
   // Persist state to file on changes (skip until initial load is done)
@@ -3522,6 +3524,8 @@ export default function App() {
           onNotificationsMutedChange={setNotificationsMuted}
           locale={locale}
           onLocaleChange={setLocale}
+          byokProviders={byokProviders}
+          onByokProvidersChange={setByokProviders}
           onClose={() => setShowSettings(false)}
         />
       ) : (
