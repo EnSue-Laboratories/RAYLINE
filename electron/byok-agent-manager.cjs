@@ -325,4 +325,61 @@ function cancelAllByok() {
   }
 }
 
-module.exports = { startByokAgent, cancelByokAgent, cancelAllByok };
+async function testByokConnectivity(opts) {
+  const { apiKey: providedKey, baseUrl: providedBaseUrl, endpoint, modelId, providerId } = opts;
+  
+  let apiKey = providedKey;
+  let baseUrl = providedBaseUrl;
+  
+  // If editing existing, try to get key/baseUrl from store if not provided
+  if (providerId && (!apiKey || !baseUrl)) {
+    const { getByokKeyForProvider } = require("./byok-store.cjs");
+    const stored = getByokKeyForProvider(providerId);
+    if (stored) {
+      if (!apiKey) apiKey = stored.apiKey;
+      if (!baseUrl) baseUrl = stored.baseUrl;
+    }
+  }
+
+  if (!apiKey) return { ok: false, error: "API key is required for testing" };
+
+  const isAnthropic = endpoint === "anthropic" || (endpoint === "custom" && baseUrl?.includes("anthropic"));
+  const url = isAnthropic ? `${baseUrl}/v1/messages` : `${baseUrl}/v1/chat/completions`;
+
+  try {
+    const body = isAnthropic ? {
+      model: modelId || "claude-3-haiku-20240307",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "hi" }],
+    } : {
+      model: modelId || "gpt-3.5-turbo",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "hi" }],
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(isAnthropic ? {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        } : {
+          "Authorization": `Bearer ${apiKey}`,
+        }),
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (response.ok) {
+      return { ok: true };
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      return { ok: false, error: errorData.error?.message || response.statusText || `HTTP ${response.status}` };
+    }
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+module.exports = { startByokAgent, cancelByokAgent, cancelAllByok, testByokConnectivity };

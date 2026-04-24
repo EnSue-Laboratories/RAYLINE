@@ -142,6 +142,7 @@ contextBridge.exposeInMainWorld("api", {
   byokLoadProviders: () => ipcRenderer.invoke("byok-load-providers"),
   byokDeleteProvider: (providerId) => ipcRenderer.invoke("byok-delete-provider", providerId),
   byokTestKey: (providerId) => ipcRenderer.invoke("byok-test-key", providerId),
+  byokTestConnectivity: (opts) => ipcRenderer.invoke("byok-test-connectivity", opts),
 
   // multica
   multicaSendCode: (args) => ipcRenderer.invoke("multica-send-code", args),

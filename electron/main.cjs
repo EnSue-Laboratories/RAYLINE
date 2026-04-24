@@ -18,7 +18,7 @@ const {
 } = require("./multica-manager.cjs");
 const { buildSpawnPath, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { saveByokProviders, getMaskedProviders, deleteByokProvider, testByokKey } = require("./byok-store.cjs");
-const { startByokAgent, cancelByokAgent, cancelAllByok } = require("./byok-agent-manager.cjs");
+const { startByokAgent, cancelByokAgent, cancelAllByok, testByokConnectivity } = require("./byok-agent-manager.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
@@ -610,6 +610,7 @@ ipcMain.handle("byok-save-providers", (_e, providers) => saveByokProviders(provi
 ipcMain.handle("byok-load-providers", () => getMaskedProviders());
 ipcMain.handle("byok-delete-provider", (_e, providerId) => deleteByokProvider(providerId));
 ipcMain.handle("byok-test-key", (_e, providerId) => testByokKey(providerId));
+ipcMain.handle("byok-test-connectivity", (_e, opts) => testByokConnectivity(opts));
 
 ipcMain.handle("rewind-files", async (_event, opts) => {
   return rewindFiles(opts);
