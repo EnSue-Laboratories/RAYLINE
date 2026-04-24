@@ -31,11 +31,11 @@ function RailButton({ label, onClick, active = false, visible = true, children }
         border: "none",
         borderRadius: 7,
         background: active
-          ? "rgba(255,255,255,0.055)"
+          ? "var(--control-bg)"
           : hovered
-            ? "rgba(255,255,255,0.07)"
+            ? "var(--control-bg)"
             : "transparent",
-        color: hovered || active ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.42)",
+        color: hovered || active ? "color-mix(in srgb, var(--text-primary) 89%, transparent)" : "color-mix(in srgb, var(--text-primary) 46%, transparent)",
         cursor: "pointer",
         padding: 0,
         opacity: visible ? 1 : 0,
