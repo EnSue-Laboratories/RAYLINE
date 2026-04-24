@@ -6,6 +6,7 @@ import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
 import { createTranslator } from "../i18n";
+import WindowDragSpacer from "./WindowDragSpacer";
 
 export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, onClose }) {
   const s = useFontScale();
@@ -190,8 +191,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      {/* Drag region */}
-      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0 }} />
+      <WindowDragSpacer />
 
       {/* Header */}
       <div
