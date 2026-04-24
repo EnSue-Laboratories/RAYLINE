@@ -2,6 +2,7 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
+const { getByokKeyForProvider } = require("./byok-store.cjs");
 const { findSessionCwd, moveSession } = require("./session-reader.cjs");
 const { fetchClaudeUsage } = require("./claude-usage-fetcher.cjs");
 
@@ -337,9 +338,16 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     log("Full args:", args.join(" "));
     log("Prompt:", runPrompt.slice(0, 100));
 
+    const byokAnthro = getByokKeyForProvider("anthropic");
     const child = spawnCli(claudeBin, args, {
       cwd: launchCwd,
-      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      env: {
+        ...process.env,
+        FORCE_COLOR: "0",
+        PATH: buildSpawnPath(),
+        ...(byokAnthro?.apiKey ? { ANTHROPIC_API_KEY: byokAnthro.apiKey } : {}),
+        ...(byokAnthro?.baseUrl && byokAnthro.baseUrl !== "https://api.anthropic.com" ? { ANTHROPIC_BASE_URL: byokAnthro.baseUrl } : {}),
+      },
       stdio: ["pipe", "pipe", "pipe"],
     });
 

@@ -3,6 +3,7 @@ const fs = require("fs");
 const os = require("os");
 const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { loadSessionMessages } = require("./session-reader.cjs");
+const { getByokKeyForProvider } = require("./byok-store.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
@@ -304,12 +305,14 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
   log("Full args:", args.filter(a => a !== fullPrompt).join(" "));
   log("Prompt:", fullPrompt.slice(0, 100));
 
+  const byokOpenai = getByokKeyForProvider("openai");
   const child = spawnCli(codexBin, args, {
     cwd: launchCwd,
     env: {
       ...process.env,
       FORCE_COLOR: "0",
       PATH: buildSpawnPath(),
+      ...(byokOpenai?.apiKey ? { OPENAI_API_KEY: byokOpenai.apiKey } : {}),
       CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
       CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",
       CLAUDI_TERMINAL_MCP_CONFIG: global.mcpConfigPath || "",
