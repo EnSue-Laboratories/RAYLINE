@@ -215,6 +215,24 @@ export default function ProjectManager() {
     if (repoFilter === repo) setRepoFilter(null);
   };
 
+  const handleBackFromDetail = () => {
+    if (selectedItem?.type === "issue") {
+      setFreshIssue((item) => (
+        item && item._repo === selectedItem.repo && item.number === selectedItem.number
+          ? null
+          : item
+      ));
+    } else if (selectedItem?.type === "pr") {
+      setFreshPR((item) => (
+        item && item._repo === selectedItem.repo && item.number === selectedItem.number
+          ? null
+          : item
+      ));
+    }
+    setSelectedItem(null);
+    setRefreshSignal((k) => k + 1);
+  };
+
   // Loading state
   if (authOk === null) {
     return (
@@ -560,7 +578,7 @@ export default function ProjectManager() {
               repo={selectedItem.repo}
               number={selectedItem.number}
               type={selectedItem.type}
-              onBack={() => setSelectedItem(null)}
+              onBack={handleBackFromDetail}
               locale={locale}
             />
           ) : activeTab === "issues" ? (

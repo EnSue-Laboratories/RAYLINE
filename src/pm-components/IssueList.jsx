@@ -3,6 +3,7 @@ import { Circle, CheckCircle2, Copy, Check, GitPullRequest } from "lucide-react"
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 import HoverIconButton from "../components/HoverIconButton";
 import { createTranslator } from "../i18n";
+import { isGitHubOpen, normalizeGitHubState } from "./githubState";
 
 function timeAgo(dateStr, t) {
   const now = Date.now();
@@ -73,7 +74,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
 
   useEffect(() => {
     if (!freshItem || freshItem.number == null) return;
-    const itemState = freshItem.state || "open";
+    const itemState = normalizeGitHubState(freshItem.state);
     if (itemState !== stateFilter) return;
     if (repoFilter && freshItem._repo !== repoFilter) return;
     if (!repos.includes(freshItem._repo)) return;
@@ -141,7 +142,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       {issues.map((item) => {
-        const isOpen = item.state === "open";
+        const isOpen = isGitHubOpen(item.state, stateFilter);
         const repoShort = item._repo.split("/").pop();
         return (
           <div
