@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, GitBranch, FileText, Check, ChevronRight, ChevronDown, Paperclip, Plus, Sparkles } from "lucide-react";
+import { X, Check, ChevronRight, ChevronDown, Paperclip, Plus } from "lucide-react";
 import ImagePreview from "./ImagePreview";
 import { createTranslator } from "../i18n";
 
@@ -166,11 +166,11 @@ export default function DispatchCard({
   locale,
 }) {
   const t = useMemo(() => createTranslator(locale), [locale]);
-  const [tab, setTab] = useState("issues"); // "issues" | "custom"
+  const [tab, setTab] = useState("auto"); // "auto" | "issues" | "custom"
+  const [lastMenuTab, setLastMenuTab] = useState("custom");
   const [globalModel, setGlobalModel] = useState(defaultModel);
   const [customRows, setCustomRows] = useState([]);
   const [issueRows, setIssueRows] = useState([]);
-  const [customMode, setCustomMode] = useState("manual");
   const [autoBrief, setAutoBrief] = useState("");
   const [autoPlannerModel, setAutoPlannerModel] = useState(() =>
     getDefaultPlannerModelId(availableModels, defaultModel)
@@ -205,9 +205,14 @@ export default function DispatchCard({
 
   const activeRows = tab === "issues"
     ? issueRows.filter((r) => r.enabled)
-    : (customMode === "auto" ? [] : customRows);
+    : (tab === "custom" ? customRows : []);
   const canDispatch = activeRows.length > 0 && !submitting
-    && (tab === "issues" || !!currentCwd);
+    && (tab === "issues" || (tab === "custom" && !!currentCwd));
+
+  const selectMenuTab = useCallback((nextTab) => {
+    setLastMenuTab(nextTab);
+    setTab(nextTab);
+  }, []);
 
   const handleAutoFill = useCallback(async () => {
     const brief = autoBrief.trim();
@@ -251,7 +256,8 @@ export default function DispatchCard({
       setCustomRows(rows);
       setErrors({});
       setAutoNote(t("dispatch.autoFilled", { count: rows.length }));
-      setCustomMode("manual");
+      setLastMenuTab("custom");
+      setTab("custom");
     } catch (e) {
       setAutoError(e?.message || t("dispatch.autoErrorFailed"));
     } finally {
@@ -260,6 +266,7 @@ export default function DispatchCard({
   }, [autoBrief, autoPlannerModel, plannerModels, currentCwd, availableModels, globalModel, t]);
 
   const handleSubmit = useCallback(async () => {
+    if (tab === "auto") return;
     const rowsToRun = tab === "issues"
       ? issueRows.filter((r) => r.enabled)
       : customRows;
@@ -352,16 +359,51 @@ export default function DispatchCard({
         )}
 
         <div style={tabsStyle} role="tablist">
-          <TabBtn active={tab === "issues"} onClick={() => setTab("issues")}>
-            <GitBranch size={13} /> {t("dispatch.tabIssues")}
+          <TabBtn active={tab === "auto"} onClick={() => setTab("auto")}>
+            {t("dispatch.tabAuto")}
           </TabBtn>
-          <TabBtn active={tab === "custom"} onClick={() => setTab("custom")}>
-            <FileText size={13} /> {t("dispatch.tabCustom")}
+          <TabBtn active={tab !== "auto"} onClick={() => setTab(lastMenuTab)}>
+            {t("dispatch.tabMenu")}
           </TabBtn>
         </div>
 
+        {tab !== "auto" && (
+          <div style={menuTabsStyle} role="tablist" aria-label={t("dispatch.tabMenu")}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "issues"}
+              onClick={() => selectMenuTab("issues")}
+              style={menuTabButtonStyle(tab === "issues")}
+            >
+              {t("dispatch.tabIssues")}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "custom"}
+              onClick={() => selectMenuTab("custom")}
+              style={menuTabButtonStyle(tab === "custom")}
+            >
+              {t("dispatch.tabCustom")}
+            </button>
+          </div>
+        )}
+
         <div style={bodyStyle}>
-          {tab === "issues" ? (
+          {tab === "auto" ? (
+            <AutoTab
+              autoBrief={autoBrief}
+              setAutoBrief={setAutoBrief}
+              autoPlannerModel={autoPlannerModel}
+              setAutoPlannerModel={setAutoPlannerModel}
+              plannerModels={plannerModels}
+              autoLoading={autoLoading}
+              autoError={autoError}
+              onAutoFill={handleAutoFill}
+              t={t}
+            />
+          ) : tab === "issues" ? (
             <IssueTab
               rows={issueRows}
               setRows={setIssueRows}
@@ -377,18 +419,8 @@ export default function DispatchCard({
               setRows={setCustomRows}
               currentCwd={currentCwd}
               availableModels={availableModels}
-              plannerModels={plannerModels}
               errors={errors}
-              mode={customMode}
-              setMode={setCustomMode}
-              autoBrief={autoBrief}
-              setAutoBrief={setAutoBrief}
-              autoPlannerModel={autoPlannerModel}
-              setAutoPlannerModel={setAutoPlannerModel}
-              autoLoading={autoLoading}
-              autoError={autoError}
               autoNote={autoNote}
-              onAutoFill={handleAutoFill}
               t={t}
             />
           )}
@@ -619,23 +651,41 @@ function IssueRow({ row, availableModels, error, onChange, t }) {
   );
 }
 
+function AutoTab({
+  autoBrief,
+  setAutoBrief,
+  autoPlannerModel,
+  setAutoPlannerModel,
+  plannerModels,
+  autoLoading,
+  autoError,
+  onAutoFill,
+  t,
+}) {
+  return (
+    <div style={{ padding: "24px 14px 14px" }}>
+      <AutoComposer
+        brief={autoBrief}
+        setBrief={setAutoBrief}
+        plannerModel={autoPlannerModel}
+        setPlannerModel={setAutoPlannerModel}
+        plannerModels={plannerModels}
+        loading={autoLoading}
+        error={autoError}
+        onAutoFill={onAutoFill}
+        t={t}
+      />
+    </div>
+  );
+}
+
 function CustomTab({
   rows,
   setRows,
   currentCwd,
   availableModels,
-  plannerModels,
   errors,
-  mode,
-  setMode,
-  autoBrief,
-  setAutoBrief,
-  autoPlannerModel,
-  setAutoPlannerModel,
-  autoLoading,
-  autoError,
   autoNote,
-  onAutoFill,
   t,
 }) {
   const addRow = () => setRows((prev) => [...prev, makeCustomRow(prev.length)]);
@@ -651,67 +701,30 @@ function CustomTab({
           {t("dispatch.selectFolderNotice")}
         </div>
       )}
-      <div style={customModeBarStyle}>
-        <div style={customModeSwitchStyle} role="tablist" aria-label={t("dispatch.customMode")}>
-          <button
-            type="button"
-            onClick={() => setMode("manual")}
-            style={customModeButtonStyle(mode === "manual")}
-          >
-            <FileText size={12} />
-            {t("dispatch.manualMode")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("auto")}
-            style={customModeButtonStyle(mode === "auto")}
-          >
-            <Sparkles size={12} />
-            {t("dispatch.autoMode")}
-          </button>
-        </div>
-        {autoNote && mode === "manual" && (
-          <div style={autoNoteStyle}>{autoNote}</div>
-        )}
-      </div>
-
-      {mode === "auto" ? (
-        <AutoComposer
-          brief={autoBrief}
-          setBrief={setAutoBrief}
-          plannerModel={autoPlannerModel}
-          setPlannerModel={setAutoPlannerModel}
-          plannerModels={plannerModels}
-          loading={autoLoading}
-          error={autoError}
-          onAutoFill={onAutoFill}
+      {autoNote && (
+        <div style={autoNoteStyle}>{autoNote}</div>
+      )}
+      {rows.map((r, i) => (
+        <CustomRow
+          key={r.key}
+          row={r}
+          index={i}
+          availableModels={availableModels}
+          error={errors[r.key]}
+          onChange={(patch) => updateRow(r.key, patch)}
+          onRemove={() => removeRow(r.key)}
           t={t}
         />
-      ) : (
-        <>
-          {rows.map((r, i) => (
-            <CustomRow
-              key={r.key}
-              row={r}
-              index={i}
-              availableModels={availableModels}
-              error={errors[r.key]}
-              onChange={(patch) => updateRow(r.key, patch)}
-              onRemove={() => removeRow(r.key)}
-              t={t}
-            />
-          ))}
-          <button
-            onClick={addRow}
-            style={addBtnStyle}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.8)"; e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "transparent"; }}
-          >
-            <Plus size={13} strokeWidth={2} />
-            <span>{t("dispatch.addSession")}</span>
-          </button>
-        </>
-      )}
+      ))}
+      <button
+        onClick={addRow}
+        style={addBtnStyle}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.8)"; e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "transparent"; }}
+      >
+        <Plus size={13} strokeWidth={2} />
+        <span>{t("dispatch.addSession")}</span>
+      </button>
     </div>
   );
 }
@@ -732,7 +745,6 @@ function AutoComposer({
     <div style={autoPanelStyle}>
       <div style={autoPanelHeaderStyle}>
         <div style={autoTitleStyle}>
-          <Sparkles size={14} />
           <span>{t("dispatch.autoComposerTitle")}</span>
         </div>
         <DispatchDropdown
@@ -757,7 +769,6 @@ function AutoComposer({
         style={autoTextareaStyle}
         {...fieldHoverProps}
       />
-      <div style={autoGuideStyle}>{t("dispatch.autoModelGuide")}</div>
       {error && <div style={autoErrorStyle}>{error}</div>}
       <div style={autoActionsStyle}>
         <button
@@ -767,7 +778,6 @@ function AutoComposer({
           style={autoFillBtnStyle(canFill, loading)}
         >
           <span style={{ visibility: loading ? "hidden" : "visible", display: "inline-flex", alignItems: "center", gap: 6 }}>
-            <Sparkles size={13} />
             {t("dispatch.autoFill")}
           </span>
           {loading && (
@@ -826,7 +836,6 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove, t }
       )}
       {row.autoReason && (
         <div style={customReasonStyle}>
-          <Sparkles size={11} />
           <span>{row.autoReason}</span>
         </div>
       )}
@@ -1240,28 +1249,21 @@ const addBtnStyle = {
   transition: "color .15s, background .15s",
 };
 
-const customModeBarStyle = {
+const menuTabsStyle = {
   display: "flex",
   alignItems: "center",
-  justifyContent: "space-between",
-  gap: 10,
-  marginBottom: 12,
+  gap: 6,
+  padding: "10px 14px",
+  borderBottom: "1px solid var(--pane-border)",
 };
-const customModeSwitchStyle = {
-  display: "inline-flex",
-  padding: 3,
-  border: "1px solid rgba(255,255,255,0.06)",
-  borderRadius: 8,
-  background: "rgba(255,255,255,0.018)",
-};
-const customModeButtonStyle = (active) => ({
+const menuTabButtonStyle = (active) => ({
   display: "inline-flex",
   alignItems: "center",
-  gap: 6,
-  padding: "6px 9px",
-  border: "none",
+  justifyContent: "center",
+  padding: "7px 10px",
+  border: "1px solid " + (active ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.05)"),
   borderRadius: 6,
-  background: active ? "rgba(255,255,255,0.08)" : "transparent",
+  background: active ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.015)",
   color: active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.48)",
   cursor: "pointer",
   fontSize: 11,
@@ -1273,6 +1275,7 @@ const autoNoteStyle = {
   color: "rgba(180,255,200,0.78)",
   fontSize: 11,
   fontFamily: "'JetBrains Mono', monospace",
+  marginBottom: 10,
   minWidth: 0,
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -1315,12 +1318,6 @@ const autoTextareaStyle = {
   outline: "none",
   boxSizing: "border-box",
   transition: "border-color .2s",
-};
-const autoGuideStyle = {
-  color: "rgba(255,255,255,0.42)",
-  fontSize: 11,
-  lineHeight: 1.45,
-  padding: "9px 12px 0",
 };
 const autoErrorStyle = {
   color: "rgba(255,180,180,0.9)",
