@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { loadMulticaState, saveMulticaState } from "../multica/store";
+import { getByokPresetsForEndpoints } from "./byok-models";
 import ModelPicker from "../components/ModelPicker";
 
 export function multicaAgentToModel(agent, state) {
@@ -67,7 +68,33 @@ export function useMulticaModels() {
   return { models, loading, error, refresh, state };
 }
 
+function useByokModels() {
+  const [models, setModels] = useState([]);
+
+  const refresh = useCallback(async () => {
+    if (!window.api?.byokLoadProviders) { setModels([]); return; }
+    try {
+      const providers = await window.api.byokLoadProviders();
+      const endpointIds = providers.map((p) => p.id);
+      setModels(getByokPresetsForEndpoints(endpointIds));
+    } catch {
+      setModels([]);
+    }
+  }, []);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const h = () => { void refresh(); };
+    window.addEventListener("byok-refresh", h);
+    return () => window.removeEventListener("byok-refresh", h);
+  }, [refresh]);
+
+  return models;
+}
+
 export function ModelPickerWithMultica({ value, onChange }) {
   const { models, error, loading } = useMulticaModels();
-  return <ModelPicker value={value} onChange={onChange} extraModels={models} extraError={error} extraLoading={loading} />;
+  const byokModels = useByokModels();
+  return <ModelPicker value={value} onChange={onChange} extraModels={[...models, ...byokModels]} extraError={error} extraLoading={loading} />;
 }

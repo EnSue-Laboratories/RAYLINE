@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
-import { MODELS, getMOrMulticaFallback } from "../data/models";
+import { MODELS, getModelFallback } from "../data/models";
 import { useFontScale } from "../contexts/FontSizeContext";
 
 const MENU_GAP = 6;
@@ -33,7 +33,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
   const [cliInstalled, setCliInstalled] = useState(null);
   const cliCheckedAtRef = useRef(0);
   const cliProbePromiseRef = useRef(null);
-  const m = getMOrMulticaFallback(value, extraModels);
+  const m = getModelFallback(value, extraModels);
 
   const probeCliInstalled = useCallback(async ({ force = false } = {}) => {
     if (cliProbePromiseRef.current) return cliProbePromiseRef.current;
@@ -215,8 +215,9 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
         >
           {(() => {
             const all = [...MODELS, ...extraModels];
-            return ["claude", "codex", "multica"].map((provider, gi) => {
+            return ["claude", "codex", "byok", "multica"].map((provider, gi) => {
               const entries = all.filter((mm) => mm.provider === provider);
+              const isByokEmpty = provider === "byok" && entries.length === 0;
               const isMulticaEmpty = provider === "multica" && entries.length === 0;
               const guide = PROVIDER_INSTALL_GUIDES[provider];
               const cliKnown = !guide || Object.prototype.hasOwnProperty.call(cliInstalled || {}, provider);
@@ -280,6 +281,36 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                       onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                     >
                       {guide.label}
+                    </button>
+                  )}
+                  {isByokEmpty && (
+                    <button
+                      key="byok-configure"
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent("open-settings-byok"));
+                        setMenuStyle(null);
+                        set(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "flex-start",
+                        width: "100%",
+                        padding: "9px 13px",
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: 7,
+                        color: "rgba(255,255,255,0.4)",
+                        fontSize: s(11),
+                        fontFamily: "'JetBrains Mono',monospace",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        transition: "all .12s",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    >
+                      {"Configure API Keys\u2026"}
                     </button>
                   )}
                   {isMulticaEmpty && (() => {

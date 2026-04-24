@@ -1138,6 +1138,11 @@ export default function App() {
     window.addEventListener("open-multica-setup", h);
     return () => window.removeEventListener("open-multica-setup", h);
   }, []);
+  useEffect(() => {
+    const h = () => setShowSettings(true);
+    window.addEventListener("open-settings-byok", h);
+    return () => window.removeEventListener("open-settings-byok", h);
+  }, []);
   const messageQueue = useRef([]);
   const queueInterruptRequestedRef = useRef(new Set());
   // Guards the async preflight gap before useAgent flips `isStreaming`.
@@ -3525,7 +3530,10 @@ export default function App() {
           locale={locale}
           onLocaleChange={setLocale}
           byokProviders={byokProviders}
-          onByokProvidersChange={setByokProviders}
+          onByokProvidersChange={(providers) => {
+            setByokProviders(providers);
+            window.dispatchEvent(new CustomEvent("byok-refresh"));
+          }}
           onClose={() => setShowSettings(false)}
         />
       ) : (
