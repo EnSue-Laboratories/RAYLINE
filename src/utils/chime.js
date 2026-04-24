@@ -1,11 +1,12 @@
+const base = import.meta.env.BASE_URL;
 export const CHIME_SOUNDS = [
-  { id: "glass", label: "Glass", src: "/sounds/glass.mp3" },
-  { id: "tink", label: "Tink", src: "/sounds/tink.mp3" },
-  { id: "pop", label: "Pop", src: "/sounds/pop.mp3" },
-  { id: "ping", label: "Ping", src: "/sounds/ping.mp3" },
-  { id: "purr", label: "Purr", src: "/sounds/purr.mp3" },
-  { id: "blow", label: "Blow", src: "/sounds/blow.mp3" },
-  { id: "bottle", label: "Bottle", src: "/sounds/bottle.mp3" },
+  { id: "glass", label: "Glass", src: `${base}sounds/glass.mp3` },
+  { id: "tink", label: "Tink", src: `${base}sounds/tink.mp3` },
+  { id: "pop", label: "Pop", src: `${base}sounds/pop.mp3` },
+  { id: "ping", label: "Ping", src: `${base}sounds/ping.mp3` },
+  { id: "purr", label: "Purr", src: `${base}sounds/purr.mp3` },
+  { id: "blow", label: "Blow", src: `${base}sounds/blow.mp3` },
+  { id: "bottle", label: "Bottle", src: `${base}sounds/bottle.mp3` },
 ];
 
 export const DEFAULT_CHIME_ID = "glass";

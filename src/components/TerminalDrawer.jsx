@@ -1061,6 +1061,7 @@ export default function TerminalDrawer({
   unregisterTerminal,
   cwd,
   wallpaper,
+  windowControlsVisible = false,
   windowMode = false,
 }) {
   const s = useFontScale();
@@ -1172,6 +1173,12 @@ export default function TerminalDrawer({
           }}
         />
       )}
+      {/* Spacer that clears the window controls area on Windows */}
+      {windowControlsVisible && (
+        <div style={{ height: WINDOW_DRAG_HEIGHT, flexShrink: 0 }} />
+      )}
+
+      {/* Header */}
       <div
         style={{
           position: "relative",
@@ -1238,9 +1245,11 @@ export default function TerminalDrawer({
               <IconButton onClick={handleCreate} title="New terminal">
                 <Plus size={13} strokeWidth={1.5} />
               </IconButton>
-              <IconButton onClick={windowMode ? onRequestClose : onToggleDrawer} title={windowMode ? "Close window" : "Close drawer"}>
-                <X size={13} strokeWidth={1.5} />
-              </IconButton>
+              {(!windowMode || !windowControlsVisible) && (
+                <IconButton onClick={windowMode ? onRequestClose : onToggleDrawer} title={windowMode ? "Close window" : "Close drawer"}>
+                  <X size={13} strokeWidth={1.5} />
+                </IconButton>
+              )}
             </div>
           </div>
 

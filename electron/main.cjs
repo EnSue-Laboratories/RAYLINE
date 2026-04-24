@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell, clipboard } = require("electron");
+const { initAutoUpdater, handleCheckForUpdates, handleDownloadUpdate, handleInstallUpdate } = require("./auto-updater.cjs");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -114,12 +115,9 @@ function getWindowChromeOptions() {
 
   if (isWindows) {
     return {
-      titleBarStyle: "hidden",
-      titleBarOverlay: {
-        color: WINDOW_BACKGROUND,
-        symbolColor: "#C8CBD3",
-        height: 52,
-      },
+      // Keep Windows fully in the client area so our custom controls receive
+      // actual pointer events instead of sitting inside the OS title bar.
+      frame: false,
       autoHideMenuBar: true,
     };
   }
@@ -130,6 +128,10 @@ function getWindowChromeOptions() {
 function applyWindowChromeTweaks(win) {
   if (!win || !isWindows) return;
   win.setMenuBarVisibility(false);
+}
+
+function getEventWindow(event) {
+  return BrowserWindow.fromWebContents(event.sender) || mainWindow || pmWindow || null;
 }
 
 function describeWindow(win) {
@@ -250,9 +252,17 @@ function createWindow() {
     }
   });
 
+  initAutoUpdater(mainWindow);
+
   if (isDev) {
     const port = process.env.VITE_PORT || "5173";
     mainWindow.loadURL(`http://localhost:${port}`);
+    mainWindow.webContents.on("before-input-event", (event, input) => {
+      if (input.key === "F12" && input.type === "keyDown") {
+        mainWindow.webContents.toggleDevTools();
+        event.preventDefault();
+      }
+    });
   } else {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }
@@ -471,11 +481,36 @@ ipcMain.handle("window-close-current", (event) => {
 });
 
 ipcMain.handle("set-window-opacity", (event, opacity) => {
-  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  const win = getEventWindow(event);
   if (!win) return false;
   const v = Number(opacity);
   if (!Number.isFinite(v)) return false;
   win.setOpacity(Math.max(0.2, Math.min(1, v)));
+  return true;
+});
+
+ipcMain.handle("window-minimize", (event) => {
+  const win = getEventWindow(event);
+  if (!win) return false;
+  win.minimize();
+  return true;
+});
+
+ipcMain.handle("window-toggle-maximize", (event) => {
+  const win = getEventWindow(event);
+  if (!win) return false;
+  if (win.isMaximized()) {
+    win.unmaximize();
+    return false;
+  }
+  win.maximize();
+  return true;
+});
+
+ipcMain.handle("window-close", (event) => {
+  const win = getEventWindow(event);
+  if (!win) return false;
+  win.close();
   return true;
 });
 
@@ -687,6 +722,12 @@ function persistStateToDisk(state) {
 ipcMain.handle("save-state", async (_event, state) => {
   return persistStateToDisk(state);
 });
+
+// ── Auto-updater ────────────────────────────────────────────────────────────
+ipcMain.handle("updater-check",    () => handleCheckForUpdates());
+ipcMain.handle("updater-download", () => handleDownloadUpdate());
+ipcMain.handle("updater-install",  () => handleInstallUpdate());
+ipcMain.handle("get-app-version",  () => app.getVersion());
 
 ipcMain.on("save-state-sync", (event, state) => {
   event.returnValue = persistStateToDisk(state);

@@ -5,6 +5,8 @@ import Sidebar      from "./components/Sidebar";
 import SidebarChromeRail from "./components/SidebarChromeRail";
 import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
+import TerminalDrawer from "./components/TerminalDrawer";
+import WindowControls from "./components/WindowControls";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
 import useWindowActivity from "./hooks/useWindowActivity";
@@ -46,6 +48,7 @@ const LAB_CONTROL_ENDPOINT = "http://127.0.0.1:4001/control";
 const LAB_CONTROL_COMMIT_DELAY_MS = 1000;
 const SIDEBAR_WIDTH = 264;
 const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
+const DEFAULT_FONT_SIZE = 17;
 const EMPTY_CONVERSATION_DATA = { messages: [], isStreaming: false, error: null };
 
 function logSessionState(...args) {
@@ -1153,9 +1156,10 @@ export default function App() {
   const [defaultModel, setDefaultModel] = useState(DEFAULT_MODEL_ID);
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
+  const [platform, setPlatform] = useState(null);
   const [wallpaper, setWallpaper] = useState(null);
   const [locale, setLocale] = useState(() => detectDefaultLocale());
-  const [fontSize, setFontSize] = useState(15);
+  const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
   const [coauthorEnabled, setCoauthorEnabled] = useState(true);
@@ -1169,6 +1173,7 @@ export default function App() {
   const [notificationSound, setNotificationSound] = useState("glass");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [hasUpdate, setHasUpdate] = useState(false);
   const [projects, setProjects] = useState({});
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
   const [draftsPath, setDraftsPath] = useState(null);
@@ -1269,6 +1274,18 @@ export default function App() {
     () => queuedMessages.filter((item) => item?.conversationId === active),
     [active, queuedMessages]
   );
+  const showWindowControls = platform === "win32";
+  const useWindowsSidebarChrome = showWindowControls;
+  const sidebarWidth = useWindowsSidebarChrome
+    ? (sidebarOpen ? 220 : 52)
+    : (sidebarOpen ? SIDEBAR_WIDTH : 0);
+
+  useEffect(() => {
+    window.api?.getSystemInfo?.().then((info) => {
+      if (info?.platform) setPlatform(info.platform);
+    }).catch(() => {});
+  }, []);
+
   const activePermissionRequests = useMemo(
     () => permissionRequests.filter((item) => item?.conversationId === active),
     [active, permissionRequests]
@@ -1420,7 +1437,7 @@ export default function App() {
         return;
       case "fontSize":
       case "app.fontSize":
-        setFontSize(clampNumber(value, 12, 22, 15));
+        setFontSize(clampNumber(value, 12, 22, DEFAULT_FONT_SIZE));
         return;
       case "sidebar.activeOpacity":
         setSidebarActiveOpacity(clampNumber(value, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
@@ -1520,6 +1537,9 @@ export default function App() {
         if (typeof state.chromeControlsOnHover === "boolean") setChromeControlsOnHover(state.chromeControlsOnHover);
         if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
         if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
+        // Migrate legacy "zh"/"en" language key to locale
+        if (state.language === "zh") setLocale("zh-CN");
+        else if (state.language === "en") setLocale("en-US");
         if (state.wallpaper) {
           setWallpaper(normalizeWallpaper(state.wallpaper));
           // Reload data URL from disk (not persisted — too large for JSON)
@@ -1535,6 +1555,14 @@ export default function App() {
       setStateLoaded(true);
     });
     window.api.getDraftsPath?.().then((p) => { if (p) setDraftsPath(p); });
+  }, []);
+
+  // Listen for auto-updater status to drive the Sidebar badge
+  useEffect(() => {
+    const unsub = window.api?.onUpdaterStatus?.((data) => {
+      setHasUpdate(data.phase === "available" || data.phase === "ready");
+    });
+    return () => unsub?.();
   }, []);
 
   // Persist state to file on changes (skip until initial load is done)
@@ -3507,14 +3535,18 @@ export default function App() {
         </div>
       )}
 
-      <SidebarChromeRail
-        sidebarOpen={sidebarOpen}
-        settingsOpen={showSettings}
-        controlsOnHover={chromeControlsOnHover}
-        onToggleSidebar={() => setSidebarOpen((o) => !o)}
-        onNew={handleNew}
-        onOpenSettings={() => setShowSettings((open) => !open)}
-      />
+      <WindowControls visible={showWindowControls} />
+
+      {!useWindowsSidebarChrome && (
+        <SidebarChromeRail
+          sidebarOpen={sidebarOpen}
+          settingsOpen={showSettings}
+          controlsOnHover={chromeControlsOnHover}
+          onToggleSidebar={() => setSidebarOpen((o) => !o)}
+          onNew={handleNew}
+          onOpenSettings={() => setShowSettings((open) => !open)}
+        />
+      )}
 
       <div
         style={{
@@ -3527,9 +3559,9 @@ export default function App() {
       {/* Sidebar */}
       <div
         style={{
-          width: sidebarOpen ? SIDEBAR_WIDTH : 0,
-          minWidth: sidebarOpen ? SIDEBAR_WIDTH : 0,
-          borderRight: `1px solid ${sidebarOpen ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0)"}`,
+          width: sidebarWidth,
+          minWidth: sidebarWidth,
+          borderRight: `1px solid ${sidebarOpen || useWindowsSidebarChrome ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0)"}`,
           display: "flex",
           flexDirection: "column",
           position: "relative",
@@ -3545,12 +3577,12 @@ export default function App() {
         }}
       >
         <div
-          aria-hidden={!sidebarOpen}
+          aria-hidden={!useWindowsSidebarChrome && !sidebarOpen}
           style={{
-            width: SIDEBAR_WIDTH,
-            minWidth: SIDEBAR_WIDTH,
+            width: useWindowsSidebarChrome ? "100%" : SIDEBAR_WIDTH,
+            minWidth: useWindowsSidebarChrome ? "100%" : SIDEBAR_WIDTH,
             height: "100%",
-            pointerEvents: sidebarOpen ? "auto" : "none",
+            pointerEvents: useWindowsSidebarChrome || sidebarOpen ? "auto" : "none",
           }}
         >
           <Sidebar
@@ -3560,9 +3592,13 @@ export default function App() {
             onNew={handleNew}
             onOpenDispatch={() => setShowDispatchCard(true)}
             onDelete={handleDelete}
+            onToggleSidebar={() => setSidebarOpen((o) => !o)}
+            isOpen={useWindowsSidebarChrome ? sidebarOpen : true}
+            windowsChrome={useWindowsSidebarChrome}
             locale={locale}
             cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
             onPickFolder={handlePickFolder}
+            onOpenSettings={() => setShowSettings(true)}
             onOpenProjectManager={() => window.api?.openProjectManager()}
             onOpenNewProject={() => setShowNewProject(true)}
             projects={projects}
@@ -3574,6 +3610,7 @@ export default function App() {
             onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
             developerMode={developerMode}
             multicaModels={multicaModels}
+            hasUpdate={hasUpdate}
           />
         </div>
       </div>
@@ -3603,6 +3640,7 @@ export default function App() {
           onNotificationSoundChange={setNotificationSound}
           notificationsMuted={notificationsMuted}
           onNotificationsMutedChange={setNotificationsMuted}
+          platform={platform}
           locale={locale}
           onLocaleChange={setLocale}
           onClose={() => setShowSettings(false)}
@@ -3654,6 +3692,7 @@ export default function App() {
           onControlChange={handleControlChange}
           canControlTarget={canControlTarget}
           developerMode={developerMode}
+          windowControlsVisible={showWindowControls}
           locale={locale}
         />
       )}
@@ -3680,6 +3719,24 @@ export default function App() {
         onClose={() => setShowNewProject(false)}
         onCloned={handleClonedRepo}
         onPickedLocalFolder={registerManualProject}
+      />
+
+      {/* Terminal drawer */}
+      <TerminalDrawer
+        sessions={terminal.sessions}
+        activeSession={terminal.activeSession}
+        onSelectSession={terminal.setActiveSession}
+        onCreateSession={terminal.createSession}
+        cwd={terminalCwd}
+        onKillSession={terminal.killSession}
+        onSendInput={terminal.sendInput}
+        onResizeSession={terminal.resizeSession}
+        drawerOpen={terminal.drawerOpen}
+        onToggleDrawer={() => terminal.setDrawerOpen((o) => !o)}
+        registerTerminal={terminal.registerTerminal}
+        unregisterTerminal={terminal.unregisterTerminal}
+        wallpaper={wallpaper}
+        windowControlsVisible={showWindowControls}
       />
       </div>
     </div>

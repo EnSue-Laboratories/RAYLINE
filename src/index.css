@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 :root {
   --pane-background: #0D0D10;
@@ -33,9 +33,10 @@ html, body, #root {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar        { width: 2px; }
-::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.03); border-radius: 2px; }
+::-webkit-scrollbar               { width: 3px; }
+::-webkit-scrollbar-track         { background: transparent; }
+::-webkit-scrollbar-thumb         { background: rgba(255,255,255,0.15); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover   { background: rgba(255,255,255,0.35); }
 
 /* ── KaTeX dark theme overrides ── */
 .katex { color: inherit; }
@@ -89,13 +90,29 @@ input:focus         { outline: none; }
   to   { opacity: 1; max-height: 60px; }
 }
 
-/* ── xterm transparent background ── */
+/* ── xterm transparent background + slim overlay scrollbar ── */
 .xterm,
 .xterm .xterm-screen,
 .xterm .xterm-viewport,
 .xterm .xterm-scrollable-element {
   background: transparent !important;
   background-color: transparent !important;
+}
+.xterm .xterm-viewport::-webkit-scrollbar { display: none; }
+.xterm .xterm-viewport { scrollbar-width: none; }
+
+/* Slim the xterm overlay (VS Code-style) scrollbar */
+.xterm .xterm-scrollable-element > .scrollbar.vertical {
+  width: 6px !important;
+}
+.xterm .xterm-scrollable-element > .scrollbar.vertical .slider {
+  width: 6px !important;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.18) !important;
+  transition: background .15s;
+}
+.xterm .xterm-scrollable-element > .scrollbar.vertical:hover .slider {
+  background: rgba(255,255,255,0.38) !important;
 }
 
 .rayline-terminal-host--opaque .xterm,

@@ -1,5 +1,6 @@
 import { memo, useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
+import { createTranslator } from "../i18n";
 import { ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
@@ -12,7 +13,7 @@ import SelectionToolbar from "./SelectionToolbar";
 import WindowDragSpacer from "./WindowDragSpacer";
 import ExportConversationBtn from "./ExportConversationBtn";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { SIDEBAR_CHROME_RAIL_LEFT, SIDEBAR_CHROME_RAIL_WIDTH } from "../windowChrome";
+import { IS_MAC, SIDEBAR_CHROME_RAIL_LEFT, SIDEBAR_CHROME_RAIL_WIDTH } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { clipboardItemsToAttachments, dataTransferHasFiles, fileListToAttachments } from "../utils/attachments";
 import TabStrip from "./TabStrip";
@@ -104,8 +105,9 @@ const ChatTranscript = memo(function ChatTranscript({
   );
 });
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, locale }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, windowControlsVisible = false, locale }) {
   const s = useFontScale();
+  const t = createTranslator(locale);
   const isDraftContext = showNewChatCard ? newChatDefaultCwd == null : isDraftConversation(convo, draftsPath);
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
@@ -237,9 +239,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
 
   // Slash command suggestions
   const COMMANDS = [
-    { cmd: "/clear", desc: "Start a new conversation" },
-    { cmd: "/new", desc: "Start a new conversation" },
-    { cmd: "/compact", desc: "Compact conversation context" },
+    { cmd: "/clear", desc: t("chatArea.cmdClearDesc") },
+    { cmd: "/new", desc: t("chatArea.cmdClearDesc") },
+    { cmd: "/compact", desc: t("chatArea.cmdCompactDesc") },
   ];
   const showCommands = input.startsWith("/") && !input.includes(" ");
   const filteredCommands = showCommands
@@ -265,13 +267,14 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
   const hasDirtyWorktree = (gitStatus?.files?.length || 0) > 0;
   const hasNoUpstream = Boolean(gitStatus?.branch) && !gitStatus?.upstream && !gitStatus?.detached;
   const branchNeedsAttention = hasDirtyWorktree || hasNoUpstream;
-  const [branchHintDismissed, setBranchHintDismissed] = useState(false);
-  useEffect(() => { setBranchHintDismissed(false); }, [convo?.id]);
+  const convoId = convo?.id ?? null;
+  const [branchHintDismissedFor, setBranchHintDismissedFor] = useState(null);
+  const branchHintDismissed = Boolean(convoId && branchHintDismissedFor === convoId);
   const showBranchHint = isMulticaModel && !showNewChatCard && branchNeedsAttention && !branchHintDismissed && !shellMode;
   const branchHintText = (() => {
-    if (hasDirtyWorktree && hasNoUpstream) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES + NOT PUBLISHED";
-    if (hasDirtyWorktree) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES";
-    return "BRANCH MAY NEED UPDATING  //  NOT PUBLISHED TO ORIGIN";
+    if (hasDirtyWorktree && hasNoUpstream) return t("chatArea.branchWarnBoth");
+    if (hasDirtyWorktree) return t("chatArea.branchWarnDirty");
+    return t("chatArea.branchWarnNoUpstream");
   })();
 
   const send = useCallback(() => {
@@ -284,9 +287,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
       setSelectedCmd(0);
     });
     if (inRef.current) inRef.current.style.height = "20px";
-    if (isMulticaModel && !shellMode) setBranchHintDismissed(true);
+    if (isMulticaModel && !shellMode) setBranchHintDismissedFor(convoId);
     onSend(nextInput, nextAttachments);
-  }, [attachments, canSend, isMulticaModel, onSend, shellMode, trimmedInput]);
+  }, [attachments, canSend, convoId, isMulticaModel, onSend, shellMode, trimmedInput]);
 
   const handleInput = (e) => {
     setInput(e.target.value);
@@ -367,9 +370,14 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
 
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
   const showConversationTitle = Boolean(convo && !showNewChatCard);
-  const topTabsLeft = sidebarOpen ? 18 : SIDEBAR_CHROME_RAIL_LEFT + SIDEBAR_CHROME_RAIL_WIDTH + 16;
+  const topTabsLeft = sidebarOpen
+    ? 18
+    : IS_MAC
+      ? SIDEBAR_CHROME_RAIL_LEFT + SIDEBAR_CHROME_RAIL_WIDTH + 16
+      : 18;
+  const topTabsRight = windowControlsVisible ? 126 : 24;
   const headerContentOffset = showHeaderTabs ? 8 : 0;
-  const headerLeftPadding = sidebarOpen ? 24 : 50;
+  const headerLeftPadding = sidebarOpen ? 24 : IS_MAC ? 50 : 24;
 
   const handleDragEnter = useCallback((e) => {
     if (!dataTransferHasFiles(e.dataTransfer)) return;
@@ -508,7 +516,12 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      <WindowDragSpacer />
+      {/* Drag region. On Windows, shrink right margin so custom controls aren't
+          inside the drag hit-area. On macOS, WindowDragSpacer reserves the
+          sidebar chrome rail as a no-drag zone. */}
+      <div style={{ marginRight: windowControlsVisible ? topTabsRight : 0 }}>
+        <WindowDragSpacer />
+      </div>
 
       {showHeaderTabs && (
         <div
@@ -516,7 +529,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
             position: "absolute",
             top: 10,
             left: topTabsLeft,
-            right: 24,
+            right: topTabsRight,
             zIndex: 40,
             display: "flex",
             alignItems: "center",
@@ -592,7 +605,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                   letterSpacing: ".1em",
                 }}
               >
-                {convo.msgs.length} MESSAGES
+                {t("chatArea.messages", { count: convo.msgs.length })}
               </div>
             </div>
           )}
@@ -624,7 +637,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
           {!showNewChatCard && developerMode && onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
-              title="Toggle terminal"
+              title={t("chatArea.toggleTerminal")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -704,8 +717,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
       {!showNewChatCard && convo && convo.msgs.length > 0 && (
         <button
           onClick={scrollToBottom}
-          aria-label="Scroll to bottom"
-          title="Scroll to bottom"
+          aria-label={t("chatArea.scrollToBottom")}
+          title={t("chatArea.scrollToBottom")}
           style={{
             position: "absolute",
             bottom: 108,
@@ -902,7 +915,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                           letterSpacing: ".06em",
                           flexShrink: 0,
                         }}>
-                          {i === 0 ? "QUEUED NEXT" : "QUEUED"}
+                          {i === 0 ? t("chatArea.queuedNext") : t("chatArea.queued")}
                         </span>
                         {attachmentCount > 0 && (
                           <span style={{
@@ -911,7 +924,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                             color: "rgba(255,255,255,0.13)",
                             letterSpacing: ".06em",
                           }}>
-                            {attachmentCount} ATTACHMENT{attachmentCount === 1 ? "" : "S"}
+                            {t("chatArea.attachmentsCount", { value: attachmentCount, suffix: attachmentCount === 1 ? "" : "S" })}
                           </span>
                         )}
                       </div>
@@ -975,13 +988,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                               color: "rgba(255,255,255,0.54)",
                             }}
                           >
-                            SAVE
+                            {t("common.save")}
                           </button>
                           <button
                             onClick={cancelQueuedEdit}
                             style={queueActionButtonStyle}
                           >
-                            CANCEL
+                            {t("common.cancel")}
                           </button>
                         </>
                       ) : (
@@ -990,13 +1003,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                             onClick={() => startQueuedEdit(q)}
                             style={queueActionButtonStyle}
                           >
-                            EDIT
+                            {t("common.edit")}
                           </button>
                           <button
                             onClick={() => removeQueuedItem(q.id)}
                             style={queueActionButtonStyle}
                           >
-                            DELETE
+                            {t("common.delete")}
                           </button>
                         </>
                       )}
@@ -1059,8 +1072,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
               }}
             >
               {canRunShell
-                ? `SHELL MODE  //  RUNS IN ${shellLocation.toUpperCase()}`
-                : "SHELL MODE  //  TYPE A COMMAND AFTER !"}
+                ? t("chatArea.shellModeReady", { loc: shellLocation })
+                : t("chatArea.shellModeEmpty")}
             </div>
           )}
           {showBranchHint && (
@@ -1110,7 +1123,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                 composingRef.current = false;
                 setInputFocused(false);
               }}
-              placeholder={shellMode ? "Run a shell command locally..." : "Ask anything..."}
+              placeholder={shellMode ? t("chatArea.placeholderShell") : t("chatArea.placeholderAsk")}
               rows={1}
               style={{
                 flex: 1,
@@ -1181,7 +1194,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                         letterSpacing: ".1em",
                       }}
                     >
-                      RUN
+                      {t("chatArea.run")}
                     </span>
                   </>
                 ) : (
@@ -1203,9 +1216,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
           >
             {shellMode
               ? (canRunShell
-                  ? "ENTER TO RUN  //  OUTPUT APPENDS BELOW  //  LOCAL SHELL"
-                  : "TYPE A COMMAND AFTER !  //  ENTER TO RUN")
-              : "ENTER TO SEND  //  SHIFT+ENTER NEWLINE  //  PASTE IMAGES"}
+                  ? t("chatArea.hintShellRun")
+                  : t("chatArea.hintShellEmpty"))
+              : t("chatArea.hintChat")}
           </div>
         </div>
       </div>}
