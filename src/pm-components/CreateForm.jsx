@@ -55,7 +55,7 @@ export default function CreateForm({ repos, type, onClose, onCreated, locale = "
         setBase(defaultBranch);
       }).catch(() => {});
     }
-  }, [repo, type]);
+  }, [repo, type, head]);
 
   useEffect(() => {
     const onKey = (e) => {

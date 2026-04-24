@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { Plus, Search, Trash2, PanelLeftClose, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow, FolderPlus } from "lucide-react";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
@@ -89,24 +89,43 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
     c.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  const folderOrderRef = useRef([]);
+  const [folderOrder, setFolderOrder] = useState([]);
+  const [prevFiltered, setPrevFiltered] = useState(filtered);
+  const [prevProjects, setPrevProjects] = useState(projects);
+
+  // Derived state: recompute folder order when filtered/projects change (React derived-state pattern)
+  if (filtered !== prevFiltered || projects !== prevProjects) {
+    setPrevFiltered(filtered);
+    setPrevProjects(projects);
+    const result = groupConvosByProject(filtered, projects);
+    const currentRoots = new Set(result.projectGroups.map(g => g.cwdRoot));
+    setFolderOrder((prevOrder) => {
+      const kept = prevOrder.filter(r => currentRoots.has(r));
+      const known = new Set(kept);
+      const newcomers = result.projectGroups
+        .filter(g => !known.has(g.cwdRoot))
+        .sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0))
+        .map(g => g.cwdRoot);
+      return [...newcomers, ...kept];
+    });
+  }
+
   const { projectGroups, drafts } = useMemo(() => {
     const result = groupConvosByProject(filtered, projects);
     const currentRoots = new Set(result.projectGroups.map(g => g.cwdRoot));
-    const prevOrder = folderOrderRef.current.filter(r => currentRoots.has(r));
+    const prevOrder = folderOrder.filter(r => currentRoots.has(r));
     const known = new Set(prevOrder);
     const newcomers = result.projectGroups
       .filter(g => !known.has(g.cwdRoot))
       .sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0))
       .map(g => g.cwdRoot);
     const nextOrder = [...newcomers, ...prevOrder];
-    folderOrderRef.current = nextOrder;
     const byRoot = new Map(result.projectGroups.map(g => [g.cwdRoot, g]));
     return {
       projectGroups: nextOrder.map(r => byRoot.get(r)).filter(Boolean),
       drafts: result.drafts,
     };
-  }, [filtered, projects]);
+  }, [filtered, projects, folderOrder]);
   const searchActive = search.length > 0;
 
   const cwdShort = cwd ? (() => {

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 export default function HoverIconButton({
@@ -18,12 +18,6 @@ export default function HoverIconButton({
   const [hovered, setHovered] = useState(false);
   const [tipPos, setTipPos] = useState(null);
 
-  useEffect(() => {
-    if (!hovered || disabled || !btnRef.current) { setTipPos(null); return; }
-    const r = btnRef.current.getBoundingClientRect();
-    setTipPos({ left: r.left + r.width / 2, top: r.top });
-  }, [hovered, disabled]);
-
   return (
     <>
       <button
@@ -35,8 +29,17 @@ export default function HoverIconButton({
         onClick={(e) => {
           if (!disabled) onClick?.(e);
         }}
-        onMouseEnter={(e) => { if (!disabled) setHovered(true); onMouseEnter?.(e); }}
-        onMouseLeave={(e) => { setHovered(false); onMouseLeave?.(e); }}
+        onMouseEnter={(e) => {
+          if (!disabled) {
+            setHovered(true);
+            if (btnRef.current) {
+              const r = btnRef.current.getBoundingClientRect();
+              setTipPos({ left: r.left + r.width / 2, top: r.top });
+            }
+          }
+          onMouseEnter?.(e);
+        }}
+        onMouseLeave={(e) => { setHovered(false); setTipPos(null); onMouseLeave?.(e); }}
         style={{
           display: "flex",
           alignItems: "center",

@@ -1,0 +1,67 @@
+import { useState, useCallback, useEffect } from "react";
+import { loadMulticaState, saveMulticaState } from "../multica/store";
+
+export function multicaAgentToModel(agent, state) {
+  return {
+    id: `multica:${agent.id}`,
+    name: agent.name,
+    tag: (agent.name || "agent").toUpperCase(),
+    provider: "multica",
+    agentId: agent.id,
+    workspaceId: state.workspaceId,
+    workspaceSlug: state.workspaceSlug,
+    runtimeId: agent.runtime_id,
+    status: agent.status,
+  };
+}
+
+export function useMulticaModels() {
+  const [state, setState] = useState(() => loadMulticaState());
+  const [models, setModels] = useState(() => (state.agentsCache || []).map((a) => multicaAgentToModel(a, state)));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const refresh = useCallback(async () => {
+    const s = loadMulticaState();
+    setState(s);
+    if (!s.token || !s.serverUrl || (!s.workspaceId && !s.workspaceSlug)) {
+      setModels([]);
+      return;
+    }
+    setLoading(true); setError(null);
+    try {
+      const agents = await window.api.multicaListAgents({
+        serverUrl: s.serverUrl,
+        token: s.token,
+        workspaceId: s.workspaceId,
+        workspaceSlug: s.workspaceSlug,
+      });
+      saveMulticaState({ agentsCache: agents, agentsCachedAt: Date.now() });
+      setModels(agents.map((a) => multicaAgentToModel(a, s)));
+    } catch (e) {
+      setError(e);
+    } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const h = () => { void refresh(); };
+    window.addEventListener("multica-refresh", h);
+    return () => window.removeEventListener("multica-refresh", h);
+  }, [refresh]);
+
+  useEffect(() => {
+    const h = (e) => {
+      const agent = e.detail;
+      if (!agent?.id) return;
+      setModels((prev) => prev.map((m) => m.agentId === agent.id
+        ? { ...m, status: agent.status }
+        : m));
+    };
+    window.addEventListener("multica-agent-status", h);
+    return () => window.removeEventListener("multica-agent-status", h);
+  }, []);
+
+  return { models, loading, error, refresh, state };
+}

@@ -8,10 +8,12 @@ export default function RepoManager({ repos, onAdd, onClose }) {
   const [search, setSearch] = useState("");
 
   const fetchRepos = () => {
-    setLoading(true);
-    setError(null);
-    window.ghApi
-      .listUserRepos(100)
+    Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError(null);
+        return window.ghApi.listUserRepos(100);
+      })
       .then((data) => {
         setUserRepos(data);
         setLoading(false);

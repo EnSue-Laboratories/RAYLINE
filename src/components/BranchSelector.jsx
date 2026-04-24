@@ -7,7 +7,7 @@ const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 
 function IconActionButton({
-  icon: Icon,
+  icon,
   tooltip,
   onClick,
   disabled = false,
@@ -21,12 +21,7 @@ function IconActionButton({
   const [hovered, setHovered] = useState(false);
   const [tipPos, setTipPos] = useState(null);
 
-  useEffect(() => {
-    if (!hovered || disabled || !btnRef.current) { setTipPos(null); return; }
-    const r = btnRef.current.getBoundingClientRect();
-    setTipPos({ left: r.left + r.width / 2, top: r.top });
-  }, [hovered, disabled]);
-
+  const IconEl = icon;
   const active = !disabled && visible;
 
   return (
@@ -40,8 +35,16 @@ function IconActionButton({
           e.stopPropagation();
           if (!disabled) onClick?.(e);
         }}
-        onMouseEnter={() => { if (active) setHovered(true); }}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={() => {
+          if (active) {
+            setHovered(true);
+            if (btnRef.current) {
+              const r = btnRef.current.getBoundingClientRect();
+              setTipPos({ left: r.left + r.width / 2, top: r.top });
+            }
+          }
+        }}
+        onMouseLeave={() => { setHovered(false); setTipPos(null); }}
         style={{
           display: "flex",
           alignItems: "center",
@@ -61,7 +64,7 @@ function IconActionButton({
           padding: 0,
         }}
       >
-        <Icon size={11} strokeWidth={2} />
+        <IconEl size={11} strokeWidth={2} />
       </button>
       {hovered && active && tipPos && createPortal(
         <div

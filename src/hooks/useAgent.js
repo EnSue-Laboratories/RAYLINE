@@ -176,7 +176,7 @@ function normalizeCodexToolArgs(payload) {
     if (parsed && typeof parsed === "object") {
       return parsed.cmd && !parsed.command ? { ...parsed, command: parsed.cmd } : parsed;
     }
-  } catch {}
+  } catch { /* not JSON — fall through */ }
 
   return payload?.type === "custom_tool_call" ? { input: raw } : { value: raw };
 }
@@ -448,7 +448,7 @@ export default function useAgent() {
               if (toolIdx >= 0) {
                 const newJson = (parts[toolIdx].argsJson || "") + (delta.partial_json || "");
                 let newArgs = parts[toolIdx].args;
-                try { newArgs = JSON.parse(newJson); } catch {}
+                try { newArgs = JSON.parse(newJson); } catch { /* partial JSON — keep previous */ }
                 parts[toolIdx] = { ...parts[toolIdx], argsJson: newJson, args: newArgs };
               }
               updateAssistant({ parts, isStreaming: true, _streamState: streamState });
@@ -482,7 +482,7 @@ export default function useAgent() {
           // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
           // Usage here is per-API-call, not cumulative — skip it to avoid flicker;
           // the `result` event below owns the authoritative cumulative usage.
-          const am = ensureAssistant();
+          ensureAssistant();
           const parts = cloneParts(lastMsg.parts);
           const hasStreamParts = parts.length > 0;
           if (!hasStreamParts && event.message?.content) {
@@ -860,10 +860,11 @@ export default function useAgent() {
     });
 
     cleanupRefs.current = [offStream, offDone, offError];
+    const timersRef = usageHydrationTimersRef;
     return () => {
       cleanupRefs.current.forEach((fn) => fn?.());
-      usageHydrationTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
-      usageHydrationTimersRef.current.clear();
+      timersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      timersRef.current.clear();
     };
   }, []);
 

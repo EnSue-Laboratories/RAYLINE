@@ -114,7 +114,7 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
   const [now, setNow] = useState(() => Date.now());
   const [phraseIdx, setPhraseIdx] = useState(0);
   const phraseRef = useRef(0);
-  const finalElapsedRef = useRef(null);
+  const [finalElapsed, setFinalElapsed] = useState(null);
 
   useEffect(() => {
     if (!isStreaming) return;
@@ -130,9 +130,12 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
   }, [isStreaming]);
 
   // Freeze elapsed at stream end (same mount) so the footer shows total runtime.
+  const prevStreamingRef = useRef(isStreaming);
   useEffect(() => {
-    if (!isStreaming && startedAt && finalElapsedRef.current == null) {
-      finalElapsedRef.current = Date.now() - startedAt;
+    const wasStreaming = prevStreamingRef.current;
+    prevStreamingRef.current = isStreaming;
+    if (wasStreaming && !isStreaming && startedAt) {
+      Promise.resolve(Date.now() - startedAt).then(setFinalElapsed);
     }
   }, [isStreaming, startedAt]);
 
@@ -140,7 +143,7 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
   // reloads, whereas `Date.now() - _startedAt` would drift across sessions.
   const elapsedMs = isStreaming
     ? (startedAt ? now - startedAt : 0)
-    : (frozenElapsedMs ?? finalElapsedRef.current ?? 0);
+    : (frozenElapsedMs ?? finalElapsed ?? 0);
 
   const model = modelId ? getM(modelId) : null;
   const isCodex = model?.provider === "codex";

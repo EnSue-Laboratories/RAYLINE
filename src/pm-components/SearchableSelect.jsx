@@ -16,12 +16,19 @@ export default function SearchableSelect({ options, value, onChange, placeholder
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(0);
+  const [prevFilteredLen, setPrevFilteredLen] = useState(0);
   const containerRef = useRef(null);
   const listRef = useRef(null);
 
   const filtered = query
     ? options.filter((o) => o.toLowerCase().includes(query.toLowerCase()))
     : options;
+
+  // Reset highlight when filtered list length changes (derived state pattern)
+  if (filtered.length !== prevFilteredLen) {
+    setPrevFilteredLen(filtered.length);
+    setHighlightIdx(0);
+  }
 
   // Close on outside click
   useEffect(() => {
@@ -34,11 +41,6 @@ export default function SearchableSelect({ options, value, onChange, placeholder
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
-  // Reset highlight when filtered list changes
-  useEffect(() => {
-    setHighlightIdx(0);
-  }, [filtered.length]);
 
   // Scroll highlighted item into view
   useEffect(() => {

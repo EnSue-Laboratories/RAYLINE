@@ -4,15 +4,16 @@ import { useFontScale } from "../contexts/FontSizeContext";
 export default function EmptyState() {
   const s = useFontScale();
   const [info, setInfo] = useState(null);
-  const [brandColor, setBrandColor] = useState("#FF4422");
+  const [brandColor, setBrandColor] = useState(() => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue("--brand-slash").trim();
+    return v || "#FF4422";
+  });
 
   useEffect(() => {
     window.api?.getSystemInfo?.().then(setInfo).catch(() => {});
   }, []);
 
   useEffect(() => {
-    const v = getComputedStyle(document.documentElement).getPropertyValue("--brand-slash").trim();
-    if (v) setBrandColor(v);
     const obs = new MutationObserver(() => {
       const nv = getComputedStyle(document.documentElement).getPropertyValue("--brand-slash").trim();
       if (nv) setBrandColor(nv);

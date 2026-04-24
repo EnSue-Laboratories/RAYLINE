@@ -6,7 +6,7 @@ export default function ThinkingBlock({ text, isThinking }) {
   const [open, setOpen] = useState(false);
   const s = useFontScale();
   const hasText = Boolean(text && text.trim().length > 0);
-  const startTime = useRef(Date.now());
+  const startTime = useRef(null);
   const [elapsed, setElapsed] = useState(0);
 
   // Track thinking duration
@@ -20,14 +20,14 @@ export default function ThinkingBlock({ text, isThinking }) {
   }, [isThinking]);
 
   // Freeze elapsed when thinking stops
-  const finalElapsed = useRef(0);
+  const [finalElapsed, setFinalElapsed] = useState(0);
   useEffect(() => {
     if (!isThinking && elapsed > 0) {
-      finalElapsed.current = elapsed;
+      Promise.resolve(elapsed).then(setFinalElapsed);
     }
   }, [isThinking, elapsed]);
 
-  const seconds = isThinking ? elapsed : (finalElapsed.current || elapsed);
+  const seconds = isThinking ? elapsed : (finalElapsed || elapsed);
 
   function formatDuration(s) {
     if (s < 1) return "";

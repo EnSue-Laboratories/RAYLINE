@@ -251,7 +251,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   const hasNoUpstream = Boolean(gitStatus?.branch) && !gitStatus?.upstream && !gitStatus?.detached;
   const branchNeedsAttention = hasDirtyWorktree || hasNoUpstream;
   const [branchHintDismissed, setBranchHintDismissed] = useState(false);
-  useEffect(() => { setBranchHintDismissed(false); }, [convo?.id]);
+  const prevConvoIdRef = useRef(convo?.id);
+  if (prevConvoIdRef.current !== convo?.id) {
+    prevConvoIdRef.current = convo?.id;
+    setBranchHintDismissed(false);
+  }
   const showBranchHint = isMulticaModel && !showNewChatCard && branchNeedsAttention && !branchHintDismissed && !shellMode;
   const branchHintText = (() => {
     if (hasDirtyWorktree && hasNoUpstream) return "BRANCH MAY NEED UPDATING  //  UNCOMMITTED CHANGES + NOT PUBLISHED";

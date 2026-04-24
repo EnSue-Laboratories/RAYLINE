@@ -11,7 +11,7 @@ export default function CommentBox({ repo, number, onCommentAdded, actions }) {
       await window.ghApi.addComment(repo, number, body.trim());
       setBody("");
       onCommentAdded();
-    } catch {}
+    } catch { /* ignore submit errors */ }
     setSubmitting(false);
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ArrowLeft, GitBranch, Plus, Check, CheckCircle2, GitMerge, RotateCcw, Copy } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -102,18 +102,21 @@ export default function ItemDetail({ repo, number, type, onBack }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showAssignMenu]);
 
-  const fetchAll = () => {
-    setLoading(true);
-    setError(null);
+  const fetchAll = useCallback(() => {
     const fetchItem =
       type === "pr"
         ? window.ghApi.getPR(repo, number)
         : window.ghApi.getIssue(repo, number);
-    Promise.all([
-      fetchItem,
-      window.ghApi.listComments(repo, number),
-      window.ghApi.listCollaborators(repo),
-    ])
+    Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError(null);
+        return Promise.all([
+          fetchItem,
+          window.ghApi.listComments(repo, number),
+          window.ghApi.listCollaborators(repo),
+        ]);
+      })
       .then(([itemData, commentsData, collabs]) => {
         setItem(itemData);
         setComments(commentsData);
@@ -124,7 +127,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         setError(err.message);
         setLoading(false);
       });
-  };
+  }, [repo, number, type]);
 
   useEffect(() => {
     fetchAll();
@@ -139,10 +142,10 @@ export default function ItemDetail({ repo, number, type, onBack }) {
         ]);
         setItem(itemData);
         setComments(commentsData);
-      } catch {}
+      } catch { /* ignore polling errors */ }
     }, 30000);
     return () => clearInterval(interval);
-  }, [repo, number, type]);
+  }, [fetchAll, repo, number, type]);
 
   const handleToggleAssign = async (login) => {
     const isAssigned = item.assignees.some((a) => a.login === login);
@@ -163,7 +166,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
     try {
       const updated = await window.ghApi.closeIssue(repo, number);
       setItem(updated);
-    } catch {}
+    } catch { /* ignore close errors */ }
     setActionLoading(false);
   };
 
@@ -172,7 +175,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
     try {
       const updated = await window.ghApi.reopenIssue(repo, number);
       setItem(updated);
-    } catch {}
+    } catch { /* ignore reopen errors */ }
     setActionLoading(false);
   };
 
@@ -182,7 +185,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
       await window.ghApi.mergePR(repo, number);
       const updated = await window.ghApi.getPR(repo, number);
       setItem(updated);
-    } catch {}
+    } catch { /* ignore merge errors */ }
     setActionLoading(false);
   };
 
@@ -190,7 +193,7 @@ export default function ItemDetail({ repo, number, type, onBack }) {
     try {
       const updated = await window.ghApi.listComments(repo, number);
       setComments(updated);
-    } catch {}
+    } catch { /* ignore refresh errors */ }
   };
 
   if (loading) {

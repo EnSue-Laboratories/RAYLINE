@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
@@ -256,67 +256,8 @@ function PointerSlider({ min, max, step, value, onChange }) {
   );
 }
 
-export default function ValueControlBlock({ json, isStreaming, onAnswer, onControlChange, canControlTarget }) {
+function ValueControlInner({ json, normalized, onAnswer, onControlChange, canControlTarget }) {
   const s = useFontScale();
-
-  if (isStreaming) {
-    return (
-      <div
-        style={{
-          margin: "12px 0",
-          borderRadius: 10,
-          border: "1px solid rgba(255,255,255,0.06)",
-          background: "rgba(255,255,255,0.02)",
-          padding: "18px 16px",
-          color: "rgba(255,255,255,0.28)",
-          fontSize: s(11),
-          fontFamily: "'JetBrains Mono',monospace",
-          letterSpacing: ".08em",
-        }}
-      >
-        CONTROL
-      </div>
-    );
-  }
-
-  let normalized;
-  try {
-    normalized = normalizeControlBlock(json);
-  } catch (error) {
-    return (
-      <div
-        style={{
-          margin: "12px 0",
-          borderRadius: 10,
-          border: "1px solid rgba(255,120,120,0.18)",
-          background: "rgba(120,0,0,0.12)",
-          padding: "14px 16px",
-        }}
-      >
-        <div
-          style={{
-            fontSize: s(10),
-            fontFamily: "'JetBrains Mono',monospace",
-            color: "rgba(255,180,180,0.75)",
-            letterSpacing: ".08em",
-            marginBottom: 8,
-          }}
-        >
-          INVALID CONTROL
-        </div>
-        <div
-          style={{
-            fontSize: s(13),
-            color: "rgba(255,220,220,0.8)",
-            fontFamily: "system-ui,-apple-system,sans-serif",
-          }}
-        >
-          {error.message}
-        </div>
-      </div>
-    );
-  }
-
   const { control, config } = normalized;
   const cachedDraftValue = controlDraftCache.get(json);
   const [sliderValue, setSliderValue] = useState(
@@ -327,15 +268,18 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
   );
   const [submitted, setSubmitted] = useState(false);
   const [buttonHovered, setButtonHovered] = useState(false);
+  const [prevJson, setPrevJson] = useState(json);
 
-  useEffect(() => {
+  // Derived state: reset slider/draft when the json (control definition) changes
+  if (json !== prevJson) {
+    setPrevJson(json);
     const nextValue = Number.isFinite(controlDraftCache.get(json))
       ? controlDraftCache.get(json)
       : config.initial;
     setSliderValue(nextValue);
     setValueDraft(formatNumber(config.getValue(nextValue)));
     setSubmitted(false);
-  }, [json, config.initial]);
+  }
 
   const value = useMemo(() => config.getValue(sliderValue), [config, sliderValue]);
   const valueText = `${formatNumber(value)}${control.unit || ""}`;
@@ -647,5 +591,77 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ValueControlBlock({ json, isStreaming, onAnswer, onControlChange, canControlTarget }) {
+  const s = useFontScale();
+
+  if (isStreaming) {
+    return (
+      <div
+        style={{
+          margin: "12px 0",
+          borderRadius: 10,
+          border: "1px solid rgba(255,255,255,0.06)",
+          background: "rgba(255,255,255,0.02)",
+          padding: "18px 16px",
+          color: "rgba(255,255,255,0.28)",
+          fontSize: s(11),
+          fontFamily: "'JetBrains Mono',monospace",
+          letterSpacing: ".08em",
+        }}
+      >
+        CONTROL
+      </div>
+    );
+  }
+
+  let normalized;
+  try {
+    normalized = normalizeControlBlock(json);
+  } catch (parseError) {
+    return (
+      <div
+        style={{
+          margin: "12px 0",
+          borderRadius: 10,
+          border: "1px solid rgba(255,120,120,0.18)",
+          background: "rgba(120,0,0,0.12)",
+          padding: "14px 16px",
+        }}
+      >
+        <div
+          style={{
+            fontSize: s(10),
+            fontFamily: "'JetBrains Mono',monospace",
+            color: "rgba(255,180,180,0.75)",
+            letterSpacing: ".08em",
+            marginBottom: 8,
+          }}
+        >
+          INVALID CONTROL
+        </div>
+        <div
+          style={{
+            fontSize: s(13),
+            color: "rgba(255,220,220,0.8)",
+            fontFamily: "system-ui,-apple-system,sans-serif",
+          }}
+        >
+          {parseError.message}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ValueControlInner
+      json={json}
+      normalized={normalized}
+      onAnswer={onAnswer}
+      onControlChange={onControlChange}
+      canControlTarget={canControlTarget}
+    />
   );
 }

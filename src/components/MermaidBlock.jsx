@@ -204,7 +204,8 @@ export default function MermaidBlock({ code }) {
   const lastRendered = useRef("");
   const timerRef = useRef(null);
   const containerRef = useRef(null);
-  const lastHeight = useRef(null);
+  const lastHeightRef = useRef(null);
+  const [lastHeight, setLastHeight] = useState(null);
 
   // Re-initialize mermaid and force re-render when data-theme changes
   useEffect(() => {
@@ -225,7 +226,7 @@ export default function MermaidBlock({ code }) {
   useEffect(() => {
     const trimmed = code?.trim();
     if (!trimmed) return;
-    if (trimmed === lastRendered.current && svg) return;
+    if (trimmed === lastRendered.current) return;
 
     // Debounce: wait 600ms after last code change (handles streaming)
     clearTimeout(timerRef.current);
@@ -244,12 +245,21 @@ export default function MermaidBlock({ code }) {
       }).catch(() => {
         setError(true);
       }).finally(() => {
-        try { document.body.removeChild(offscreen); } catch {}
+        try { document.body.removeChild(offscreen); } catch { /* offscreen already removed */ }
       });
     }, 600);
 
     return () => clearTimeout(timerRef.current);
   }, [code, themeKey]);
+
+  // Capture height when SVG is rendered (must be called before any early returns)
+  useEffect(() => {
+    if (svg && containerRef.current) {
+      const h = containerRef.current.offsetHeight;
+      lastHeightRef.current = h;
+      setLastHeight(h);
+    }
+  }, [svg]);
 
   if (error) {
     return (
@@ -270,13 +280,6 @@ export default function MermaidBlock({ code }) {
     );
   }
 
-  // Capture height when SVG is rendered
-  useEffect(() => {
-    if (svg && containerRef.current) {
-      lastHeight.current = containerRef.current.offsetHeight;
-    }
-  }, [svg]);
-
   if (!svg) {
     return (
       <div style={{
@@ -290,7 +293,7 @@ export default function MermaidBlock({ code }) {
         fontSize: s(11),
         fontFamily: "'JetBrains Mono',monospace",
         // Preserve last known height to prevent scroll jumps
-        minHeight: lastHeight.current || undefined,
+        minHeight: lastHeight || undefined,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

@@ -4,9 +4,6 @@ import { useFontScale } from "../contexts/FontSizeContext";
 
 export default function InteractiveBlock({ code, isStreaming }) {
   const s = useFontScale();
-  const iframeRef = useRef(null);
-  const [height, setHeight] = useState(300);
-  const [loaded, setLoaded] = useState(false);
 
   // While streaming, show a generating placeholder
   if (isStreaming) {
