@@ -93,7 +93,7 @@ export default function SidebarChromeRail({ sidebarOpen, settingsOpen, onToggleS
         <Plus size={15} strokeWidth={1.6} />
       </RailButton>
 
-      <RailButton label="Settings" onClick={onOpenSettings} active={settingsOpen}>
+      <RailButton label={settingsOpen ? "Close settings" : "Settings"} onClick={onOpenSettings} active={settingsOpen}>
         <Settings size={14} strokeWidth={1.55} />
       </RailButton>
     </div>

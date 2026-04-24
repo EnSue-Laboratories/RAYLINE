@@ -3359,7 +3359,7 @@ export default function App() {
         settingsOpen={showSettings}
         onToggleSidebar={() => setSidebarOpen((o) => !o)}
         onNew={handleNew}
-        onOpenSettings={() => setShowSettings(true)}
+        onOpenSettings={() => setShowSettings((open) => !open)}
       />
 
       <div
