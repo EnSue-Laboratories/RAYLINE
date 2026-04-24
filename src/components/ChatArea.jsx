@@ -369,6 +369,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
   const showConversationTitle = Boolean(convo && !showNewChatCard);
   const topTabsLeft = sidebarOpen ? 18 : SIDEBAR_CHROME_RAIL_LEFT + SIDEBAR_CHROME_RAIL_WIDTH + 16;
   const headerContentOffset = showHeaderTabs ? 8 : 0;
+  const headerLeftPadding = sidebarOpen ? 24 : 50;
 
   const handleDragEnter = useCallback((e) => {
     if (!dataTransferHasFiles(e.dataTransfer)) return;
@@ -544,11 +545,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
       {/* Top bar — aligns with sidebar header */}
       <div
         style={{
-          padding: `${headerContentOffset}px 24px 12px`,
+          padding: `${headerContentOffset}px 24px 12px ${headerLeftPadding}px`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          transition: "padding-top .16s ease",
+          transition: "padding .16s ease",
         }}
       >
         <div style={{
@@ -556,7 +557,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
           alignItems: "center",
           justifyContent: "space-between",
           width: "100%",
-          maxWidth: !sidebarOpen ? 640 : "none",
+          maxWidth: "none",
         }}>
         <div
           style={{
