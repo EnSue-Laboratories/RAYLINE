@@ -70,6 +70,7 @@ function validateProvider(p) {
     name,
     apiKey: String(p.apiKey || ""),
     baseUrl: String(p.baseUrl || "").trim(),
+    defaultModelId: String(p.defaultModelId || "").trim(),
   };
 }
 
@@ -77,7 +78,20 @@ function validateProvider(p) {
 
 function saveByokProviders(providers) {
   if (!Array.isArray(providers)) throw new Error("providers must be an array");
-  const validated = providers.map(validateProvider).filter(Boolean);
+  const currentProviders = readStore();
+  const validated = providers.map((p) => {
+    const valid = validateProvider(p);
+    if (!valid) return null;
+    if (valid.apiKey.includes("••••")) {
+      const existing = currentProviders.find((ep) => ep.id === valid.id);
+      if (existing) {
+        valid.apiKey = existing.apiKey;
+      } else {
+        valid.apiKey = "";
+      }
+    }
+    return valid;
+  }).filter(Boolean);
   writeStore(validated);
   log("Saved", validated.length, "provider(s)");
   return true;

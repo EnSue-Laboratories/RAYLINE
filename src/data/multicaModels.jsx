@@ -76,7 +76,23 @@ function useByokModels() {
     try {
       const providers = await window.api.byokLoadProviders();
       const endpointIds = providers.map((p) => p.id);
-      setModels(getByokPresetsForEndpoints(endpointIds));
+      const presets = getByokPresetsForEndpoints(endpointIds);
+      const customModels = providers
+        .filter(p => p.id.startsWith("custom-"))
+        .map(p => {
+          // If defaultModelId isn't set, default to a fallback.
+          // Need to dynamically import buildCustomByokModel from byok-models
+          return {
+            id: `byok:${p.id}:${p.defaultModelId || "custom-model"}`,
+            name: p.name || "Custom Provider",
+            tag: (p.defaultModelId || "CUSTOM").toUpperCase(),
+            provider: "byok",
+            endpoint: p.id,
+            modelId: p.defaultModelId || "custom-model",
+            contextWindow: 128_000,
+          };
+        });
+      setModels([...presets, ...customModels]);
     } catch {
       setModels([]);
     }

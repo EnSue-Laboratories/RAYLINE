@@ -21,6 +21,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const [byokDraftKey, setByokDraftKey] = useState("");
   const [byokDraftBaseUrl, setByokDraftBaseUrl] = useState("");
   const [byokDraftName, setByokDraftName] = useState("");
+  const [byokDraftModelId, setByokDraftModelId] = useState("");
 
   // Sync from parent when wallpaper prop changes externally
   useEffect(() => {
@@ -1033,31 +1034,58 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     </div>
 
                     {byokDraftType === "custom" && (
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
-                          {t("settings.byokCustomName")}
+                      <>
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                            {t("settings.byokCustomName")}
+                          </div>
+                          <input
+                            type="text"
+                            value={byokDraftName}
+                            onChange={(e) => setByokDraftName(e.target.value)}
+                            placeholder={t("settings.byokCustomNamePlaceholder") || "e.g., My Local Inference"}
+                            spellCheck={false}
+                            style={{
+                              width: "100%",
+                              boxSizing: "border-box",
+                              height: 32,
+                              padding: "0 10px",
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: 7,
+                              color: "rgba(255,255,255,0.9)",
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: s(12),
+                              outline: "none",
+                            }}
+                          />
                         </div>
-                        <input
-                          type="text"
-                          value={byokDraftName}
-                          onChange={(e) => setByokDraftName(e.target.value)}
-                          placeholder={t("settings.byokCustomNamePlaceholder")}
-                          spellCheck={false}
-                          style={{
-                            width: "100%",
-                            boxSizing: "border-box",
-                            height: 32,
-                            padding: "0 10px",
-                            background: "rgba(255,255,255,0.04)",
-                            border: "1px solid rgba(255,255,255,0.08)",
-                            borderRadius: 7,
-                            color: "rgba(255,255,255,0.9)",
-                            fontFamily: "'JetBrains Mono', monospace",
-                            fontSize: s(12),
-                            outline: "none",
-                          }}
-                        />
-                      </div>
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
+                            Model ID (Required)
+                          </div>
+                          <input
+                            type="text"
+                            value={byokDraftModelId}
+                            onChange={(e) => setByokDraftModelId(e.target.value)}
+                            placeholder="e.g., llama3, qwen-coder"
+                            spellCheck={false}
+                            style={{
+                              width: "100%",
+                              boxSizing: "border-box",
+                              height: 32,
+                              padding: "0 10px",
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: 7,
+                              color: "rgba(255,255,255,0.9)",
+                              fontFamily: "'JetBrains Mono', monospace",
+                              fontSize: s(12),
+                              outline: "none",
+                            }}
+                          />
+                        </div>
+                      </>
                     )}
 
                     {byokDraftType && (
@@ -1120,7 +1148,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         <div style={{ display: "flex", gap: 8 }}>
                           <button
                             type="button"
-                            disabled={!byokDraftType || (!byokDraftKey && !byokDraftBaseUrl)}
+                            disabled={
+                              !byokDraftType ||
+                              (byokDraftType !== "custom" && !byokDraftKey) ||
+                              (byokDraftType === "custom" && (!byokDraftBaseUrl || !byokDraftModelId))
+                            }
                             onClick={async () => {
                               if (!window.api?.byokSaveProviders) return;
                               const id = byokDraftType === "custom"
@@ -1131,7 +1163,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                               const existing = byokProviders.map((p) => ({ ...p }));
                               // For built-in types, replace existing entry
                               const idx = byokDraftType !== "custom" ? existing.findIndex((p) => p.id === byokDraftType) : -1;
-                              const newEntry = { id, name, apiKey: byokDraftKey, baseUrl: byokDraftBaseUrl };
+                              const newEntry = { id, name, apiKey: byokDraftKey, baseUrl: byokDraftBaseUrl, defaultModelId: byokDraftModelId };
                               if (idx >= 0) {
                                 // Update: keep existing key if new one is empty (user might only update baseUrl)
                                 if (!byokDraftKey) newEntry.apiKey = "";
@@ -1149,15 +1181,16 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                               setByokDraftKey("");
                               setByokDraftBaseUrl("");
                               setByokDraftName("");
+                              setByokDraftModelId("");
                             }}
                             style={{
                               padding: "6px 14px",
                               borderRadius: 7,
-                              background: (byokDraftType && (byokDraftKey || byokDraftBaseUrl)) ? "rgba(180,220,255,0.15)" : "rgba(255,255,255,0.03)",
+                              background: (!(!byokDraftType || (byokDraftType !== "custom" && !byokDraftKey) || (byokDraftType === "custom" && (!byokDraftBaseUrl || !byokDraftModelId)))) ? "rgba(180,220,255,0.15)" : "rgba(255,255,255,0.03)",
                               border: "1px solid rgba(255,255,255,0.06)",
-                              color: (byokDraftType && (byokDraftKey || byokDraftBaseUrl)) ? "rgba(180,220,255,0.9)" : "rgba(255,255,255,0.38)",
+                              color: (!(!byokDraftType || (byokDraftType !== "custom" && !byokDraftKey) || (byokDraftType === "custom" && (!byokDraftBaseUrl || !byokDraftModelId)))) ? "rgba(180,220,255,0.9)" : "rgba(255,255,255,0.38)",
                               fontSize: s(12),
-                              cursor: (byokDraftType && (byokDraftKey || byokDraftBaseUrl)) ? "pointer" : "not-allowed",
+                              cursor: (!(!byokDraftType || (byokDraftType !== "custom" && !byokDraftKey) || (byokDraftType === "custom" && (!byokDraftBaseUrl || !byokDraftModelId)))) ? "pointer" : "not-allowed",
                               fontFamily: "system-ui, sans-serif",
                             }}
                           >
@@ -1171,6 +1204,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                               setByokDraftKey("");
                               setByokDraftBaseUrl("");
                               setByokDraftName("");
+                              setByokDraftModelId("");
                             }}
                             style={{
                               padding: "6px 14px",

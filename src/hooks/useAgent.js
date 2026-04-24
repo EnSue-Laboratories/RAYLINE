@@ -969,12 +969,14 @@ export default function useAgent() {
   }, []);
 
   const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, cwd, multicaContext, multicaToken }) => {
+    let newMessages = [];
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId);
       if (convo) {
         const msgs = convo.messages.slice(0, messageIndex);
         msgs.push({ id: uid(), role: "user", text: newText });
+        newMessages = [...msgs];
         msgs.push({ id: uid(), role: "assistant", parts: [], isStreaming: true, isThinking: false, _startedAt: Date.now(), _usage: null });
         next.set(conversationId, { messages: msgs, isStreaming: true, error: null });
       }
@@ -996,9 +998,8 @@ export default function useAgent() {
         return true;
       }
       if (provider === "byok") {
-        const convo = conversationsRef.current.get(conversationId);
-        const msgs = convo?.messages
-          ?.filter((m) => m.role === "user" || m.role === "assistant")
+        const msgs = newMessages
+          .filter((m) => m.role === "user" || m.role === "assistant")
           .map((m) => ({
             role: m.role,
             text: m.text || (m.parts || []).filter((p) => p.type === "text").map((p) => p.text).join("\n"),

@@ -29,7 +29,10 @@ function buildAnthropicRequest({ modelId, prompt, messages, systemPrompt }) {
 
   // Add current prompt
   if (prompt) {
-    apiMessages.push({ role: "user", content: prompt });
+    const lastMsg = apiMessages[apiMessages.length - 1];
+    if (!lastMsg || lastMsg.role !== "user" || lastMsg.content !== prompt) {
+      apiMessages.push({ role: "user", content: prompt });
+    }
   }
 
   return {
@@ -61,7 +64,10 @@ function buildOpenAIRequest({ modelId, prompt, messages, systemPrompt }) {
 
   // Add current prompt
   if (prompt) {
-    apiMessages.push({ role: "user", content: prompt });
+    const lastMsg = apiMessages[apiMessages.length - 1];
+    if (!lastMsg || lastMsg.role !== "user" || lastMsg.content !== prompt) {
+      apiMessages.push({ role: "user", content: prompt });
+    }
   }
 
   return {
