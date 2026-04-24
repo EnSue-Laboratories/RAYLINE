@@ -1,51 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, GitBranch, FileText, Check, ChevronRight, ChevronDown, Paperclip, Plus } from "lucide-react";
+import { X, ChevronDown, Paperclip, Plus } from "lucide-react";
 import ImagePreview from "./ImagePreview";
 import { createTranslator } from "../i18n";
-
-function TransparentCheckbox({ checked, onChange, ariaLabel }) {
-  return (
-    <label style={{ display: "inline-flex", alignItems: "center", cursor: "pointer", flexShrink: 0 }}>
-      <input
-        type="checkbox"
-        checked={!!checked}
-        onChange={(e) => onChange(e.target.checked)}
-        aria-label={ariaLabel}
-        style={{ opacity: 0, width: 0, height: 0, margin: 0, pointerEvents: "none" }}
-      />
-      <span
-        aria-hidden
-        style={{
-          width: 16, height: 16, borderRadius: 4,
-          border: "1px solid rgba(255,255,255,0.18)",
-          background: checked ? "rgba(255,255,255,0.08)" : "transparent",
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
-          transition: "border-color .15s, background .15s",
-        }}
-      >
-        <Check
-          size={11}
-          strokeWidth={2.4}
-          color="rgba(255,255,255,0.86)"
-          style={{
-            opacity: checked ? 1 : 0,
-            transform: checked ? "scale(1)" : "scale(0.75)",
-            transition: "opacity .12s ease, transform .12s ease",
-          }}
-        />
-      </span>
-    </label>
-  );
-}
-
-const sectionLabelStyle = {
-  fontSize: 9,
-  color: "rgba(255,255,255,0.35)",
-  fontFamily: "'JetBrains Mono', monospace",
-  letterSpacing: ".12em",
-  textTransform: "uppercase",
-};
 
 const onFieldHoverIn = (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; };
 const onFieldHoverOut = (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; };
@@ -55,15 +12,6 @@ const fieldHoverProps = {
   onFocus: onFieldHoverIn,
   onBlur: onFieldHoverOut,
 };
-
-function slugifyBranch(text, fallbackIndex) {
-  const slug = (text || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-+|-+$)/g, "")
-    .slice(0, 32);
-  return slug || `task-${fallbackIndex + 1}`;
-}
 
 function defaultCustomBranch(index) {
   const d = new Date();
@@ -85,20 +33,56 @@ function makeCustomRow(index) {
   };
 }
 
-function buildIssuePrompt(issue) {
-  const body = issue.body ? `\n\n${issue.body}` : "";
-  return `Fix issue #${issue.number}: ${issue.title}${body}`;
+function sanitizeBranchName(text, fallbackIndex) {
+  const slug = (text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-+|-+$)/g, "")
+    .slice(0, 48);
+  return slug || defaultCustomBranch(fallbackIndex);
 }
 
-function makeIssueRow(issue) {
+function uniqueBranchName(base, used) {
+  let next = base;
+  let i = 2;
+  while (used.has(next)) {
+    const suffix = `-${i}`;
+    next = `${base.slice(0, Math.max(1, 48 - suffix.length))}${suffix}`;
+    i += 1;
+  }
+  used.add(next);
+  return next;
+}
+
+function makeCustomRowFromPlan(plan, index, validModelIds, usedBranches) {
+  const branchBase = sanitizeBranchName(plan.branch || plan.title || plan.prompt, index);
   return {
-    key: `issue-${issue.number}`,
-    enabled: false,
-    issue,
-    prompt: buildIssuePrompt(issue),
-    branch: `issue-${issue.number}-${slugifyBranch(issue.title, issue.number)}`,
-    model: "",
-    expanded: false,
+    key: "r" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+    prompt: String(plan.prompt || plan.title || "").trim(),
+    branch: uniqueBranchName(branchBase, usedBranches),
+    model: validModelIds.has(plan.model) ? plan.model : "",
+    attachments: [],
+  };
+}
+
+function getDefaultPlannerModelId(availableModels, defaultModel) {
+  const plannerModels = (availableModels || []).filter((m) => m.provider === "claude" || m.provider === "codex");
+  if (plannerModels.some((m) => m.id === defaultModel)) return defaultModel;
+  return plannerModels.find((m) => m.id === "gpt55-med")?.id
+    || plannerModels.find((m) => m.provider === "claude" && m.id === "sonnet")?.id
+    || plannerModels[0]?.id
+    || "";
+}
+
+function modelPayload(model) {
+  if (!model) return null;
+  return {
+    id: model.id,
+    name: model.name || model.label || model.id,
+    tag: model.tag,
+    provider: model.provider,
+    cliFlag: model.cliFlag,
+    effort: model.effort,
   };
 }
 
@@ -106,19 +90,35 @@ export default function DispatchCard({
   onClose,
   onDispatch,
   currentCwd,
-  projects,
   defaultModel = "sonnet",
   availableModels = [],
   locale,
 }) {
   const t = useMemo(() => createTranslator(locale), [locale]);
-  const [tab, setTab] = useState("issues"); // "issues" | "custom"
+  const [tab, setTab] = useState("auto"); // "auto" | "custom"
   const [globalModel, setGlobalModel] = useState(defaultModel);
   const [customRows, setCustomRows] = useState([]);
-  const [issueRows, setIssueRows] = useState([]);
+  const [autoBrief, setAutoBrief] = useState("");
+  const [autoPlannerModel, setAutoPlannerModel] = useState(() =>
+    getDefaultPlannerModelId(availableModels, defaultModel)
+  );
+  const [autoLoading, setAutoLoading] = useState(false);
+  const [autoError, setAutoError] = useState(null);
+  const [autoNote, setAutoNote] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({}); // rowKey -> message
   const [banner, setBanner] = useState(null);
+
+  const plannerModels = useMemo(
+    () => (availableModels || []).filter((m) => m.provider === "claude" || m.provider === "codex"),
+    [availableModels]
+  );
+
+  useEffect(() => {
+    if (!plannerModels.length) return;
+    if (plannerModels.some((m) => m.id === autoPlannerModel)) return;
+    setAutoPlannerModel(getDefaultPlannerModelId(availableModels, defaultModel));
+  }, [plannerModels, autoPlannerModel, availableModels, defaultModel]);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
@@ -130,16 +130,63 @@ export default function DispatchCard({
     setBanner(null);
   }, [tab]);
 
-  const activeRows = tab === "issues"
-    ? issueRows.filter((r) => r.enabled)
-    : customRows;
+  const activeRows = tab === "custom" ? customRows : [];
   const canDispatch = activeRows.length > 0 && !submitting
-    && (tab === "issues" || !!currentCwd);
+    && tab === "custom" && !!currentCwd;
+
+  const handleAutoFill = useCallback(async () => {
+    const brief = autoBrief.trim();
+    if (!brief) {
+      setAutoError(t("dispatch.autoErrorBriefEmpty"));
+      return;
+    }
+    if (!window.api?.dispatchPlan) {
+      setAutoError(t("dispatch.autoErrorUnavailable"));
+      return;
+    }
+
+    const plannerModel = plannerModels.find((m) => m.id === autoPlannerModel) || plannerModels[0];
+    if (!plannerModel) {
+      setAutoError(t("dispatch.autoErrorNoPlanner"));
+      return;
+    }
+
+    setAutoLoading(true);
+    setAutoError(null);
+    setAutoNote(null);
+    try {
+      const result = await window.api.dispatchPlan({
+        instructions: brief,
+        cwd: currentCwd,
+        plannerModel: modelPayload(plannerModel),
+        targetModels: availableModels.map(modelPayload).filter(Boolean),
+        defaultTargetModel: globalModel,
+      });
+      const validModelIds = new Set(availableModels.map((m) => m.id));
+      const usedBranches = new Set();
+      const rows = (result?.rows || [])
+        .map((row, index) => makeCustomRowFromPlan(row, index, validModelIds, usedBranches))
+        .filter((row) => row.prompt.trim());
+
+      if (rows.length === 0) {
+        setAutoError(t("dispatch.autoErrorNoRows"));
+        return;
+      }
+
+      setCustomRows(rows);
+      setErrors({});
+      setAutoNote(t("dispatch.autoFilled", { count: rows.length }));
+      setTab("custom");
+    } catch (e) {
+      setAutoError(e?.message || t("dispatch.autoErrorFailed"));
+    } finally {
+      setAutoLoading(false);
+    }
+  }, [autoBrief, autoPlannerModel, plannerModels, currentCwd, availableModels, globalModel, t]);
 
   const handleSubmit = useCallback(async () => {
-    const rowsToRun = tab === "issues"
-      ? issueRows.filter((r) => r.enabled)
-      : customRows;
+    if (tab === "auto") return;
+    const rowsToRun = customRows;
 
     const rowErrors = {};
     const seenBranches = new Set();
@@ -198,17 +245,11 @@ export default function DispatchCard({
     }));
 
     const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
-    if (tab === "issues") {
-      setIssueRows((prev) => prev.map((r) =>
-        successBranches.has(r.branch.trim()) ? { ...r, enabled: false } : r
-      ));
-    } else {
-      setCustomRows((prev) => prev.filter((r) => !successBranches.has(r.branch.trim())));
-    }
-  }, [tab, issueRows, customRows, currentCwd, globalModel, onDispatch, onClose, t]);
+    setCustomRows((prev) => prev.filter((r) => !successBranches.has(r.branch.trim())));
+  }, [tab, customRows, currentCwd, globalModel, onDispatch, onClose, t]);
 
   return (
-    <div style={backdropStyle} onClick={onClose}>
+    <div style={backdropStyle}>
       <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <header style={headerStyle}>
           <div style={headerTextStyle}>
@@ -229,23 +270,25 @@ export default function DispatchCard({
         )}
 
         <div style={tabsStyle} role="tablist">
-          <TabBtn active={tab === "issues"} onClick={() => setTab("issues")}>
-            <GitBranch size={13} /> {t("dispatch.tabIssues")}
+          <TabBtn active={tab === "auto"} onClick={() => setTab("auto")}>
+            {t("dispatch.tabAuto")}
           </TabBtn>
           <TabBtn active={tab === "custom"} onClick={() => setTab("custom")}>
-            <FileText size={13} /> {t("dispatch.tabCustom")}
+            {t("dispatch.tabMenu")}
           </TabBtn>
         </div>
 
         <div style={bodyStyle}>
-          {tab === "issues" ? (
-            <IssueTab
-              rows={issueRows}
-              setRows={setIssueRows}
-              projects={projects}
-              currentCwd={currentCwd}
-              availableModels={availableModels}
-              errors={errors}
+          {tab === "auto" ? (
+            <AutoTab
+              autoBrief={autoBrief}
+              setAutoBrief={setAutoBrief}
+              autoPlannerModel={autoPlannerModel}
+              setAutoPlannerModel={setAutoPlannerModel}
+              plannerModels={plannerModels}
+              autoLoading={autoLoading}
+              autoError={autoError}
+              onAutoFill={handleAutoFill}
               t={t}
             />
           ) : (
@@ -255,40 +298,43 @@ export default function DispatchCard({
               currentCwd={currentCwd}
               availableModels={availableModels}
               errors={errors}
+              autoNote={autoNote}
               t={t}
             />
           )}
         </div>
 
-        <footer style={footerStyle}>
-          <DispatchDropdown
-            ariaLabel={t("dispatch.defaultModel")}
-            value={globalModel}
-            onChange={setGlobalModel}
-            options={availableModels.map((m) => ({
-              value: m.id,
-              label: m.name || m.label || m.id,
-              triggerLabel: m.tag || m.label || m.id,
-              sublabel: m.tag,
-              group: (m.provider || "MODEL").toUpperCase(),
-            }))}
-            grouped
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={!canDispatch}
-            style={primaryBtnStyle(canDispatch, submitting)}
-          >
-            <span style={{ visibility: submitting ? "hidden" : "visible" }}>
-              {t(activeRows.length === 1 ? "dispatch.dispatchOne" : "dispatch.dispatchMany", { count: activeRows.length || 0 })}
-            </span>
-            {submitting && (
-              <span style={{ position: "absolute", inset: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                <DispatchLoadingDots ariaLabel={t("dispatch.dispatching")} />
+        {tab !== "auto" && (
+          <footer style={footerStyle}>
+            <DispatchDropdown
+              ariaLabel={t("dispatch.defaultModel")}
+              value={globalModel}
+              onChange={setGlobalModel}
+              options={availableModels.map((m) => ({
+                value: m.id,
+                label: m.name || m.label || m.id,
+                triggerLabel: m.tag || m.label || m.id,
+                sublabel: m.tag,
+                group: (m.provider || "MODEL").toUpperCase(),
+              }))}
+              grouped
+            />
+            <button
+              onClick={handleSubmit}
+              disabled={!canDispatch}
+              style={primaryBtnStyle(canDispatch, submitting)}
+            >
+              <span style={{ visibility: submitting ? "hidden" : "visible" }}>
+                {t(activeRows.length === 1 ? "dispatch.dispatchOne" : "dispatch.dispatchMany", { count: activeRows.length || 0 })}
               </span>
-            )}
-          </button>
-        </footer>
+              {submitting && (
+                <span style={{ position: "absolute", inset: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                  <DispatchLoadingDots ariaLabel={t("dispatch.dispatching")} />
+                </span>
+              )}
+            </button>
+          </footer>
+        )}
       </div>
     </div>
   );
@@ -331,165 +377,89 @@ function TabBtn({ active, onClick, children }) {
   );
 }
 
-function IssueTab({ rows, setRows, projects, currentCwd, availableModels, errors, t }) {
-  const [selectedPath, setSelectedPath] = useState(currentCwd || "");
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState(null);
-
-  const projectPaths = useMemo(
-    () => Object.keys(projects || {}).filter((p) => !projects[p]?.hidden),
-    [projects]
-  );
-
-  useEffect(() => {
-    if (!selectedPath) { setRows([]); return; }
-    let cancelled = false;
-    setLoading(true); setLoadError(null);
-    (async () => {
-      try {
-        const s = await window.api.gitRemoteSlug(selectedPath);
-        if (cancelled) return;
-        if (!s) {
-          setRows([]); setLoadError(t("dispatch.noGithubRemote"));
-          return;
-        }
-        const issues = await window.api.ghListIssues(s, "open");
-        if (cancelled) return;
-        setRows((issues || []).map((iss) => ({ ...makeIssueRow(iss), cwd: selectedPath })));
-      } catch (e) {
-        if (!cancelled) setLoadError(e?.message || t("dispatch.failedToLoadIssues"));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [selectedPath, setRows, t]);
-
-  const toggleAll = (checked) => setRows((prev) => prev.map((r) => ({ ...r, enabled: checked })));
-  const updateRow = (key, patch) => setRows((prev) =>
-    prev.map((r) => (r.key === key ? { ...r, ...patch } : r))
-  );
-
-  const allChecked = rows.length > 0 && rows.every((r) => r.enabled);
-
+function AutoTab({
+  autoBrief,
+  setAutoBrief,
+  autoPlannerModel,
+  setAutoPlannerModel,
+  plannerModels,
+  autoLoading,
+  autoError,
+  onAutoFill,
+  t,
+}) {
   return (
     <div style={{ padding: "24px 14px 14px" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-        <label style={sectionLabelStyle}>{t("dispatch.workingDirectory")}</label>
-        <DispatchDropdown
-          fullWidth
-          ariaLabel={t("dispatch.workingDirectory")}
-          value={selectedPath}
-          onChange={setSelectedPath}
-          placeholder={t("dispatch.select")}
-          options={[
-            { value: "", label: t("dispatch.select") },
-            ...projectPaths.map((p) => ({ value: p, label: p })),
-          ]}
-        />
-      </div>
-
-      {selectedPath && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <span style={sectionLabelStyle}>{t("dispatch.issues")}</span>
-          {rows.length > 0 && (
-            <span style={{ ...sectionLabelStyle, color: "rgba(255,255,255,0.25)" }}>
-              {rows.filter((r) => r.enabled).length}/{rows.length}
-            </span>
-          )}
-        </div>
-      )}
-
-      {loading && <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>{t("dispatch.loadingIssues")}</div>}
-      {loadError && <div style={errorStyle}>{loadError}</div>}
-      {!loading && !loadError && rows.length === 0 && selectedPath && (
-        <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{t("dispatch.noOpenIssues")}</div>
-      )}
-
-      {rows.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderBottom: "1px solid var(--pane-border)" }}>
-          <TransparentCheckbox
-            checked={allChecked}
-            onChange={toggleAll}
-            ariaLabel={t("dispatch.selectAllIssues")}
-          />
-          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-            {t("dispatch.selectAll")}
-          </span>
-        </div>
-      )}
-
-      {rows.map((r) => (
-        <IssueRow
-          key={r.key}
-          row={r}
-          availableModels={availableModels}
-          error={errors[r.key]}
-          onChange={(patch) => updateRow(r.key, patch)}
-          t={t}
-        />
-      ))}
+      <AutoComposer
+        brief={autoBrief}
+        setBrief={setAutoBrief}
+        plannerModel={autoPlannerModel}
+        setPlannerModel={setAutoPlannerModel}
+        plannerModels={plannerModels}
+        loading={autoLoading}
+        error={autoError}
+        onAutoFill={onAutoFill}
+        t={t}
+      />
     </div>
   );
 }
 
-function IssueRow({ row, availableModels, error, onChange, t }) {
-  const { issue } = row;
-  return (
-    <div style={{ ...rowStyle(!!error), flexDirection: "column", gap: 6 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <TransparentCheckbox
-          checked={row.enabled}
-          onChange={(v) => onChange({ enabled: v })}
-          ariaLabel={t("dispatch.selectIssue", { number: issue.number })}
-        />
-        <button
-          onClick={() => onChange({ expanded: !row.expanded })}
-          style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}
-          aria-label={t("dispatch.toggleDetails")}
-        >
-          {row.expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        </button>
-        <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, fontFamily: "monospace" }}>
-          #{issue.number}
-        </span>
-        <span style={{ fontSize: 12, color: "white", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {issue.title}
-        </span>
-        <input
-          type="text"
-          value={row.branch}
-          onChange={(e) => onChange({ branch: e.target.value })}
-          style={{ ...inputStyle, width: 180, flex: "none" }}
-          {...fieldHoverProps}
-        />
-        <DispatchDropdown
-          ariaLabel={t("dispatch.modelForIssue", { number: issue.number })}
-          value={row.model}
-          onChange={(v) => onChange({ model: v })}
-          options={modelOptionsWithDefault(availableModels, t)}
-          grouped
-        />
-      </div>
-      {row.expanded && (
-        <textarea
-          value={row.prompt}
-          onChange={(e) => onChange({ prompt: e.target.value })}
-          rows={6}
-          style={textareaStyle}
-          {...fieldHoverProps}
-        />
-      )}
-      {error && <div style={errorStyle}>{error}</div>}
-    </div>
-  );
-}
-
-function CustomTab({ rows, setRows, currentCwd, availableModels, errors, t }) {
+function CustomTab({
+  rows,
+  setRows,
+  currentCwd,
+  availableModels,
+  errors,
+  autoNote,
+  t,
+}) {
   const addRow = () => setRows((prev) => [...prev, makeCustomRow(prev.length)]);
   const removeRow = (key) => setRows((prev) => prev.filter((r) => r.key !== key));
   const updateRow = (key, patch) => setRows((prev) =>
     prev.map((r) => (r.key === key ? { ...r, ...patch } : r))
+  );
+  const [issues, setIssues] = useState([]);
+  const [issuesLoading, setIssuesLoading] = useState(false);
+  const [issuesError, setIssuesError] = useState(null);
+
+  useEffect(() => {
+    if (!currentCwd || !window.api?.gitRemoteSlug || !window.api?.ghListIssues) {
+      setIssues([]);
+      setIssuesError(null);
+      setIssuesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIssuesLoading(true);
+    setIssuesError(null);
+    (async () => {
+      try {
+        const slug = await window.api.gitRemoteSlug(currentCwd);
+        if (cancelled) return;
+        if (!slug) {
+          setIssues([]);
+          return;
+        }
+        const loaded = await window.api.ghListIssues(slug, "open");
+        if (!cancelled) setIssues(Array.isArray(loaded) ? loaded : []);
+      } catch (e) {
+        if (!cancelled) {
+          setIssues([]);
+          setIssuesError(e?.message || t("dispatch.failedToLoadIssues"));
+        }
+      } finally {
+        if (!cancelled) setIssuesLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [currentCwd, t]);
+
+  const issueOptions = useMemo(
+    () => issueOptionsWithDefault(issues, issuesLoading, issuesError, t),
+    [issues, issuesLoading, issuesError, t]
   );
 
   return (
@@ -499,12 +469,17 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors, t }) {
           {t("dispatch.selectFolderNotice")}
         </div>
       )}
+      {autoNote && (
+        <div style={autoNoteStyle}>{autoNote}</div>
+      )}
       {rows.map((r, i) => (
         <CustomRow
           key={r.key}
           row={r}
           index={i}
           availableModels={availableModels}
+          issueOptions={issueOptions}
+          issues={issues}
           error={errors[r.key]}
           onChange={(patch) => updateRow(r.key, patch)}
           onRemove={() => removeRow(r.key)}
@@ -524,7 +499,69 @@ function CustomTab({ rows, setRows, currentCwd, availableModels, errors, t }) {
   );
 }
 
-function CustomRow({ row, index, availableModels, error, onChange, onRemove, t }) {
+function AutoComposer({
+  brief,
+  setBrief,
+  plannerModel,
+  setPlannerModel,
+  plannerModels,
+  loading,
+  error,
+  onAutoFill,
+  t,
+}) {
+  const canFill = !!brief.trim() && plannerModels.length > 0 && !loading;
+  return (
+    <div style={autoPanelStyle}>
+      <div style={autoPanelHeaderStyle}>
+        <div style={autoTitleStyle}>
+          <span>{t("dispatch.autoComposerTitle")}</span>
+        </div>
+        <DispatchDropdown
+          ariaLabel={t("dispatch.autoPlannerModel")}
+          value={plannerModel}
+          onChange={setPlannerModel}
+          options={plannerModels.map((m) => ({
+            value: m.id,
+            label: m.name || m.label || m.id,
+            triggerLabel: m.tag || m.label || m.id,
+            sublabel: m.tag,
+            group: (m.provider || "MODEL").toUpperCase(),
+          }))}
+          grouped
+        />
+      </div>
+      <textarea
+        value={brief}
+        onChange={(e) => setBrief(e.target.value)}
+        placeholder={t("dispatch.autoBriefPlaceholder")}
+        rows={7}
+        style={autoTextareaStyle}
+        {...fieldHoverProps}
+      />
+      {error && <div style={autoErrorStyle}>{error}</div>}
+      <div style={autoActionsStyle}>
+        <button
+          type="button"
+          onClick={onAutoFill}
+          disabled={!canFill}
+          style={autoFillBtnStyle(canFill, loading)}
+        >
+          <span style={{ visibility: loading ? "hidden" : "visible", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            {t("dispatch.autoFill")}
+          </span>
+          {loading && (
+            <span style={{ position: "absolute", inset: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+              <DispatchLoadingDots ariaLabel={t("dispatch.autoFilling")} />
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CustomRow({ row, index, availableModels, issueOptions, issues, error, onChange, onRemove, t }) {
   const attachments = row.attachments || [];
 
   const addAttachments = (items) => {
@@ -534,6 +571,11 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove, t }
 
   const removeAttachment = (i) => {
     onChange({ attachments: attachments.filter((_, idx) => idx !== i) });
+  };
+
+  const handleIssueChange = (value) => {
+    const issue = issues.find((iss) => String(iss.number) === value);
+    onChange({ issue: issue || undefined });
   };
 
   const handlePaste = (e) => {
@@ -574,6 +616,15 @@ function CustomRow({ row, index, availableModels, error, onChange, onRemove, t }
           placeholder={t("dispatch.branchNamePlaceholder")}
           onChange={(e) => onChange({ branch: e.target.value })}
           style={customBranchStyle}
+        />
+        <span style={customDividerStyle} aria-hidden />
+        <DispatchDropdown
+          compact
+          ariaLabel={t("dispatch.attachIssue")}
+          value={row.issue?.number ? String(row.issue.number) : ""}
+          onChange={handleIssueChange}
+          options={issueOptions}
+          grouped
         />
         <span style={customDividerStyle} aria-hidden />
         <DispatchDropdown
@@ -869,6 +920,49 @@ function modelOptionsWithDefault(availableModels, t) {
   ];
 }
 
+function issueOptionsWithDefault(issues, loading, error, t) {
+  const issueGroup = t ? t("dispatch.issueGroup") : "ISSUE";
+  const options = [
+    {
+      value: "",
+      label: t ? t("dispatch.noIssue") : "No issue",
+      triggerLabel: t ? t("dispatch.noIssueShort") : "Issue",
+      group: issueGroup,
+    },
+  ];
+
+  if (loading) {
+    options.push({
+      value: "__loading",
+      label: t ? t("dispatch.loadingIssues") : "Loading issues...",
+      triggerLabel: "...",
+      group: issueGroup,
+    });
+    return options;
+  }
+
+  if (error) {
+    options.push({
+      value: "__error",
+      label: error,
+      triggerLabel: t ? t("dispatch.noIssueShort") : "Issue",
+      group: issueGroup,
+    });
+    return options;
+  }
+
+  return [
+    ...options,
+    ...(issues || []).map((issue) => ({
+      value: String(issue.number),
+      label: `#${issue.number} ${issue.title}`,
+      triggerLabel: `#${issue.number}`,
+      sublabel: "ISSUE",
+      group: issueGroup,
+    })),
+  ];
+}
+
 // Styles — mirror NewChatCard.jsx conventions
 const backdropStyle = {
   position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
@@ -902,7 +996,7 @@ const closeBtnStyle = {
   cursor: "pointer", padding: 4,
 };
 const tabsStyle = {
-  display: "flex", gap: 4, padding: "10px 14px 0",
+  display: "flex", alignItems: "flex-end", gap: 4, padding: "10px 14px 0",
   borderBottom: "1px solid var(--pane-border)",
 };
 const tabBtnStyle = (active, hovered) => ({
@@ -936,33 +1030,6 @@ const noticeStyle = {
   color: "rgba(255,200,150,0.9)", borderRadius: 6, padding: "8px 10px",
   fontSize: 12, marginBottom: 10,
 };
-const rowStyle = (hasError) => ({
-  border: "1px solid " + (hasError ? "rgba(255,180,180,0.35)" : "var(--pane-border)"),
-  borderRadius: 8, padding: 10, marginBottom: 10,
-  display: "flex", flexDirection: "column", gap: 8,
-  background: "rgba(255,255,255,0.015)",
-});
-const textareaStyle = {
-  width: "100%", minHeight: 48, resize: "vertical",
-  background: "rgba(255,255,255,0.02)", color: "rgba(255,255,255,0.8)",
-  border: "1px solid rgba(255,255,255,0.04)", borderRadius: 7,
-  padding: "8px 10px", fontSize: 12, fontFamily: "inherit",
-  outline: "none",
-  transition: "border-color .2s",
-};
-const inputStyle = {
-  flex: 1,
-  background: "rgba(255,255,255,0.02)",
-  color: "rgba(255,255,255,0.6)",
-  border: "1px solid rgba(255,255,255,0.04)",
-  borderRadius: 7,
-  padding: "8px 12px",
-  fontSize: 10,
-  fontFamily: "'JetBrains Mono', monospace",
-  letterSpacing: ".06em",
-  outline: "none",
-  transition: "border-color .2s",
-};
 const addBtnStyle = {
   display: "inline-flex", alignItems: "center", gap: 6,
   background: "transparent",
@@ -976,6 +1043,80 @@ const addBtnStyle = {
   letterSpacing: ".06em",
   transition: "color .15s, background .15s",
 };
+
+const autoNoteStyle = {
+  color: "rgba(255,255,255,0.68)",
+  fontSize: 11,
+  fontFamily: "'JetBrains Mono', monospace",
+  marginBottom: 10,
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+const autoPanelStyle = {
+  border: "1px solid rgba(255,255,255,0.07)",
+  borderRadius: 8,
+  background: "rgba(255,255,255,0.018)",
+  overflow: "hidden",
+};
+const autoPanelHeaderStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  padding: "10px 12px",
+  borderBottom: "1px solid rgba(255,255,255,0.05)",
+};
+const autoTitleStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 7,
+  color: "rgba(255,255,255,0.82)",
+  fontSize: 12,
+  fontWeight: 500,
+};
+const autoTextareaStyle = {
+  width: "100%",
+  minHeight: 132,
+  resize: "vertical",
+  background: "rgba(0,0,0,0.12)",
+  color: "rgba(255,255,255,0.86)",
+  border: "1px solid rgba(255,255,255,0.04)",
+  borderRadius: 7,
+  padding: "11px 12px",
+  fontSize: 12,
+  fontFamily: "inherit",
+  lineHeight: 1.45,
+  outline: "none",
+  boxSizing: "border-box",
+  transition: "border-color .2s",
+};
+const autoErrorStyle = {
+  color: "rgba(255,180,180,0.9)",
+  fontSize: 11,
+  padding: "9px 12px 0",
+};
+const autoActionsStyle = {
+  display: "flex",
+  justifyContent: "flex-end",
+  padding: 12,
+};
+const autoFillBtnStyle = (enabled, loading) => ({
+  position: "relative",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minWidth: 60,
+  padding: "8px 12px",
+  borderRadius: 6,
+  border: "none",
+  background: loading ? "rgba(255,255,255,0.86)" : (enabled ? "white" : "rgba(255,255,255,0.08)"),
+  color: loading ? "black" : (enabled ? "black" : "rgba(255,255,255,0.38)"),
+  cursor: loading ? "progress" : (enabled ? "pointer" : "not-allowed"),
+  fontSize: 12,
+  fontWeight: 500,
+});
 
 const customRowStyle = (hasError) => ({
   border: "1px solid " + (hasError ? "rgba(255,180,180,0.35)" : "var(--pane-border)"),
@@ -1026,7 +1167,4 @@ const customDividerStyle = {
 const customErrorStyle = {
   color: "rgba(255,180,180,0.9)", fontSize: 11,
   padding: "0 12px 8px",
-};
-const errorStyle = {
-  color: "rgba(255,180,180,0.9)", fontSize: 11, marginTop: 2,
 };
