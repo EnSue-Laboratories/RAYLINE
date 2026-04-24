@@ -137,6 +137,12 @@ contextBridge.exposeInMainWorld("api", {
   setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
   writeClipboardImage: (dataUrl) => ipcRenderer.invoke("clipboard-write-image", dataUrl),
 
+  // BYOK key management
+  byokSaveProviders: (providers) => ipcRenderer.invoke("byok-save-providers", providers),
+  byokLoadProviders: () => ipcRenderer.invoke("byok-load-providers"),
+  byokDeleteProvider: (providerId) => ipcRenderer.invoke("byok-delete-provider", providerId),
+  byokTestKey: (providerId) => ipcRenderer.invoke("byok-test-key", providerId),
+
   // multica
   multicaSendCode: (args) => ipcRenderer.invoke("multica-send-code", args),
   multicaVerifyCode: (args) => ipcRenderer.invoke("multica-verify-code", args),
