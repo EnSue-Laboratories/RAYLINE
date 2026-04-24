@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { ArrowLeft, Check, ChevronDown, Image } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { createTranslator } from "../i18n";
+import { useTheme } from "../contexts/ThemeContext.jsx";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
@@ -9,6 +10,7 @@ import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from ".
 
 export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, onClose }) {
   const s = useFontScale();
+  const { mode, setMode } = useTheme();
   const t = createTranslator(locale);
   const showUpdaterSettings = platform === "win32";
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
@@ -155,6 +157,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const imgOpacityPct = sliderPct(local.imgOpacity || 0, 0, 100);
   const appBlurPct = sliderPct(appBlur || 0, 0, 20);
   const appOpacityPct = sliderPct(appOpacity || 100, 30, 100);
+  const themeOptions = [
+    { value: "auto", label: t("settings.themeAuto") },
+    { value: "light", label: t("settings.themeLight") },
+    { value: "dark", label: t("settings.themeDark") },
+  ];
 
   // Slider track style helper
   const sliderTrack = (pct) =>
@@ -291,6 +298,183 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
           >
             {t("settings.appearance")}
           </div>
+
+
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 10,
+              }}
+            >
+              {t("settings.theme")}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              {themeOptions.map((option) => {
+                const selected = mode === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      height: 30,
+                      padding: "0 10px",
+                      borderRadius: 7,
+                      background: selected ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
+                      border: selected ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(255,255,255,0.08)",
+                      color: selected ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.62)",
+                      cursor: "pointer",
+                      fontSize: s(12),
+                      transition: "all .2s",
+                      fontFamily: "system-ui, sans-serif",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="rayline-theme"
+                      value={option.value}
+                      checked={selected}
+                      onChange={(e) => setMode(e.target.value)}
+                      style={{
+                        accentColor: "white",
+                        margin: 0,
+                      }}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 2,
+              }}
+            >
+              {t("settings.language")}
+            </div>
+            <div
+              style={{
+                fontSize: s(11),
+                color: "rgba(255,255,255,0.3)",
+                marginBottom: 10,
+              }}
+            >
+              {t("settings.languageDescription")}
+            </div>
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <select
+                value={locale}
+                onChange={(e) => onLocaleChange?.(e.target.value)}
+                style={{
+                  width: "100%",
+                  height: 32,
+                  padding: "0 28px 0 10px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 7,
+                  color: "rgba(255,255,255,0.9)",
+                  fontFamily: "system-ui, sans-serif",
+                  fontSize: s(12),
+                  outline: "none",
+                  WebkitAppearance: "none",
+                  MozAppearance: "none",
+                  appearance: "none",
+                }}
+              >
+                <option value="en-US">{t("settings.languageEnglish")}</option>
+                <option value="zh-CN">{t("settings.languageChinese")}</option>
+              </select>
+              <ChevronDown
+                size={12}
+                strokeWidth={2}
+                style={{
+                  position: "absolute",
+                  right: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "rgba(255,255,255,0.5)",
+                  pointerEvents: "none",
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: s(13),
+                    color: "rgba(255,255,255,0.8)",
+                    marginBottom: 2,
+                  }}
+                >
+                  {t("settings.chromeControlsOnHover")}
+                </div>
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: "rgba(255,255,255,0.3)",
+                  }}
+                >
+                  {t("settings.chromeControlsOnHoverDescription")}
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={chromeControlsOnHover}
+                onClick={() => onChromeControlsOnHoverChange?.(!chromeControlsOnHover)}
+                style={{
+                  flexShrink: 0,
+                  width: 38,
+                  height: 22,
+                  borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: chromeControlsOnHover ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                  position: "relative",
+                  cursor: "pointer",
+                  padding: 0,
+                  transition: "background 120ms ease",
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    left: chromeControlsOnHover ? 18 : 2,
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    background: "rgba(255,255,255,0.9)",
+                    transition: "left 120ms ease",
+                  }}
+                />
+              </button>
+            </div>
+          </div>
+
 
           {/* Wallpaper subsection */}
           <div style={{ marginBottom: 28 }}>
