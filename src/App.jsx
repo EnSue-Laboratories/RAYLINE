@@ -2,8 +2,6 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
-import SidebarChromeRail from "./components/SidebarChromeRail";
-import { IS_MAC } from "./windowChrome";
 import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
 import TerminalDrawer from "./components/TerminalDrawer";
