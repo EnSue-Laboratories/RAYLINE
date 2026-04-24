@@ -195,6 +195,8 @@ function normalizeCodexToolResult(output) {
 
 export default function useAgent() {
   const [conversations, setConversations] = useState(new Map());
+  const conversationsRef = useRef(conversations);
+  conversationsRef.current = conversations;
   const cleanupRefs = useRef([]);
   const pendingStartsRef = useRef(new Map());
   const usageHydrationTimersRef = useRef(new Set());
@@ -926,6 +928,19 @@ export default function useAgent() {
         payload._multica = multicaContext;
         payload._multicaToken = multicaToken;
       }
+      if (provider === "byok") {
+        // BYOK direct API calls need conversation history since there's no CLI session
+        const convo = conversationsRef.current.get(conversationId);
+        if (convo?.messages) {
+          payload.messages = convo.messages
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => ({
+              role: m.role,
+              text: m.text || (m.parts || []).filter((p) => p.type === "text").map((p) => p.text).join("\n"),
+            }))
+            .filter((m) => m.text);
+        }
+      }
       window.api.agentStart(payload);
     }
     return true;
@@ -977,6 +992,26 @@ export default function useAgent() {
           cwd,
           _multica: multicaContext,
           _multicaToken: multicaToken,
+        });
+        return true;
+      }
+      if (provider === "byok") {
+        const convo = conversationsRef.current.get(conversationId);
+        const msgs = convo?.messages
+          ?.filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            role: m.role,
+            text: m.text || (m.parts || []).filter((p) => p.type === "text").map((p) => p.text).join("\n"),
+          }))
+          .filter((m) => m.text) || [];
+        window.api.agentEditAndResend({
+          conversationId,
+          prompt: wirePrompt ?? newText,
+          model,
+          provider,
+          effort,
+          cwd,
+          messages: msgs,
         });
         return true;
       }

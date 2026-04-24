@@ -18,6 +18,7 @@ const {
 } = require("./multica-manager.cjs");
 const { buildSpawnPath, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { saveByokProviders, getMaskedProviders, deleteByokProvider, testByokKey } = require("./byok-store.cjs");
+const { startByokAgent, cancelByokAgent, cancelAllByok } = require("./byok-agent-manager.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
@@ -550,7 +551,9 @@ ipcMain.handle("read-image", async (_event, filePath) => {
 
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
-  if (opts.provider === "multica") {
+  if (opts.provider === "byok") {
+    startByokAgent(opts, event.sender);
+  } else if (opts.provider === "multica") {
     startMulticaAgent(opts, event.sender).catch((err) => {
       event.sender.send("agent-stream", {
         conversationId: opts.conversationId,
@@ -568,13 +571,16 @@ ipcMain.on("agent-start", (event, opts) => {
 ipcMain.on("agent-cancel", (_event, { conversationId }) => {
   cancelAgent(conversationId);
   cancelCodexAgent(conversationId);
+  cancelByokAgent(conversationId);
   cancelMulticaAgent(conversationId).catch((err) => {
     console.error("[multica] cancel failed", { conversationId, error: err?.message || String(err) });
   });
 });
 
 ipcMain.on("agent-edit-resend", (event, opts) => {
-  if (opts.provider === "codex") {
+  if (opts.provider === "byok") {
+    startByokAgent(opts, event.sender);
+  } else if (opts.provider === "codex") {
     startCodexAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
   } else {
     startAgent({ ...opts, forkSession: true }, event.sender);
