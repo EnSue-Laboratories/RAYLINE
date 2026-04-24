@@ -153,4 +153,5 @@ contextBridge.exposeInMainWorld("api", {
   multicaSendMessage: (args) => ipcRenderer.invoke("multica-send-message", args),
   multicaListMessages: (args) => ipcRenderer.invoke("multica-list-messages", args),
   multicaSubscribe: (args) => ipcRenderer.invoke("multica-subscribe", args),
+  getOpenCodeMetadata: (binary) => ipcRenderer.invoke("get-opencode-metadata", binary),
 });

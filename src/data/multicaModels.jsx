@@ -80,18 +80,17 @@ function useByokModels() {
       const endpointIds = providers.map((p) => p.id);
       const presets = getByokPresetsForEndpoints(endpointIds);
       const customModels = providers
-        .filter(p => p.id.startsWith("custom-"))
+        .filter(p => p.id.startsWith("custom-") || p.type?.startsWith("opencode") || p.id.startsWith("opencode"))
         .map(p => {
           // If defaultModelId isn't set, default to a fallback.
-          // Need to dynamically import buildCustomByokModel from byok-models
           return {
-            id: `byok:${p.id}:${p.defaultModelId || "custom-model"}`,
-            name: p.name || "Custom Provider",
-            tag: (p.defaultModelId || "CUSTOM").toUpperCase(),
+            id: `byok:${p.id}:${p.defaultModelId || "default"}`,
+            name: p.name || (p.type === "opencode-cli" ? "OpenCode CLI" : "OpenCode"),
+            tag: (p.defaultModelId || "DEFAULT").toUpperCase(),
             provider: "byok",
             endpoint: p.id,
-            modelId: p.defaultModelId || "custom-model",
-            contextWindow: 128_000,
+            modelId: p.defaultModelId || "default",
+            contextWindow: 200_000,
           };
         });
       setModels([...presets, ...customModels]);

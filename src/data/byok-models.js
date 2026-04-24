@@ -12,6 +12,15 @@ export const BYOK_PRESETS = [
   { id: "byok:openai:gpt-4.1",  name: "GPT-4.1 (API)",  tag: "GPT-4.1",  provider: "byok", endpoint: "openai", modelId: "gpt-4.1",  contextWindow: 1_047_576 },
   { id: "byok:openai:o3",       name: "o3 (API)",        tag: "O3",       provider: "byok", endpoint: "openai", modelId: "o3",       contextWindow: 200_000 },
   { id: "byok:openai:o4-mini",  name: "o4-mini (API)",   tag: "O4-MINI",  provider: "byok", endpoint: "openai", modelId: "o4-mini",  contextWindow: 200_000 },
+
+  // DeepSeek
+  { id: "byok:deepseek:deepseek-v4-flash", name: "DeepSeek v4 Flash", tag: "DS-V4", provider: "byok", endpoint: "deepseek", modelId: "deepseek-v4-flash", contextWindow: 128_000 },
+  { id: "byok:deepseek:deepseek-chat",     name: "DeepSeek Chat",     tag: "DS-CHAT", provider: "byok", endpoint: "deepseek", modelId: "deepseek-chat", contextWindow: 128_000 },
+
+  // OpenCode Specialized Agents
+  { id: "byok:opencode-cli:coder",       name: "OpenCode Coder Agent",       tag: "CODER", provider: "byok", endpoint: "opencode-cli", modelId: "coder", contextWindow: 128_000 },
+  { id: "byok:opencode-cli:researcher",  name: "OpenCode Researcher Agent",  tag: "RESEARCH", provider: "byok", endpoint: "opencode-cli", modelId: "researcher", contextWindow: 128_000 },
+  { id: "byok:opencode-cli:interpreter", name: "OpenCode Interpreter Agent", tag: "INTERPRET", provider: "byok", endpoint: "opencode-cli", modelId: "open-interpreter", contextWindow: 128_000 },
 ];
 
 export function isByokModelId(id) {
