@@ -59,6 +59,7 @@ let pmWindow;
 let terminalWindow;
 let terminalWindowRevealTimer = null;
 let pendingPreferredTerminalSessionName = null;
+let sidebarTerminalEnabledPreference = false;
 
 function terminalDebug(event, details = {}, meta = {}) {
   if (!TERMINAL_DEBUG_ENABLED) return;
@@ -84,6 +85,39 @@ function isTerminalWindowOpen() {
 
 function broadcastTerminalWindowState() {
   broadcastToAllWindows("terminal-window-state", { open: isTerminalWindowOpen() });
+}
+
+function rememberTerminalSurfacePreference(state) {
+  if (typeof state?.sidebarTerminalEnabled === "boolean") {
+    sidebarTerminalEnabledPreference = state.sidebarTerminalEnabled;
+  }
+}
+
+function revealSidebarTerminal(payload = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createTerminalWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+  mainWindow.webContents.send("terminal-sidebar-reveal-request", {
+    name: payload.name || null,
+  });
+}
+
+function revealTerminalSurface(payload = {}) {
+  if (payload.reveal === false) return;
+  const isAutoReveal = payload.reveal == null || payload.reveal === "auto";
+  const useSidebar = payload.reveal === "sidebar"
+    || (isAutoReveal && sidebarTerminalEnabledPreference);
+
+  if (useSidebar) {
+    revealSidebarTerminal(payload);
+    return;
+  }
+
+  createTerminalWindow();
 }
 
 function clearTerminalWindowRevealTimer() {
@@ -415,8 +449,8 @@ app.whenReady().then(() => {
       return;
     }
 
-    if (payload.reason === "created" && payload.reveal !== false) {
-      createTerminalWindow();
+    if (payload.reason === "created") {
+      revealTerminalSurface(payload);
     }
   });
 });
@@ -455,6 +489,11 @@ ipcMain.handle("close-terminal-window", () => {
 
 ipcMain.handle("is-terminal-window-open", () => {
   return isTerminalWindowOpen();
+});
+
+ipcMain.handle("terminal-surface-preference", (_event, state) => {
+  rememberTerminalSurfacePreference(state);
+  return true;
 });
 
 ipcMain.on("terminal-debug-log", (event, payload = {}) => {
@@ -700,6 +739,7 @@ const stateFilePath = path.join(app.getPath("userData"), "claudi-state.json");
 
 function persistStateToDisk(state) {
   try {
+    rememberTerminalSurfacePreference(state);
     // Preserve pmRepos from PM window (main app state doesn't include it)
     let existing = {};
     try {
@@ -736,7 +776,9 @@ ipcMain.on("save-state-sync", (event, state) => {
 ipcMain.handle("load-state", async () => {
   try {
     if (fs.existsSync(stateFilePath)) {
-      return JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+      const state = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+      rememberTerminalSurfacePreference(state);
+      return state;
     }
     // Try migrating from old app name
     const oldPaths = [
@@ -747,6 +789,7 @@ ipcMain.handle("load-state", async () => {
       if (fs.existsSync(old)) {
         const data = JSON.parse(fs.readFileSync(old, "utf-8"));
         fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
+        rememberTerminalSurfacePreference(data);
         return data;
       }
     }

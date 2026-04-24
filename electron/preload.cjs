@@ -108,12 +108,18 @@ contextBridge.exposeInMainWorld("api", {
   openTerminalWindow: () => ipcRenderer.invoke("open-terminal-window"),
   closeTerminalWindow: () => ipcRenderer.invoke("close-terminal-window"),
   isTerminalWindowOpen: () => ipcRenderer.invoke("is-terminal-window-open"),
+  setTerminalSurfacePreference: (state) => ipcRenderer.invoke("terminal-surface-preference", state),
   terminalWindowReady: () => ipcRenderer.send("terminal-window-ready"),
   closeCurrentWindow: () => ipcRenderer.invoke("window-close-current"),
   onTerminalWindowState: (cb) => {
     const handler = (_e, data) => cb(data);
     ipcRenderer.on("terminal-window-state", handler);
     return () => ipcRenderer.removeListener("terminal-window-state", handler);
+  },
+  onTerminalSidebarRevealRequest: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("terminal-sidebar-reveal-request", handler);
+    return () => ipcRenderer.removeListener("terminal-sidebar-reveal-request", handler);
   },
   onTerminalSessionsState: (cb) => {
     const handler = (_e, data) => cb(data);

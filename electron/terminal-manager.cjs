@@ -80,7 +80,7 @@ let currentPort = null;
 /** @type {((name: string, data: string) => void)|null} */
 let outputCallback = null;
 
-/** @type {((payload: { reason: string, name?: string, exitCode?: number|null, reveal?: boolean, sessions: Array<object> }) => void)|null} */
+/** @type {((payload: { reason: string, name?: string, exitCode?: number|null, reveal?: boolean|string, sessions: Array<object> }) => void)|null} */
 let sessionStateCallback = null;
 
 // ---------------------------------------------------------------------------
@@ -257,10 +257,10 @@ function broadcast(payload) {
 /**
  * Spawn a new PTY session.
  *
- * @param {{ name: string, command?: string, cwd?: string, reveal?: boolean }} opts
+ * @param {{ name: string, command?: string, cwd?: string, reveal?: boolean|string }} opts
  * @returns {{ ok: true, name: string } | { error: string }}
  */
-function createSession({ name, command, cwd, reveal = true } = {}) {
+function createSession({ name, command, cwd, reveal = "auto" } = {}) {
   if (!name) return { error: "name is required" };
   if (!pty) return { error: "node-pty is not available" };
   if (sessions.has(name)) return { error: `Session '${name}' already exists` };
@@ -334,7 +334,7 @@ function createSession({ name, command, cwd, reveal = true } = {}) {
 
   sessions.set(name, session);
   log(`session '${name}' started (PID ${ptyProcess.pid})`);
-  emitSessionState("created", { name, reveal: reveal !== false });
+  emitSessionState("created", { name, reveal });
 
   return { ok: true, name };
 }
@@ -463,7 +463,7 @@ function setOutputCallback(cb) {
 /**
  * Set the callback that is invoked whenever the session list changes.
  *
- * @param {(payload: { reason: string, name?: string, exitCode?: number|null, reveal?: boolean, sessions: Array<object> }) => void} cb
+ * @param {(payload: { reason: string, name?: string, exitCode?: number|null, reveal?: boolean|string, sessions: Array<object> }) => void} cb
  */
 function setSessionStateCallback(cb) {
   sessionStateCallback = cb;

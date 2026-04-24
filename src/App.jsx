@@ -339,7 +339,7 @@ async function runShellViaTerminalApi({ command, cwd }) {
   const marker = `__CLAUDI_SHELL_EXIT__${Date.now()}_${Math.random().toString(36).slice(2)}`;
   const deadline = Date.now() + SHELL_TERMINAL_TIMEOUT_MS;
 
-  const createResult = await window.api.terminalCreate({ name: sessionName, cwd });
+  const createResult = await window.api.terminalCreate({ name: sessionName, cwd, reveal: false });
   if (createResult?.error) {
     return {
       ok: false,
@@ -1146,7 +1146,7 @@ export default function App() {
     markMulticaConnected,
   } = useAgent();
   const terminal = useTerminal();
-  const { closeWindow: closeTerminalWindow } = terminal;
+  const { closeWindow: closeTerminalWindow, openWindow: openTerminalWindow } = terminal;
   const { prefersReducedMotion } = useWindowActivity();
   const { models: multicaModels } = useMulticaModels();
 
@@ -3491,7 +3491,20 @@ export default function App() {
     } else {
       setSidebarTerminalOpen(false);
     }
+    window.api?.setTerminalSurfacePreference?.({ sidebarTerminalEnabled });
   }, [closeTerminalWindow, sidebarTerminalEnabled]);
+
+  useEffect(() => {
+    if (!window.api?.onTerminalSidebarRevealRequest) return undefined;
+    return window.api.onTerminalSidebarRevealRequest(() => {
+      if (sidebarTerminalEnabled) {
+        closeTerminalWindow();
+        setSidebarTerminalOpen(true);
+        return;
+      }
+      openTerminalWindow();
+    });
+  }, [closeTerminalWindow, openTerminalWindow, sidebarTerminalEnabled]);
 
   const createSidebarTerminalSession = useCallback(
     (opts = {}) => terminal.createSession({ ...opts, reveal: false }),
