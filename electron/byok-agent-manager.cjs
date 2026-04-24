@@ -1,9 +1,15 @@
 const { getByokKeyForProvider } = require("./byok-store.cjs");
+const WebSocket = require("ws");
 
 const activeAgents = new Map();
 
 function log(...args) {
-  console.log("[byok-agent-manager]", ...args);
+  try {
+    const { log: loggerLog } = require("./logger.cjs");
+    loggerLog("[byok-agent-manager]", ...args);
+  } catch (e) {
+    console.log("[byok-agent-manager]", ...args);
+  }
 }
 
 function parseByokModelId(id) {
@@ -274,7 +280,9 @@ function startByokAgent(opts, webContents) {
       const isAnthropic = endpoint === "anthropic";
       const baseUrl = providerKey.baseUrl || (isAnthropic ? "https://api.anthropic.com" : "https://api.openai.com");
 
-      if (isAnthropic) {
+      if (endpoint === "opencode") {
+        await startOpenCodeAgent({ baseUrl, apiKey: providerKey.apiKey, conversationId, prompt, messages, webContents, controller });
+      } else if (isAnthropic) {
         const body = buildAnthropicRequest({ modelId, prompt, messages, systemPrompt: BYOK_SYSTEM_PROMPT });
         await streamAnthropicSSE({ baseUrl, apiKey: providerKey.apiKey, body, conversationId, webContents, controller });
       } else {
@@ -307,6 +315,90 @@ function startByokAgent(opts, webContents) {
   };
 
   run();
+}
+
+async function startOpenCodeAgent({ baseUrl, apiKey, conversationId, prompt, messages, webContents, controller }) {
+  const wsUrl = baseUrl.replace(/^http/, "ws") + "/acp";
+  log("Connecting to OpenCode:", wsUrl);
+
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl, {
+      headers: apiKey ? { "Authorization": `Bearer ${apiKey}` } : {},
+    });
+
+    let sessionId = null;
+    let initialized = false;
+    let requestId = 1;
+
+    const send = (method, params) => {
+      ws.send(JSON.stringify({ jsonrpc: "2.0", id: requestId++, method, params }));
+    };
+
+    ws.on("open", () => {
+      send("initialize", { protocolVersion: "1", capabilities: {} });
+    });
+
+    ws.on("message", (data) => {
+      const msg = JSON.parse(data.toString());
+      if (msg.error) {
+        webContents.send("agent-error", { conversationId, error: msg.error.message || "OpenCode error" });
+        ws.close();
+        return;
+      }
+
+      if (!initialized && msg.method === undefined) {
+        // Initialize response
+        initialized = true;
+        send("session/new", { workingDirectory: process.cwd() });
+        return;
+      }
+
+      if (initialized && !sessionId && msg.result?.sessionId) {
+        sessionId = msg.result.sessionId;
+        // Start the chat
+        send("session/chat", { sessionId, message: prompt });
+        return;
+      }
+
+      // Handle stream events from ACP
+      if (msg.method === "session/notification" && msg.params?.sessionId === sessionId) {
+        const { type, delta, content_block } = msg.params;
+        
+        if (type === "content_block_start") {
+          webContents.send("agent-stream", {
+            conversationId,
+            event: { type: "stream_event", event: { type: "content_block_start", index: 0, content_block } },
+          });
+        } else if (type === "content_block_delta") {
+          webContents.send("agent-stream", {
+            conversationId,
+            event: { type: "stream_event", event: { type: "content_block_delta", index: 0, delta } },
+          });
+        } else if (type === "content_block_stop") {
+          webContents.send("agent-stream", {
+            conversationId,
+            event: { type: "stream_event", event: { type: "content_block_stop", index: 0 } },
+          });
+        } else if (type === "chat/done" || type === "session/done") {
+          ws.close();
+        }
+      }
+    });
+
+    ws.on("close", () => {
+      log("OpenCode connection closed");
+      resolve();
+    });
+
+    ws.on("error", (err) => {
+      log("OpenCode connection error:", err.message);
+      reject(err);
+    });
+
+    controller.signal.addEventListener("abort", () => {
+      ws.close();
+    });
+  });
 }
 
 function cancelByokAgent(conversationId) {
