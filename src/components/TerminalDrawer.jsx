@@ -31,31 +31,78 @@ function getTerminalWallpaperOverlayAlpha(wallpaper) {
   return 0.52 + getWallpaperOpacityValue(wallpaper) * 0.18;
 }
 
-function getTerminalTheme(opaqueBackground) {
+function getResolvedThemeMode(detail) {
+  const candidate = detail?.resolved || detail?.mode || detail?.theme;
+  if (candidate === "light" || candidate === "dark") return candidate;
+
+  if (typeof document !== "undefined") {
+    const root = document.documentElement;
+    if (root.dataset.theme === "light" || root.dataset.theme === "dark") {
+      return root.dataset.theme;
+    }
+    if (root.classList.contains("light")) return "light";
+  }
+
+  return "dark";
+}
+
+function readRootCssVar(name, fallback) {
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+function getTerminalTheme(opaqueBackground, mode = "dark") {
+  const background = mode === "light" ? "#f8fafc" : TERMINAL_OPAQUE_BG;
+  const foreground = mode === "light" ? "rgba(15,23,42,0.88)" : "rgba(244,247,250,0.88)";
+  const cursor = mode === "light" ? "rgba(15,23,42,0.96)" : "rgba(245,247,251,0.98)";
+  const selectionBackground = mode === "light" ? "rgba(37,99,235,0.18)" : "rgba(120,182,255,0.18)";
+  const selectionInactiveBackground = mode === "light" ? "rgba(37,99,235,0.1)" : "rgba(120,182,255,0.1)";
+
   return {
-    background: opaqueBackground ? TERMINAL_OPAQUE_BG : XTERM_TRANSPARENT,
-    foreground: "rgba(244,247,250,0.88)",
-    cursor: "rgba(245,247,251,0.98)",
-    cursorAccent: opaqueBackground ? TERMINAL_OPAQUE_BG : XTERM_TRANSPARENT,
-    selectionBackground: "rgba(120,182,255,0.18)",
-    selectionInactiveBackground: "rgba(120,182,255,0.1)",
-    black: "#0f1116",
-    red: "#f38ba8",
-    green: "#7ed7b9",
-    yellow: "#f5c97a",
-    blue: "#89b4fa",
-    magenta: "#cba6f7",
-    cyan: "#74c7ec",
-    white: "#bac2de",
-    brightBlack: "#585b70",
-    brightRed: "#f7a6bc",
-    brightGreen: "#9ce8cf",
-    brightYellow: "#f8d99c",
-    brightBlue: "#a6c9ff",
-    brightMagenta: "#d9b8fb",
-    brightCyan: "#98dbf3",
-    brightWhite: "#f5f7fb",
+    background: opaqueBackground ? readRootCssVar("--term-background", background) : XTERM_TRANSPARENT,
+    foreground: readRootCssVar("--term-foreground", foreground),
+    cursor: readRootCssVar("--term-cursor", cursor),
+    cursorAccent: opaqueBackground ? readRootCssVar("--term-background", background) : XTERM_TRANSPARENT,
+    selectionBackground: readRootCssVar("--term-selection-background", selectionBackground),
+    selectionInactiveBackground: readRootCssVar("--term-selection-inactive-background", selectionInactiveBackground),
+    black: readRootCssVar("--term-black", "#0f1116"),
+    red: readRootCssVar("--term-red", "#f38ba8"),
+    green: readRootCssVar("--term-green", "#7ed7b9"),
+    yellow: readRootCssVar("--term-yellow", "#f5c97a"),
+    blue: readRootCssVar("--term-blue", "#89b4fa"),
+    magenta: readRootCssVar("--term-magenta", "#cba6f7"),
+    cyan: readRootCssVar("--term-cyan", "#74c7ec"),
+    white: readRootCssVar("--term-white", "#bac2de"),
+    brightBlack: readRootCssVar("--term-bright-black", "#585b70"),
+    brightRed: readRootCssVar("--term-bright-red", "#f7a6bc"),
+    brightGreen: readRootCssVar("--term-bright-green", "#9ce8cf"),
+    brightYellow: readRootCssVar("--term-bright-yellow", "#f8d99c"),
+    brightBlue: readRootCssVar("--term-bright-blue", "#a6c9ff"),
+    brightMagenta: readRootCssVar("--term-bright-magenta", "#d9b8fb"),
+    brightCyan: readRootCssVar("--term-bright-cyan", "#98dbf3"),
+    brightWhite: readRootCssVar("--term-bright-white", "#f5f7fb"),
   };
+}
+
+function serializeTerminalBuffer(term) {
+  const serializeAddon = term?.__raylineSerializeAddon;
+  if (serializeAddon?.serialize) {
+    try {
+      return serializeAddon.serialize();
+    } catch {
+      // Fall through to the public buffer API fallback.
+    }
+  }
+
+  const buffer = term?.buffer?.active;
+  if (!buffer?.getLine || !Number.isFinite(buffer.length)) return "";
+
+  const lines = [];
+  for (let row = 0; row < buffer.length; row += 1) {
+    const line = buffer.getLine(row);
+    lines.push(line?.translateToString(true) ?? "");
+  }
+  return lines.join("\r\n");
 }
 
 function emitTerminalDebug(event, details = {}) {
@@ -425,6 +472,9 @@ function SessionTerminal({
   const fitTimersRef = useRef([]);
   const lastSyncedPtySizeRef = useRef("");
   const mouseGestureRef = useRef(null);
+  const themeModeRef = useRef(getResolvedThemeMode());
+  const pendingScrollbackRef = useRef("");
+  const [themeRevision, setThemeRevision] = useState(0);
 
   // Stable refs so the async IIFE captures up-to-date callbacks without
   // restarting the effect every time parent re-renders.
@@ -438,6 +488,17 @@ function SessionTerminal({
   useEffect(() => { registerRef.current = registerTerminal; }, [registerTerminal]);
   useEffect(() => { unregRef.current = unregisterTerminal; }, [unregisterTerminal]);
   useEffect(() => { activeRef.current = isActive; }, [isActive]);
+
+  useEffect(() => {
+    const handleThemeChange = (event) => {
+      themeModeRef.current = getResolvedThemeMode(event.detail);
+      pendingScrollbackRef.current = serializeTerminalBuffer(termRef.current);
+      setThemeRevision((revision) => revision + 1);
+    };
+
+    window.addEventListener("rayline:theme-change", handleThemeChange);
+    return () => window.removeEventListener("rayline:theme-change", handleThemeChange);
+  }, []);
 
   const teardown = useCallback(() => {
     fitTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -480,7 +541,7 @@ function SessionTerminal({
       containerRef.current.appendChild(el);
 
       const term = new Terminal({
-        theme: getTerminalTheme(opaqueBackground),
+        theme: getTerminalTheme(opaqueBackground, themeModeRef.current),
         fontFamily: FONT_FAMILY,
         fontSize: 13,
         fontWeight: "400",
@@ -719,7 +780,11 @@ function SessionTerminal({
 
       registerRef.current(sessionName, term);
 
-      if (window.api?.terminalRead) {
+      const pendingScrollback = pendingScrollbackRef.current;
+      pendingScrollbackRef.current = "";
+      if (pendingScrollback) {
+        term.write(pendingScrollback);
+      } else if (window.api?.terminalRead) {
         try {
           const result = await window.api.terminalRead({ name: sessionName, lines: 500 });
           if (!cancelled && result?.ok && result.lines?.length) {
@@ -773,7 +838,7 @@ function SessionTerminal({
       emitTerminalDebug("session:teardown", { sessionName });
       teardown();
     };
-  }, [opaqueBackground, plainClickMovesCursor, promptSelectionEditing, promptUndoShortcut, sessionName, teardown]);
+  }, [opaqueBackground, plainClickMovesCursor, promptSelectionEditing, promptUndoShortcut, sessionName, teardown, themeRevision]);
 
   useEffect(() => {
     const logActiveState = (phase) => {
