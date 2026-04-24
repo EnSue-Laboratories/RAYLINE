@@ -923,10 +923,6 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               </div>
 
               <div style={{ marginBottom: 28 }}>
-                <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.3)", marginBottom: 12 }}>
-                  {t("settings.byokDescription")}
-                </div>
-
                 {byokProviders.length === 0 && !byokAddOpen && (
                   <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.35)", marginBottom: 12 }}>
                     {t("settings.byokNoProviders")}
