@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { ArrowLeft, Check, ChevronDown, Image } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { useTheme } from "../contexts/ThemeContext.jsx";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
@@ -10,6 +11,7 @@ import WindowDragSpacer from "./WindowDragSpacer";
 
 export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, onClose }) {
   const s = useFontScale();
+  const { mode, setMode } = useTheme();
   const t = createTranslator(locale);
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
   const [multica, setMultica] = useState(() => loadMulticaState());
@@ -155,6 +157,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const imgOpacityPct = sliderPct(local.imgOpacity || 0, 0, 100);
   const appBlurPct = sliderPct(appBlur || 0, 0, 20);
   const appOpacityPct = sliderPct(appOpacity || 100, 30, 100);
+  const themeOptions = [
+    { value: "auto", label: t("settings.themeAuto") },
+    { value: "light", label: t("settings.themeLight") },
+    { value: "dark", label: t("settings.themeDark") },
+  ];
 
   // Slider track style helper
   const sliderTrack = (pct) =>
@@ -262,6 +269,62 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             }}
           >
             {t("settings.appearance")}
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "rgba(255,255,255,0.8)",
+                marginBottom: 10,
+              }}
+            >
+              {t("settings.theme")}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              {themeOptions.map((option) => {
+                const selected = mode === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      height: 30,
+                      padding: "0 10px",
+                      borderRadius: 7,
+                      background: selected ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
+                      border: selected ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(255,255,255,0.08)",
+                      color: selected ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.62)",
+                      cursor: "pointer",
+                      fontSize: s(12),
+                      transition: "all .2s",
+                      fontFamily: "system-ui, sans-serif",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="rayline-theme"
+                      value={option.value}
+                      checked={selected}
+                      onChange={(e) => setMode(e.target.value)}
+                      style={{
+                        accentColor: "white",
+                        margin: 0,
+                      }}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           <div style={{ marginBottom: 24 }}>
