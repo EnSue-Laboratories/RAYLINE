@@ -18,6 +18,10 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
+  --text-primary: rgba(255,255,255,0.92);
+  --control-bg: rgba(255,255,255,0.04);
+  --control-border: rgba(255,255,255,0.08);
+  --app-background: #0D0D10;
 }
 
 *, *::before, *::after {
