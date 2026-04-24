@@ -143,6 +143,62 @@ function conversationHasInjectedPromptMetadata(messages) {
   });
 }
 
+function getMulticaAgentIdFromModelId(modelId) {
+  const parts = String(modelId || "").split(":");
+  return parts.length === 2 && parts[0] === "multica" && parts[1] ? parts[1] : "";
+}
+
+function normalizeMulticaContext(context, fallbackAgentId = "") {
+  if (!context || typeof context !== "object") return null;
+  const agentId = typeof context.agentId === "string" && context.agentId
+    ? context.agentId
+    : fallbackAgentId;
+  const sessionId = typeof context.sessionId === "string" && context.sessionId
+    ? context.sessionId
+    : "";
+  if (!agentId || !sessionId) return null;
+  return {
+    ...context,
+    agentId,
+    sessionId,
+    serverUrl: context.serverUrl || "",
+    workspaceId: context.workspaceId || "",
+    workspaceSlug: context.workspaceSlug || "",
+  };
+}
+
+function getMulticaSessionContexts(conversation) {
+  const sessions = {};
+  const rawSessions = conversation?._multicaSessions;
+  if (rawSessions && typeof rawSessions === "object") {
+    for (const [agentId, context] of Object.entries(rawSessions)) {
+      const normalized = normalizeMulticaContext(context, agentId);
+      if (normalized) sessions[normalized.agentId] = normalized;
+    }
+  }
+
+  const activeContext = normalizeMulticaContext(conversation?._multica);
+  if (activeContext) sessions[activeContext.agentId] = activeContext;
+  return sessions;
+}
+
+function getMulticaContextForAgent(conversation, agentId) {
+  if (!agentId) return null;
+  return getMulticaSessionContexts(conversation)[agentId] || null;
+}
+
+function withMulticaContext(conversation, context) {
+  if (!conversation || !context?.agentId || !context?.sessionId) return conversation;
+  return {
+    ...conversation,
+    _multica: context,
+    _multicaSessions: {
+      ...getMulticaSessionContexts(conversation),
+      [context.agentId]: context,
+    },
+  };
+}
+
 function normalizeMulticaCheckoutUrl(remoteUrl, remoteSlug) {
   const slug = typeof remoteSlug === "string" ? remoteSlug.trim().replace(/\.git$/i, "") : "";
   if (slug) return `https://github.com/${slug}`;
@@ -2205,11 +2261,10 @@ export default function App() {
 
   const ensureMulticaContextForConversation = useCallback(
     async ({ conversationId, conversation, normalizedConversation, modelId, title, forceNewSession = false }) => {
-      const parts = String(modelId || "").split(":");
-      if (parts.length !== 2 || !parts[1]) {
+      const agentId = getMulticaAgentIdFromModelId(modelId);
+      if (!agentId) {
         throw new Error(`Invalid Multica model id: ${modelId}`);
       }
-      const agentId = parts[1];
       const { loadMulticaState } = await import("./multica/store");
       const mState = loadMulticaState();
       const token = mState.token;
@@ -2219,10 +2274,14 @@ export default function App() {
         throw new Error("Multica workspace is not configured");
       }
 
-      const existing = normalizedConversation?._multica || conversation?._multica || null;
+      const contextSource = normalizedConversation || conversation || null;
+      const activeExisting =
+        normalizeMulticaContext(normalizedConversation?._multica) ||
+        normalizeMulticaContext(conversation?._multica);
+      const existing = getMulticaContextForAgent(contextSource, agentId);
       const desiredServerUrl = mState.serverUrl;
-      const desiredWorkspaceId = mState.workspaceId || existing?.workspaceId || "";
-      const desiredWorkspaceSlug = mState.workspaceSlug || existing?.workspaceSlug || "";
+      const desiredWorkspaceId = mState.workspaceId || existing?.workspaceId || activeExisting?.workspaceId || "";
+      const desiredWorkspaceSlug = mState.workspaceSlug || existing?.workspaceSlug || activeExisting?.workspaceSlug || "";
       const hydratedContext = existing
         ? {
             ...existing,
@@ -2244,7 +2303,9 @@ export default function App() {
         (
           hydratedContext.serverUrl !== existing?.serverUrl ||
           hydratedContext.workspaceId !== existing?.workspaceId ||
-          hydratedContext.workspaceSlug !== existing?.workspaceSlug
+          hydratedContext.workspaceSlug !== existing?.workspaceSlug ||
+          activeExisting?.agentId !== hydratedContext.agentId ||
+          activeExisting?.sessionId !== hydratedContext.sessionId
         );
 
       if (
@@ -2258,7 +2319,7 @@ export default function App() {
       ) {
         if (shouldPersistHydratedContext) {
           setConvoList((p) =>
-            p.map((c) => (c.id === conversationId ? { ...c, _multica: hydratedContext } : c))
+            p.map((c) => (c.id === conversationId ? withMulticaContext(c, hydratedContext) : c))
           );
         }
         return { context: hydratedContext, token };
@@ -2280,7 +2341,7 @@ export default function App() {
         sessionId: session.id,
       };
       setConvoList((p) =>
-        p.map((c) => (c.id === conversationId ? { ...c, _multica: context } : c))
+        p.map((c) => (c.id === conversationId ? withMulticaContext(c, context) : c))
       );
       return { context, token };
     },
@@ -2383,9 +2444,20 @@ export default function App() {
             conversationHasInjectedPromptMetadata(normalizedConversation.archivedMessages) ||
             conversationHasInjectedPromptMetadata(thisConvoData.messages)
           );
-        const previousMulticaContext =
+        const selectedMulticaAgentId =
           currentProvider === "multica"
-            ? (normalizedConversation?._multica || conversation?._multica || null)
+            ? getMulticaAgentIdFromModelId(normalizedConversation.model)
+            : "";
+        const previousActiveMulticaContext =
+          currentProvider === "multica"
+            ? (
+                normalizeMulticaContext(normalizedConversation?._multica) ||
+                normalizeMulticaContext(conversation?._multica)
+              )
+            : null;
+        const previousSelectedMulticaContext =
+          currentProvider === "multica"
+            ? getMulticaContextForAgent(normalizedConversation, selectedMulticaAgentId)
             : null;
         let multicaContext, multicaToken;
         if (m.provider === "multica") {
@@ -2411,18 +2483,26 @@ export default function App() {
           currentProvider === "multica" &&
           !isFirstMessage &&
           prevProvider === "multica" &&
-          Boolean(previousMulticaContext?.agentId) &&
+          Boolean(previousActiveMulticaContext?.agentId) &&
           Boolean(multicaContext?.agentId) &&
-          previousMulticaContext.agentId !== multicaContext.agentId;
+          previousActiveMulticaContext.agentId !== multicaContext.agentId;
         const handoffSwitched = providerSwitched || multicaModelSwitched;
+        const hasSameActiveMulticaContext =
+          Boolean(previousActiveMulticaContext?.sessionId) &&
+          Boolean(multicaContext?.sessionId) &&
+          previousActiveMulticaContext.sessionId === multicaContext.sessionId &&
+          previousActiveMulticaContext.agentId === multicaContext.agentId;
+        const hasRecoveredSelectedMulticaContext =
+          !previousActiveMulticaContext &&
+          Boolean(previousSelectedMulticaContext?.sessionId) &&
+          Boolean(multicaContext?.sessionId) &&
+          previousSelectedMulticaContext.sessionId === multicaContext.sessionId &&
+          previousSelectedMulticaContext.agentId === multicaContext.agentId;
         const multicaSessionReused =
           currentProvider === "multica" &&
           !isFirstMessage &&
           prevProvider === "multica" &&
-          Boolean(previousMulticaContext?.sessionId) &&
-          Boolean(multicaContext?.sessionId) &&
-          previousMulticaContext.sessionId === multicaContext.sessionId &&
-          previousMulticaContext.agentId === multicaContext.agentId;
+          (hasSameActiveMulticaContext || hasRecoveredSelectedMulticaContext);
         const canResumeExistingSession =
           !isFirstMessage &&
           (
@@ -2855,13 +2935,16 @@ export default function App() {
       // Persist on the conversation so resume works after restart.
       // Survives round-trip via normalizeConversationState's `...conversation` spread
       // and JSON.stringify in electron/main.cjs. If an allowlist is ever added to
-      // either path, `_multica` must be explicitly included.
+      // either path, `_multica` and `_multicaSessions` must be explicitly included.
       n._multica = {
         serverUrl: mState.serverUrl,
         workspaceSlug: mState.workspaceSlug,
         workspaceId: mState.workspaceId,
         agentId,
         sessionId: multicaSession.id,
+      };
+      n._multicaSessions = {
+        [agentId]: n._multica,
       };
     }
 
