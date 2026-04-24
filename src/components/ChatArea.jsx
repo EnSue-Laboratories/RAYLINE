@@ -12,7 +12,7 @@ import SelectionToolbar from "./SelectionToolbar";
 import WindowDragSpacer from "./WindowDragSpacer";
 import ExportConversationBtn from "./ExportConversationBtn";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { SIDEBAR_CHROME_RAIL_LEFT, SIDEBAR_CHROME_RAIL_WIDTH } from "../windowChrome";
+import { IS_MAC, SIDEBAR_CHROME_RAIL_LEFT, SIDEBAR_CHROME_RAIL_WIDTH } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { clipboardItemsToAttachments, dataTransferHasFiles, fileListToAttachments } from "../utils/attachments";
 import TabStrip from "./TabStrip";
@@ -367,9 +367,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
 
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
   const showConversationTitle = Boolean(convo && !showNewChatCard);
-  const topTabsLeft = sidebarOpen ? 18 : SIDEBAR_CHROME_RAIL_LEFT + SIDEBAR_CHROME_RAIL_WIDTH + 16;
+  const topTabsLeft = sidebarOpen
+    ? 18
+    : IS_MAC
+      ? SIDEBAR_CHROME_RAIL_LEFT + SIDEBAR_CHROME_RAIL_WIDTH + 16
+      : 18;
   const headerContentOffset = showHeaderTabs ? 8 : 0;
-  const headerLeftPadding = sidebarOpen ? 24 : 50;
+  const headerLeftPadding = sidebarOpen ? 24 : IS_MAC ? 50 : 24;
 
   const handleDragEnter = useCallback((e) => {
     if (!dataTransferHasFiles(e.dataTransfer)) return;

@@ -3,6 +3,7 @@ import AuroraCanvas from "./components/AuroraCanvas";
 import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
 import SidebarChromeRail from "./components/SidebarChromeRail";
+import { IS_MAC } from "./windowChrome";
 import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
 import useAgent     from "./hooks/useAgent";
@@ -3424,14 +3425,16 @@ export default function App() {
         </div>
       )}
 
-      <SidebarChromeRail
-        sidebarOpen={sidebarOpen}
-        settingsOpen={showSettings}
-        controlsOnHover={chromeControlsOnHover}
-        onToggleSidebar={() => setSidebarOpen((o) => !o)}
-        onNew={handleNew}
-        onOpenSettings={() => setShowSettings((open) => !open)}
-      />
+      {IS_MAC && (
+        <SidebarChromeRail
+          sidebarOpen={sidebarOpen}
+          settingsOpen={showSettings}
+          controlsOnHover={chromeControlsOnHover}
+          onToggleSidebar={() => setSidebarOpen((o) => !o)}
+          onNew={handleNew}
+          onOpenSettings={() => setShowSettings((open) => !open)}
+        />
+      )}
 
       <div
         style={{

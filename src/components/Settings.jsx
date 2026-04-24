@@ -7,6 +7,7 @@ import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
 import { createTranslator } from "../i18n";
 import WindowDragSpacer from "./WindowDragSpacer";
+import { IS_MAC } from "../windowChrome";
 
 export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, onClose }) {
   const s = useFontScale();
@@ -321,6 +322,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             </div>
           </div>
 
+          {IS_MAC && (
           <div style={{ marginBottom: 24 }}>
             <div
               style={{
@@ -382,6 +384,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               </button>
             </div>
           </div>
+          )}
 
           {/* Wallpaper subsection */}
           <div style={{ marginBottom: 28 }}>

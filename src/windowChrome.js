@@ -1,5 +1,8 @@
 export const WINDOW_DRAG_HEIGHT = 52;
 
+export const IS_MAC =
+  typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || "");
+
 const TRAFFIC_LIGHT_LEFT = 16;
 const TRAFFIC_LIGHT_GROUP_WIDTH = 56;
 const TRAFFIC_LIGHT_GAP = 12;
