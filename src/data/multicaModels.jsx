@@ -3,6 +3,7 @@ import { loadMulticaState, saveMulticaState } from "../multica/store";
 import { getByokPresetsForEndpoints } from "./byok-models";
 import ModelPicker from "../components/ModelPicker";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function multicaAgentToModel(agent, state) {
   return {
     id: `multica:${agent.id}`,
@@ -17,6 +18,7 @@ export function multicaAgentToModel(agent, state) {
   };
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useMulticaModels() {
   const [state, setState] = useState(() => loadMulticaState());
   const [models, setModels] = useState(() => (state.agentsCache || []).map((a) => multicaAgentToModel(a, state)));
@@ -98,6 +100,7 @@ function useByokModels() {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void refresh(); }, [refresh]);
 
   useEffect(() => {

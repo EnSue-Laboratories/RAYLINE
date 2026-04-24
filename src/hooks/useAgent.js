@@ -176,7 +176,7 @@ function normalizeCodexToolArgs(payload) {
     if (parsed && typeof parsed === "object") {
       return parsed.cmd && !parsed.command ? { ...parsed, command: parsed.cmd } : parsed;
     }
-  } catch {}
+  } catch { /* ignore */ }
 
   return payload?.type === "custom_tool_call" ? { input: raw } : { value: raw };
 }
@@ -196,7 +196,9 @@ function normalizeCodexToolResult(output) {
 export default function useAgent() {
   const [conversations, setConversations] = useState(new Map());
   const conversationsRef = useRef(conversations);
-  conversationsRef.current = conversations;
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
   const cleanupRefs = useRef([]);
   const pendingStartsRef = useRef(new Map());
   const usageHydrationTimersRef = useRef(new Set());
@@ -455,7 +457,7 @@ export default function useAgent() {
               if (toolIdx >= 0) {
                 const newJson = (parts[toolIdx].argsJson || "") + (delta.partial_json || "");
                 let newArgs = parts[toolIdx].args;
-                try { newArgs = JSON.parse(newJson); } catch {}
+                try { newArgs = JSON.parse(newJson); } catch { /* ignore */ }
                 parts[toolIdx] = { ...parts[toolIdx], argsJson: newJson, args: newArgs };
               }
               updateAssistant({ parts, isStreaming: true, _streamState: streamState });
@@ -489,7 +491,7 @@ export default function useAgent() {
           // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
           // Usage here is per-API-call, not cumulative — skip it to avoid flicker;
           // the `result` event below owns the authoritative cumulative usage.
-          const am = ensureAssistant();
+          ensureAssistant();
           const parts = cloneParts(lastMsg.parts);
           const hasStreamParts = parts.length > 0;
           if (!hasStreamParts && event.message?.content) {
@@ -870,10 +872,12 @@ export default function useAgent() {
     });
 
     cleanupRefs.current = [offStream, offDone, offError];
+    const cleanups = cleanupRefs.current;
+    const timers = usageHydrationTimersRef.current;
     return () => {
-      cleanupRefs.current.forEach((fn) => fn?.());
-      usageHydrationTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
-      usageHydrationTimersRef.current.clear();
+      cleanups.forEach((fn) => fn?.());
+      timers.forEach((timerId) => window.clearTimeout(timerId));
+      timers.clear();
     };
   }, []);
 

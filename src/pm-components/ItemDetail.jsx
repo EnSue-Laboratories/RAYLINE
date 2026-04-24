@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { ArrowLeft, GitBranch, Plus, Check, CheckCircle2, GitMerge, RotateCcw, Copy } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -104,7 +104,7 @@ export default function ItemDetail({ repo, number, type, onBack, locale }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showAssignMenu]);
 
-  const fetchAll = () => {
+  const fetchAll = useCallback(() => {
     setLoading(true);
     setError(null);
     const fetchItem =
@@ -126,9 +126,10 @@ export default function ItemDetail({ repo, number, type, onBack, locale }) {
         setError(err.message);
         setLoading(false);
       });
-  };
+  }, [repo, number, type]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAll();
     const interval = setInterval(async () => {
       try {
@@ -141,10 +142,10 @@ export default function ItemDetail({ repo, number, type, onBack, locale }) {
         ]);
         setItem(itemData);
         setComments(commentsData);
-      } catch {}
+      } catch { /* ignore */ }
     }, 30000);
     return () => clearInterval(interval);
-  }, [repo, number, type]);
+  }, [repo, number, type, fetchAll]);
 
   const handleToggleAssign = async (login) => {
     const isAssigned = item.assignees.some((a) => a.login === login);
@@ -165,7 +166,7 @@ export default function ItemDetail({ repo, number, type, onBack, locale }) {
     try {
       const updated = await window.ghApi.closeIssue(repo, number);
       setItem(updated);
-    } catch {}
+    } catch { /* ignore */ }
     setActionLoading(false);
   };
 
@@ -174,7 +175,7 @@ export default function ItemDetail({ repo, number, type, onBack, locale }) {
     try {
       const updated = await window.ghApi.reopenIssue(repo, number);
       setItem(updated);
-    } catch {}
+    } catch { /* ignore */ }
     setActionLoading(false);
   };
 
@@ -184,7 +185,7 @@ export default function ItemDetail({ repo, number, type, onBack, locale }) {
       await window.ghApi.mergePR(repo, number);
       const updated = await window.ghApi.getPR(repo, number);
       setItem(updated);
-    } catch {}
+    } catch { /* ignore */ }
     setActionLoading(false);
   };
 
@@ -192,7 +193,7 @@ export default function ItemDetail({ repo, number, type, onBack, locale }) {
     try {
       const updated = await window.ghApi.listComments(repo, number);
       setComments(updated);
-    } catch {}
+    } catch { /* ignore */ }
   };
 
   if (loading) {

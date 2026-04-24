@@ -25,6 +25,7 @@ export default function RepoManager({ repos, onAdd, onClose, locale }) {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchRepos();
   }, []);
 

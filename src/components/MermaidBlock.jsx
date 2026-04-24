@@ -131,12 +131,19 @@ export default function MermaidBlock({ code }) {
       }).catch(() => {
         setError(true);
       }).finally(() => {
-        try { document.body.removeChild(offscreen); } catch {}
+        try { document.body.removeChild(offscreen); } catch { /* ignore */ }
       });
     }, 600);
 
     return () => clearTimeout(timerRef.current);
-  }, [code]);
+  }, [code, svg]);
+
+  // Capture height when SVG is rendered
+  useEffect(() => {
+    if (svg && containerRef.current) {
+      lastHeight.current = containerRef.current.offsetHeight;
+    }
+  }, [svg]);
 
   if (error) {
     return (
@@ -156,13 +163,6 @@ export default function MermaidBlock({ code }) {
       </pre>
     );
   }
-
-  // Capture height when SVG is rendered
-  useEffect(() => {
-    if (svg && containerRef.current) {
-      lastHeight.current = containerRef.current.offsetHeight;
-    }
-  }, [svg]);
 
   if (!svg) {
     return (

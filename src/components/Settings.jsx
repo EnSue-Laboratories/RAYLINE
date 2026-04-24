@@ -23,12 +23,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const [byokDraftName, setByokDraftName] = useState("");
   const [byokDraftModelId, setByokDraftModelId] = useState("");
 
-  // Sync from parent when wallpaper prop changes externally
-  useEffect(() => {
-    // Local edits should reset when the persisted wallpaper changes outside this panel.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  const [prevWallpaper, setPrevWallpaper] = useState(wallpaper);
+  if (wallpaper !== prevWallpaper) {
+    setPrevWallpaper(wallpaper);
     setLocal(normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
-  }, [wallpaper]);
+  }
 
   // Load data URL when path is set but dataUrl is missing (e.g. after app restart)
   useEffect(() => {
@@ -1156,7 +1155,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                             onClick={async () => {
                               if (!window.api?.byokSaveProviders) return;
                               const id = byokDraftType === "custom"
-                                ? `custom-${(byokDraftName || "provider").toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`
+                                ? `custom-${(byokDraftName || "provider").toLowerCase().replace(/\s+/g, "-")}-${new Date().getTime()}`
                                 : byokDraftType;
                               const name = byokDraftName || byokDraftType;
                               // Load existing raw providers, add new, save all

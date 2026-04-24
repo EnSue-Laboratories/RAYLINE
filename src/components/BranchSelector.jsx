@@ -8,7 +8,8 @@ const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 
 function IconActionButton({
-  icon: Icon,
+  // eslint-disable-next-line no-unused-vars
+  icon: IconComponent,
   tooltip,
   onClick,
   disabled = false,
@@ -22,13 +23,22 @@ function IconActionButton({
   const [hovered, setHovered] = useState(false);
   const [tipPos, setTipPos] = useState(null);
 
-  useEffect(() => {
-    if (!hovered || disabled || !btnRef.current) { setTipPos(null); return; }
-    const r = btnRef.current.getBoundingClientRect();
-    setTipPos({ left: r.left + r.width / 2, top: r.top });
-  }, [hovered, disabled]);
-
   const active = !disabled && visible;
+
+  const handleMouseEnter = () => {
+    if (active) {
+      setHovered(true);
+      if (btnRef.current) {
+        const r = btnRef.current.getBoundingClientRect();
+        setTipPos({ left: r.left + r.width / 2, top: r.top });
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHovered(false);
+    setTipPos(null);
+  };
 
   return (
     <>
@@ -41,8 +51,8 @@ function IconActionButton({
           e.stopPropagation();
           if (!disabled) onClick?.(e);
         }}
-        onMouseEnter={() => { if (active) setHovered(true); }}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         style={{
           display: "flex",
           alignItems: "center",
@@ -62,7 +72,7 @@ function IconActionButton({
           padding: 0,
         }}
       >
-        <Icon size={11} strokeWidth={2} />
+        <IconComponent size={11} strokeWidth={2} />
       </button>
       {hovered && active && tipPos && createPortal(
         <div
