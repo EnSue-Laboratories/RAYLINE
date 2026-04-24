@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback, useTransition } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { Plus, Search, Trash2, FolderOpen, ChevronRight, Workflow, FolderPlus } from "lucide-react";
 import WindowDragSpacer from "./WindowDragSpacer";
@@ -6,6 +6,8 @@ import ProjectGroup from "./ProjectGroup";
 import { getMOrMulticaFallback } from "../data/models";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 import { createTranslator } from "../i18n";
+
+const COLLAPSE_PERSIST_DELAY_MS = 1200;
 
 function getMainRepoRoot(dir) {
   if (!dir) return dir;
@@ -94,9 +96,10 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
   const [searchOpen, setSearchOpen] = useState(false);
   const [draftsHeaderHovered, setDraftsHeaderHovered] = useState(false);
   const t = useMemo(() => createTranslator(locale), [locale]);
-  const [, startCollapsePersistTransition] = useTransition();
   const projectsRef = useRef(projects);
   const collapsedOverridesRef = useRef({});
+  const pendingCollapsePersistRef = useRef({});
+  const collapsePersistTimerRef = useRef(null);
   const [collapsedOverrides, setCollapsedOverrides] = useState({});
 
   useEffect(() => {
@@ -106,6 +109,14 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
   useEffect(() => {
     collapsedOverridesRef.current = collapsedOverrides;
   }, [collapsedOverrides]);
+
+  useEffect(() => (
+    () => {
+      if (collapsePersistTimerRef.current) {
+        clearTimeout(collapsePersistTimerRef.current);
+      }
+    }
+  ), []);
 
   const searchQuery = search.toLowerCase();
   const filtered = useMemo(
@@ -135,17 +146,19 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
     collapsedOverridesRef.current = nextOverrides;
     setCollapsedOverrides(nextOverrides);
 
-    const persist = () => {
-      startCollapsePersistTransition(() => {
-        onToggleProjectCollapse(root, collapsed);
-      });
-    };
-    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
-      window.requestAnimationFrame(persist);
-    } else {
-      setTimeout(persist, 0);
+    pendingCollapsePersistRef.current[root] = collapsed;
+    if (collapsePersistTimerRef.current) {
+      clearTimeout(collapsePersistTimerRef.current);
     }
-  }, [onToggleProjectCollapse, startCollapsePersistTransition]);
+    collapsePersistTimerRef.current = setTimeout(() => {
+      const pending = pendingCollapsePersistRef.current;
+      pendingCollapsePersistRef.current = {};
+      collapsePersistTimerRef.current = null;
+      for (const [projectRoot, nextCollapsed] of Object.entries(pending)) {
+        onToggleProjectCollapse(projectRoot, nextCollapsed);
+      }
+    }, COLLAPSE_PERSIST_DELAY_MS);
+  }, [onToggleProjectCollapse]);
   const searchActive = search.length > 0;
 
   const cwdShort = cwd ? (() => {
