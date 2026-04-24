@@ -6,8 +6,9 @@ import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
 import { createTranslator } from "../i18n";
+import WindowDragSpacer from "./WindowDragSpacer";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, onClose }) {
   const s = useFontScale();
   const t = createTranslator(locale);
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
@@ -190,8 +191,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      {/* Drag region */}
-      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0 }} />
+      <WindowDragSpacer />
 
       {/* Header */}
       <div
@@ -318,6 +318,68 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   pointerEvents: "none",
                 }}
               />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: s(13),
+                    color: "rgba(255,255,255,0.8)",
+                    marginBottom: 2,
+                  }}
+                >
+                  {t("settings.chromeControlsOnHover")}
+                </div>
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: "rgba(255,255,255,0.3)",
+                  }}
+                >
+                  {t("settings.chromeControlsOnHoverDescription")}
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={chromeControlsOnHover}
+                onClick={() => onChromeControlsOnHoverChange?.(!chromeControlsOnHover)}
+                style={{
+                  flexShrink: 0,
+                  width: 38,
+                  height: 22,
+                  borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: chromeControlsOnHover ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                  position: "relative",
+                  cursor: "pointer",
+                  padding: 0,
+                  transition: "background 120ms ease",
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    left: chromeControlsOnHover ? 18 : 2,
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    background: "rgba(255,255,255,0.9)",
+                    transition: "left 120ms ease",
+                  }}
+                />
+              </button>
             </div>
           </div>
 

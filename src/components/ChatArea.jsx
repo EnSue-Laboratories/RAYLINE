@@ -1,6 +1,6 @@
 import { memo, useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
-import { PanelLeftOpen, Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
+import { ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
@@ -9,9 +9,10 @@ import BranchSelector from "./BranchSelector";
 import GitStatusPill from "./GitStatusPill";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
+import WindowDragSpacer from "./WindowDragSpacer";
 import ExportConversationBtn from "./ExportConversationBtn";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
+import { SIDEBAR_CHROME_RAIL_LEFT, SIDEBAR_CHROME_RAIL_WIDTH } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { clipboardItemsToAttachments, dataTransferHasFiles, fileListToAttachments } from "../utils/attachments";
 import TabStrip from "./TabStrip";
@@ -103,7 +104,7 @@ const ChatTranscript = memo(function ChatTranscript({
   );
 });
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, locale }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, locale }) {
   const s = useFontScale();
   const isDraftContext = showNewChatCard ? newChatDefaultCwd == null : isDraftConversation(convo, draftsPath);
   const [input, setInput]             = useState("");
@@ -366,8 +367,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
   const showConversationTitle = Boolean(convo && !showNewChatCard);
-  const topTabsLeft = sidebarOpen ? 18 : 104;
+  const topTabsLeft = sidebarOpen ? 18 : SIDEBAR_CHROME_RAIL_LEFT + SIDEBAR_CHROME_RAIL_WIDTH + 16;
   const headerContentOffset = showHeaderTabs ? 8 : 0;
+  const headerLeftPadding = sidebarOpen ? 24 : 50;
 
   const handleDragEnter = useCallback((e) => {
     if (!dataTransferHasFiles(e.dataTransfer)) return;
@@ -506,14 +508,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      {/* Drag region matching sidebar spacer */}
-      <div
-        style={{
-          height: WINDOW_DRAG_HEIGHT,
-          WebkitAppRegion: "drag",
-          flexShrink: 0,
-        }}
-      />
+      <WindowDragSpacer />
 
       {showHeaderTabs && (
         <div
@@ -547,50 +542,14 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         </div>
       )}
 
-      {/* Sidebar collapsed: icon buttons below traffic lights */}
-      {!sidebarOpen && (
-        <div style={{
-          position: "fixed", top: WINDOW_DRAG_HEIGHT, left: 34,
-          display: "flex", gap: 4,
-          zIndex: 50, WebkitAppRegion: "no-drag",
-        }}>
-          <button
-            onClick={onToggleSidebar}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 28, height: 28, borderRadius: 7,
-              background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.4)", transition: "all .15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
-          >
-            <PanelLeftOpen size={16} strokeWidth={1.5} />
-          </button>
-          <button
-            onClick={onNew}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 28, height: 28, borderRadius: 7,
-              background: "none", border: "none", cursor: "pointer",
-              color: "rgba(255,255,255,0.4)", transition: "all .15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.75)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
-          >
-            <Plus size={16} strokeWidth={1.5} />
-          </button>
-        </div>
-      )}
-
       {/* Top bar — aligns with sidebar header */}
       <div
         style={{
-          padding: `${headerContentOffset}px 24px 12px`,
+          padding: `${headerContentOffset}px 24px 12px ${headerLeftPadding}px`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          transition: "padding-top .16s ease",
+          transition: "padding .16s ease",
         }}
       >
         <div style={{
@@ -598,7 +557,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           alignItems: "center",
           justifyContent: "space-between",
           width: "100%",
-          maxWidth: !sidebarOpen ? 640 : "none",
+          maxWidth: "none",
         }}>
         <div
           style={{

@@ -500,7 +500,7 @@ export default function NewChatCard({
         backdropFilter: "blur(48px) saturate(1.2)",
         border: `1px solid ${dragOver ? "rgba(180,220,255,0.12)" : SHEET_BORDER}`,
         borderRadius: 14,
-        padding: 20,
+        padding: "20px 20px 10px",
         display: "flex",
         flexDirection: "column",
         gap: 12,
@@ -675,7 +675,7 @@ export default function NewChatCard({
         {/* Bottom bar */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          paddingTop: 4, borderTop: "1px solid var(--pane-border)",
+          paddingTop: 10, borderTop: "1px solid var(--pane-border)",
         }}>
           <ProjectPicker
             value={selectedCwd}

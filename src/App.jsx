@@ -2,10 +2,12 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
+import SidebarChromeRail from "./components/SidebarChromeRail";
 import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
+import useWindowActivity from "./hooks/useWindowActivity";
 import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
 import NewProjectModal from "./components/NewProjectModal";
@@ -42,6 +44,7 @@ const SHELL_TRANSCRIPT_LIMIT = 12000;
 const SHELL_TERMINAL_TIMEOUT_MS = 15000;
 const LAB_CONTROL_ENDPOINT = "http://127.0.0.1:4001/control";
 const LAB_CONTROL_COMMIT_DELAY_MS = 1000;
+const SIDEBAR_WIDTH = 264;
 const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
 const EMPTY_CONVERSATION_DATA = { messages: [], isStreaming: false, error: null };
 
@@ -1044,6 +1047,7 @@ export default function App() {
     markMulticaConnected,
   } = useAgent();
   const terminal = useTerminal();
+  const { prefersReducedMotion } = useWindowActivity();
   const { models: multicaModels } = useMulticaModels();
 
   // convos: array of { id, sessionId, title, model, ts }
@@ -1065,6 +1069,7 @@ export default function App() {
   const [appBlur, setAppBlur] = useState(0);
   const [appOpacity, setAppOpacity] = useState(100);
   const [developerMode, setDeveloperMode] = useState(true);
+  const [chromeControlsOnHover, setChromeControlsOnHover] = useState(false);
   const [notificationSound, setNotificationSound] = useState("glass");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -1126,6 +1131,7 @@ export default function App() {
     appBlur,
     appOpacity,
     developerMode,
+    chromeControlsOnHover,
     notificationSound,
     notificationsMuted,
     queuedMessages,
@@ -1134,6 +1140,7 @@ export default function App() {
     appOpacity,
     coauthorEnabled,
     coauthorTrailer,
+    chromeControlsOnHover,
     cwd,
     defaultModel,
     defaultPrBranch,
@@ -1402,6 +1409,7 @@ export default function App() {
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
+        if (typeof state.chromeControlsOnHover === "boolean") setChromeControlsOnHover(state.chromeControlsOnHover);
         if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
         if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
         if (state.wallpaper) {
@@ -3315,6 +3323,9 @@ export default function App() {
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  const sidebarPaneTransition = prefersReducedMotion
+    ? "none"
+    : "width .34s cubic-bezier(.16,1,.3,1), min-width .34s cubic-bezier(.16,1,.3,1), border-color .18s ease";
 
   return (
     <FontSizeContext.Provider value={fontSize}>
@@ -3353,6 +3364,15 @@ export default function App() {
         </div>
       )}
 
+      <SidebarChromeRail
+        sidebarOpen={sidebarOpen}
+        settingsOpen={showSettings}
+        controlsOnHover={chromeControlsOnHover}
+        onToggleSidebar={() => setSidebarOpen((o) => !o)}
+        onNew={handleNew}
+        onOpenSettings={() => setShowSettings((open) => !open)}
+      />
+
       <div
         style={{
           display: "flex",
@@ -3364,46 +3384,55 @@ export default function App() {
       {/* Sidebar */}
       <div
         style={{
-          width: sidebarOpen ? 264 : 0,
-          minWidth: sidebarOpen ? 264 : 0,
-          borderRight: sidebarOpen ? "1px solid rgba(255,255,255,0.025)" : "none",
+          width: sidebarOpen ? SIDEBAR_WIDTH : 0,
+          minWidth: sidebarOpen ? SIDEBAR_WIDTH : 0,
+          borderRight: `1px solid ${sidebarOpen ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0)"}`,
           display: "flex",
           flexDirection: "column",
           position: "relative",
           zIndex: 10,
+          flexShrink: 0,
           ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), {
             hoverOpacity: clampNumber(sidebarActiveOpacity * 0.6, 0.8, sidebarActiveOpacity),
             activeOpacity: sidebarActiveOpacity,
           }),
           backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
-          transition: "all .35s cubic-bezier(.16,1,.3,1)",
+          transition: sidebarPaneTransition,
           overflow: "hidden",
         }}
       >
-        <Sidebar
-          convos={convosForSidebar}
-          active={active}
-          onSelect={handleSelect}
-          onNew={handleNew}
-          onOpenDispatch={() => setShowDispatchCard(true)}
-          onDelete={handleDelete}
-          onToggleSidebar={() => setSidebarOpen((o) => !o)}
-          locale={locale}
-          cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
-          onPickFolder={handlePickFolder}
-          onOpenSettings={() => setShowSettings(true)}
-          onOpenProjectManager={() => window.api?.openProjectManager()}
-          onOpenNewProject={() => setShowNewProject(true)}
-          projects={projects}
-          draftsPath={draftsPath}
-          onToggleProjectCollapse={handleToggleProjectCollapse}
-          onHideProject={handleHideProject}
-          onNewInProject={handleNewInProject}
-          draftsCollapsed={draftsCollapsed}
-          onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
-          developerMode={developerMode}
-          multicaModels={multicaModels}
-        />
+        <div
+          aria-hidden={!sidebarOpen}
+          style={{
+            width: SIDEBAR_WIDTH,
+            minWidth: SIDEBAR_WIDTH,
+            height: "100%",
+            pointerEvents: sidebarOpen ? "auto" : "none",
+          }}
+        >
+          <Sidebar
+            convos={convosForSidebar}
+            active={active}
+            onSelect={handleSelect}
+            onNew={handleNew}
+            onOpenDispatch={() => setShowDispatchCard(true)}
+            onDelete={handleDelete}
+            locale={locale}
+            cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
+            onPickFolder={handlePickFolder}
+            onOpenProjectManager={() => window.api?.openProjectManager()}
+            onOpenNewProject={() => setShowNewProject(true)}
+            projects={projects}
+            draftsPath={draftsPath}
+            onToggleProjectCollapse={handleToggleProjectCollapse}
+            onHideProject={handleHideProject}
+            onNewInProject={handleNewInProject}
+            draftsCollapsed={draftsCollapsed}
+            onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
+            developerMode={developerMode}
+            multicaModels={multicaModels}
+          />
+        </div>
       </div>
 
       {/* Main content: Settings or Chat */}
@@ -3425,6 +3454,8 @@ export default function App() {
           onAppOpacityChange={setAppOpacity}
           developerMode={developerMode}
           onDeveloperModeChange={setDeveloperMode}
+          chromeControlsOnHover={chromeControlsOnHover}
+          onChromeControlsOnHoverChange={setChromeControlsOnHover}
           notificationSound={notificationSound}
           onNotificationSoundChange={setNotificationSound}
           notificationsMuted={notificationsMuted}
@@ -3439,9 +3470,7 @@ export default function App() {
           onSend={handleSend}
           onCancel={handleCancel}
           onEdit={handleEdit}
-          onToggleSidebar={() => setSidebarOpen((o) => !o)}
           sidebarOpen={sidebarOpen}
-          onNew={handleNew}
           onModelChange={handleModelChange}
           defaultModel={defaultModel}
           queuedMessages={activeQueuedMessages}
