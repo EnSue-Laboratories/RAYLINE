@@ -250,7 +250,7 @@ export default function DispatchCard({
   }, [tab, customRows, currentCwd, globalModel, onDispatch, onClose, t]);
 
   return (
-    <div style={backdropStyle} onClick={onClose}>
+    <div style={backdropStyle}>
       <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <header style={headerStyle}>
           <div style={headerTextStyle}>
