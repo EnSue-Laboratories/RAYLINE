@@ -26,10 +26,10 @@ function writeStore(providers) {
 
   if (isEncryptionAvailable()) {
     const encrypted = safeStorage.encryptString(json);
-    fs.writeFileSync(storePath, encrypted);
+    fs.writeFileSync(storePath, Buffer.concat([Buffer.from("enc:"), encrypted]));
   } else {
     log("WARNING: safeStorage encryption not available — storing keys with base64 encoding only");
-    fs.writeFileSync(storePath, Buffer.from(json).toString("base64"), "utf-8");
+    fs.writeFileSync(storePath, Buffer.from("b64:" + Buffer.from(json).toString("base64")), "utf-8");
   }
 }
 
@@ -39,14 +39,25 @@ function readStore() {
 
   try {
     const raw = fs.readFileSync(storePath);
+    let json = null;
 
-    if (isEncryptionAvailable()) {
-      const json = safeStorage.decryptString(raw);
-      return JSON.parse(json);
+    if (raw.slice(0, 4).toString("utf-8") === "enc:") {
+      json = safeStorage.decryptString(raw.slice(4));
+    } else if (raw.slice(0, 4).toString("utf-8") === "b64:") {
+      json = Buffer.from(raw.slice(4).toString("utf-8"), "base64").toString("utf-8");
+    } else {
+      // Legacy fallback
+      if (isEncryptionAvailable()) {
+        try {
+          json = safeStorage.decryptString(raw);
+        } catch {
+          json = Buffer.from(raw.toString("utf-8"), "base64").toString("utf-8");
+        }
+      } else {
+        json = Buffer.from(raw.toString("utf-8"), "base64").toString("utf-8");
+      }
     }
 
-    // Fallback: base64
-    const json = Buffer.from(raw.toString("utf-8"), "base64").toString("utf-8");
     return JSON.parse(json);
   } catch (err) {
     log("Failed to read store:", err.message);

@@ -30,7 +30,9 @@ function buildAnthropicRequest({ modelId, prompt, messages, systemPrompt }) {
   // Add current prompt
   if (prompt) {
     const lastMsg = apiMessages[apiMessages.length - 1];
-    if (!lastMsg || lastMsg.role !== "user" || lastMsg.content !== prompt) {
+    if (lastMsg && lastMsg.role === "user") {
+      lastMsg.content = prompt;
+    } else {
       apiMessages.push({ role: "user", content: prompt });
     }
   }
@@ -65,7 +67,9 @@ function buildOpenAIRequest({ modelId, prompt, messages, systemPrompt }) {
   // Add current prompt
   if (prompt) {
     const lastMsg = apiMessages[apiMessages.length - 1];
-    if (!lastMsg || lastMsg.role !== "user" || lastMsg.content !== prompt) {
+    if (lastMsg && lastMsg.role === "user") {
+      lastMsg.content = prompt;
+    } else {
       apiMessages.push({ role: "user", content: prompt });
     }
   }
@@ -83,8 +87,17 @@ Keep responses concise and conversational.
 Use markdown formatting — the client renders headings, code blocks, tables, lists, and mermaid diagrams.
 For math, use LaTeX: $inline$ and $$block$$. Never wrap LaTeX in code blocks.`;
 
+function buildEndpointUrl(base, suffix) {
+  let url = base.replace(/\/+$/, "");
+  if (url.endsWith(suffix)) return url;
+  if (url.endsWith("/v1") && suffix.startsWith("/v1/")) {
+    return url + suffix.slice(3);
+  }
+  return url + suffix;
+}
+
 async function streamAnthropicSSE({ baseUrl, apiKey, body, conversationId, webContents, controller }) {
-  const url = `${baseUrl.replace(/\/+$/, "")}/v1/messages`;
+  const url = buildEndpointUrl(baseUrl, "/v1/messages");
   log("Anthropic request:", url, "model:", body.model);
 
   const response = await fetch(url, {
@@ -135,7 +148,7 @@ async function streamAnthropicSSE({ baseUrl, apiKey, body, conversationId, webCo
 }
 
 async function streamOpenAISSE({ baseUrl, apiKey, body, conversationId, webContents, controller }) {
-  const url = `${baseUrl.replace(/\/+$/, "")}/v1/chat/completions`;
+  const url = buildEndpointUrl(baseUrl, "/v1/chat/completions");
   log("OpenAI request:", url, "model:", body.model);
 
   const headers = {
