@@ -29,11 +29,21 @@ export function isMulticaModelId(id) {
   return typeof id === "string" && id.startsWith("multica:");
 }
 
-export function getMOrMulticaFallback(id, multicaModels) {
+export { isByokModelId, parseByokModelId } from "./byok-models";
+
+export function getModelFallback(id, extraModels) {
   if (isMulticaModelId(id)) {
-    const hit = multicaModels?.find((m) => m.id === id);
+    const hit = extraModels?.find((m) => m.id === id);
     if (hit) return hit;
     return { id, name: "Multica agent", tag: "MULTICA", provider: "multica" };
   }
+  if (typeof id === "string" && id.startsWith("byok:")) {
+    const hit = extraModels?.find((m) => m.id === id);
+    if (hit) return hit;
+    return { id, name: "BYOK model", tag: "BYOK", provider: "byok" };
+  }
   return getM(id);
 }
+
+// Legacy alias
+export const getMOrMulticaFallback = getModelFallback;
