@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { Plus, Search, Trash2, FolderOpen, ChevronRight, Workflow, FolderPlus } from "lucide-react";
 import WindowDragSpacer from "./WindowDragSpacer";
@@ -38,9 +38,11 @@ function groupConvosByProject(convos, projectsMeta, draftsPath) {
         collapsed: meta.collapsed ?? false,
         hidden: meta.hidden ?? false,
         convos: [],
+        latestTs: null,
       };
     }
     groups[root].convos.push(c);
+    groups[root].latestTs = Math.max(groups[root].latestTs || 0, c.ts || 0);
   }
   // Also include manually added projects with 0 convos
   for (const [projectPath, meta] of Object.entries(projectsMeta || {})) {
@@ -53,12 +55,13 @@ function groupConvosByProject(convos, projectsMeta, draftsPath) {
         collapsed: meta.collapsed ?? false,
         hidden: meta.hidden ?? false,
         convos: [],
+        latestTs: null,
       };
     }
   }
   const sorted = Object.values(groups).sort((a, b) => {
-    const aTs = a.convos.length ? Math.max(...a.convos.map(c => c.ts)) : 0;
-    const bTs = b.convos.length ? Math.max(...b.convos.map(c => c.ts)) : 0;
+    const aTs = a.latestTs || 0;
+    const bTs = b.latestTs || 0;
     return bTs - aTs;
   });
 
@@ -71,11 +74,6 @@ function groupConvosByProject(convos, projectsMeta, draftsPath) {
       const parent = parts.length >= 2 ? parts[parts.length - 2] : "";
       if (parent) g.name = `${g.name} (${parent})`;
     }
-  });
-
-  // Add latest timestamp for header display
-  sorted.forEach(g => {
-    g.latestTs = g.convos.length ? Math.max(...g.convos.map(c => c.ts)) : null;
   });
 
   return { projectGroups: sorted, drafts };
@@ -97,27 +95,14 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
   const [draftsHeaderHovered, setDraftsHeaderHovered] = useState(false);
   const t = useMemo(() => createTranslator(locale), [locale]);
 
-  const filtered = convos.filter((c) =>
-    c.title.toLowerCase().includes(search.toLowerCase())
+  const searchQuery = search.toLowerCase();
+  const filtered = useMemo(
+    () => convos.filter((c) => c.title.toLowerCase().includes(searchQuery)),
+    [convos, searchQuery]
   );
 
-  const folderOrderRef = useRef([]);
   const { projectGroups, drafts } = useMemo(() => {
-    const result = groupConvosByProject(filtered, projects, draftsPath);
-    const currentRoots = new Set(result.projectGroups.map(g => g.cwdRoot));
-    const prevOrder = folderOrderRef.current.filter(r => currentRoots.has(r));
-    const known = new Set(prevOrder);
-    const newcomers = result.projectGroups
-      .filter(g => !known.has(g.cwdRoot))
-      .sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0))
-      .map(g => g.cwdRoot);
-    const nextOrder = [...newcomers, ...prevOrder];
-    folderOrderRef.current = nextOrder;
-    const byRoot = new Map(result.projectGroups.map(g => [g.cwdRoot, g]));
-    return {
-      projectGroups: nextOrder.map(r => byRoot.get(r)).filter(Boolean),
-      drafts: result.drafts,
-    };
+    return groupConvosByProject(filtered, projects, draftsPath);
   }, [draftsPath, filtered, projects]);
   const searchActive = search.length > 0;
 
