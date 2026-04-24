@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { useLanguage } from "../contexts/LanguageContext";
-import { t } from "../i18n";
+import { createTranslator } from "../i18n";
 import { Plus, Search, Trash2, PanelLeftClose, PanelLeftOpen, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow, FolderPlus } from "lucide-react";
 import { SIDEBAR_TOGGLE_LEFT, SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
@@ -100,10 +99,9 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, hasUpdate = false }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, hasUpdate = false, locale = "en-US" }) {
   const s = useFontScale();
-  // Consume language context so we re-render when language changes
-  useLanguage();
+  const t = createTranslator(locale);
   const [search, setSearch]     = useState("");
   const [searchFocused, setSF]  = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -167,20 +165,20 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
 
         {/* Action icons */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 0" }}>
-          <IconRailBtn onClick={onToggleSidebar} title={t("expand_sidebar")}><PanelLeftOpen size={17} strokeWidth={1.5} /></IconRailBtn>
-          <IconRailBtn onClick={onNew} title={t("new_chat")}><Plus size={17} strokeWidth={1.5} /></IconRailBtn>
-          <IconRailBtn onClick={onOpenDispatch} title={t("dispatch")}><Workflow size={17} strokeWidth={1.5} /></IconRailBtn>
-          <IconRailBtn onClick={onOpenNewProject} title={t("new_project")}><FolderPlus size={17} strokeWidth={1.5} /></IconRailBtn>
-          {developerMode && <IconRailBtn onClick={onOpenProjectManager} title={t("github_projects")}><GitHubIcon size={17} /></IconRailBtn>}
+          <IconRailBtn onClick={onToggleSidebar} title={t("chromeRail.expandSidebar")}><PanelLeftOpen size={17} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onNew} title={t("sidebar.newChat")}><Plus size={17} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onOpenDispatch} title={t("sidebar.dispatch")}><Workflow size={17} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onOpenNewProject} title={t("sidebar.newProject")}><FolderPlus size={17} strokeWidth={1.5} /></IconRailBtn>
+          {developerMode && <IconRailBtn onClick={onOpenProjectManager} title={t("sidebar.githubProjects")}><GitHubIcon size={17} /></IconRailBtn>}
         </div>
 
         <div style={{ flex: 1 }} />
 
         {/* Footer icons */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 0 14px" }}>
-          <IconRailBtn onClick={onPickFolder} title={cwdShort || t("select_folder")}><FolderOpen size={16} strokeWidth={1.5} /></IconRailBtn>
+          <IconRailBtn onClick={onPickFolder} title={cwdShort || t("sidebar.selectFolder")}><FolderOpen size={16} strokeWidth={1.5} /></IconRailBtn>
           <div style={{ position: "relative" }}>
-            <IconRailBtn onClick={onOpenSettings} title={t("settings")}><SettingsIcon size={16} strokeWidth={1.5} /></IconRailBtn>
+            <IconRailBtn onClick={onOpenSettings} title={t("settings.title")}><SettingsIcon size={16} strokeWidth={1.5} /></IconRailBtn>
             {hasUpdate && (
               <span style={{
                 position: "absolute",
@@ -295,7 +293,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <Plus size={15} strokeWidth={1.5} />
-          {t("new_chat")}
+          {t("sidebar.newChat")}
         </button>
         <button
           onClick={onOpenDispatch}
@@ -311,7 +309,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <Workflow size={15} strokeWidth={1.5} />
-          {t("dispatch")}
+          {t("sidebar.dispatch")}
         </button>
         <button
           onClick={onOpenNewProject}
@@ -327,7 +325,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <FolderPlus size={15} strokeWidth={1.5} />
-          {t("new_project")}
+          {t("sidebar.newProject")}
         </button>
         {developerMode && (
           <button
@@ -344,7 +342,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
           >
             <GitHubIcon size={15} />
-            {t("github_projects")}
+            {t("sidebar.githubProjects")}
           </button>
         )}
         {convos.length > 0 && !searchOpen && <button
@@ -361,7 +359,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { applyPaneInteractionStyle(e.currentTarget, "idle"); e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
         >
           <Search size={15} strokeWidth={1.5} />
-          {t("search")}
+          {t("sidebar.search")}
         </button>}
         {searchOpen && <div
           style={{
@@ -385,7 +383,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           </span>
           <input
             type="text"
-            placeholder={t("search_placeholder")}
+            placeholder={t("sidebar.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onFocus={() => setSF(true)}
@@ -422,14 +420,14 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               color: "rgba(255,255,255,0.15)",
               letterSpacing: ".08em",
             }}>
-              {t("no_conversations")}
+              {t("sidebar.noConversations")}
             </div>
             <div style={{
               fontSize: s(10),
               color: "rgba(255,255,255,0.1)",
               fontFamily: "system-ui,sans-serif",
             }}>
-              {t("start_typing")}
+              {t("sidebar.noConversationsHint")}
             </div>
           </div>
         )}
@@ -491,7 +489,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                   letterSpacing: ".04em",
                 }}
               >
-                {t("drafts")}
+                {t("sidebar.drafts")}
               </span>
             </div>
 
@@ -626,7 +624,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                             animation: "dotPulse 1.2s ease-in-out infinite",
                           }}
                         />
-                        {t("running")}
+                        {t("sidebar.running")}
                       </div>
                     )}
                   </div>
@@ -667,7 +665,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
         >
           <FolderOpen size={10} strokeWidth={1.5} />
-          {cwdShort || t("select_folder")}
+          {cwdShort || t("sidebar.selectFolder")}
         </button>
         <button
           onClick={onOpenSettings}
@@ -705,7 +703,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           )}
         </button>
         <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.38)", letterSpacing: ".06em" }}>
-          {t("chats", convos.length)}
+          {t("sidebar.chatsCount", { value: convos.length })}
         </span>
       </div>
     </div>

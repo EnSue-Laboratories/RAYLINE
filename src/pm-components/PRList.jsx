@@ -2,22 +2,24 @@ import React, { useState, useEffect } from "react";
 import { GitPullRequest, GitMerge, GitPullRequestClosed, Copy, Check, GitBranch } from "lucide-react";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 import HoverIconButton from "../components/HoverIconButton";
+import { createTranslator } from "../i18n";
 
-function timeAgo(dateStr) {
+function timeAgo(dateStr, t) {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diff = now - then;
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return t("pm.timeMinutesAgo", { count: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t("pm.timeHoursAgo", { count: hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return t("pm.timeDaysAgo", { count: days });
   const months = Math.floor(days / 30);
-  return `${months}mo ago`;
+  return t("pm.timeMonthsAgo", { count: months });
 }
 
-export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, refreshSignal, freshItem }) {
+export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, refreshSignal, freshItem, locale = "en-US" }) {
+  const t = createTranslator(locale);
   const [prs, setPrs] = useState([]);
   const [initialLoad, setInitialLoad] = useState(true);
   const [error, setError] = useState(null);
@@ -47,7 +49,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
         );
       });
     } catch (err) {
-      setError(err.message || "Failed to load pull requests");
+      setError(err.message || t("pm.failedToLoadPullRequests"));
     } finally {
       setInitialLoad(false);
     }
@@ -83,7 +85,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
   if (initialLoad && prs.length === 0) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui", fontSize: 13 }}>
-        Loading pull requests...
+        {t("pm.loadingPullRequests")}
       </div>
     );
   }
@@ -96,7 +98,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
           onClick={() => fetchPRs()}
           style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "rgba(255,255,255,0.5)", padding: "6px 16px", cursor: "pointer", fontFamily: "system-ui", fontSize: 12 }}
         >
-          Retry
+          {t("pm.retry")}
         </button>
       </div>
     );
@@ -105,7 +107,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
   if (prs.length === 0) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "rgba(255,255,255,0.3)", fontFamily: "system-ui", fontSize: 13 }}>
-        No pull requests found
+        {t("pm.noPullRequestsFound")}
       </div>
     );
   }
@@ -172,12 +174,12 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
                   border: "1px solid rgba(255,255,255,0.08)",
                   flexShrink: 0,
                 }}>
-                  Draft
+                  {t("pm.draft")}
                 </span>
               )}
               <HoverIconButton
                 className="row-action-btn"
-                tooltip={copiedSummary ? "Copied" : "Copy PR summary"}
+                tooltip={copiedSummary ? t("pm.copied") : t("pm.copyPrSummary")}
                 onClick={(e) => {
                   e.stopPropagation();
                   const url = `https://github.com/${item._repo}/pull/${item.number}`;
@@ -194,7 +196,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
               </HoverIconButton>
               <HoverIconButton
                 className="row-action-btn"
-                tooltip={copiedCheckout ? "Copied" : "Copy checkout command"}
+                tooltip={copiedCheckout ? t("pm.copied") : t("pm.copyCheckoutCommand")}
                 onClick={(e) => {
                   e.stopPropagation();
                   const cmd = `gh pr checkout ${item.number} -R ${item._repo}`;
@@ -214,7 +216,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
               </span>
             </div>
             <div style={{ marginLeft: 26, color: "rgba(255,255,255,0.3)", fontFamily: "system-ui", fontSize: 12, marginTop: 2 }}>
-              by {item.user?.login || "unknown"} · updated {timeAgo(item.updated_at)}
+              {t("pm.byUpdated", { user: item.user?.login || t("pm.unknownUser"), time: timeAgo(item.updated_at, t) })}
             </div>
           </div>
         );

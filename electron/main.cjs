@@ -3,7 +3,7 @@ const { initAutoUpdater, handleCheckForUpdates, handleDownloadUpdate, handleInst
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { startAgent, cancelAgent, cancelAll, rewindFiles } = require("./agent-manager.cjs");
+const { startAgent, cancelAgent, cancelAll, rewindFiles, respondPermission } = require("./agent-manager.cjs");
 const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
 const {
   startMulticaAgent,
@@ -28,7 +28,9 @@ const isMac = process.platform === "darwin";
 const isWindows = process.platform === "win32";
 const SHELL_COMMAND_TIMEOUT_MS = 15000;
 const SHELL_OUTPUT_LIMIT = 128 * 1024;
+const DISPATCH_PLAN_TIMEOUT_MS = 90000;
 const WINDOW_BACKGROUND = "#0D0D10";
+const TERMINAL_DEBUG_ENABLED = /^(1|true|yes|on)$/i.test(String(process.env.RAYLINE_TERMINAL_DEBUG || ""));
 const WALLPAPER_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
 const WALLPAPER_MIME_TYPES = {
   png: "image/png",
@@ -54,6 +56,54 @@ if (isDev && isMac) {
 
 let mainWindow;
 let pmWindow;
+let terminalWindow;
+let terminalWindowRevealTimer = null;
+let pendingPreferredTerminalSessionName = null;
+
+function terminalDebug(event, details = {}, meta = {}) {
+  if (!TERMINAL_DEBUG_ENABLED) return;
+  const payload = {
+    ts: new Date().toISOString(),
+    event,
+    ...meta,
+    details,
+  };
+  console.log(`[terminal-debug] ${JSON.stringify(payload)}`);
+}
+
+function broadcastToAllWindows(channel, payload) {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win || win.isDestroyed()) continue;
+    win.webContents.send(channel, payload);
+  }
+}
+
+function isTerminalWindowOpen() {
+  return Boolean(terminalWindow && !terminalWindow.isDestroyed());
+}
+
+function broadcastTerminalWindowState() {
+  broadcastToAllWindows("terminal-window-state", { open: isTerminalWindowOpen() });
+}
+
+function clearTerminalWindowRevealTimer() {
+  if (!terminalWindowRevealTimer) return;
+  clearTimeout(terminalWindowRevealTimer);
+  terminalWindowRevealTimer = null;
+}
+
+function revealTerminalWindow(reason = "unknown") {
+  if (!isTerminalWindowOpen()) return;
+  clearTerminalWindowRevealTimer();
+  if (!terminalWindow.isVisible()) {
+    terminalWindow.show();
+  }
+  terminalWindow.focus();
+  terminalDebug("terminal-window:revealed", {
+    reason,
+    ...describeWindow(terminalWindow),
+  }, { source: "main" });
+}
 
 function getWindowChromeOptions() {
   if (isMac) {
@@ -82,6 +132,54 @@ function applyWindowChromeTweaks(win) {
 
 function getEventWindow(event) {
   return BrowserWindow.fromWebContents(event.sender) || mainWindow || pmWindow || null;
+}
+
+function describeWindow(win) {
+  if (!win || win.isDestroyed()) return null;
+  const bounds = win.getBounds();
+  const [contentWidth, contentHeight] = win.getContentSize();
+  return {
+    bounds,
+    contentSize: { width: contentWidth, height: contentHeight },
+    focused: win.isFocused(),
+    visible: win.isVisible(),
+    minimized: win.isMinimized(),
+  };
+}
+
+function attachTerminalWindowDebug(win) {
+  if (!TERMINAL_DEBUG_ENABLED || !win) return;
+
+  const events = [
+    "ready-to-show",
+    "show",
+    "hide",
+    "focus",
+    "blur",
+    "resize",
+    "move",
+    "maximize",
+    "unmaximize",
+    "enter-full-screen",
+    "leave-full-screen",
+  ];
+
+  for (const eventName of events) {
+    win.on(eventName, () => {
+      terminalDebug(`terminal-window:${eventName}`, describeWindow(win), { source: "main" });
+    });
+  }
+
+  win.webContents.on("did-finish-load", () => {
+    terminalDebug("terminal-window:did-finish-load", {
+      ...describeWindow(win),
+      url: win.webContents.getURL(),
+    }, { source: "main" });
+  });
+
+  win.webContents.on("render-process-gone", (_event, details) => {
+    terminalDebug("terminal-window:render-process-gone", details, { source: "main" });
+  });
 }
 
 function getWallpaperStorageDir() {
@@ -207,9 +305,70 @@ function createProjectManagerWindow() {
   pmWindow.on("closed", () => { pmWindow = null; });
 }
 
+function createTerminalWindow() {
+  if (isTerminalWindowOpen()) {
+    if (terminalWindow.isMinimized()) terminalWindow.restore();
+    revealTerminalWindow("existing-window");
+    broadcastTerminalWindowState();
+    return terminalWindow;
+  }
+
+  terminalWindow = new BrowserWindow({
+    title: "Terminals",
+    width: 960,
+    height: 760,
+    minWidth: 560,
+    minHeight: 320,
+    show: false,
+    backgroundColor: WINDOW_BACKGROUND,
+    icon: path.join(__dirname, "../public/icon.png"),
+    ...getWindowChromeOptions(),
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  applyWindowChromeTweaks(terminalWindow);
+  attachTerminalWindowDebug(terminalWindow);
+
+  terminalWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+
+  if (isDev) {
+    const port = process.env.VITE_PORT || "5173";
+    terminalWindow.loadURL(`http://localhost:${port}/src/terminal-window.html`);
+  } else {
+    terminalWindow.loadFile(path.join(__dirname, "../dist/src/terminal-window.html"));
+  }
+
+  clearTerminalWindowRevealTimer();
+  terminalWindowRevealTimer = setTimeout(() => {
+    revealTerminalWindow("startup-timeout");
+  }, isDev ? 2500 : 1500);
+
+  terminalWindow.on("closed", () => {
+    clearTerminalWindowRevealTimer();
+    terminalWindow = null;
+    broadcastTerminalWindowState();
+  });
+
+  broadcastTerminalWindowState();
+  return terminalWindow;
+}
+
 app.setName("RayLine");
 
 app.whenReady().then(() => {
+  terminalDebug("app:ready", {
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+    platform: process.platform,
+  }, { source: "main" });
+
   // Set dock icon on macOS
   if (isMac) {
     const iconPath = path.join(__dirname, "../public/icon.png");
@@ -237,8 +396,27 @@ app.whenReady().then(() => {
 
   // Forward terminal output to renderer
   terminalManager.setOutputCallback((name, data) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("terminal-output", { name, data });
+    broadcastToAllWindows("terminal-output", { name, data });
+  });
+
+  terminalManager.setSessionStateCallback((payload) => {
+    if (payload.reason === "created" && payload.name) {
+      pendingPreferredTerminalSessionName = payload.name;
+    } else if (!payload.sessions?.some((session) => session.name === pendingPreferredTerminalSessionName)) {
+      pendingPreferredTerminalSessionName = null;
+    }
+
+    broadcastToAllWindows("terminal-sessions-state", payload);
+
+    if (payload.sessions.length === 0) {
+      if (isTerminalWindowOpen()) {
+        terminalWindow.close();
+      }
+      return;
+    }
+
+    if (payload.reason === "created") {
+      createTerminalWindow();
     }
   });
 });
@@ -261,6 +439,45 @@ ipcMain.handle("folder-pick", async () => {
 
 ipcMain.on("open-project-manager", () => {
   createProjectManagerWindow();
+});
+
+ipcMain.handle("open-terminal-window", () => {
+  createTerminalWindow();
+  return true;
+});
+
+ipcMain.handle("close-terminal-window", () => {
+  if (isTerminalWindowOpen()) {
+    terminalWindow.close();
+  }
+  return true;
+});
+
+ipcMain.handle("is-terminal-window-open", () => {
+  return isTerminalWindowOpen();
+});
+
+ipcMain.on("terminal-debug-log", (event, payload = {}) => {
+  if (!TERMINAL_DEBUG_ENABLED) return;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  terminalDebug(payload.event || "renderer-log", payload.details || {}, {
+    source: payload.source || "renderer",
+    page: payload.page || event.sender.getURL?.(),
+    windowTitle: win?.getTitle?.() || null,
+  });
+});
+
+ipcMain.on("terminal-window-ready", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed() || win !== terminalWindow) return;
+  revealTerminalWindow("renderer-ready");
+});
+
+ipcMain.handle("window-close-current", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) return false;
+  win.close();
+  return true;
 });
 
 ipcMain.handle("set-window-opacity", (event, opacity) => {
@@ -396,6 +613,14 @@ ipcMain.on("agent-edit-resend", (event, opts) => {
     startCodexAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
   } else {
     startAgent({ ...opts, forkSession: true }, event.sender);
+  }
+});
+
+ipcMain.on("agent-permission-respond", (_event, opts) => {
+  try {
+    respondPermission(opts);
+  } catch (err) {
+    console.error("[agent] permission respond failed:", err?.message || err);
   }
 });
 
@@ -576,6 +801,235 @@ ipcMain.handle("system-info", () => ({
   memory: Math.round(os.totalmem() / (1024 * 1024 * 1024)) + " GB",
   shell: (process.env.SHELL || process.env.COMSPEC || "unknown").split("/").pop(),
 }));
+
+const DISPATCH_PLANNER_SYSTEM_PROMPT = `You are RayLine's Dispatch auto-fill planner.
+
+Turn the user's high-level request into editable Custom Dispatch rows.
+
+Output only valid JSON with this shape:
+{"rows":[{"title":"short label","prompt":"self-contained agent task","branch":"kebab-case-branch","model":"exact-model-id"}]}
+
+Rules:
+- Create 1 to 6 rows. Use one row when the work is not safely parallelizable.
+- Do not create GitHub issue rows. This planner only fills the Custom dispatch screen.
+- Each prompt must be self-contained, specific, and ready to send to an agent in its own worktree.
+- Branch names must be lowercase kebab-case and unique.
+- Choose model ids only from the provided target model list.
+- Prefer Codex/GPT models for bug finding, regressions, CI/test failures, correctness checks, code review, refactors, and repo-wide reasoning.
+- Prefer Claude models for creative/product work, UX strategy, new feature design, frontend implementation, visual polish, copy, and exploratory UI iteration.
+- Prefer higher-reasoning variants for architecture, risky migrations, or unclear requirements; prefer medium/default variants for straightforward implementation.
+- If no exact model is clearly best, use the user's default target model.`;
+
+function compactDispatchModel(model = {}) {
+  const id = typeof model.id === "string" ? model.id : "";
+  if (!id) return null;
+  const provider = typeof model.provider === "string" ? model.provider : "claude";
+  const name = typeof model.name === "string"
+    ? model.name
+    : (typeof model.label === "string" ? model.label : id);
+  const lower = `${id} ${name} ${provider}`.toLowerCase();
+  let guide = "General coding agent.";
+  if (provider === "codex" || lower.includes("gpt")) {
+    guide = "Strong for bug checking, repo reasoning, tests, regressions, correctness, refactors, and code review.";
+  } else if (provider === "claude") {
+    guide = "Strong for creative/product work, UX, frontend design, visual polish, copy, and feature implementation.";
+  } else if (provider === "multica") {
+    guide = "Use only when the agent name or runtime clearly matches the task.";
+  }
+  return {
+    id,
+    name,
+    tag: typeof model.tag === "string" ? model.tag : undefined,
+    provider,
+    effort: typeof model.effort === "string" ? model.effort : undefined,
+    guide,
+  };
+}
+
+function buildDispatchPlannerPrompt({ instructions, cwd, targetModels, defaultTargetModel }) {
+  const models = (Array.isArray(targetModels) ? targetModels : [])
+    .map(compactDispatchModel)
+    .filter(Boolean);
+  return [
+    `Working directory: ${cwd || "(none selected)"}`,
+    `Default target model id: ${defaultTargetModel || "(none)"}`,
+    "Available target models:",
+    JSON.stringify(models, null, 2),
+    "User batch brief:",
+    String(instructions || "").trim(),
+  ].join("\n\n");
+}
+
+function parseDispatchPlanJson(text) {
+  const raw = String(text || "").trim();
+  if (!raw) throw new Error("Planner returned no output.");
+
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = (fenced ? fenced[1].trim() : raw).trim();
+  const arrayStart = candidate.indexOf("[");
+  const arrayEnd = candidate.lastIndexOf("]");
+  const objectStart = candidate.indexOf("{");
+  const objectEnd = candidate.lastIndexOf("}");
+  const jsonText = arrayStart >= 0 && (arrayStart < objectStart || objectStart === -1) && arrayEnd > arrayStart
+    ? candidate.slice(arrayStart, arrayEnd + 1)
+    : (objectStart >= 0 && objectEnd > objectStart ? candidate.slice(objectStart, objectEnd + 1) : candidate);
+  const parsed = JSON.parse(jsonText);
+  const rows = Array.isArray(parsed) ? parsed : parsed?.rows;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error("Planner did not return any dispatch rows.");
+  }
+  return {
+    rows: rows.slice(0, 8).map((row) => ({
+      title: String(row?.title || "").trim(),
+      prompt: String(row?.prompt || "").trim(),
+      branch: String(row?.branch || "").trim(),
+      model: String(row?.model || "").trim(),
+    })).filter((row) => row.prompt || row.title),
+  };
+}
+
+function runClaudeDispatchPlanner({ prompt, plannerModel, cwd }) {
+  return new Promise((resolve, reject) => {
+    const claudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
+    if (!claudeBin) {
+      reject(new Error("Unable to locate the Claude CLI binary"));
+      return;
+    }
+
+    const args = [
+      "--print",
+      "--output-format", "text",
+      "--tools", "",
+      "--model", plannerModel?.cliFlag || plannerModel?.id || "sonnet",
+      "--no-session-persistence",
+      "--system-prompt", DISPATCH_PLANNER_SYSTEM_PROMPT,
+      prompt,
+    ];
+    const launchCwd = cwd && fs.existsSync(cwd) ? cwd : process.cwd();
+    const child = spawnCli(claudeBin, args, {
+      cwd: launchCwd,
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let settled = false;
+    let out = "";
+    let err = "";
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(reject, new Error("Dispatch planner timed out."));
+    }, DISPATCH_PLAN_TIMEOUT_MS);
+
+    child.stdout.on("data", (c) => { out += c.toString(); });
+    child.stderr.on("data", (c) => { err += c.toString(); });
+    child.on("close", (code) => {
+      if (code !== 0 && !out.trim()) {
+        finish(reject, new Error(err.trim() || `Claude planner exited with code ${code}.`));
+        return;
+      }
+      finish(resolve, out.trim());
+    });
+    child.on("error", (error) => finish(reject, error));
+  });
+}
+
+function runCodexDispatchPlanner({ prompt, plannerModel, cwd }) {
+  return new Promise((resolve, reject) => {
+    const codexBin = resolveCliBin("codex", { envVarName: "CODEX_BIN" });
+    if (!codexBin) {
+      reject(new Error("Unable to locate the Codex CLI binary"));
+      return;
+    }
+
+    const outputPath = path.join(
+      os.tmpdir(),
+      `rayline-dispatch-plan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`
+    );
+    const fullPrompt = `${DISPATCH_PLANNER_SYSTEM_PROMPT}\n\n${prompt}`;
+    const args = [
+      "exec",
+      "--ephemeral",
+      "--sandbox", "read-only",
+      "--skip-git-repo-check",
+      "-m", plannerModel?.cliFlag || plannerModel?.id || "gpt-5.4",
+      "-o", outputPath,
+    ];
+    if (plannerModel?.effort) {
+      args.push("-c", `model_reasoning_effort="${plannerModel.effort}"`);
+    }
+    args.push("--", fullPrompt);
+
+    const launchCwd = cwd && fs.existsSync(cwd) ? cwd : process.cwd();
+    const child = spawnCli(codexBin, args, {
+      cwd: launchCwd,
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let settled = false;
+    let out = "";
+    let err = "";
+    const cleanup = () => {
+      fs.promises.unlink(outputPath).catch(() => {});
+    };
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+      fn(value);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(reject, new Error("Dispatch planner timed out."));
+    }, DISPATCH_PLAN_TIMEOUT_MS);
+
+    child.stdout.on("data", (c) => { out += c.toString(); });
+    child.stderr.on("data", (c) => { err += c.toString(); });
+    child.on("close", (code) => {
+      let finalText = "";
+      try {
+        if (fs.existsSync(outputPath)) finalText = fs.readFileSync(outputPath, "utf-8");
+      } catch {}
+      if (!finalText.trim()) finalText = out.trim();
+      if (code !== 0 && !finalText.trim()) {
+        finish(reject, new Error(err.trim() || `Codex planner exited with code ${code}.`));
+        return;
+      }
+      finish(resolve, finalText.trim());
+    });
+    child.on("error", (error) => finish(reject, error));
+  });
+}
+
+async function runDispatchPlanner(opts = {}) {
+  const plannerModel = opts.plannerModel || {};
+  const prompt = buildDispatchPlannerPrompt({
+    instructions: opts.instructions,
+    cwd: opts.cwd,
+    targetModels: opts.targetModels,
+    defaultTargetModel: opts.defaultTargetModel,
+  });
+
+  const provider = plannerModel.provider === "codex" ? "codex" : "claude";
+  const text = provider === "codex"
+    ? await runCodexDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd })
+    : await runClaudeDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd });
+  return parseDispatchPlanJson(text);
+}
+
+ipcMain.handle("dispatch-plan", async (_event, opts = {}) => {
+  if (!String(opts.instructions || "").trim()) {
+    throw new Error("Add a batch brief before auto-filling dispatch.");
+  }
+  return runDispatchPlanner(opts);
+});
 
 // IPC: quick explain (one-shot, not in chat history)
 ipcMain.handle("quick-explain", async (_event, { text, model }) => {
@@ -760,6 +1214,12 @@ ipcMain.handle("terminal-resize", async (_event, { name, cols, rows }) => {
 
 ipcMain.handle("terminal-metadata", async () => {
   return terminalManager.getSessionMetadata();
+});
+
+ipcMain.handle("terminal-consume-preferred-session", async () => {
+  const preferredSessionName = pendingPreferredTerminalSessionName;
+  pendingPreferredTerminalSessionName = null;
+  return preferredSessionName;
 });
 
 // IPC: saved terminal metadata for restore on launch

@@ -89,6 +89,7 @@ export default function NewChatCard({
   const [showTreeInput, setShowTreeInput] = useState(false);
   const treeBtnRef = useRef(null);
   const treeMenuRef = useRef(null);
+  const isDraftSelection = selectedCwd == null;
 
   const makeClaudiBranchName = useCallback((baseBranch) => {
     const suffix = Math.random().toString(36).slice(2, 8);
@@ -285,6 +286,11 @@ export default function NewChatCard({
     setWorktree(false);
     setWorktreeName("");
     setShowTreeInput(false);
+    if (nextCwd == null) {
+      setIssueContext(null);
+      setShowIssueSearch(false);
+      setIssueSearchQuery("");
+    }
     setError(null);
   }, []);
 
@@ -496,7 +502,7 @@ export default function NewChatCard({
         backdropFilter: "blur(48px) saturate(1.2)",
         border: `1px solid ${dragOver ? "rgba(180,220,255,0.12)" : SHEET_BORDER}`,
         borderRadius: 14,
-        padding: 20,
+        padding: "20px 20px 10px",
         display: "flex",
         flexDirection: "column",
         gap: 12,
@@ -589,7 +595,7 @@ export default function NewChatCard({
           </button>
 
           {/* Branch — searchable typeahead */}
-          {developerMode && <div ref={branchSearchRef} style={{ position: "relative" }}>
+          {developerMode && !isDraftSelection && <div ref={branchSearchRef} style={{ position: "relative" }}>
             <button onClick={openBranchPicker} style={toolBtnStyle(!!branch)}>
               <GitBranch style={chipIconStyle} />
               <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -616,7 +622,7 @@ export default function NewChatCard({
           </div>}
 
           {/* Worktree — inline name input */}
-          {developerMode && <div ref={treeBtnRef} style={{ position: "relative" }}>
+          {developerMode && !isDraftSelection && <div ref={treeBtnRef} style={{ position: "relative" }}>
             <button onClick={openTreeInput} style={toolBtnStyle(worktree)}>
               <GitFork style={chipIconStyle} />
               <span style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -640,7 +646,7 @@ export default function NewChatCard({
           </div>}
 
           {/* Link issue — text toggle with searchable dropdown */}
-          {developerMode && <div ref={issueSearchRef} style={{ position: "relative" }}>
+          {developerMode && !isDraftSelection && <div ref={issueSearchRef} style={{ position: "relative" }}>
             <button
               onClick={() => {
                 if (issueContext) { setIssueContext(null); return; }
@@ -671,7 +677,7 @@ export default function NewChatCard({
         {/* Bottom bar */}
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          paddingTop: 4, borderTop: "1px solid var(--pane-border)",
+          paddingTop: 10, borderTop: "1px solid var(--pane-border)",
         }}>
           <ProjectPicker
             value={selectedCwd}

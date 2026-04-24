@@ -1,14 +1,23 @@
 import { useRef, useEffect } from "react";
+import useWindowActivity from "../hooks/useWindowActivity";
+
+const FOCUSED_GRAIN_FRAME_MS = 100;
+const BACKGROUND_GRAIN_FRAME_MS = 400;
+const REDUCED_MOTION_GRAIN_FRAME_MS = 700;
 
 export default function Grain() {
   const ref = useRef(null);
+  const fiRef = useRef(0);
+  const { isVisible, isFocused, prefersReducedMotion } = useWindowActivity();
 
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
     const ctx = c.getContext("2d");
+    if (!ctx) return;
     var frames = [];
-    var tm;
+    var tm = null;
+    var raf = null;
 
     const gen = () => {
       c.width = Math.ceil(window.innerWidth / 3);
@@ -25,22 +34,33 @@ export default function Grain() {
     };
     gen();
 
-    var fi = 0;
-    const loop = () => {
-      if (frames.length > 0) {
-        ctx.putImageData(frames[fi % frames.length], 0, 0);
-        fi++;
-      }
-      tm = setTimeout(() => requestAnimationFrame(loop), 100);
+    const frameBudget = prefersReducedMotion
+      ? REDUCED_MOTION_GRAIN_FRAME_MS
+      : (isFocused ? FOCUSED_GRAIN_FRAME_MS : BACKGROUND_GRAIN_FRAME_MS);
+    const schedule = () => {
+      if (!isVisible) return;
+      tm = setTimeout(() => {
+        raf = requestAnimationFrame(loop);
+      }, frameBudget);
     };
-    loop();
+    const loop = () => {
+      if (!isVisible) return;
+      if (frames.length > 0) {
+        ctx.putImageData(frames[fiRef.current % frames.length], 0, 0);
+        fiRef.current += 1;
+      }
+      schedule();
+    };
+
+    if (isVisible) loop();
 
     window.addEventListener("resize", gen);
     return () => {
-      clearTimeout(tm);
+      if (tm != null) clearTimeout(tm);
+      if (raf != null) cancelAnimationFrame(raf);
       window.removeEventListener("resize", gen);
     };
-  }, []);
+  }, [isFocused, isVisible, prefersReducedMotion]);
 
   return (
     <canvas

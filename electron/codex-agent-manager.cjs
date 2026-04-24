@@ -120,7 +120,7 @@ function buildClaudiPrompt(prompt, files, mcpServers) {
 
   const terminalInstructions = hasTerminalSessions
     ? `Terminal sessions:
-RayLine's terminal means the visible sidebar terminal drawer inside the app. Sessions created there are user-visible and remain available across turns.
+RayLine's terminal means the dedicated terminal window inside the app. Sessions created there are user-visible and remain available across turns.
 Use RayLine's terminal when you want the user to see or interact with a shell, when a process should keep running, or when stdin needs to be sent over time.
 Prefer RayLine's terminal over one-off shell commands for dev servers, watchers, REPLs, or any command the user may want to monitor.
 If MCP terminal tools are unavailable, use the local terminal CLI exposed via $CLAUDI_TERMINAL_CLI.
@@ -131,8 +131,8 @@ CLI examples:
 - node "$CLAUDI_TERMINAL_CLI" read <name> --lines 80
 - node "$CLAUDI_TERMINAL_CLI" kill <name>`
     : `Terminal sessions:
-RayLine's terminal means the visible sidebar terminal drawer inside the app. Do not describe it generically; use it when you want a user-visible, long-lived shell inside RayLine itself.
-If terminal-session MCP tools are not exposed, use the local terminal CLI exposed via $CLAUDI_TERMINAL_CLI to control RayLine's sidebar terminal directly.
+RayLine's terminal means the dedicated terminal window inside the app. Do not describe it generically; use it when you want a user-visible, long-lived shell inside RayLine itself.
+If terminal-session MCP tools are not exposed, use the local terminal CLI exposed via $CLAUDI_TERMINAL_CLI to control RayLine's terminal window directly.
 CLI examples:
 - node "$CLAUDI_TERMINAL_CLI" list
 - node "$CLAUDI_TERMINAL_CLI" create <name> --cwd <path>
@@ -323,6 +323,7 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
     child,
     cancelled: false,
     sawTurnCompleted: false,
+    lastErrorMessage: null,
     threadId: null,
   };
 
@@ -345,6 +346,15 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
         (event.type === "event_msg" && event.payload?.type === "task_complete")
       ) {
         state.sawTurnCompleted = true;
+      }
+      if (event.type === "error" && typeof event.message === "string" && event.message.trim()) {
+        state.lastErrorMessage = event.message.trim();
+      } else if (event.type === "turn.failed") {
+        const message =
+          (typeof event.error?.message === "string" && event.error.message.trim()) ||
+          (typeof event.message === "string" && event.message.trim()) ||
+          null;
+        if (message) state.lastErrorMessage = message;
       }
       log("Parsed event type:", event.type);
       webContents.send("agent-stream", { conversationId, event });
@@ -400,15 +410,19 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
       return;
     }
 
-    if (shouldEmitStderrError({
+    if (state.lastErrorMessage || shouldEmitStderrError({
       stderrBuffer,
       exitCode,
       signal,
       cancelled: state.cancelled,
       sawTurnCompleted: state.sawTurnCompleted,
     })) {
-      log("Full stderr:", stderrBuffer);
-      webContents.send("agent-error", { conversationId, error: stderrBuffer.trim() });
+      const error = state.lastErrorMessage || stderrBuffer.trim();
+      log("Codex process error:", error);
+      if (stderrBuffer.trim() && error !== stderrBuffer.trim()) {
+        log("Full stderr:", stderrBuffer);
+      }
+      webContents.send("agent-error", { conversationId, error });
     }
 
     scheduleSessionSnapshot(webContents, conversationId, state.threadId);

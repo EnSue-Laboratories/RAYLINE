@@ -1,13 +1,25 @@
 import { useRef, useEffect } from "react";
+import useWindowActivity from "../hooks/useWindowActivity";
+
+const T_PER_MS = 0.00018;
+const FOCUSED_FRAME_MS = 1000 / 60;
+const BACKGROUND_FRAME_MS = 1000 / 12;
+const REDUCED_MOTION_FRAME_MS = 1000 / 8;
 
 export default function AuroraCanvas() {
   const ref = useRef(null);
+  const tRef = useRef(0);
+  const lastFrameAtRef = useRef(0);
+  const { isVisible, isFocused, prefersReducedMotion } = useWindowActivity();
 
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
     const ctx = c.getContext("2d");
-    let w, h, raf;
+    if (!ctx) return;
+    let w;
+    let h;
+    let raf = null;
 
     var orbList = [
       { phase: 0,   speedX: 0.3,  speedY: 0.2,  radius: 220, cx: 0.6, cy: 0.35 },
@@ -21,14 +33,12 @@ export default function AuroraCanvas() {
     };
     resize();
 
-    let t = 0;
-    const draw = () => {
-      t += 0.003;
-
+    const renderFrame = () => {
       ctx.fillStyle = "#0D0D0F";
       ctx.fillRect(0, 0, w, h);
 
       // Compute orb positions
+      const t = tRef.current;
       var orbPositions = [];
       for (var oi = 0; oi < orbList.length; oi++) {
         var ob = orbList[oi];
@@ -50,17 +60,38 @@ export default function AuroraCanvas() {
         ctx.arc(gp.x, gp.y, gp.r * 0.7, 0, Math.PI * 2);
         ctx.fill();
       }
+    };
+
+    const frameBudget = prefersReducedMotion
+      ? REDUCED_MOTION_FRAME_MS
+      : (isFocused ? FOCUSED_FRAME_MS : BACKGROUND_FRAME_MS);
+
+    const draw = (now) => {
+      if (!isVisible) return;
+      const lastFrameAt = lastFrameAtRef.current;
+      if (lastFrameAt && (now - lastFrameAt) < frameBudget) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+
+      const delta = lastFrameAt ? (now - lastFrameAt) : frameBudget;
+      lastFrameAtRef.current = now;
+      tRef.current += delta * T_PER_MS;
+      renderFrame();
 
       raf = requestAnimationFrame(draw);
     };
 
-    draw();
+    renderFrame();
+    if (isVisible) {
+      raf = requestAnimationFrame(draw);
+    }
     window.addEventListener("resize", resize);
     return () => {
-      cancelAnimationFrame(raf);
+      if (raf != null) cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [isFocused, isVisible, prefersReducedMotion]);
 
   return (
     <canvas

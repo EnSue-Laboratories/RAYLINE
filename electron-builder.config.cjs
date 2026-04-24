@@ -87,6 +87,10 @@ module.exports = {
     maintainer: "Ensue Laboratories <contact@ensue.dev>",
     target: ["AppImage", "deb", "tar.gz"],
   },
+  asarUnpack: [
+    "electron/shell-init/**",
+    "electron/vendor/**",
+  ],
   files: ["dist/**/*", "electron/**/*", "public/**/*"],
   directories: {
     output: "release",

@@ -52,9 +52,23 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
     }
     setStatus("loading");
 
+    const measureHost = target.parentElement || document.body;
+    const measureClone = target.cloneNode(true);
+    measureClone
+      .querySelectorAll('[data-copy-image-ignore="true"]')
+      .forEach((el) => el.remove());
+    measureClone.style.position = "absolute";
+    measureClone.style.top = "-99999px";
+    measureClone.style.left = "0";
+    measureClone.style.visibility = "hidden";
+    measureClone.style.pointerEvents = "none";
+    measureClone.style.width = `${target.getBoundingClientRect().width}px`;
+    measureHost.appendChild(measureClone);
+
     try {
-      const contentWidth = target.scrollWidth;
-      const contentHeight = target.scrollHeight;
+      const contentWidth = measureClone.scrollWidth;
+      const contentHeight = measureClone.scrollHeight;
+      measureHost.removeChild(measureClone);
       const totalWidth = contentWidth + CAPTURE_PADDING_X * 2;
       const totalHeight = contentHeight + CAPTURE_PADDING_TOP + CAPTURE_PADDING_BOTTOM;
 
@@ -106,6 +120,10 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
     } catch (error) {
       console.error("[CopyImageBtn] Failed to copy image", error);
       setStatus("error");
+    } finally {
+      if (measureClone.parentNode) {
+        measureClone.parentNode.removeChild(measureClone);
+      }
     }
 
     queueReset();

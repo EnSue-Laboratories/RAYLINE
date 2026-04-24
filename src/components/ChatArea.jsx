@@ -1,7 +1,6 @@
 import { memo, useState, useRef, useCallback, useEffect } from "react";
 import { flushSync } from "react-dom";
-import { useLanguage } from "../contexts/LanguageContext";
-import { t } from "../i18n";
+import { createTranslator } from "../i18n";
 import { Plus, ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
 import Message from "./Message";
 import EmptyState from "./EmptyState";
@@ -11,9 +10,10 @@ import BranchSelector from "./BranchSelector";
 import GitStatusPill from "./GitStatusPill";
 import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
+import WindowDragSpacer from "./WindowDragSpacer";
 import ExportConversationBtn from "./ExportConversationBtn";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
+import { IS_MAC, SIDEBAR_CHROME_RAIL_LEFT, SIDEBAR_CHROME_RAIL_WIDTH } from "../windowChrome";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { clipboardItemsToAttachments, dataTransferHasFiles, fileListToAttachments } from "../utils/attachments";
 import TabStrip from "./TabStrip";
@@ -28,6 +28,19 @@ const MemoImagePreview = memo(ImagePreview);
 const MemoModelPickerWithMultica = memo(ModelPickerWithMultica);
 const MemoSelectionToolbar = memo(SelectionToolbar);
 const MemoTabStrip = memo(TabStrip);
+
+function getMainRepoRoot(dir) {
+  if (!dir) return dir;
+  const wtIdx = dir.indexOf("/.worktrees/");
+  return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
+}
+
+function isDraftConversation(convo, draftsPath) {
+  if (!convo) return false;
+  if (convo.cwd == null) return true;
+  if (!draftsPath) return false;
+  return getMainRepoRoot(convo.cwd) === getMainRepoRoot(draftsPath);
+}
 
 const ChatTranscript = memo(function ChatTranscript({
   showNewChatCard,
@@ -92,10 +105,10 @@ const ChatTranscript = memo(function ChatTranscript({
   );
 });
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, windowControlsVisible = false }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSidebar, sidebarOpen, onNew, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, windowControlsVisible = false, locale }) {
   const s = useFontScale();
-  // Consume language context so we re-render when language changes
-  useLanguage();
+  const t = createTranslator(locale);
+  const isDraftContext = showNewChatCard ? newChatDefaultCwd == null : isDraftConversation(convo, draftsPath);
   const [input, setInput]             = useState("");
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments]   = useState([]);
@@ -226,9 +239,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   // Slash command suggestions
   const COMMANDS = [
-    { cmd: "/clear", desc: t("cmd_clear_desc") },
-    { cmd: "/new", desc: t("cmd_clear_desc") },
-    { cmd: "/compact", desc: t("cmd_compact_desc") },
+    { cmd: "/clear", desc: t("chatArea.cmdClearDesc") },
+    { cmd: "/new", desc: t("chatArea.cmdClearDesc") },
+    { cmd: "/compact", desc: t("chatArea.cmdCompactDesc") },
   ];
   const showCommands = input.startsWith("/") && !input.includes(" ");
   const filteredCommands = showCommands
@@ -258,9 +271,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
   useEffect(() => { setBranchHintDismissed(false); }, [convo?.id]);
   const showBranchHint = isMulticaModel && !showNewChatCard && branchNeedsAttention && !branchHintDismissed && !shellMode;
   const branchHintText = (() => {
-    if (hasDirtyWorktree && hasNoUpstream) return t("branch_warn_both");
-    if (hasDirtyWorktree) return t("branch_warn_dirty");
-    return t("branch_warn_no_upstream");
+    if (hasDirtyWorktree && hasNoUpstream) return t("chatArea.branchWarnBoth");
+    if (hasDirtyWorktree) return t("chatArea.branchWarnDirty");
+    return t("chatArea.branchWarnNoUpstream");
   })();
 
   const send = useCallback(() => {
@@ -356,9 +369,14 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
 
   const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
   const showConversationTitle = Boolean(convo && !showNewChatCard);
-  const topTabsLeft = 18;
+  const topTabsLeft = sidebarOpen
+    ? 18
+    : IS_MAC
+      ? SIDEBAR_CHROME_RAIL_LEFT + SIDEBAR_CHROME_RAIL_WIDTH + 16
+      : 18;
   const topTabsRight = windowControlsVisible ? 126 : 24;
   const headerContentOffset = showHeaderTabs ? 8 : 0;
+  const headerLeftPadding = sidebarOpen ? 24 : IS_MAC ? 50 : 24;
 
   const handleDragEnter = useCallback((e) => {
     if (!dataTransferHasFiles(e.dataTransfer)) return;
@@ -497,20 +515,12 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      {/* Drag region matching sidebar spacer.
-          When window controls are visible (Windows), shrink the drag region on
-          the right so the control buttons are not inside the drag hit-area.
-          Electron processes WebkitAppRegion regions before React event handlers,
-          and a drag region physically covering a button causes clicks to be
-          swallowed by the OS window-move handler even with no-drag on the button. */}
-      <div
-        style={{
-          height: WINDOW_DRAG_HEIGHT,
-          WebkitAppRegion: "drag",
-          flexShrink: 0,
-          marginRight: windowControlsVisible ? topTabsRight : 0,
-        }}
-      />
+      {/* Drag region. On Windows, shrink right margin so custom controls aren't
+          inside the drag hit-area. On macOS, WindowDragSpacer reserves the
+          sidebar chrome rail as a no-drag zone. */}
+      <div style={{ marginRight: windowControlsVisible ? topTabsRight : 0 }}>
+        <WindowDragSpacer />
+      </div>
 
       {showHeaderTabs && (
         <div
@@ -547,11 +557,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       {/* Top bar — aligns with sidebar header */}
       <div
         style={{
-          padding: `${headerContentOffset}px 24px 12px`,
+          padding: `${headerContentOffset}px 24px 12px ${headerLeftPadding}px`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          transition: "padding-top .16s ease",
+          transition: "padding .16s ease",
         }}
       >
         <div style={{
@@ -559,7 +569,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           alignItems: "center",
           justifyContent: "space-between",
           width: "100%",
-          maxWidth: !sidebarOpen ? 640 : "none",
+          maxWidth: "none",
         }}>
         <div
           style={{
@@ -594,27 +604,29 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                   letterSpacing: ".1em",
                 }}
               >
-                {t("messages", convo.msgs.length)}
+                {t("chatArea.messages", { count: convo.msgs.length })}
               </div>
             </div>
           )}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
-          {!showNewChatCard && developerMode && (
+          {!showNewChatCard && developerMode && !isDraftContext && (
             <MemoGitStatusPill
               cwd={cwd}
               defaultPrBranch={defaultPrBranch}
               coauthorEnabled={coauthorEnabled}
               coauthorTrailer={coauthorTrailer}
+              locale={locale}
             />
           )}
-          {!showNewChatCard && developerMode && (
+          {!showNewChatCard && developerMode && !isDraftContext && (
             <MemoBranchSelector
               cwd={cwd}
               onCwdChange={onCwdChange}
               hasMessages={convo?.msgs?.length > 0}
               onRefocusTerminal={onRefocusTerminal}
+              locale={locale}
             />
           )}
           {!showNewChatCard && <MemoModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
@@ -624,7 +636,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           {!showNewChatCard && developerMode && onToggleTerminal && (
             <button
               onClick={onToggleTerminal}
-              title={t("toggle_terminal")}
+              title={t("chatArea.toggleTerminal")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -704,8 +716,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
       {!showNewChatCard && convo && convo.msgs.length > 0 && (
         <button
           onClick={scrollToBottom}
-          aria-label={t("scroll_to_bottom")}
-          title={t("scroll_to_bottom")}
+          aria-label={t("chatArea.scrollToBottom")}
+          title={t("chatArea.scrollToBottom")}
           style={{
             position: "absolute",
             bottom: 108,
@@ -750,6 +762,112 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
         style={{ padding: "12px 28px 24px", display: "flex", justifyContent: "center" }}
       >
         <div style={{ width: "100%", maxWidth: 560 }}>
+          {permissionRequests && permissionRequests.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              {permissionRequests.map((req) => {
+                const actionButtonStyle = {
+                  height: 24,
+                  padding: "0 9px",
+                  borderRadius: 7,
+                  border: "1px solid rgba(255,255,255,0.04)",
+                  background: "transparent",
+                  color: "rgba(255,255,255,0.3)",
+                  cursor: "pointer",
+                  fontSize: s(9),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  letterSpacing: ".05em",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                };
+                const labelText = req.isSensitiveFile ? "SENSITIVE" : "PERMISSION";
+                const tool = req.toolName || "Tool";
+                const summary = req.summary || "";
+                return (
+                  <div
+                    key={req.requestId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 8px",
+                      marginBottom: 4,
+                      background: "rgba(255,255,255,0.014)",
+                      border: "1px solid rgba(255,255,255,0.035)",
+                      borderRadius: 12,
+                      fontSize: s(12),
+                      color: "rgba(255,255,255,0.44)",
+                      fontFamily: "system-ui,sans-serif",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        <span style={{
+                          fontSize: s(9),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          color: "rgba(255,255,255,0.14)",
+                          letterSpacing: ".06em",
+                          flexShrink: 0,
+                        }}>
+                          {labelText}
+                        </span>
+                        <span style={{
+                          fontSize: s(9),
+                          fontFamily: "'JetBrains Mono',monospace",
+                          color: "rgba(255,255,255,0.28)",
+                          letterSpacing: ".06em",
+                        }}>
+                          {String(tool).toUpperCase()}
+                        </span>
+                      </div>
+                      <div style={{
+                        flex: 1,
+                        minWidth: 0,
+                        padding: "2px 8px",
+                        transform: "translateY(-1.5px)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        lineHeight: "18px",
+                        color: "rgba(255,255,255,0.62)",
+                      }}
+                        title={summary}
+                      >
+                        {summary}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                      <button
+                        onClick={() => onRespondPermission?.({ requestId: req.requestId, behavior: "allow", scope: "once" })}
+                        style={{
+                          ...actionButtonStyle,
+                          background: "rgba(255,255,255,0.06)",
+                          color: "rgba(255,255,255,0.54)",
+                        }}
+                        title="Allow this request once"
+                      >
+                        ALLOW ONCE
+                      </button>
+                      <button
+                        onClick={() => onRespondPermission?.({ requestId: req.requestId, behavior: "allow", scope: "session" })}
+                        style={actionButtonStyle}
+                        title="Allow this tool + target for the rest of the session"
+                      >
+                        ALLOW SESSION
+                      </button>
+                      <button
+                        onClick={() => onRespondPermission?.({ requestId: req.requestId, behavior: "deny" })}
+                        style={actionButtonStyle}
+                        title="Deny this request"
+                      >
+                        DENY
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {queuedMessages && queuedMessages.length > 0 && (
             <div style={{ marginBottom: 8 }}>
               {queuedMessages.map((q, i) => {
@@ -796,7 +914,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                           letterSpacing: ".06em",
                           flexShrink: 0,
                         }}>
-                          {i === 0 ? t("queued_next") : t("queued")}
+                          {i === 0 ? t("chatArea.queuedNext") : t("chatArea.queued")}
                         </span>
                         {attachmentCount > 0 && (
                           <span style={{
@@ -805,7 +923,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                             color: "rgba(255,255,255,0.13)",
                             letterSpacing: ".06em",
                           }}>
-                            {t("attachment", attachmentCount)}
+                            {t("chatArea.attachmentsCount", { value: attachmentCount, suffix: attachmentCount === 1 ? "" : "S" })}
                           </span>
                         )}
                       </div>
@@ -869,13 +987,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                               color: "rgba(255,255,255,0.54)",
                             }}
                           >
-                            {t("save")}
+                            {t("common.save")}
                           </button>
                           <button
                             onClick={cancelQueuedEdit}
                             style={queueActionButtonStyle}
                           >
-                            {t("cancel")}
+                            {t("common.cancel")}
                           </button>
                         </>
                       ) : (
@@ -884,13 +1002,13 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                             onClick={() => startQueuedEdit(q)}
                             style={queueActionButtonStyle}
                           >
-                            {t("edit")}
+                            {t("common.edit")}
                           </button>
                           <button
                             onClick={() => removeQueuedItem(q.id)}
                             style={queueActionButtonStyle}
                           >
-                            {t("delete")}
+                            {t("common.delete")}
                           </button>
                         </>
                       )}
@@ -953,8 +1071,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
               }}
             >
               {canRunShell
-                ? t("shell_mode_ready", shellLocation)
-                : t("shell_mode_empty")}
+                ? t("chatArea.shellModeReady", { loc: shellLocation })
+                : t("chatArea.shellModeEmpty")}
             </div>
           )}
           {showBranchHint && (
@@ -1004,7 +1122,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                 composingRef.current = false;
                 setInputFocused(false);
               }}
-              placeholder={shellMode ? t("placeholder_shell") : t("placeholder_ask")}
+              placeholder={shellMode ? t("chatArea.placeholderShell") : t("chatArea.placeholderAsk")}
               rows={1}
               style={{
                 flex: 1,
@@ -1075,7 +1193,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
                         letterSpacing: ".1em",
                       }}
                     >
-                      {t("run")}
+                      {t("chatArea.run")}
                     </span>
                   </>
                 ) : (
@@ -1097,9 +1215,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, onToggleSide
           >
             {shellMode
               ? (canRunShell
-                  ? t("hint_shell_run")
-                  : t("hint_shell_empty"))
-              : t("hint_chat")}
+                  ? t("chatArea.hintShellRun")
+                  : t("chatArea.hintShellEmpty"))
+              : t("chatArea.hintChat")}
           </div>
         </div>
       </div>}

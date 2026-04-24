@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { createTranslator } from "../i18n";
 
-export default function CommentBox({ repo, number, onCommentAdded, actions }) {
+export default function CommentBox({ repo, number, onCommentAdded, actions, locale }) {
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -20,7 +22,7 @@ export default function CommentBox({ repo, number, onCommentAdded, actions }) {
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="Write a comment..."
+        placeholder={t("pm.commentPlaceholder")}
         rows={3}
         style={{
           width: "100%",
@@ -55,7 +57,7 @@ export default function CommentBox({ repo, number, onCommentAdded, actions }) {
             transition: "all .15s",
           }}
         >
-          {submitting ? "..." : "Comment"}
+          {submitting ? "..." : t("pm.comment")}
         </button>
       </div>
     </div>

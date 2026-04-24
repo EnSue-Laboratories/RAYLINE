@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld("ghApi", {
   uploadImage: (repo, base64Data, filename) => ipcRenderer.invoke("gh-upload-image", repo, base64Data, filename),
   loadPmState: () => ipcRenderer.invoke("gh-load-pm-state"),
   savePmState: (state) => ipcRenderer.invoke("gh-save-pm-state", state),
+  loadAppState: () => ipcRenderer.invoke("load-state"),
   readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
   getSystemInfo: () => ipcRenderer.invoke("system-info"),
   windowMinimize: () => ipcRenderer.invoke("window-minimize"),

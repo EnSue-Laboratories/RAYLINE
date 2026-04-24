@@ -9,3 +9,8 @@ src-ui-backup/
 docs/plans/2026-04-15-sidebar-organization.md
 ARCH.md
 .gstack
+
+# Shell history files — must never be committed (may leak private commands)
+.zsh_history
+.bash_history
+.histfile

@@ -1,17 +1,15 @@
 import { useState, useCallback, useEffect } from "react";
 import { ArrowLeft, Check, ChevronDown, Image } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { useLanguage } from "../contexts/LanguageContext";
-import { t } from "../i18n";
+import { createTranslator } from "../i18n";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, language = "en", onLanguageChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, onClose }) {
   const s = useFontScale();
-  // Consume language context so we re-render when language changes
-  useLanguage();
+  const t = createTranslator(locale);
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
   const [multica, setMultica] = useState(() => loadMulticaState());
   const [multicaServerDraft, setMulticaServerDraft] = useState(() => loadMulticaState().serverUrl || "");
@@ -80,12 +78,12 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const normalizedMulticaServerDraft = normalizeMulticaServerUrl(multicaServerDraft);
   const multicaConnected = Boolean(multica.token && multica.serverUrl && (multica.workspaceId || multica.workspaceSlug));
   const multicaStatus = multicaConnected
-    ? t("multica_status_connected")
+    ? t("settings.multicaConnected")
     : multica.token && multica.serverUrl
-      ? t("multica_status_auth_no_ws")
+      ? t("settings.multicaAuthenticatedNoWorkspace")
       : multica.serverUrl
-        ? t("multica_status_server_only")
-        : t("multica_status_none");
+        ? t("settings.multicaServerConfigured")
+        : t("settings.multicaNotConfigured");
   const multicaServerDirty = normalizedMulticaServerDraft !== (multica.serverUrl || "");
 
   const refreshMultica = useCallback(() => {
@@ -262,7 +260,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             color: "rgba(255,255,255,0.85)",
           }}
         >
-          {t("settings")}
+          {t("settings.title")}
         </span>
       </div>
 
@@ -288,7 +286,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginBottom: 20,
             }}
           >
-            {t("section_appearance")}
+            {t("settings.appearance")}
           </div>
 
           {/* Wallpaper subsection */}
@@ -300,7 +298,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 2,
               }}
             >
-              {t("wallpaper")}
+              {t("settings.wallpaper")}
             </div>
             <div
               style={{
@@ -309,7 +307,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 12,
               }}
             >
-              {t("wallpaper_desc")}
+              {t("settings.wallpaperDescription")}
             </div>
 
             {/* Preview row */}
@@ -367,7 +365,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     fontFamily: "system-ui, sans-serif",
                   }}
                 >
-                  {t("choose_image")}
+                  {t("settings.chooseImage")}
                 </button>
                 {local.path && (
                   <button
@@ -388,7 +386,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       fontFamily: "system-ui, sans-serif",
                     }}
                   >
-                    {t("remove")}
+                    {t("settings.remove")}
                   </button>
                 )}
               </div>
@@ -419,7 +417,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              {t("image_blur")}: {local.imgBlur || 0}
+              {t("settings.imageBlurValue", { value: local.imgBlur || 0 })}
             </div>
             <input
               type="range"
@@ -440,7 +438,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              {t("image_opacity")}: {local.imgOpacity || 0}
+              {t("settings.imageOpacityValue", { value: local.imgOpacity || 0 })}
             </div>
             <input
               type="range"
@@ -457,7 +455,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginTop: 8,
               }}
             >
-              {t("image_opacity_desc")}
+              {t("settings.imageOpacityDescription")}
             </div>
           </div>
 
@@ -470,7 +468,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              {t("app_blur")}: {appBlur || 0}
+              {t("settings.appBlurValue", { value: appBlur || 0 })}
             </div>
             <input
               type="range"
@@ -487,7 +485,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginTop: 8,
               }}
             >
-              {t("app_blur_desc")}
+              {t("settings.appBlurDescription")}
             </div>
           </div>
 
@@ -500,7 +498,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              {t("app_opacity")}: {appOpacity ?? 100}
+              {t("settings.appOpacityValue", { value: appOpacity ?? 100 })}
             </div>
             <input
               type="range"
@@ -517,7 +515,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginTop: 8,
               }}
             >
-              {t("app_opacity_desc")}
+              {t("settings.appOpacityDescription")}
             </div>
           </div>
 
@@ -534,7 +532,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginTop: 12,
             }}
           >
-            {t("section_typography")}
+            {t("settings.typography")}
           </div>
 
           {/* Font Size */}
@@ -546,7 +544,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 10,
               }}
             >
-              {t("font_size")}: {fontSize}px
+              {t("settings.fontSizeValue", { value: fontSize })}
             </div>
             <input
               type="range"
@@ -571,7 +569,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginTop: 12,
             }}
           >
-            {t("section_integrations")}
+            {t("settings.integrations")}
           </div>
 
           <div style={{ marginBottom: 28 }}>
@@ -591,7 +589,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 12,
               }}
             >
-              {t("multica_desc")}
+              {t("settings.multicaDescription")}
             </div>
 
             <div style={{ marginBottom: 12 }}>
@@ -612,7 +610,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     marginBottom: 2,
                   }}
                 >
-                  {t("multica_email")} {multica.email}
+                  {t("settings.email", { value: multica.email })}
                 </div>
               )}
               {(multica.workspaceSlug || multica.workspaceId) && (
@@ -622,7 +620,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     color: "rgba(255,255,255,0.42)",
                   }}
                 >
-                  {t("multica_workspace")} {multica.workspaceSlug || multica.workspaceId}
+                  {t("settings.workspace", { value: multica.workspaceSlug || multica.workspaceId })}
                 </div>
               )}
             </div>
@@ -635,7 +633,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   marginBottom: 2,
                 }}
               >
-                {t("multica_server_url")}
+                {t("settings.serverUrl")}
               </div>
               <div
                 style={{
@@ -644,7 +642,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   marginBottom: 10,
                 }}
               >
-                {t("multica_server_url_desc")}
+                {t("settings.serverUrlDescription")}
               </div>
               <input
                 type="text"
@@ -685,7 +683,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   fontFamily: "system-ui, sans-serif",
                 }}
               >
-                {normalizedMulticaServerDraft ? t("save_server") : t("clear_server")}
+                {normalizedMulticaServerDraft ? t("settings.saveServer") : t("settings.clearServer")}
               </button>
               <button
                 type="button"
@@ -702,7 +700,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   fontFamily: "system-ui, sans-serif",
                 }}
               >
-                {multicaConnected ? t("manage_connection") : t("open_setup")}
+                {multicaConnected ? t("settings.manageConnection") : t("settings.openSetup")}
               </button>
               {(multica.token || multica.workspaceId || multica.workspaceSlug) && (
                 <button
@@ -720,7 +718,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     fontFamily: "system-ui, sans-serif",
                   }}
                 >
-                  {t("disconnect")}
+                  {t("settings.disconnect")}
                 </button>
               )}
             </div>
@@ -739,7 +737,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginTop: 12,
             }}
           >
-            {t("section_advanced")}
+            {t("settings.advanced")}
           </div>
 
           {/* Developer mode toggle */}
@@ -760,7 +758,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     marginBottom: 2,
                   }}
                 >
-                  {t("developer_mode")}
+                  {t("settings.developerMode")}
                 </div>
                 <div
                   style={{
@@ -768,7 +766,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     color: "rgba(255,255,255,0.3)",
                   }}
                 >
-                  {t("developer_mode_desc")}
+                  {t("settings.developerModeDescription")}
                 </div>
               </div>
               <button
@@ -820,15 +818,15 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   marginTop: 12,
                 }}
               >
-                {t("section_notifications")}
+                {t("settings.notifications")}
               </div>
 
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)", marginBottom: 2 }}>
-                  {t("completion_chime")}
+                  {t("settings.completionChime")}
                 </div>
                 <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.3)", marginBottom: 10 }}>
-                  {t("completion_chime_desc")}
+                  {t("settings.completionChimeDescription")}
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -888,7 +886,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       opacity: notificationsMuted ? 0.4 : 1,
                     }}
                   >
-                    {t("preview")}
+                    {t("settings.preview")}
                   </button>
                 </div>
               </div>
@@ -942,7 +940,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   />
                 </span>
                 <span style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)" }}>
-                  {t("mute_chime")}
+                  {t("settings.muteCompletionChime")}
                 </span>
               </label>
 
@@ -959,7 +957,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   marginTop: 12,
                 }}
               >
-                {t("section_git")}
+                {t("settings.git")}
               </div>
 
               {/* Default PR branch */}
@@ -971,7 +969,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     marginBottom: 2,
                   }}
                 >
-                  {t("default_pr_branch")}
+                  {t("settings.defaultPrBranch")}
                 </div>
                 <div
                   style={{
@@ -980,7 +978,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     marginBottom: 10,
                   }}
                 >
-                  {t("default_pr_branch_desc")}
+                  {t("settings.defaultPrBranchDescription")}
                 </div>
                 <input
                   type="text"
@@ -1026,7 +1024,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         marginBottom: 2,
                       }}
                     >
-                      {t("auto_coauthor")}
+                      {t("settings.autoCoauthor")}
                     </div>
                     <div
                       style={{
@@ -1034,7 +1032,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         color: "rgba(255,255,255,0.3)",
                       }}
                     >
-                      {t("auto_coauthor_desc")}
+                      {t("settings.autoCoauthorDescription")}
                     </div>
                   </div>
                   <button
@@ -1086,21 +1084,21 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginTop: 12,
             }}
           >
-            {t("section_language")}
+            {t("settings.language")}
           </div>
 
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)", marginBottom: 10 }}>
-              {t("language_label")}
+              {t("settings.languageLabel")}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              {["en", "zh"].map((lang) => {
-                const selected = language === lang;
+              {[["en-US", "settings.languageEnglish"], ["zh-CN", "settings.languageChinese"]].map(([lc, key]) => {
+                const selected = locale === lc;
                 return (
                   <button
-                    key={lang}
+                    key={lc}
                     type="button"
-                    onClick={() => onLanguageChange?.(lang)}
+                    onClick={() => onLocaleChange?.(lc)}
                     style={{
                       padding: "6px 16px",
                       borderRadius: 7,
@@ -1113,7 +1111,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       fontFamily: "system-ui, sans-serif",
                     }}
                   >
-                    {t(lang === "en" ? "lang_en" : "lang_zh")}
+                    {t(key)}
                   </button>
                 );
               })}
@@ -1133,35 +1131,35 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               marginTop: 12,
             }}
           >
-            {t("section_updates")}
+            {t("settings.updates")}
           </div>
 
           <div style={{ marginBottom: 32 }}>
             {appVersion && (
               <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono',monospace", marginBottom: 14, letterSpacing: ".04em" }}>
-                {t("current_version")}  v{appVersion}
+                {t("settings.currentVersion")}  v{appVersion}
               </div>
             )}
 
             {/* Status text */}
             {updaterPhase === "available" && updateVersion && (
               <div style={{ fontSize: s(12), color: "rgba(165,255,210,0.82)", marginBottom: 10 }}>
-                {t("update_available", updateVersion)}
+                {t("settings.updateAvailable", { version: updateVersion })}
               </div>
             )}
             {updaterPhase === "not-available" && (
               <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.38)", marginBottom: 10 }}>
-                {t("up_to_date")}
+                {t("settings.upToDate")}
               </div>
             )}
             {updaterPhase === "ready" && (
               <div style={{ fontSize: s(12), color: "rgba(165,255,210,0.82)", marginBottom: 10 }}>
-                {t("ready_to_install")}
+                {t("settings.readyToInstall")}
               </div>
             )}
             {updaterPhase === "error" && (
               <div style={{ fontSize: s(12), color: "rgba(255,120,100,0.82)", marginBottom: 10 }}>
-                {t("update_error")}
+                {t("settings.updateError")}
                 {updateError && <span style={{ opacity: 0.6, marginLeft: 6, fontFamily: "'JetBrains Mono',monospace", fontSize: s(10) }}>{updateError.slice(0, 80)}</span>}
               </div>
             )}
@@ -1170,7 +1168,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             {updaterPhase === "downloading" && (
               <div style={{ marginBottom: 10 }}>
                 <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.55)", marginBottom: 6 }}>
-                  {t("downloading", downloadPct)}
+                  {t("settings.downloading", { pct: downloadPct })}
                 </div>
                 <div style={{ height: 3, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${downloadPct}%`, background: "rgba(255,255,255,0.4)", transition: "width .3s ease", borderRadius: 2 }} />
@@ -1191,7 +1189,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     transition: "all .2s", fontFamily: "system-ui, sans-serif",
                   }}
                 >
-                  {t("check_updates")}
+                  {t("settings.checkUpdates")}
                 </button>
               )}
               {updaterPhase === "checking" && (
@@ -1205,7 +1203,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     fontFamily: "system-ui, sans-serif",
                   }}
                 >
-                  {t("checking")}
+                  {t("settings.checking")}
                 </button>
               )}
               {updaterPhase === "available" && (
@@ -1219,7 +1217,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     transition: "all .2s", fontFamily: "system-ui, sans-serif",
                   }}
                 >
-                  {t("check_updates")}
+                  {t("settings.checkUpdates")}
                 </button>
               )}
               {updaterPhase === "ready" && (
@@ -1233,7 +1231,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     transition: "all .2s", fontFamily: "system-ui, sans-serif", fontWeight: 600,
                   }}
                 >
-                  {t("install_restart")}
+                  {t("settings.installRestart")}
                 </button>
               )}
               {updaterPhase === "error" && (
@@ -1247,7 +1245,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     transition: "all .2s", fontFamily: "system-ui, sans-serif",
                   }}
                 >
-                  {t("retry")}
+                  {t("settings.retryUpdate")}
                 </button>
               )}
             </div>

@@ -2,12 +2,14 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import AuroraCanvas from "./components/AuroraCanvas";
 import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
+import SidebarChromeRail from "./components/SidebarChromeRail";
+import { IS_MAC } from "./windowChrome";
 import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
 import WindowControls from "./components/WindowControls";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
-import TerminalDrawer from "./components/TerminalDrawer";
+import useWindowActivity from "./hooks/useWindowActivity";
 import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
 import NewProjectModal from "./components/NewProjectModal";
@@ -16,10 +18,9 @@ import { useMulticaModels } from "./data/multicaModels.jsx";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
-import { LanguageContext } from "./contexts/LanguageContext";
-import { setLang } from "./i18n";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
+import { detectDefaultLocale, normalizeLocale } from "./i18n";
 import {
   pinTabPatch,
   runEndedPatch,
@@ -45,8 +46,10 @@ const SHELL_TRANSCRIPT_LIMIT = 12000;
 const SHELL_TERMINAL_TIMEOUT_MS = 15000;
 const LAB_CONTROL_ENDPOINT = "http://127.0.0.1:4001/control";
 const LAB_CONTROL_COMMIT_DELAY_MS = 1000;
+const SIDEBAR_WIDTH = 264;
 const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
 const DEFAULT_FONT_SIZE = 17;
+const EMPTY_CONVERSATION_DATA = { messages: [], isStreaming: false, error: null };
 
 function logSessionState(...args) {
   console.log("[session-state]", ...args);
@@ -56,6 +59,23 @@ function getMainRepoRoot(dir) {
   if (!dir) return dir;
   const wtIdx = dir.indexOf("/.worktrees/");
   return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
+}
+
+function isDraftProjectRoot(dir, draftsPath) {
+  if (!dir || !draftsPath) return false;
+  return getMainRepoRoot(dir) === getMainRepoRoot(draftsPath);
+}
+
+function getProjectRootOrUndefined(dir, draftsPath) {
+  const root = getMainRepoRoot(dir);
+  if (!root || isDraftProjectRoot(root, draftsPath)) return undefined;
+  return root;
+}
+
+function normalizeConversationCreationCwd(dir, draftsPath) {
+  if (dir === null) return null;
+  if (dir === undefined) return undefined;
+  return getProjectRootOrUndefined(dir, draftsPath);
 }
 
 function getEffectiveConversationCwd(conversation, appCwd, draftsPath) {
@@ -399,6 +419,29 @@ function normalizeProjectsMeta(projectsMeta) {
   }
 
   return normalized;
+}
+
+function getProjectChooserSignature(entries) {
+  return entries
+    .map(([projectPath, meta]) => [
+      projectPath,
+      meta?.name || "",
+      meta?.hidden ? "1" : "0",
+      meta?.manual ? "1" : "0",
+    ].join("\u0000"))
+    .join("\u0001");
+}
+
+function buildProjectChooserProjects(entries) {
+  const chooserProjects = {};
+  for (const [projectPath, meta] of entries) {
+    chooserProjects[projectPath] = {
+      ...(meta?.name ? { name: meta.name } : {}),
+      ...(meta?.hidden ? { hidden: true } : {}),
+      ...(meta?.manual ? { manual: true } : {}),
+    };
+  }
+  return chooserProjects;
 }
 
 function extractLoadedSessionMeta(result) {
@@ -858,6 +901,23 @@ function getMessageTextPreview(message) {
     .join(" ");
 }
 
+function getSidebarMessagePreview(message, limit = 45) {
+  if (!message) return null;
+  if (typeof message.text === "string") return message.text.slice(0, limit);
+  if (!Array.isArray(message.parts)) return null;
+
+  let preview = "";
+  for (const part of message.parts) {
+    if (part?.type !== "text" || typeof part.text !== "string" || part.text.length === 0) continue;
+    if (preview) preview += " ";
+    const remaining = limit - preview.length;
+    if (remaining <= 0) break;
+    preview += part.text.slice(0, remaining);
+    if (preview.length >= limit) break;
+  }
+  return preview || null;
+}
+
 function isPersistableLiveMessage(message) {
   if (!message) return false;
   if (message.role !== "assistant") return true;
@@ -1030,6 +1090,7 @@ export default function App() {
     markMulticaConnected,
   } = useAgent();
   const terminal = useTerminal();
+  const { prefersReducedMotion } = useWindowActivity();
   const { models: multicaModels } = useMulticaModels();
 
   // convos: array of { id, sessionId, title, model, ts }
@@ -1041,6 +1102,7 @@ export default function App() {
   const [stateLoaded, setStateLoaded] = useState(false);
   const [platform, setPlatform] = useState(null);
   const [wallpaper, setWallpaper] = useState(null);
+  const [locale, setLocale] = useState(() => detectDefaultLocale());
   const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
@@ -1051,9 +1113,9 @@ export default function App() {
   const [appBlur, setAppBlur] = useState(0);
   const [appOpacity, setAppOpacity] = useState(100);
   const [developerMode, setDeveloperMode] = useState(true);
+  const [chromeControlsOnHover, setChromeControlsOnHover] = useState(false);
   const [notificationSound, setNotificationSound] = useState("glass");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
-  const [language, setLanguage] = useState("en");
   const [showSettings, setShowSettings] = useState(false);
   const [hasUpdate, setHasUpdate] = useState(false);
   const [projects, setProjects] = useState({});
@@ -1063,6 +1125,18 @@ export default function App() {
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const [showMulticaSetup, setShowMulticaSetup] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
+  const projectChooserProjectsRef = useRef({ signature: null, value: {} });
+  const projectChooserProjects = useMemo(() => {
+    const entries = Object.entries(projects || {}).sort(([a], [b]) => a.localeCompare(b));
+    const signature = getProjectChooserSignature(entries);
+    if (projectChooserProjectsRef.current.signature === signature) {
+      return projectChooserProjectsRef.current.value;
+    }
+
+    const value = buildProjectChooserProjects(entries);
+    projectChooserProjectsRef.current = { signature, value };
+    return value;
+  }, [projects]);
   useEffect(() => {
     const h = () => setShowMulticaSetup(true);
     window.addEventListener("open-multica-setup", h);
@@ -1070,8 +1144,11 @@ export default function App() {
   }, []);
   const messageQueue = useRef([]);
   const queueInterruptRequestedRef = useRef(new Set());
+  // Guards the async preflight gap before useAgent flips `isStreaming`.
+  const sendInFlightConversationIdsRef = useRef(new Set());
   const activeConversationIdRef = useRef(null);
   const [queuedMessages, setQueuedMessages] = useState([]);
+  const [permissionRequests, setPermissionRequests] = useState([]);
   const labControlTimersRef = useRef(new Map());
   const persistableConversations = useMemo(
     () =>
@@ -1099,6 +1176,7 @@ export default function App() {
     active: persistedActive,
     cwd,
     defaultModel,
+    locale,
     fontSize,
     sidebarActiveOpacity,
     wallpaper: getPersistedWallpaper(wallpaper),
@@ -1110,22 +1188,23 @@ export default function App() {
     appBlur,
     appOpacity,
     developerMode,
+    chromeControlsOnHover,
     notificationSound,
     notificationsMuted,
-    language,
     queuedMessages,
   }), [
     appBlur,
     appOpacity,
     coauthorEnabled,
     coauthorTrailer,
+    chromeControlsOnHover,
     cwd,
     defaultModel,
     defaultPrBranch,
     developerMode,
     draftsCollapsed,
     fontSize,
-    language,
+    locale,
     notificationSound,
     notificationsMuted,
     persistedActive,
@@ -1146,6 +1225,44 @@ export default function App() {
       if (info?.platform) setPlatform(info.platform);
     }).catch(() => {});
   }, []);
+
+  const activePermissionRequests = useMemo(
+    () => permissionRequests.filter((item) => item?.conversationId === active),
+    [active, permissionRequests]
+  );
+
+  useEffect(() => {
+    if (!window.api?.onAgentPermissionRequest) return undefined;
+    const offRequest = window.api.onAgentPermissionRequest((data) => {
+      if (!data?.requestId) return;
+      setPermissionRequests((prev) => {
+        if (prev.some((p) => p.requestId === data.requestId)) return prev;
+        return [...prev, data];
+      });
+    });
+    const offCancelled = window.api.onAgentPermissionCancelled?.(({ requestId }) => {
+      if (!requestId) return;
+      setPermissionRequests((prev) => prev.filter((p) => p.requestId !== requestId));
+    });
+    const offDone = window.api.onAgentDone?.(({ conversationId }) => {
+      if (!conversationId) return;
+      setPermissionRequests((prev) => prev.filter((p) => p.conversationId !== conversationId));
+    });
+    return () => {
+      offRequest?.();
+      offCancelled?.();
+      offDone?.();
+    };
+  }, []);
+
+  const respondPermission = useCallback(({ requestId, behavior, scope, message }) => {
+    if (!window.api?.agentPermissionRespond) return;
+    const req = permissionRequests.find((p) => p.requestId === requestId);
+    const conversationId = req?.conversationId;
+    if (!conversationId) return;
+    window.api.agentPermissionRespond({ conversationId, requestId, behavior, scope, message });
+    setPermissionRequests((prev) => prev.filter((p) => p.requestId !== requestId));
+  }, [permissionRequests]);
 
   useEffect(() => {
     activeConversationIdRef.current = active;
@@ -1339,6 +1456,7 @@ export default function App() {
         else if (state.active) setActive(state.active);
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
+        if (state.locale) setLocale(normalizeLocale(state.locale));
         if (state.fontSize) setFontSize(state.fontSize);
         if (state.sidebarActiveOpacity != null) {
           setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
@@ -1356,12 +1474,12 @@ export default function App() {
         if (state.appBlur != null) setAppBlur(clampNumber(state.appBlur, 0, 20, 0));
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
+        if (typeof state.chromeControlsOnHover === "boolean") setChromeControlsOnHover(state.chromeControlsOnHover);
         if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
         if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
-        if (state.language === "zh" || state.language === "en") {
-          setLanguage(state.language);
-          setLang(state.language);
-        }
+        // Migrate legacy "zh"/"en" language key to locale
+        if (state.language === "zh") setLocale("zh-CN");
+        else if (state.language === "en") setLocale("en-US");
         if (state.wallpaper) {
           setWallpaper(normalizeWallpaper(state.wallpaper));
           // Reload data URL from disk (not persisted — too large for JSON)
@@ -1414,8 +1532,14 @@ export default function App() {
     window.api.setWindowOpacity(Math.max(0.3, Math.min(1, appOpacity / 100)));
   }, [appOpacity, stateLoaded]);
 
-  const activeConvo = convoList.find((c) => c.id === active);
-  const activeData  = active ? getConversation(active) : { messages: [], isStreaming: false, error: null };
+  const activeConvo = useMemo(
+    () => convoList.find((c) => c.id === active) || null,
+    [active, convoList]
+  );
+  const activeData = useMemo(
+    () => (active ? getConversation(active) : EMPTY_CONVERSATION_DATA),
+    [active, getConversation]
+  );
 
   // The first tab strip only appears for a concurrent streaming burst.
   // Once the strip exists, any newly streaming session joins it immediately.
@@ -1889,21 +2013,26 @@ export default function App() {
     setShowNewChatCard(true);
   };
 
-  const handleToggleProjectCollapse = (cwdRoot) => {
+  const handleToggleProjectCollapse = useCallback((cwdRoot, nextCollapsed) => {
     const projectRoot = getMainRepoRoot(cwdRoot);
-    setProjects((prev) => ({
-      ...prev,
-      [projectRoot]: { ...prev[projectRoot], collapsed: !prev[projectRoot]?.collapsed },
-    }));
-  };
+    setProjects((prev) => {
+      const current = prev[projectRoot]?.collapsed ?? false;
+      const collapsed = typeof nextCollapsed === "boolean" ? nextCollapsed : !current;
+      if (current === collapsed) return prev;
+      return {
+        ...prev,
+        [projectRoot]: { ...prev[projectRoot], collapsed },
+      };
+    });
+  }, []);
 
-  const handleHideProject = (cwdRoot) => {
+  const handleHideProject = useCallback((cwdRoot) => {
     const projectRoot = getMainRepoRoot(cwdRoot);
     setProjects((prev) => ({
       ...prev,
       [projectRoot]: { ...prev[projectRoot], hidden: true },
     }));
-  };
+  }, []);
 
   const registerManualProject = useCallback((projectPath) => {
     if (!projectPath) return;
@@ -1926,27 +2055,47 @@ export default function App() {
     if (clonedPath) registerManualProject(clonedPath);
   }, [registerManualProject]);
 
-  const handleNewInProject = (cwdRoot) => {
+  const handleNewInProject = useCallback((cwdRoot) => {
     const id = "c" + Date.now();
     const n = createConversationDraft({
       id,
       title: "New chat",
       modelId: defaultModel,
       ts: Date.now(),
-      cwd: cwdRoot || undefined,
+      cwd: cwdRoot ?? null,
     });
     setConvoList((p) => [n, ...p]);
     setActive(id);
     setShowNewChatCard(false);
-    if (cwdRoot && projects[cwdRoot]?.hidden) {
-      setProjects((prev) => ({
-        ...prev,
-        [cwdRoot]: { ...prev[cwdRoot], hidden: false },
-      }));
+    if (cwdRoot) {
+      setProjects((prev) => (
+        prev[cwdRoot]?.hidden
+          ? { ...prev, [cwdRoot]: { ...prev[cwdRoot], hidden: false } }
+          : prev
+      ));
     }
-  };
+  }, [createConversationDraft, defaultModel]);
 
-  const handleDelete = (id, e) => {
+  const pinnedTabs = useMemo(() => {
+    return convoList
+      .filter((c) => c.tab?.pinned)
+      .sort((a, b) => {
+        const aPinnedAt = Number(a.tab?.pinnedAt) || 0;
+        const bPinnedAt = Number(b.tab?.pinnedAt) || 0;
+        if (aPinnedAt !== bPinnedAt) return aPinnedAt - bPinnedAt;
+        return (a.ts || 0) - (b.ts || 0);
+      })
+      .map((c) => {
+        const data = getConversation(c.id);
+        return {
+          id: c.id,
+          title: c.title || "Untitled",
+          state: computeTabState(c, { isStreaming: Boolean(data.isStreaming) }),
+        };
+      });
+  }, [convoList, getConversation]);
+
+  const handleDelete = useCallback((id, e) => {
     e.stopPropagation();
     cancelMessage(id);
     const remaining = convoList.filter((c) => c.id !== id);
@@ -1971,26 +2120,7 @@ export default function App() {
         setActive(null);
       }
     }
-  };
-
-  const pinnedTabs = useMemo(() => {
-    return convoList
-      .filter((c) => c.tab?.pinned)
-      .sort((a, b) => {
-        const aPinnedAt = Number(a.tab?.pinnedAt) || 0;
-        const bPinnedAt = Number(b.tab?.pinnedAt) || 0;
-        if (aPinnedAt !== bPinnedAt) return aPinnedAt - bPinnedAt;
-        return (a.ts || 0) - (b.ts || 0);
-      })
-      .map((c) => {
-        const data = getConversation(c.id);
-        return {
-          id: c.id,
-          title: c.title || "Untitled",
-          state: computeTabState(c, { isStreaming: Boolean(data.isStreaming) }),
-        };
-      });
-  }, [convoList, getConversation]);
+  }, [active, cancelMessage, convoList, handleSelect, pinnedTabs]);
 
   const handleCloseTab = useCallback((id) => {
     const closingIndex = pinnedTabs.findIndex((tab) => tab.id === id);
@@ -2217,299 +2347,310 @@ export default function App() {
   const sendMessageToConversation = useCallback(
     async ({ conversationId, conversation, text, attachments, titleText }) => {
       if (!conversationId || !conversation) return false;
-
-      // Live cwd check (belt-and-suspenders — select-time heal covers most cases
-      // but directory may have vanished between select and send).
-      const recovery = await healConversationCwdIfMissing(conversationId, conversation);
-      const pendingRecovery = conversation?.pendingCwdRecovery || null;
-      let reminderSource = null;
-      if (recovery?.wasMissing) {
-        reminderSource = {
-          originalCwd: recovery.originalCwd,
-          recoveredCwd: recovery.cwd,
-          recoveryReason: recovery.recoveryReason,
-        };
-      } else if (pendingRecovery) {
-        reminderSource = pendingRecovery;
-      }
-      // Clear the pending marker whenever we have one to consume, regardless
-      // of whether the live or pending recovery is what we used — either way
-      // it's accounted for in the current send.
-      if (pendingRecovery) {
-        setConvoList((p) =>
-          p.map((c) => (c.id === conversationId ? { ...c, pendingCwdRecovery: undefined } : c))
-        );
-      }
-      const missingCwdReminder = reminderSource ? buildMissingCwdReminder(reminderSource) : null;
-      const effectiveCwd = recovery
-        ? (recovery.cwd ?? undefined)
-        : getEffectiveConversationCwd(conversation, cwd, draftsPath);
-      const thisConvoData = getConversation(conversationId);
-      const normalizedConversation = normalizeConversationState(conversation);
-      const activeSession = getActiveConversationSession(normalizedConversation);
-      const isFirstMessage = thisConvoData.messages.length === 0;
-      const messageIndex = thisConvoData.messages.length;
-      const syncedMessageCount = thisConvoData.messages.length;
-      const imageAttachments = attachments
-        ?.filter((a) => a.type === "image" && typeof a.dataUrl === "string")
-        .map((a) => ({
-          dataUrl: a.dataUrl,
-          ...(typeof a.name === "string" ? { name: a.name } : {}),
-          ...(typeof a.path === "string" ? { path: a.path } : {}),
-        }));
-      const images = imageAttachments?.map((a) => a.dataUrl);
-      const files = attachments?.filter((a) => a.type === "file");
-      const m = getMOrMulticaFallback(normalizedConversation.model);
-      const currentProvider = m.provider || "claude";
-      // Multica context must be resolved BEFORE prepareMessage so a missing
-      // context doesn't leave an orphan streaming assistant bubble.
-      const multicaSessionPolluted =
-        currentProvider === "multica" &&
-        (
-          conversationHasInjectedPromptMetadata(normalizedConversation.archivedMessages) ||
-          conversationHasInjectedPromptMetadata(thisConvoData.messages)
-        );
-      const previousMulticaContext =
-        currentProvider === "multica"
-          ? (normalizedConversation?._multica || conversation?._multica || null)
-          : null;
-      let multicaContext, multicaToken;
-      if (m.provider === "multica") {
-        ({ context: multicaContext, token: multicaToken } = await ensureMulticaContextForConversation({
-          conversationId,
-          conversation,
-          normalizedConversation,
-          modelId: normalizedConversation.model,
-          title: titleText || conversation?.title || normalizedConversation?.title || text.slice(0, 60),
-          forceNewSession: multicaSessionPolluted,
-        }));
-      }
-      const prevProvider = isFirstMessage
-        ? normalizedConversation.lastProvider || activeSession?.provider || null
-        : await resolveConversationLastProvider(normalizedConversation);
-      const currentProviderSession = await resolveConversationProviderSession(
-        normalizedConversation,
-        currentProvider
-      );
-      const providerSwitched =
-        !isFirstMessage && prevProvider && prevProvider !== currentProvider;
-      const multicaModelSwitched =
-        currentProvider === "multica" &&
-        !isFirstMessage &&
-        prevProvider === "multica" &&
-        Boolean(previousMulticaContext?.agentId) &&
-        Boolean(multicaContext?.agentId) &&
-        previousMulticaContext.agentId !== multicaContext.agentId;
-      const handoffSwitched = providerSwitched || multicaModelSwitched;
-      const multicaSessionReused =
-        currentProvider === "multica" &&
-        !isFirstMessage &&
-        prevProvider === "multica" &&
-        Boolean(previousMulticaContext?.sessionId) &&
-        Boolean(multicaContext?.sessionId) &&
-        previousMulticaContext.sessionId === multicaContext.sessionId &&
-        previousMulticaContext.agentId === multicaContext.agentId;
-      const canResumeExistingSession =
-        !isFirstMessage &&
-        (
-          multicaSessionReused ||
-          (
-            prevProvider === currentProvider &&
-            Boolean(currentProviderSession?.nativeSessionId) &&
-            currentProviderSession.syncedThroughMessageCount === syncedMessageCount
-          )
-        );
-      const needsHistoryPrimeFallback =
-        !isFirstMessage &&
-        currentProvider !== "multica" &&
-        !handoffSwitched &&
-        !canResumeExistingSession;
-      const needsFreshSession =
-        isFirstMessage ||
-        handoffSwitched ||
-        needsHistoryPrimeFallback ||
-        (currentProvider === "multica" && !canResumeExistingSession);
-      const seededSession =
-        needsFreshSession
-          ? (
-              isFirstMessage && activeSession?.provider === currentProvider
-                ? {
-                    ...activeSession,
-                    nativeSessionId:
-                      currentProvider === "claude"
-                        ? activeSession.nativeSessionId || crypto.randomUUID()
-                        : activeSession.nativeSessionId || null,
-                    model: normalizedConversation.model,
-                    syncedThroughMessageCount: syncedMessageCount,
-                    updatedAt: Date.now(),
-                    origin: isFirstMessage ? "initial-send" : (handoffSwitched ? "handoff" : "resync"),
-                  }
-                : createSeedSession(normalizedConversation, currentProvider, {
-                    model: normalizedConversation.model,
-                    syncedThroughMessageCount: syncedMessageCount,
-                    origin: isFirstMessage ? "initial-send" : (handoffSwitched ? "handoff" : "resync"),
-                  })
-            )
-          : null;
-      const initialSessionId =
-        needsFreshSession && currentProvider === "claude"
-          ? seededSession?.nativeSessionId || undefined
-          : undefined;
-      const resumeSessionId = currentProviderSession?.nativeSessionId || undefined;
-      const prime =
-        handoffSwitched
-          ? buildCrossProviderPrime(thisConvoData.messages)
-          : needsHistoryPrimeFallback
-            ? buildConversationPrime(thisConvoData.messages)
-            : null;
-      const primedPrompt = prime ? decoratePromptWithPrime(text, prime) : text;
-      const decoratedPrompt = decoratePromptWithReminder(primedPrompt, missingCwdReminder);
-      let wirePrompt = decoratedPrompt;
-      if (currentProvider === "multica" && needsFreshSession) {
-        wirePrompt = await buildMulticaBootstrapPrompt(effectiveCwd, decoratedPrompt);
-      }
-      const sendStartedAt = Date.now();
-
-      if (isFirstMessage) {
-        const newTitle = deriveConversationTitle(titleText || text, attachments);
-        setConvoList((p) =>
-          p.map((c) => c.id === conversationId ? { ...c, title: newTitle } : c)
-        );
+      if (sendInFlightConversationIdsRef.current.has(conversationId)) {
+        logSendFlow("handleSend:skip-concurrent-start", { conversationId });
+        return false;
       }
 
-      logSendFlow("handleSend:start", {
-        conversationId,
-        effectiveCwd,
-        isFirstMessage,
-        messageIndex,
-        currentProvider,
-        prevProvider: prevProvider || null,
-        providerSwitched,
-        multicaModelSwitched,
-        handoffSwitched,
-        sessionId: normalizedConversation.sessionId || null,
-        sessionProvider: normalizedConversation.sessionProvider || null,
-        providerSessions: normalizedConversation.providerSessions || null,
-        activeSessionId: normalizedConversation.activeSessionId || null,
-        activeSession,
-        currentProviderSession,
-        initialSessionId: initialSessionId || null,
-        resumeSessionId: canResumeExistingSession ? (resumeSessionId || null) : null,
-        primeMode:
-          providerSwitched
-            ? "cross-provider"
-            : multicaModelSwitched
-              ? "multica-model-handoff"
-              : (needsHistoryPrimeFallback ? "history-fallback" : null),
-        multicaSessionPolluted,
-      });
+      sendInFlightConversationIdsRef.current.add(conversationId);
 
-      const pendingId = prepareMessage({
-        conversationId,
-        prompt: text,
-        images: images?.length ? images : undefined,
-        files: files?.length ? files : undefined,
-      });
+      try {
 
-      logSendFlow("handleSend:seeded", {
-        conversationId,
-        pendingId,
-        elapsedMs: Date.now() - sendStartedAt,
-      });
-
-      // Create a git checkpoint before sending (for future edit rewind)
-      if (effectiveCwd && window.api) {
-        const checkpointStartedAt = Date.now();
-        logCheckpoint("checkpointCreate:start", { cwdPath: effectiveCwd, conversationId, messageIndex });
-        try {
-          const cp = await window.api.checkpointCreate(effectiveCwd);
-          logCheckpoint("checkpointCreate:success", {
-            cwdPath: effectiveCwd,
-            conversationId,
-            messageIndex,
-            ref: cp?.ref || null,
-            durationMs: Date.now() - checkpointStartedAt,
-            totalElapsedMs: Date.now() - sendStartedAt,
-          });
-          if (cp?.ref) {
-            setConvoList((p) =>
-              p.map((c) => {
-                if (c.id !== conversationId) return c;
-                const checkpoints = { ...(c.checkpoints || {}) };
-                checkpoints[messageIndex] = cp.ref;
-                return { ...c, checkpoints };
-              })
-            );
-          }
-        } catch (e) {
-          logCheckpoint("checkpointCreate:failed", {
-            cwdPath: effectiveCwd,
-            conversationId,
-            messageIndex,
-            durationMs: Date.now() - checkpointStartedAt,
-            totalElapsedMs: Date.now() - sendStartedAt,
-            error: e.message,
-          });
-          console.warn("Checkpoint creation failed:", e.message);
+        // Live cwd check (belt-and-suspenders — select-time heal covers most cases
+        // but directory may have vanished between select and send).
+        const recovery = await healConversationCwdIfMissing(conversationId, conversation);
+        const pendingRecovery = conversation?.pendingCwdRecovery || null;
+        let reminderSource = null;
+        if (recovery?.wasMissing) {
+          reminderSource = {
+            originalCwd: recovery.originalCwd,
+            recoveredCwd: recovery.cwd,
+            recoveryReason: recovery.recoveryReason,
+          };
+        } else if (pendingRecovery) {
+          reminderSource = pendingRecovery;
         }
-      }
-
-      const started = startPreparedMessage({
-        conversationId,
-        pendingId,
-        sessionId: initialSessionId,
-        resumeSessionId: canResumeExistingSession ? resumeSessionId : undefined,
-        prompt: wirePrompt,
-        model: m.cliFlag,
-        provider: m.provider || "claude",
-        effort: m.effort,
-        cwd: effectiveCwd,
-        images:
+        // Clear the pending marker whenever we have one to consume, regardless
+        // of whether the live or pending recovery is what we used — either way
+        // it's accounted for in the current send.
+        if (pendingRecovery) {
+          setConvoList((p) =>
+            p.map((c) => (c.id === conversationId ? { ...c, pendingCwdRecovery: undefined } : c))
+          );
+        }
+        const missingCwdReminder = reminderSource ? buildMissingCwdReminder(reminderSource) : null;
+        const effectiveCwd = recovery
+          ? (recovery.cwd ?? undefined)
+          : getEffectiveConversationCwd(conversation, cwd, draftsPath);
+        const thisConvoData = getConversation(conversationId);
+        const normalizedConversation = normalizeConversationState(conversation);
+        const activeSession = getActiveConversationSession(normalizedConversation);
+        const isFirstMessage = thisConvoData.messages.length === 0;
+        const messageIndex = thisConvoData.messages.length;
+        const syncedMessageCount = thisConvoData.messages.length;
+        const imageAttachments = attachments
+          ?.filter((a) => a.type === "image" && typeof a.dataUrl === "string")
+          .map((a) => ({
+            dataUrl: a.dataUrl,
+            ...(typeof a.name === "string" ? { name: a.name } : {}),
+            ...(typeof a.path === "string" ? { path: a.path } : {}),
+          }));
+        const images = imageAttachments?.map((a) => a.dataUrl);
+        const files = attachments?.filter((a) => a.type === "file");
+        const m = getMOrMulticaFallback(normalizedConversation.model);
+        const currentProvider = m.provider || "claude";
+        // Multica context must be resolved BEFORE prepareMessage so a missing
+        // context doesn't leave an orphan streaming assistant bubble.
+        const multicaSessionPolluted =
+          currentProvider === "multica" &&
+          (
+            conversationHasInjectedPromptMetadata(normalizedConversation.archivedMessages) ||
+            conversationHasInjectedPromptMetadata(thisConvoData.messages)
+          );
+        const previousMulticaContext =
           currentProvider === "multica"
-            ? (imageAttachments?.length ? imageAttachments : undefined)
-            : (images?.length ? images : undefined),
-        files: files?.length ? files : undefined,
-        multicaContext,
-        multicaToken,
-      });
-
-      if (started) {
-        const providerUsed = m.provider || "claude";
-        setConvoList((p) =>
-          p.map((c) => {
-            if (c.id !== conversationId) return c;
-            let next = normalizeConversationState(c);
-            if (seededSession) {
-              next = upsertConversationSession(next, seededSession, {
-                activate: true,
-                preferPendingActive: true,
-                lastProvider: providerUsed,
-              });
-            } else if (currentProviderSession?.id) {
-              next = normalizeConversationState({
-                ...next,
-                activeSessionId: currentProviderSession.id,
-                lastProvider: providerUsed,
-              });
-            } else {
-              next = normalizeConversationState({
-                ...next,
-                lastProvider: providerUsed,
-              });
-            }
-            return next;
-          })
+            ? (normalizedConversation?._multica || conversation?._multica || null)
+            : null;
+        let multicaContext, multicaToken;
+        if (m.provider === "multica") {
+          ({ context: multicaContext, token: multicaToken } = await ensureMulticaContextForConversation({
+            conversationId,
+            conversation,
+            normalizedConversation,
+            modelId: normalizedConversation.model,
+            title: titleText || conversation?.title || normalizedConversation?.title || text.slice(0, 60),
+            forceNewSession: multicaSessionPolluted,
+          }));
+        }
+        const prevProvider = isFirstMessage
+          ? normalizedConversation.lastProvider || activeSession?.provider || null
+          : await resolveConversationLastProvider(normalizedConversation);
+        const currentProviderSession = await resolveConversationProviderSession(
+          normalizedConversation,
+          currentProvider
         );
+        const providerSwitched =
+          !isFirstMessage && prevProvider && prevProvider !== currentProvider;
+        const multicaModelSwitched =
+          currentProvider === "multica" &&
+          !isFirstMessage &&
+          prevProvider === "multica" &&
+          Boolean(previousMulticaContext?.agentId) &&
+          Boolean(multicaContext?.agentId) &&
+          previousMulticaContext.agentId !== multicaContext.agentId;
+        const handoffSwitched = providerSwitched || multicaModelSwitched;
+        const multicaSessionReused =
+          currentProvider === "multica" &&
+          !isFirstMessage &&
+          prevProvider === "multica" &&
+          Boolean(previousMulticaContext?.sessionId) &&
+          Boolean(multicaContext?.sessionId) &&
+          previousMulticaContext.sessionId === multicaContext.sessionId &&
+          previousMulticaContext.agentId === multicaContext.agentId;
+        const canResumeExistingSession =
+          !isFirstMessage &&
+          (
+            multicaSessionReused ||
+            (
+              prevProvider === currentProvider &&
+              Boolean(currentProviderSession?.nativeSessionId) &&
+              currentProviderSession.syncedThroughMessageCount === syncedMessageCount
+            )
+          );
+        const needsHistoryPrimeFallback =
+          !isFirstMessage &&
+          currentProvider !== "multica" &&
+          !handoffSwitched &&
+          !canResumeExistingSession;
+        const needsFreshSession =
+          isFirstMessage ||
+          handoffSwitched ||
+          needsHistoryPrimeFallback ||
+          (currentProvider === "multica" && !canResumeExistingSession);
+        const seededSession =
+          needsFreshSession
+            ? (
+                isFirstMessage && activeSession?.provider === currentProvider
+                  ? {
+                      ...activeSession,
+                      nativeSessionId:
+                        currentProvider === "claude"
+                          ? activeSession.nativeSessionId || crypto.randomUUID()
+                          : activeSession.nativeSessionId || null,
+                      model: normalizedConversation.model,
+                      syncedThroughMessageCount: syncedMessageCount,
+                      updatedAt: Date.now(),
+                      origin: isFirstMessage ? "initial-send" : (handoffSwitched ? "handoff" : "resync"),
+                    }
+                  : createSeedSession(normalizedConversation, currentProvider, {
+                      model: normalizedConversation.model,
+                      syncedThroughMessageCount: syncedMessageCount,
+                      origin: isFirstMessage ? "initial-send" : (handoffSwitched ? "handoff" : "resync"),
+                    })
+              )
+            : null;
+        const initialSessionId =
+          needsFreshSession && currentProvider === "claude"
+            ? seededSession?.nativeSessionId || undefined
+            : undefined;
+        const resumeSessionId = currentProviderSession?.nativeSessionId || undefined;
+        const prime =
+          handoffSwitched
+            ? buildCrossProviderPrime(thisConvoData.messages)
+            : needsHistoryPrimeFallback
+              ? buildConversationPrime(thisConvoData.messages)
+              : null;
+        const primedPrompt = prime ? decoratePromptWithPrime(text, prime) : text;
+        const decoratedPrompt = decoratePromptWithReminder(primedPrompt, missingCwdReminder);
+        let wirePrompt = decoratedPrompt;
+        if (currentProvider === "multica" && needsFreshSession) {
+          wirePrompt = await buildMulticaBootstrapPrompt(effectiveCwd, decoratedPrompt);
+        }
+        const sendStartedAt = Date.now();
+
+        if (isFirstMessage) {
+          const newTitle = deriveConversationTitle(titleText || text, attachments);
+          setConvoList((p) =>
+            p.map((c) => c.id === conversationId ? { ...c, title: newTitle } : c)
+          );
+        }
+
+        logSendFlow("handleSend:start", {
+          conversationId,
+          effectiveCwd,
+          isFirstMessage,
+          messageIndex,
+          currentProvider,
+          prevProvider: prevProvider || null,
+          providerSwitched,
+          multicaModelSwitched,
+          handoffSwitched,
+          sessionId: normalizedConversation.sessionId || null,
+          sessionProvider: normalizedConversation.sessionProvider || null,
+          providerSessions: normalizedConversation.providerSessions || null,
+          activeSessionId: normalizedConversation.activeSessionId || null,
+          activeSession,
+          currentProviderSession,
+          initialSessionId: initialSessionId || null,
+          resumeSessionId: canResumeExistingSession ? (resumeSessionId || null) : null,
+          primeMode:
+            providerSwitched
+              ? "cross-provider"
+              : multicaModelSwitched
+                ? "multica-model-handoff"
+                : (needsHistoryPrimeFallback ? "history-fallback" : null),
+          multicaSessionPolluted,
+        });
+
+        const pendingId = prepareMessage({
+          conversationId,
+          prompt: text,
+          images: images?.length ? images : undefined,
+          files: files?.length ? files : undefined,
+        });
+
+        logSendFlow("handleSend:seeded", {
+          conversationId,
+          pendingId,
+          elapsedMs: Date.now() - sendStartedAt,
+        });
+
+        // Create a git checkpoint before sending (for future edit rewind)
+        if (effectiveCwd && window.api) {
+          const checkpointStartedAt = Date.now();
+          logCheckpoint("checkpointCreate:start", { cwdPath: effectiveCwd, conversationId, messageIndex });
+          try {
+            const cp = await window.api.checkpointCreate(effectiveCwd);
+            logCheckpoint("checkpointCreate:success", {
+              cwdPath: effectiveCwd,
+              conversationId,
+              messageIndex,
+              ref: cp?.ref || null,
+              durationMs: Date.now() - checkpointStartedAt,
+              totalElapsedMs: Date.now() - sendStartedAt,
+            });
+            if (cp?.ref) {
+              setConvoList((p) =>
+                p.map((c) => {
+                  if (c.id !== conversationId) return c;
+                  const checkpoints = { ...(c.checkpoints || {}) };
+                  checkpoints[messageIndex] = cp.ref;
+                  return { ...c, checkpoints };
+                })
+              );
+            }
+          } catch (e) {
+            logCheckpoint("checkpointCreate:failed", {
+              cwdPath: effectiveCwd,
+              conversationId,
+              messageIndex,
+              durationMs: Date.now() - checkpointStartedAt,
+              totalElapsedMs: Date.now() - sendStartedAt,
+              error: e.message,
+            });
+            console.warn("Checkpoint creation failed:", e.message);
+          }
+        }
+
+        const started = startPreparedMessage({
+          conversationId,
+          pendingId,
+          sessionId: initialSessionId,
+          resumeSessionId: canResumeExistingSession ? resumeSessionId : undefined,
+          prompt: wirePrompt,
+          model: m.cliFlag,
+          provider: m.provider || "claude",
+          effort: m.effort,
+          cwd: effectiveCwd,
+          images:
+            currentProvider === "multica"
+              ? (imageAttachments?.length ? imageAttachments : undefined)
+              : (images?.length ? images : undefined),
+          files: files?.length ? files : undefined,
+          multicaContext,
+          multicaToken,
+        });
+
+        if (started) {
+          const providerUsed = m.provider || "claude";
+          setConvoList((p) =>
+            p.map((c) => {
+              if (c.id !== conversationId) return c;
+              let next = normalizeConversationState(c);
+              if (seededSession) {
+                next = upsertConversationSession(next, seededSession, {
+                  activate: true,
+                  preferPendingActive: true,
+                  lastProvider: providerUsed,
+                });
+              } else if (currentProviderSession?.id) {
+                next = normalizeConversationState({
+                  ...next,
+                  activeSessionId: currentProviderSession.id,
+                  lastProvider: providerUsed,
+                });
+              } else {
+                next = normalizeConversationState({
+                  ...next,
+                  lastProvider: providerUsed,
+                });
+              }
+              return next;
+            })
+          );
+        }
+
+        logSendFlow("handleSend:agent-start", {
+          conversationId,
+          pendingId,
+          started,
+          totalElapsedMs: Date.now() - sendStartedAt,
+        });
+
+        return started;
+      } finally {
+        sendInFlightConversationIdsRef.current.delete(conversationId);
       }
-
-      logSendFlow("handleSend:agent-start", {
-        conversationId,
-        pendingId,
-        started,
-        totalElapsedMs: Date.now() - sendStartedAt,
-      });
-
-      return started;
     },
     [buildMulticaBootstrapPrompt, cwd, draftsPath, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
   );
@@ -2538,7 +2679,7 @@ export default function App() {
       }
 
       // Queue if currently streaming
-      if (activeData.isStreaming && active) {
+      if (active && (activeData.isStreaming || sendInFlightConversationIdsRef.current.has(active))) {
         enqueueQueuedMessage({ conversationId: active, text, attachments });
         return;
       }
@@ -2554,7 +2695,7 @@ export default function App() {
           title: deriveConversationTitle(text, attachments),
           modelId: defaultModel,
           ts: Date.now(),
-          cwd: getMainRepoRoot(cwd) || undefined,
+          cwd: getProjectRootOrUndefined(cwd, draftsPath),
         });
         convoId = id;
         setConvoList((p) => [convo, ...p]);
@@ -2658,7 +2799,12 @@ export default function App() {
 
   // Process queued messages when streaming ends
   useEffect(() => {
-    if (!active || activeData.isStreaming || messageQueue.current.length === 0) return;
+    if (
+      !active
+      || activeData.isStreaming
+      || sendInFlightConversationIdsRef.current.has(active)
+      || messageQueue.current.length === 0
+    ) return;
     const next = messageQueue.current.find((item) => item?.conversationId === active);
     if (!next) return;
 
@@ -2669,7 +2815,9 @@ export default function App() {
 
   const handleCreateChat = useCallback(async (opts) => {
     const id = opts.id || ("c" + Date.now());
-    const effectiveCwd = opts.cwd !== undefined ? opts.cwd : (getMainRepoRoot(cwd) || undefined);
+    const effectiveCwd = opts.cwd !== undefined
+      ? normalizeConversationCreationCwd(opts.cwd, draftsPath)
+      : getProjectRootOrUndefined(cwd, draftsPath);
     const modelId = opts.model || defaultModel;
     const n = createConversationDraft({
       id,
@@ -2776,7 +2924,7 @@ export default function App() {
         attachments: opts.attachments,
       });
     }
-  }, [createConversationDraft, cwd, defaultModel, projects, sendMessageToConversation]);
+  }, [createConversationDraft, cwd, defaultModel, draftsPath, projects, sendMessageToConversation]);
 
   const handleDispatch = useCallback(async (rows) => {
     // rows: Array<{ prompt, attachments?, model?, cwd, branch, issueContext?, tag? }>
@@ -3183,69 +3331,70 @@ export default function App() {
   }, [active, activeData.isStreaming, activeData.messages]);
 
   // Build convo object for ChatArea
-  const convo = activeConvo
-    ? {
-        ...activeConvo,
-        msgs: activeData.messages,
-        isStreaming: activeData.isStreaming,
-        error: activeData.error,
-      }
-    : null;
+  const convo = useMemo(
+    () => activeConvo
+      ? {
+          ...activeConvo,
+          msgs: activeData.messages,
+          isStreaming: activeData.isStreaming,
+          error: activeData.error,
+        }
+      : null,
+    [activeConvo, activeData.error, activeData.isStreaming, activeData.messages]
+  );
 
   // Build convos for Sidebar
-  const convosForSidebar = convoList.map((c) => {
-    const data = getConversation(c.id);
-    const msgs = data.messages;
-    const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
-    const lastText = lastMsg?.parts
-      ? lastMsg.parts.filter(p => p.type === "text").map(p => p.text).join(" ")
-      : (lastMsg?.text || "");
-    const preview = lastText ? lastText.slice(0, 45) : null;
-    return {
-      ...c,
-      msgs,
-      lastPreview: preview || c.lastPreview || "Empty",
-      isStreaming: data.isStreaming,
-    };
-  }).filter((conversation) => (
-    conversation.id === active || hasConversationMessages(conversation, { messages: conversation.msgs })
-  ));
+  const convosForSidebar = useMemo(() => {
+    const rows = [];
+    for (const c of convoList) {
+      const data = getConversation(c.id);
+      if (c.id !== active && !hasConversationMessages(c, data)) continue;
+
+      const msgs = data.messages || [];
+      const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+      rows.push({
+        ...c,
+        lastPreview: getSidebarMessagePreview(lastMsg) || c.lastPreview || "Empty",
+        isStreaming: data.isStreaming,
+      });
+    }
+    return rows;
+  }, [active, convoList, getConversation]);
 
   const tabs = useMemo(
     () => (pinnedTabs.length > 1 ? pinnedTabs : []),
     [pinnedTabs]
   );
 
-  // Refresh terminal sessions periodically (catches Claude-created sessions)
-  useEffect(() => {
-    terminal.refreshSessions();
-    const interval = setInterval(() => terminal.refreshSessions(), 3000);
-    return () => clearInterval(interval);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const allCwdRoots = useMemo(() => {
     const roots = new Set();
-    convoList.forEach(c => { if (c.cwd) roots.add(getMainRepoRoot(c.cwd)); });
-    Object.keys(projects).forEach(r => roots.add(getMainRepoRoot(r)));
-    return [...roots].filter(r => r && !r.includes("/.worktrees/"));
-  }, [convoList, projects]);
+    convoList.forEach((c) => {
+      const root = getMainRepoRoot(c.cwd);
+      if (root && !isDraftProjectRoot(root, draftsPath)) roots.add(root);
+    });
+    Object.keys(projectChooserProjects).forEach((r) => {
+      const root = getMainRepoRoot(r);
+      if (root && !isDraftProjectRoot(root, draftsPath)) roots.add(root);
+    });
+    return [...roots].filter((r) => r && !r.includes("/.worktrees/"));
+  }, [convoList, draftsPath, projectChooserProjects]);
 
   const newChatDefaultCwd = useMemo(() => {
     const activeCwd = activeConvo?.cwd;
-    if (activeCwd) return getMainRepoRoot(activeCwd);
-    if (cwd) return getMainRepoRoot(cwd);
+    if (activeCwd && !isDraftProjectRoot(activeCwd, draftsPath)) return getMainRepoRoot(activeCwd);
+    if (cwd && !isDraftProjectRoot(cwd, draftsPath)) return getMainRepoRoot(cwd);
     const sorted = [...convoList].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
     for (const c of sorted) {
-      if (c.cwd) return getMainRepoRoot(c.cwd);
+      if (c.cwd && !isDraftProjectRoot(c.cwd, draftsPath)) return getMainRepoRoot(c.cwd);
     }
     return null;
-  }, [activeConvo, cwd, convoList]);
+  }, [activeConvo, cwd, convoList, draftsPath]);
 
   const terminalCwd = activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd);
 
   const handleToggleTerminal = async () => {
     if (terminal.drawerOpen) {
-      terminal.setDrawerOpen(false);
+      await terminal.closeWindow();
       return;
     }
 
@@ -3254,18 +3403,15 @@ export default function App() {
       return;
     }
 
-    terminal.setDrawerOpen(true);
+    await terminal.openWindow();
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
-
-  const handleLanguageChange = (lang) => {
-    setLanguage(lang);
-    setLang(lang);
-  };
+  const sidebarPaneTransition = prefersReducedMotion
+    ? "none"
+    : "width .34s cubic-bezier(.16,1,.3,1), min-width .34s cubic-bezier(.16,1,.3,1), border-color .18s ease";
 
   return (
-    <LanguageContext.Provider value={{ lang: language, setLang: handleLanguageChange }}>
     <FontSizeContext.Provider value={fontSize}>
     <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative" }}>
       {wallpaper?.dataUrl ? (
@@ -3322,12 +3468,13 @@ export default function App() {
           flexDirection: "column",
           position: "relative",
           zIndex: 10,
+          flexShrink: 0,
           ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl), {
             hoverOpacity: clampNumber(sidebarActiveOpacity * 0.6, 0.8, sidebarActiveOpacity),
             activeOpacity: sidebarActiveOpacity,
           }),
           backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
-          transition: "all .35s cubic-bezier(.16,1,.3,1)",
+          transition: sidebarPaneTransition,
           overflow: "hidden",
         }}
       >
@@ -3340,12 +3487,14 @@ export default function App() {
           onDelete={handleDelete}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           isOpen={sidebarOpen}
+          locale={locale}
           cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
           onPickFolder={handlePickFolder}
           onOpenSettings={() => setShowSettings(true)}
           onOpenProjectManager={() => window.api?.openProjectManager()}
           onOpenNewProject={() => setShowNewProject(true)}
           projects={projects}
+          draftsPath={draftsPath}
           onToggleProjectCollapse={handleToggleProjectCollapse}
           onHideProject={handleHideProject}
           onNewInProject={handleNewInProject}
@@ -3376,12 +3525,14 @@ export default function App() {
           onAppOpacityChange={setAppOpacity}
           developerMode={developerMode}
           onDeveloperModeChange={setDeveloperMode}
+          chromeControlsOnHover={chromeControlsOnHover}
+          onChromeControlsOnHoverChange={setChromeControlsOnHover}
           notificationSound={notificationSound}
           onNotificationSoundChange={setNotificationSound}
           notificationsMuted={notificationsMuted}
           onNotificationsMutedChange={setNotificationsMuted}
-          language={language}
-          onLanguageChange={handleLanguageChange}
+          locale={locale}
+          onLocaleChange={setLocale}
           onClose={() => setShowSettings(false)}
         />
       ) : (
@@ -3390,14 +3541,14 @@ export default function App() {
           onSend={handleSend}
           onCancel={handleCancel}
           onEdit={handleEdit}
-          onToggleSidebar={() => setSidebarOpen((o) => !o)}
           sidebarOpen={sidebarOpen}
-          onNew={handleNew}
           onModelChange={handleModelChange}
           defaultModel={defaultModel}
           queuedMessages={activeQueuedMessages}
           onUpdateQueuedMessage={updateQueuedMessage}
           onRemoveQueuedMessage={removeQueuedMessage}
+          permissionRequests={activePermissionRequests}
+          onRespondPermission={respondPermission}
           onToggleTerminal={handleToggleTerminal}
           terminalOpen={terminal.drawerOpen}
           terminalCount={terminal.sessions.length}
@@ -3407,7 +3558,8 @@ export default function App() {
           onCloseTab={handleCloseTab}
           wallpaper={wallpaper}
           cwd={terminalCwd}
-          onRefocusTerminal={terminal.focusActiveSession}
+          draftsPath={draftsPath}
+          onRefocusTerminal={terminal.openWindow}
           onCwdChange={(newCwd) => {
             setCwd(newCwd);
             if (active) {
@@ -3422,7 +3574,7 @@ export default function App() {
           onCreateChat={handleCreateChat}
           onCancelNewChat={() => setShowNewChatCard(false)}
           allCwdRoots={allCwdRoots}
-          projects={projects}
+          projects={projectChooserProjects}
           defaultPrBranch={defaultPrBranch}
           newChatDefaultCwd={newChatDefaultCwd}
           coauthorEnabled={coauthorEnabled}
@@ -3431,6 +3583,7 @@ export default function App() {
           canControlTarget={canControlTarget}
           developerMode={developerMode}
           windowControlsVisible={showWindowControls}
+          locale={locale}
         />
       )}
 
@@ -3439,9 +3592,10 @@ export default function App() {
           onClose={() => setShowDispatchCard(false)}
           onDispatch={handleDispatch}
           currentCwd={newChatDefaultCwd || undefined}
-          projects={projects}
+          projects={projectChooserProjects}
           defaultModel={defaultModel}
           availableModels={dispatchAvailableModels}
+          locale={locale}
         />
       )}
 
@@ -3477,6 +3631,5 @@ export default function App() {
       </div>
     </div>
     </FontSizeContext.Provider>
-    </LanguageContext.Provider>
   );
 }

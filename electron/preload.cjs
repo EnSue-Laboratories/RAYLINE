@@ -23,6 +23,17 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on("agent-error", handler);
     return () => ipcRenderer.removeListener("agent-error", handler);
   },
+  agentPermissionRespond: (opts) => ipcRenderer.send("agent-permission-respond", opts),
+  onAgentPermissionRequest: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("agent-permission-request", handler);
+    return () => ipcRenderer.removeListener("agent-permission-request", handler);
+  },
+  onAgentPermissionCancelled: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("agent-permission-cancelled", handler);
+    return () => ipcRenderer.removeListener("agent-permission-cancelled", handler);
+  },
   pickFolder: () => ipcRenderer.invoke("folder-pick"),
   selectWallpaper: (previousPath) => ipcRenderer.invoke("select-wallpaper", previousPath),
   deleteWallpaper: (filePath) => ipcRenderer.invoke("delete-wallpaper", filePath),
@@ -46,6 +57,7 @@ contextBridge.exposeInMainWorld("api", {
     try { return webUtils.getPathForFile(file); } catch { return null; }
   },
   quickExplain: (opts) => ipcRenderer.invoke("quick-explain", opts),
+  dispatchPlan: (opts) => ipcRenderer.invoke("dispatch-plan", opts),
   getSystemInfo: () => ipcRenderer.invoke("system-info"),
   getDraftsPath: () => ipcRenderer.invoke("get-drafts-path"),
   pathExists: (p) => ipcRenderer.invoke("path-exists", p),
@@ -85,11 +97,28 @@ contextBridge.exposeInMainWorld("api", {
   terminalList: () => ipcRenderer.invoke("terminal-list"),
   terminalResize: ({ name, cols, rows }) => ipcRenderer.invoke("terminal-resize", { name, cols, rows }),
   terminalMetadata: () => ipcRenderer.invoke("terminal-metadata"),
+  terminalConsumePreferredSession: () => ipcRenderer.invoke("terminal-consume-preferred-session"),
   terminalSavedMetadata: () => ipcRenderer.invoke("terminal-saved-metadata"),
+  terminalDebugLog: (payload) => ipcRenderer.send("terminal-debug-log", payload),
   onTerminalOutput: (cb) => {
     const handler = (_e, data) => cb(data);
     ipcRenderer.on("terminal-output", handler);
     return () => ipcRenderer.removeListener("terminal-output", handler);
+  },
+  openTerminalWindow: () => ipcRenderer.invoke("open-terminal-window"),
+  closeTerminalWindow: () => ipcRenderer.invoke("close-terminal-window"),
+  isTerminalWindowOpen: () => ipcRenderer.invoke("is-terminal-window-open"),
+  terminalWindowReady: () => ipcRenderer.send("terminal-window-ready"),
+  closeCurrentWindow: () => ipcRenderer.invoke("window-close-current"),
+  onTerminalWindowState: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("terminal-window-state", handler);
+    return () => ipcRenderer.removeListener("terminal-window-state", handler);
+  },
+  onTerminalSessionsState: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("terminal-sessions-state", handler);
+    return () => ipcRenderer.removeListener("terminal-sessions-state", handler);
   },
 
   // File operations
