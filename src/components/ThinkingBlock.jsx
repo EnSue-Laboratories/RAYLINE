@@ -45,7 +45,7 @@ export default function ThinkingBlock({ text, isThinking }) {
       <div style={{
         margin: "6px 0 10px",
         borderRadius: 8,
-        border: "1px solid var(--control-border)",
+        border: "1px solid rgba(255,255,255,0.04)",
         background: "rgba(255,255,255,0.015)",
         padding: "8px 10px",
         display: "flex",
@@ -69,7 +69,7 @@ export default function ThinkingBlock({ text, isThinking }) {
     <div style={{
       margin: "6px 0 10px",
       borderRadius: 8,
-      border: "1px solid var(--control-border)",
+      border: "1px solid rgba(255,255,255,0.04)",
       background: "rgba(255,255,255,0.015)",
       overflow: "hidden",
     }}>

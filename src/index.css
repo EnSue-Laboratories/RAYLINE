@@ -18,6 +18,11 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
+  --control-bg-strong: rgba(255,255,255,0.08);
+}
+
+[data-theme="light"] {
+  --control-bg-strong: rgba(0,0,0,0.10);
 }
 
 *, *::before, *::after {

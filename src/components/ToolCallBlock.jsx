@@ -128,7 +128,7 @@ export default function ToolCallBlock({ tool }) {
       style={{
         margin: "8px 0",
         borderRadius: 8,
-        border: "1px solid var(--pane-border)",
+        border: "1px solid rgba(255,255,255,0.06)",
         background: "rgba(255,255,255,0.02)",
         overflow: "hidden",
       }}
