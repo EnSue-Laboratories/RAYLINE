@@ -1,7 +1,44 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 :root {
-  --pane-background: #0D0D10;
+  --app-background: #0D0D10;
+  --text-primary: color-mix(in srgb, white 92%, transparent);
+  --text-secondary: color-mix(in srgb, white 84%, transparent);
+  --text-tertiary: color-mix(in srgb, white 74%, transparent);
+  --text-muted: color-mix(in srgb, white 55%, transparent);
+  --text-subtle: color-mix(in srgb, white 42%, transparent);
+  --text-disabled: color-mix(in srgb, white 35%, transparent);
+  --text-faint: color-mix(in srgb, white 30%, transparent);
+  --text-ghost: color-mix(in srgb, white 25%, transparent);
+  --control-bg: color-mix(in srgb, white 4%, transparent);
+  --control-bg-soft: color-mix(in srgb, white 2.5%, transparent);
+  --control-bg-hover: color-mix(in srgb, white 5%, transparent);
+  --control-bg-strong: color-mix(in srgb, white 8%, transparent);
+  --control-bg-active: color-mix(in srgb, white 10%, transparent);
+  --control-bg-selected: color-mix(in srgb, white 18%, transparent);
+  --control-border: color-mix(in srgb, white 8%, transparent);
+  --control-border-soft: color-mix(in srgb, white 5%, transparent);
+  --control-border-strong: color-mix(in srgb, white 12%, transparent);
+  --divider: var(--control-bg);
+  --divider-soft: var(--control-bg-soft);
+  --overlay-surface: color-mix(in srgb, black 95%, white 5%);
+  --overlay-backdrop: color-mix(in srgb, black 45%, transparent);
+  --code-bg: color-mix(in srgb, black 25%, transparent);
+  --link-text: hsl(222 100% 78%);
+  --link-text-hover: hsl(222 100% 82%);
+  --success-text: hsl(137 75% 78%);
+  --success-text-strong: hsl(137 85% 82%);
+  --success-bg: color-mix(in srgb, hsl(137 75% 78%) 14%, transparent);
+  --success-border: color-mix(in srgb, hsl(137 75% 78%) 22%, transparent);
+  --success-ring: color-mix(in srgb, hsl(137 75% 78%) 6%, transparent);
+  --danger-text: hsl(0 70% 78%);
+  --danger-text-strong: hsl(0 75% 82%);
+  --danger-bg: color-mix(in srgb, hsl(0 70% 70%) 12%, transparent);
+  --danger-bg-soft: color-mix(in srgb, hsl(0 70% 70%) 7%, transparent);
+  --danger-border: color-mix(in srgb, hsl(0 70% 70%) 22%, transparent);
+  --accent-text: hsl(263 100% 78%);
+  --accent-bg: color-mix(in srgb, hsl(263 100% 76%) 20%, transparent);
+  --pane-background: var(--app-background);
   --pane-background-rgb: 13, 13, 16;
   --pane-overlay-alpha: 0.82;
   --pane-background-overlay: rgba(var(--pane-background-rgb), var(--pane-overlay-alpha));
@@ -11,6 +48,8 @@
   --pane-elevated: rgba(var(--pane-elevated-rgb), 0.5);
   --pane-hover: #121214;
   --pane-active: #141416;
+  --pane-interaction-hover: var(--pane-hover);
+  --pane-interaction-active: var(--pane-active);
   --pane-interaction-hover-fill: var(--pane-hover);
   --pane-interaction-active-fill: var(--pane-active);
   --pane-interaction-hover-filter: none;
@@ -18,109 +57,69 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
-  --overlay-bg: rgba(0, 0, 0, 0.52);
-
-  --text-primary: rgba(255, 255, 255, 0.92);
-  --text-secondary: rgba(255, 255, 255, 0.68);
-  --text-muted: rgba(255, 255, 255, 0.46);
-  --text-faint: rgba(255, 255, 255, 0.28);
-  --text-disabled: rgba(255, 255, 255, 0.20);
-  --text-inverse: #0D0D10;
-
-  --control-bg: rgba(255, 255, 255, 0.06);
-  --control-bg-subtle: rgba(255, 255, 255, 0.035);
-  --control-bg-strong: rgba(255, 255, 255, 0.10);
-  --control-bg-active: rgba(255, 255, 255, 0.14);
-  --control-bg-contrast: rgba(255, 255, 255, 0.08);
-  --control-border: rgba(255, 255, 255, 0.10);
-  --control-border-hover: rgba(255, 255, 255, 0.16);
-  --control-border-active: rgba(255, 255, 255, 0.24);
-  --control-border-strong: rgba(255, 255, 255, 0.18);
-  --control-highlight: rgba(255, 255, 255, 0.18);
-  --control-thumb-bg: #F4F5F7;
-
-  --accent-bg: rgba(92, 160, 255, 0.16);
-  --accent-bg-strong: rgba(92, 160, 255, 0.24);
-  --accent-border: rgba(126, 178, 255, 0.34);
-  --accent-text: #9CC6FF;
-  --accent-muted: rgba(156, 198, 255, 0.58);
-
-  --success-bg: rgba(46, 204, 113, 0.14);
-  --success-border: rgba(46, 204, 113, 0.32);
-
-  --warning-bg: rgba(255, 196, 87, 0.12);
-  --warning-bg-strong: rgba(255, 196, 87, 0.18);
-  --warning-border: rgba(255, 196, 87, 0.30);
-  --warning-text: #FFD37A;
-
-  --danger-bg: rgba(255, 93, 93, 0.12);
-  --danger-border: rgba(255, 93, 93, 0.30);
-  --danger-border-strong: rgba(255, 120, 120, 0.42);
-  --danger-text: #FF9A9A;
-  --danger-text-strong: #FFB3B3;
-
-  --loading-dot-bg: rgba(255, 255, 255, 0.44);
+  --pm-modal-backdrop: var(--overlay-backdrop);
+  --pm-modal-backdrop-blur: 6px;
 }
 
 [data-theme="light"] {
-  --pane-background: #F8F9FA;
-  --pane-background-rgb: 248, 249, 250;
+  --app-background: #f7f7f8;
+  --text-primary: color-mix(in srgb, black 88%, transparent);
+  --text-secondary: color-mix(in srgb, black 76%, transparent);
+  --text-tertiary: color-mix(in srgb, black 66%, transparent);
+  --text-muted: color-mix(in srgb, black 54%, transparent);
+  --text-subtle: color-mix(in srgb, black 42%, transparent);
+  --text-disabled: color-mix(in srgb, black 34%, transparent);
+  --text-faint: color-mix(in srgb, black 28%, transparent);
+  --text-ghost: color-mix(in srgb, black 24%, transparent);
+  --control-bg: color-mix(in srgb, black 5%, transparent);
+  --control-bg-soft: color-mix(in srgb, black 3%, transparent);
+  --control-bg-hover: color-mix(in srgb, black 7%, transparent);
+  --control-bg-strong: color-mix(in srgb, black 10%, transparent);
+  --control-bg-active: color-mix(in srgb, black 12%, transparent);
+  --control-bg-selected: color-mix(in srgb, black 16%, transparent);
+  --control-border: color-mix(in srgb, black 10%, transparent);
+  --control-border-soft: color-mix(in srgb, black 7%, transparent);
+  --control-border-strong: color-mix(in srgb, black 16%, transparent);
+  --divider: var(--control-bg);
+  --divider-soft: var(--control-bg-soft);
+  --overlay-surface: color-mix(in srgb, white 96%, black 4%);
+  --overlay-backdrop: color-mix(in srgb, black 18%, transparent);
+  --code-bg: color-mix(in srgb, black 5%, transparent);
+  --link-text: hsl(222 84% 46%);
+  --link-text-hover: hsl(222 84% 38%);
+  --success-text: hsl(142 54% 32%);
+  --success-text-strong: hsl(142 62% 25%);
+  --success-bg: color-mix(in srgb, hsl(142 54% 38%) 12%, transparent);
+  --success-border: color-mix(in srgb, hsl(142 54% 38%) 24%, transparent);
+  --success-ring: color-mix(in srgb, hsl(142 54% 38%) 8%, transparent);
+  --danger-text: hsl(0 66% 44%);
+  --danger-text-strong: hsl(0 72% 36%);
+  --danger-bg: color-mix(in srgb, hsl(0 66% 48%) 10%, transparent);
+  --danger-bg-soft: color-mix(in srgb, hsl(0 66% 48%) 6%, transparent);
+  --danger-border: color-mix(in srgb, hsl(0 66% 48%) 22%, transparent);
+  --accent-text: hsl(263 62% 46%);
+  --accent-bg: color-mix(in srgb, hsl(263 62% 50%) 12%, transparent);
+  --pane-background: var(--app-background);
+  --pane-background-rgb: 247, 247, 248;
+  --pane-overlay-alpha: 0.88;
   --pane-background-overlay: rgba(var(--pane-background-rgb), var(--pane-overlay-alpha));
-  --pane-hover-overlay: rgba(241, 243, 245, var(--pane-overlay-alpha));
-  --pane-active-overlay: rgba(233, 236, 239, var(--pane-overlay-alpha));
+  --pane-hover-overlay: rgba(238, 238, 240, var(--pane-overlay-alpha));
+  --pane-active-overlay: rgba(230, 230, 232, var(--pane-overlay-alpha));
   --pane-elevated-rgb: 255, 255, 255;
-  --pane-elevated: rgba(var(--pane-elevated-rgb), 0.78);
-  --pane-hover: #F1F3F5;
-  --pane-active: #E9ECEF;
+  --pane-elevated: rgba(var(--pane-elevated-rgb), 0.72);
+  --pane-hover: #eeeeef;
+  --pane-active: #e6e6e8;
+  --pane-interaction-hover: var(--pane-hover);
+  --pane-interaction-active: var(--pane-active);
   --pane-interaction-hover-fill: var(--pane-hover);
   --pane-interaction-active-fill: var(--pane-active);
   --pane-interaction-hover-filter: none;
   --pane-interaction-active-filter: none;
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
-  --pane-border: rgba(13, 13, 16, 0.10);
-  --overlay-bg: rgba(13, 13, 16, 0.34);
-
-  --text-primary: #0D0D10;
-  --text-secondary: rgba(13, 13, 16, 0.70);
-  --text-muted: rgba(13, 13, 16, 0.52);
-  --text-faint: rgba(13, 13, 16, 0.34);
-  --text-disabled: rgba(13, 13, 16, 0.26);
-  --text-inverse: #FFFFFF;
-
-  --control-bg: #FFFFFF;
-  --control-bg-subtle: #F8F9FA;
-  --control-bg-strong: #EEF1F4;
-  --control-bg-active: #E9ECEF;
-  --control-bg-contrast: #F2F4F7;
-  --control-border: rgba(13, 13, 16, 0.12);
-  --control-border-hover: rgba(13, 13, 16, 0.18);
-  --control-border-active: rgba(13, 13, 16, 0.26);
-  --control-border-strong: rgba(13, 13, 16, 0.20);
-  --control-highlight: rgba(255, 255, 255, 0.80);
-  --control-thumb-bg: #FFFFFF;
-
-  --accent-bg: #EAF3FF;
-  --accent-bg-strong: #DCEBFF;
-  --accent-border: rgba(57, 124, 214, 0.30);
-  --accent-text: #2563B8;
-  --accent-muted: rgba(37, 99, 184, 0.58);
-
-  --success-bg: #EAF8F0;
-  --success-border: rgba(30, 132, 73, 0.26);
-
-  --warning-bg: #FFF7E6;
-  --warning-bg-strong: #FFEFC7;
-  --warning-border: rgba(190, 123, 0, 0.28);
-  --warning-text: #8A5A00;
-
-  --danger-bg: #FFF0F0;
-  --danger-border: rgba(204, 58, 58, 0.24);
-  --danger-border-strong: rgba(204, 58, 58, 0.36);
-  --danger-text: #B42323;
-  --danger-text-strong: #8F1D1D;
-
-  --loading-dot-bg: rgba(13, 13, 16, 0.36);
+  --pane-border: rgba(0,0,0,0.08);
+  --pm-modal-backdrop: var(--overlay-backdrop);
+  --pm-modal-backdrop-blur: 6px;
 }
 
 *, *::before, *::after {
@@ -136,9 +135,10 @@ html, body, #root {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar        { width: 2px; }
-::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.03); border-radius: 2px; }
+::-webkit-scrollbar               { width: 3px; }
+::-webkit-scrollbar-track         { background: transparent; }
+::-webkit-scrollbar-thumb         { background: rgba(255,255,255,0.15); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover   { background: rgba(255,255,255,0.35); }
 
 /* ── KaTeX dark theme overrides ── */
 .katex { color: inherit; }
@@ -192,13 +192,30 @@ input:focus         { outline: none; }
   to   { opacity: 1; max-height: 60px; }
 }
 
-/* ── xterm transparent background ── */
+/* ── xterm transparent background + slim overlay scrollbar ── */
 .xterm,
 .xterm .xterm-screen,
 .xterm .xterm-viewport,
 .xterm .xterm-scrollable-element {
   background: transparent !important;
   background-color: transparent !important;
+}
+.xterm .xterm-viewport::-webkit-scrollbar { display: none; }
+.xterm .xterm-viewport { scrollbar-width: none; }
+
+/* xterm overlay scrollbar — matches Settings page scrollbar style */
+/* xterm 6.x uses .xterm-scrollbar.xterm-vertical / .xterm-slider (10px default, override to 3px) */
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical {
+  width: 3px !important;
+}
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical .xterm-slider {
+  width: 3px !important;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.15) !important;
+  transition: background .15s;
+}
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical:hover .xterm-slider {
+  background: rgba(255,255,255,0.35) !important;
 }
 
 .rayline-terminal-host--opaque .xterm,
@@ -218,14 +235,6 @@ input:focus         { outline: none; }
   box-shadow: none;
 }
 
-.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar {
-  width: 3px;
-}
-
-.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-}
 
 /* ── Range slider ── */
 input[type="range"] {
