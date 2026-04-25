@@ -1,12 +1,76 @@
-import { useRef, useEffect, useState } from "react";
+import { useCallback, useRef, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { useResolvedThemeMode } from "../contexts/ThemeContext";
 
 export default function InteractiveBlock({ code, isStreaming }) {
   const s = useFontScale();
-  const iframeRef = useRef(null);
-  const [height, setHeight] = useState(300);
-  const [loaded, setLoaded] = useState(false);
+  const resolvedMode = useResolvedThemeMode();
+  const initialResolvedModeRef = useRef(resolvedMode);
+  const srcdoc = useMemo(() => {
+    const initialResolvedMode = initialResolvedModeRef.current;
+    return `<!DOCTYPE html>
+<html data-theme="${initialResolvedMode}">
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    color-scheme: ${initialResolvedMode};
+    --bg: ${initialResolvedMode === "light" ? "#ffffff" : "#0a0a0a"};
+    --fg: ${initialResolvedMode === "light" ? "rgba(15,23,42,0.78)" : "rgba(255,255,255,0.75)"};
+    --line: ${initialResolvedMode === "light" ? "rgba(15,23,42,0.18)" : "rgba(255,255,255,0.15)"};
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #ffffff;
+    --fg: rgba(15,23,42,0.78);
+    --line: rgba(15,23,42,0.18);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0a0a0a;
+    --fg: rgba(255,255,255,0.75);
+    --line: rgba(255,255,255,0.15);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 12px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    overflow: hidden;
+  }
+  svg text { fill: var(--fg); }
+  svg line, svg path { stroke: var(--line); }
+</style>
+</head>
+<body>
+${code}
+<script>
+  function applyTheme(resolved) {
+    if (resolved !== 'light' && resolved !== 'dark') return;
+    document.documentElement.dataset.theme = resolved;
+    postHeight();
+  }
+  window.addEventListener('message', (event) => {
+    if (event.data?.type === 'rayline:theme') {
+      applyTheme(event.data.resolved);
+    }
+  });
+
+  // Auto-resize: post height to parent
+  function postHeight() {
+    const h = Math.max(document.body.scrollHeight, document.body.offsetHeight, 60);
+    window.parent.postMessage({ type: 'iframe-resize', height: h }, '*');
+  }
+  new ResizeObserver(postHeight).observe(document.body);
+  window.addEventListener('load', () => setTimeout(postHeight, 100));
+  postHeight();
+</script>
+</body>
+</html>`;
+  }, [code]);
 
   // While streaming, show a generating placeholder
   if (isStreaming) {
@@ -44,40 +108,6 @@ export default function InteractiveBlock({ code, isStreaming }) {
     );
   }
 
-  // Wrap user code in a full HTML document with dark theme defaults + auto-resize
-  const srcdoc = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  *, *::before, *::after { box-sizing: border-box; }
-  html, body {
-    margin: 0; padding: 12px;
-    background: #0a0a0a;
-    color: rgba(255,255,255,0.75);
-    font-family: system-ui, -apple-system, sans-serif;
-    font-size: 14px;
-    overflow: hidden;
-  }
-  svg text { fill: rgba(255,255,255,0.75); }
-  svg line, svg path { stroke: rgba(255,255,255,0.15); }
-</style>
-</head>
-<body>
-${code}
-<script>
-  // Auto-resize: post height to parent
-  function postHeight() {
-    const h = Math.max(document.body.scrollHeight, document.body.offsetHeight, 60);
-    window.parent.postMessage({ type: 'iframe-resize', height: h }, '*');
-  }
-  new ResizeObserver(postHeight).observe(document.body);
-  window.addEventListener('load', () => setTimeout(postHeight, 100));
-  postHeight();
-</script>
-</body>
-</html>`;
-
   return (
     <div style={{
       margin: "12px 0",
@@ -96,15 +126,18 @@ ${code}
       }}>
         INTERACTIVE
       </div>
-      <IframeRenderer srcdoc={srcdoc} />
+      <IframeRenderer srcdoc={srcdoc} resolvedMode={resolvedMode} />
     </div>
   );
 }
 
 // Separate component so iframe doesn't re-mount on every parent render
-function IframeRenderer({ srcdoc }) {
+function IframeRenderer({ srcdoc, resolvedMode }) {
   const iframeRef = useRef(null);
   const [height, setHeight] = useState(300);
+  const postTheme = useCallback(() => {
+    iframeRef.current?.contentWindow?.postMessage({ type: "rayline:theme", resolved: resolvedMode }, "*");
+  }, [resolvedMode]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -116,10 +149,15 @@ function IframeRenderer({ srcdoc }) {
     return () => window.removeEventListener("message", handler);
   }, []);
 
+  useEffect(() => {
+    postTheme();
+  }, [postTheme]);
+
   return (
     <iframe
       ref={iframeRef}
       srcDoc={srcdoc}
+      onLoad={postTheme}
       style={{
         width: "100%",
         height,

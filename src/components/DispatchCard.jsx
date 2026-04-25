@@ -4,8 +4,8 @@ import { X, ChevronDown, Paperclip, Plus } from "lucide-react";
 import ImagePreview from "./ImagePreview";
 import { createTranslator } from "../i18n";
 
-const onFieldHoverIn = (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; };
-const onFieldHoverOut = (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; };
+const onFieldHoverIn = (e) => { e.currentTarget.style.borderColor = "var(--control-bg-active)"; };
+const onFieldHoverOut = (e) => { e.currentTarget.style.borderColor = "var(--control-bg)"; };
 const fieldHoverProps = {
   onMouseEnter: onFieldHoverIn,
   onMouseLeave: onFieldHoverOut,
@@ -264,7 +264,7 @@ export default function DispatchCard({
         </header>
 
         {banner && (
-          <div role="status" aria-live="polite" style={{ background: "rgba(255,200,150,0.08)", color: "rgba(255,200,150,0.9)", padding: "8px 14px", fontSize: 12 }}>
+          <div role="status" aria-live="polite" style={{ background: "var(--warning-bg-strong)", color: "var(--warning-text)", padding: "8px 14px", fontSize: 12 }}>
             {banner}
           </div>
         )}
@@ -345,7 +345,7 @@ function DispatchLoadingDots({ ariaLabel }) {
     width: 5,
     height: 5,
     borderRadius: "50%",
-    background: "rgba(0,0,0,0.45)",
+    background: "var(--loading-dot-bg)",
     display: "inline-block",
     animation: `dotPulse 1.2s ease-in-out ${delay} infinite`,
   });
@@ -489,8 +489,8 @@ function CustomTab({
       <button
         onClick={addRow}
         style={addBtnStyle}
-        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.8)"; e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.4)"; e.currentTarget.style.background = "transparent"; }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--control-bg)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.background = "transparent"; }}
       >
         <Plus size={13} strokeWidth={2} />
         <span>{t("dispatch.addSession")}</span>
@@ -660,7 +660,7 @@ function RemoveRowButton({ onClick, t }) {
         background: "none",
         border: "none",
         cursor: "pointer",
-        color: hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
+        color: hovered ? "var(--text-primary)" : "var(--text-secondary)",
         padding: 0,
         display: "inline-flex",
         alignItems: "center",
@@ -681,7 +681,7 @@ function AttachmentPicker({ attachments, onChange }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         cursor: "pointer",
-        color: hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
+        color: hovered ? "var(--text-primary)" : "var(--text-secondary)",
         display: "inline-flex",
         alignItems: "center",
         gap: 4,
@@ -783,9 +783,9 @@ function DispatchDropdown({
         display: "inline-flex", alignItems: "center", gap: 6,
         padding: "3px 6px",
         background: "transparent",
-        border: "1px solid " + (hovered ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)"),
+        border: "1px solid " + (hovered ? "var(--control-bg-active)" : "var(--control-bg)"),
         borderRadius: 6,
-        color: selected ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.45)",
+        color: selected ? "var(--text-secondary)" : "var(--text-muted)",
         fontSize: 10,
         fontFamily: "'JetBrains Mono',monospace",
         letterSpacing: ".06em",
@@ -797,10 +797,10 @@ function DispatchDropdown({
         display: "flex", alignItems: "center", justifyContent: "space-between",
         gap: 6,
         padding: fullWidth ? "12px 12px" : "6px 10px",
-        background: "rgba(255,255,255,0.02)",
-        border: "1px solid rgba(255,255,255,0.04)",
+        background: "var(--control-bg-subtle)",
+        border: "1px solid var(--control-bg)",
         borderRadius: 7,
-        color: selected ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.45)",
+        color: selected ? "var(--text-secondary)" : "var(--text-muted)",
         fontSize: fullWidth ? 11 : 10,
         fontFamily: "'JetBrains Mono',monospace",
         letterSpacing: ".06em",
@@ -828,10 +828,10 @@ function DispatchDropdown({
         style={triggerStyle}
         onMouseEnter={compact
           ? () => setHovered(true)
-          : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
+          : (e) => { e.currentTarget.style.borderColor = "var(--control-bg-active)"; }}
         onMouseLeave={compact
           ? () => setHovered(false)
-          : (e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
+          : (e) => { e.currentTarget.style.borderColor = "var(--control-bg)"; }}
       >
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: fullWidth ? 1 : undefined, textAlign: "left" }}>
           {triggerText}
@@ -861,9 +861,9 @@ function DispatchDropdown({
         >
           {Object.entries(groups).map(([groupLabel, opts], gi) => (
             <div key={groupLabel || `g${gi}`}>
-              {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}
+              {gi > 0 && <div style={{ height: 1, background: "var(--control-bg)", margin: "4px 8px" }} />}
               {groupLabel && (
-                <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: 8, color: "rgba(255,255,255,0.2)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace", textTransform: "uppercase" }}>
+                <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: 8, color: "var(--text-disabled)", letterSpacing: ".12em", fontFamily: "'JetBrains Mono',monospace", textTransform: "uppercase" }}>
                   {groupLabel}
                 </div>
               )}
@@ -875,15 +875,15 @@ function DispatchDropdown({
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     width: "100%", padding: "8px 12px",
-                    background: opt.value === value ? "rgba(255,255,255,0.04)" : "transparent",
+                    background: opt.value === value ? "var(--control-bg)" : "transparent",
                     border: "none", borderRadius: 7,
-                    color: opt.value === value ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
+                    color: opt.value === value ? "var(--text-primary)" : "var(--text-secondary)",
                     fontSize: 11,
                     fontFamily: "'JetBrains Mono',monospace",
                     cursor: "pointer", textAlign: "left",
                     transition: "background .12s, color .12s",
                   }}
-                  onMouseEnter={(e) => { if (opt.value !== value) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                  onMouseEnter={(e) => { if (opt.value !== value) e.currentTarget.style.background = "var(--control-bg)"; }}
                   onMouseLeave={(e) => { if (opt.value !== value) e.currentTarget.style.background = "transparent"; }}
                 >
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -965,7 +965,7 @@ function issueOptionsWithDefault(issues, loading, error, t) {
 
 // Styles — mirror NewChatCard.jsx conventions
 const backdropStyle = {
-  position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+  position: "fixed", inset: 0, background: "var(--overlay-bg)",
   display: "flex", alignItems: "center", justifyContent: "center",
   zIndex: 1000, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
 };
@@ -976,7 +976,7 @@ const cardStyle = {
   WebkitBackdropFilter: "blur(48px) saturate(1.2)",
   border: "1px solid var(--pane-border)",
   borderRadius: 12, display: "flex", flexDirection: "column",
-  color: "white", fontFamily: "system-ui, sans-serif", fontSize: 13,
+  color: "var(--text-primary)", fontFamily: "system-ui, sans-serif", fontSize: 13,
   boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
 };
 const headerStyle = {
@@ -988,11 +988,11 @@ const headerTextStyle = { display: "flex", flexDirection: "column", gap: 5, minW
 const titleStyle = { fontSize: 14, fontWeight: 500 };
 const subtitleStyle = {
   fontSize: 11,
-  color: "rgba(255,255,255,0.45)",
+  color: "var(--text-muted)",
   lineHeight: 1.45,
 };
 const closeBtnStyle = {
-  background: "none", border: "none", color: "rgba(255,255,255,0.55)",
+  background: "none", border: "none", color: "var(--text-secondary)",
   cursor: "pointer", padding: 4,
 };
 const tabsStyle = {
@@ -1004,9 +1004,9 @@ const tabBtnStyle = (active, hovered) => ({
   padding: "8px 12px", borderRadius: "6px 6px 0 0",
   background: active ? "var(--pane-hover)" : "transparent",
   color: active
-    ? "white"
-    : hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.55)",
-  border: "none", borderBottom: active ? "1px solid white" : "1px solid transparent",
+    ? "var(--text-primary)"
+    : hovered ? "var(--text-primary)" : "var(--text-secondary)",
+  border: "none", borderBottom: active ? "1px solid var(--text-primary)" : "1px solid transparent",
   cursor: "pointer", fontSize: 12,
   transition: "color .2s",
 });
@@ -1018,23 +1018,23 @@ const footerStyle = {
 const primaryBtnStyle = (enabled, loading) => ({
   position: "relative",
   padding: "8px 14px", borderRadius: 6, border: "none",
-  background: loading ? "rgba(255,255,255,0.85)" : (enabled ? "white" : "rgba(255,255,255,0.1)"),
-  color: loading ? "black" : (enabled ? "black" : "rgba(255,255,255,0.4)"),
+  background: loading ? "var(--text-primary)" : (enabled ? "var(--text-primary)" : "var(--control-bg-active)"),
+  color: loading ? "var(--text-inverse)" : (enabled ? "var(--text-inverse)" : "var(--text-muted)"),
   cursor: loading ? "progress" : (enabled ? "pointer" : "not-allowed"),
   fontSize: 12, fontWeight: 500,
   display: "inline-flex", alignItems: "center", justifyContent: "center",
 });
 
 const noticeStyle = {
-  background: "rgba(255,200,150,0.06)", border: "1px solid rgba(255,200,150,0.18)",
-  color: "rgba(255,200,150,0.9)", borderRadius: 6, padding: "8px 10px",
+  background: "var(--warning-bg)", border: "1px solid var(--warning-border)",
+  color: "var(--warning-text)", borderRadius: 6, padding: "8px 10px",
   fontSize: 12, marginBottom: 10,
 };
 const addBtnStyle = {
   display: "inline-flex", alignItems: "center", gap: 6,
   background: "transparent",
   border: "none",
-  color: "rgba(255,255,255,0.4)",
+  color: "var(--text-muted)",
   padding: "6px 8px",
   borderRadius: 6,
   marginTop: 2,
@@ -1045,7 +1045,7 @@ const addBtnStyle = {
 };
 
 const autoNoteStyle = {
-  color: "rgba(255,255,255,0.68)",
+  color: "var(--text-secondary)",
   fontSize: 11,
   fontFamily: "'JetBrains Mono', monospace",
   marginBottom: 10,
@@ -1055,9 +1055,9 @@ const autoNoteStyle = {
   whiteSpace: "nowrap",
 };
 const autoPanelStyle = {
-  border: "1px solid rgba(255,255,255,0.07)",
+  border: "1px solid var(--control-bg-strong)",
   borderRadius: 8,
-  background: "rgba(255,255,255,0.018)",
+  background: "var(--control-bg-subtle)",
   overflow: "hidden",
 };
 const autoPanelHeaderStyle = {
@@ -1066,13 +1066,13 @@ const autoPanelHeaderStyle = {
   justifyContent: "space-between",
   gap: 10,
   padding: "10px 12px",
-  borderBottom: "1px solid rgba(255,255,255,0.05)",
+  borderBottom: "1px solid var(--control-bg-strong)",
 };
 const autoTitleStyle = {
   display: "inline-flex",
   alignItems: "center",
   gap: 7,
-  color: "rgba(255,255,255,0.82)",
+  color: "var(--text-primary)",
   fontSize: 12,
   fontWeight: 500,
 };
@@ -1080,9 +1080,9 @@ const autoTextareaStyle = {
   width: "100%",
   minHeight: 132,
   resize: "vertical",
-  background: "rgba(0,0,0,0.12)",
-  color: "rgba(255,255,255,0.86)",
-  border: "1px solid rgba(255,255,255,0.04)",
+  background: "var(--control-bg-contrast)",
+  color: "var(--text-primary)",
+  border: "1px solid var(--control-bg)",
   borderRadius: 7,
   padding: "11px 12px",
   fontSize: 12,
@@ -1093,7 +1093,7 @@ const autoTextareaStyle = {
   transition: "border-color .2s",
 };
 const autoErrorStyle = {
-  color: "rgba(255,180,180,0.9)",
+  color: "var(--danger-text-strong)",
   fontSize: 11,
   padding: "9px 12px 0",
 };
@@ -1111,18 +1111,18 @@ const autoFillBtnStyle = (enabled, loading) => ({
   padding: "8px 12px",
   borderRadius: 6,
   border: "none",
-  background: loading ? "rgba(255,255,255,0.86)" : (enabled ? "white" : "rgba(255,255,255,0.08)"),
-  color: loading ? "black" : (enabled ? "black" : "rgba(255,255,255,0.38)"),
+  background: loading ? "var(--text-primary)" : (enabled ? "var(--text-primary)" : "var(--control-border)"),
+  color: loading ? "var(--text-inverse)" : (enabled ? "var(--text-inverse)" : "var(--text-muted)"),
   cursor: loading ? "progress" : (enabled ? "pointer" : "not-allowed"),
   fontSize: 12,
   fontWeight: 500,
 });
 
 const customRowStyle = (hasError) => ({
-  border: "1px solid " + (hasError ? "rgba(255,180,180,0.35)" : "var(--pane-border)"),
+  border: "1px solid " + (hasError ? "var(--danger-border-strong)" : "var(--pane-border)"),
   borderRadius: 8,
   marginBottom: 10,
-  background: "rgba(255,255,255,0.015)",
+  background: "var(--control-bg-subtle)",
   overflow: "hidden",
   transition: "border-color .2s",
 });
@@ -1131,7 +1131,7 @@ const customTextareaStyle = {
   minHeight: 72,
   resize: "vertical",
   background: "transparent",
-  color: "rgba(255,255,255,0.85)",
+  color: "var(--text-primary)",
   border: "none",
   padding: "12px 12px 8px",
   fontSize: 12,
@@ -1144,14 +1144,14 @@ const customControlsStyle = {
   gap: 8,
   alignItems: "center",
   padding: "6px 10px 6px 12px",
-  borderTop: "1px solid rgba(255,255,255,0.04)",
-  background: "rgba(255,255,255,0.01)",
+  borderTop: "1px solid var(--control-bg)",
+  background: "var(--control-bg-subtle)",
 };
 const customBranchStyle = {
   flex: 1,
   minWidth: 0,
   background: "transparent",
-  color: "rgba(255,255,255,0.65)",
+  color: "var(--text-secondary)",
   border: "none",
   padding: "4px 0",
   fontSize: 10,
@@ -1161,10 +1161,10 @@ const customBranchStyle = {
 };
 const customDividerStyle = {
   width: 1, height: 12,
-  background: "rgba(255,255,255,0.06)",
+  background: "var(--control-bg-strong)",
   flexShrink: 0,
 };
 const customErrorStyle = {
-  color: "rgba(255,180,180,0.9)", fontSize: 11,
+  color: "var(--danger-text-strong)", fontSize: 11,
   padding: "0 12px 8px",
 };

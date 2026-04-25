@@ -586,7 +586,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
             <div style={{ animation: "dropIn .2s ease", minWidth: 0 }}>
               <div style={{
                 fontSize: s(12.5),
-                color: "rgba(255,255,255,0.88)",
+                color: "color-mix(in srgb, var(--text-primary) 88%, transparent)",
                 fontFamily: "system-ui,sans-serif",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -600,7 +600,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                 style={{
                   fontSize: s(9),
                   fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.28)",
+                  color: "color-mix(in srgb, var(--text-primary) 28%, transparent)",
                   marginTop: 2,
                   letterSpacing: ".1em",
                 }}
@@ -647,14 +647,14 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                 height: 23,
                 padding: terminalCount > 0 ? "0 8px" : 0,
                 borderRadius: 7,
-                background: terminalOpen ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)",
-                border: "1px solid " + (terminalOpen ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.06)"),
-                color: terminalOpen ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)",
+                background: terminalOpen ? "var(--control-bg-active)" : "var(--control-bg)",
+                border: "1px solid " + (terminalOpen ? "var(--control-border)" : "var(--pane-border)"),
+                color: terminalOpen ? "color-mix(in srgb, var(--text-primary) 70%, transparent)" : "color-mix(in srgb, var(--text-primary) 40%, transparent)",
                 cursor: "pointer",
                 transition: "all .2s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = terminalOpen ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)"; e.currentTarget.style.color = terminalOpen ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--control-bg-active)"; e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 70%, transparent)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = terminalOpen ? "var(--control-bg-active)" : "var(--control-bg)"; e.currentTarget.style.color = terminalOpen ? "color-mix(in srgb, var(--text-primary) 70%, transparent)" : "color-mix(in srgb, var(--text-primary) 40%, transparent)"; }}
             >
               <TerminalIcon size={14} strokeWidth={1.5} />
               {terminalCount > 0 && (
@@ -730,9 +730,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
             width: 32,
             height: 32,
             borderRadius: "50%",
-            background: "rgba(255,255,255,0.02)",
-            border: "1px solid rgba(255,255,255,0.04)",
-            color: "rgba(255,255,255,0.72)",
+            background: "var(--control-bg-subtle)",
+            border: "1px solid var(--control-border)",
+            color: "color-mix(in srgb, var(--text-primary) 72%, transparent)",
             cursor: "pointer",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",
@@ -743,14 +743,14 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
             zIndex: 20,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.06)";
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.10)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.92)";
+            e.currentTarget.style.background = "var(--control-bg-active)";
+            e.currentTarget.style.borderColor = "var(--control-border-hover)";
+            e.currentTarget.style.color = "var(--text-primary)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-            e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)";
-            e.currentTarget.style.color = "rgba(255,255,255,0.72)";
+            e.currentTarget.style.background = "var(--control-bg-subtle)";
+            e.currentTarget.style.borderColor = "var(--control-border)";
+            e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 72%, transparent)";
           }}
         >
           <ArrowDown size={16} strokeWidth={1.75} />
@@ -770,9 +770,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                   height: 24,
                   padding: "0 9px",
                   borderRadius: 7,
-                  border: "1px solid rgba(255,255,255,0.04)",
+                  border: "1px solid var(--control-border)",
                   background: "transparent",
-                  color: "rgba(255,255,255,0.3)",
+                  color: "color-mix(in srgb, var(--text-primary) 30%, transparent)",
                   cursor: "pointer",
                   fontSize: s(9),
                   fontFamily: "'JetBrains Mono',monospace",
@@ -793,11 +793,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                       gap: 8,
                       padding: "6px 8px",
                       marginBottom: 4,
-                      background: "rgba(255,255,255,0.014)",
-                      border: "1px solid rgba(255,255,255,0.035)",
+                      background: "var(--control-bg-subtle)",
+                      border: "1px solid var(--pane-border)",
                       borderRadius: 12,
                       fontSize: s(12),
-                      color: "rgba(255,255,255,0.44)",
+                      color: "color-mix(in srgb, var(--text-primary) 44%, transparent)",
                       fontFamily: "system-ui,sans-serif",
                     }}
                   >
@@ -806,7 +806,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                         <span style={{
                           fontSize: s(9),
                           fontFamily: "'JetBrains Mono',monospace",
-                          color: "rgba(255,255,255,0.14)",
+                          color: "color-mix(in srgb, var(--text-primary) 14%, transparent)",
                           letterSpacing: ".06em",
                           flexShrink: 0,
                         }}>
@@ -815,7 +815,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                         <span style={{
                           fontSize: s(9),
                           fontFamily: "'JetBrains Mono',monospace",
-                          color: "rgba(255,255,255,0.28)",
+                          color: "color-mix(in srgb, var(--text-primary) 28%, transparent)",
                           letterSpacing: ".06em",
                         }}>
                           {String(tool).toUpperCase()}
@@ -830,7 +830,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                         lineHeight: "18px",
-                        color: "rgba(255,255,255,0.62)",
+                        color: "color-mix(in srgb, var(--text-primary) 62%, transparent)",
                       }}
                         title={summary}
                       >
@@ -842,8 +842,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                         onClick={() => onRespondPermission?.({ requestId: req.requestId, behavior: "allow", scope: "once" })}
                         style={{
                           ...actionButtonStyle,
-                          background: "rgba(255,255,255,0.06)",
-                          color: "rgba(255,255,255,0.54)",
+                          background: "var(--control-bg)",
+                          color: "color-mix(in srgb, var(--text-primary) 54%, transparent)",
                         }}
                         title="Allow this request once"
                       >
@@ -878,9 +878,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                   height: 24,
                   padding: "0 9px",
                   borderRadius: 7,
-                  border: "1px solid rgba(255,255,255,0.04)",
+                  border: "1px solid var(--control-border)",
                   background: "transparent",
-                  color: "rgba(255,255,255,0.3)",
+                  color: "color-mix(in srgb, var(--text-primary) 30%, transparent)",
                   cursor: "pointer",
                   fontSize: s(9),
                   fontFamily: "'JetBrains Mono',monospace",
@@ -898,11 +898,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                       gap: 8,
                       padding: "6px 8px",
                       marginBottom: 4,
-                      background: "rgba(255,255,255,0.014)",
-                      border: "1px solid rgba(255,255,255,0.035)",
+                      background: "var(--control-bg-subtle)",
+                      border: "1px solid var(--pane-border)",
                       borderRadius: 12,
                       fontSize: s(12),
-                      color: "rgba(255,255,255,0.44)",
+                      color: "color-mix(in srgb, var(--text-primary) 44%, transparent)",
                       fontFamily: "system-ui,sans-serif",
                     }}
                   >
@@ -911,7 +911,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                         <span style={{
                           fontSize: s(9),
                           fontFamily: "'JetBrains Mono',monospace",
-                          color: "rgba(255,255,255,0.14)",
+                          color: "color-mix(in srgb, var(--text-primary) 14%, transparent)",
                           letterSpacing: ".06em",
                           flexShrink: 0,
                         }}>
@@ -921,7 +921,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                           <span style={{
                             fontSize: s(9),
                             fontFamily: "'JetBrains Mono',monospace",
-                            color: "rgba(255,255,255,0.13)",
+                            color: "color-mix(in srgb, var(--text-primary) 13%, transparent)",
                             letterSpacing: ".06em",
                           }}>
                             {t("chatArea.attachmentsCount", { value: attachmentCount, suffix: attachmentCount === 1 ? "" : "S" })}
@@ -938,11 +938,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                             rows={1}
                             style={{
                               width: "100%",
-                              background: "rgba(255,255,255,0.014)",
-                              border: "1px solid rgba(255,255,255,0.05)",
+                              background: "var(--control-bg-subtle)",
+                              border: "1px solid var(--pane-border)",
                               borderRadius: 7,
                               padding: "2px 8px",
-                              color: "rgba(255,255,255,0.82)",
+                              color: "color-mix(in srgb, var(--text-primary) 82%, transparent)",
                               fontSize: s(12),
                               lineHeight: "18px",
                               fontFamily: "inherit",
@@ -963,7 +963,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
                             lineHeight: "18px",
-                            color: "rgba(255,255,255,0.62)",
+                            color: "color-mix(in srgb, var(--text-primary) 62%, transparent)",
                           }}>
                             {q.text}
                           </div>
@@ -984,8 +984,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                             onClick={() => saveQueuedEdit(q.id)}
                             style={{
                               ...queueActionButtonStyle,
-                              background: "rgba(255,255,255,0.06)",
-                              color: "rgba(255,255,255,0.54)",
+                              background: "var(--control-bg)",
+                              color: "color-mix(in srgb, var(--text-primary) 54%, transparent)",
                             }}
                           >
                             {t("common.save")}
@@ -1024,7 +1024,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
             <div style={{
               marginBottom: 6,
               background: wallpaper?.dataUrl ? "var(--pane-elevated)" : "rgba(24,24,24,0.95)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              border: "1px solid var(--control-border)",
               borderRadius: 10,
               padding: "4px",
               backdropFilter: "blur(20px)",
@@ -1097,7 +1097,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
               gap: 10,
               background: dragOver
                 ? "rgba(180,220,255,0.06)"
-                : (inputFocused ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)"),
+                : (inputFocused ? "var(--control-bg)" : "rgba(255,255,255,0.02)"),
               border: (shellMode ? "2px solid " : "1px solid ") + (
                 dragOver
                   ? "rgba(153,214,255,0.28)"
@@ -1130,7 +1130,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                 background: "transparent",
                 border: "none",
                 resize: "none",
-                color: "rgba(255,255,255,0.92)",
+                color: "var(--text-primary)",
                 fontSize: s(13),
                 lineHeight: 1.5,
                 fontFamily: "system-ui,-apple-system,sans-serif",
@@ -1151,14 +1151,14 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                   height: 30,
                   borderRadius: 8,
                   flexShrink: 0,
-                  background: "rgba(255,255,255,0.08)",
+                  background: "var(--control-bg-strong)",
                   border: "1px solid rgba(255,255,255,0.12)",
                   color: "rgba(255,255,255,0.5)",
                   cursor: "pointer",
                   transition: "all .2s",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.12)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "var(--control-bg-strong)"; }}
               >
                 <Square size={10} fill="currentColor" />
               </button>
@@ -1210,7 +1210,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
               marginTop: 8,
               fontSize: s(8),
               fontFamily: "'JetBrains Mono',monospace",
-              color: "rgba(255,255,255,0.30)",
+              color: "var(--text-muted)",
               letterSpacing: ".1em",
             }}
           >

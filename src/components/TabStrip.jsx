@@ -25,7 +25,7 @@ export default function TabStrip({ tabs, activeId, onSelect, onClose }) {
         flex: 1,
         minWidth: 0,
         padding: "1px 0",
-        maskImage: "linear-gradient(to right, transparent 0, black 10px, black calc(100% - 10px), transparent 100%)",
+        maskImage: "linear-gradient(to right, transparent 0, var(--text-primary) 10px, var(--text-primary) calc(100% - 10px), transparent 100%)",
       }}
       className="tab-strip-scroll"
     >

@@ -18,6 +18,54 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255,255,255,0.62);
+  --text-muted: rgba(255, 255, 255, 0.25);
+  --text-faint: rgba(255,255,255,0.45);
+  --text-disabled: rgba(255,255,255,0.30);
+  --text-inverse: #0f172a;
+  --control-bg: rgba(255,255,255,.04);
+  --control-bg-subtle: rgba(255,255,255,.02);
+  --control-bg-active: rgba(255,255,255,.10);
+  --control-bg-strong: rgba(255,255,255,.14);
+  --control-border: rgba(255,255,255,.10);
+  --control-border-hover: rgba(255,255,255,.18);
+  --control-border-active: rgba(255,255,255,.26);
+  --bg-secondary: var(--pane-elevated);
+  --scrollbar-thumb: rgba(255,255,255,.08);
+  --scrollbar-track: transparent;
+}
+
+:root[data-theme="light"] {
+  --pane-background: #f0f0f4;
+  --pane-background-rgb: 240, 240, 244;
+  --pane-overlay-alpha: 0.88;
+  --pane-background-overlay: rgba(var(--pane-background-rgb), var(--pane-overlay-alpha));
+  --pane-hover-overlay: rgba(220, 220, 228, var(--pane-overlay-alpha));
+  --pane-active-overlay: rgba(210, 210, 218, var(--pane-overlay-alpha));
+  --pane-elevated-rgb: 248, 248, 252;
+  --pane-elevated: rgba(var(--pane-elevated-rgb), 0.92);
+  --pane-hover: #e8e8ee;
+  --pane-active: #e0e0e8;
+  --pane-interaction-hover-fill: var(--pane-hover);
+  --pane-interaction-active-fill: var(--pane-active);
+  --pane-border: rgba(0,0,0,0.08);
+  --aurora-bg: #f0f0f4;
+  --aurora-glow: rgba(80,100,200,0.04);
+  --text-primary: rgba(0, 0, 0, 0.9);
+  --text-secondary: #4a5568;
+  --text-muted: rgba(0, 0, 0, 0.35);
+  --text-faint: #718096;
+  --text-disabled: #94a3b8;
+  --text-inverse: #ffffff;
+  --control-bg: rgba(15,23,42,.06);
+  --control-bg-subtle: rgba(15,23,42,.03);
+  --control-bg-active: rgba(15,23,42,.10);
+  --control-bg-strong: rgba(15,23,42,.14);
+  --control-border: rgba(15,23,42,.14);
+  --control-border-hover: rgba(15,23,42,.22);
+  --control-border-active: rgba(15,23,42,.30);
+  --scrollbar-thumb: rgba(0,0,0,.08);
 }
 
 *, *::before, *::after {
@@ -33,19 +81,18 @@ html, body, #root {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar               { width: 3px; }
-::-webkit-scrollbar-track         { background: transparent; }
-::-webkit-scrollbar-thumb         { background: rgba(255,255,255,0.15); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover   { background: rgba(255,255,255,0.35); }
+::-webkit-scrollbar        { width: 2px; }
+::-webkit-scrollbar-track  { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb  { background: var(--scrollbar-thumb); border-radius: 2px; }
 
 /* ── KaTeX dark theme overrides ── */
-.katex { color: inherit; }
-.katex-display { margin: 12px 0; overflow-x: auto; overflow-y: hidden; }
+.katex { color: var(--text-primary); }
+.katex-display { margin: 12px 0; overflow-x: auto; overflow-y: hidden; background: var(--bg-secondary); }
 .katex-display > .katex { text-align: center; }
 
 /* ── Form resets ── */
 textarea::placeholder,
-input::placeholder  { color: rgba(255, 255, 255, 0.25); }
+input::placeholder  { color: var(--text-muted); }
 textarea:focus,
 input:focus         { outline: none; }
 
@@ -133,6 +180,14 @@ input:focus         { outline: none; }
   box-shadow: none;
 }
 
+.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar {
+  width: 3px;
+}
+
+.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
 
 /* ── Range slider ── */
 input[type="range"] {
