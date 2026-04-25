@@ -19,7 +19,18 @@
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
   --text-primary: rgba(255, 255, 255, 0.9);
+  --text-secondary: rgba(255,255,255,0.62);
   --text-muted: rgba(255, 255, 255, 0.25);
+  --text-faint: rgba(255,255,255,0.45);
+  --text-disabled: rgba(255,255,255,0.30);
+  --text-inverse: #0f172a;
+  --control-bg: rgba(255,255,255,.04);
+  --control-bg-subtle: rgba(255,255,255,.02);
+  --control-bg-active: rgba(255,255,255,.10);
+  --control-bg-strong: rgba(255,255,255,.14);
+  --control-border: rgba(255,255,255,.10);
+  --control-border-hover: rgba(255,255,255,.18);
+  --control-border-active: rgba(255,255,255,.26);
   --bg-secondary: var(--pane-elevated);
   --scrollbar-thumb: rgba(255,255,255,.08);
   --scrollbar-track: transparent;
@@ -27,7 +38,18 @@
 
 :root[data-theme="light"] {
   --text-primary: rgba(0, 0, 0, 0.9);
+  --text-secondary: #4a5568;
   --text-muted: rgba(0, 0, 0, 0.35);
+  --text-faint: #718096;
+  --text-disabled: #94a3b8;
+  --text-inverse: #ffffff;
+  --control-bg: rgba(15,23,42,.06);
+  --control-bg-subtle: rgba(15,23,42,.03);
+  --control-bg-active: rgba(15,23,42,.10);
+  --control-bg-strong: rgba(15,23,42,.14);
+  --control-border: rgba(15,23,42,.14);
+  --control-border-hover: rgba(15,23,42,.22);
+  --control-border-active: rgba(15,23,42,.30);
   --scrollbar-thumb: rgba(0,0,0,.08);
 }
 

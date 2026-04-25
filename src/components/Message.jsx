@@ -345,7 +345,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
         <div style={{
           fontSize: s(9),
           fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.38)",
+          color: "var(--text-secondary)",
           letterSpacing: ".14em",
           marginBottom: 10,
         }}>
@@ -526,7 +526,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
               marginBottom: 10,
               fontSize: s(9),
               fontFamily: "'JetBrains Mono',monospace",
-              color: "rgba(255,255,255,0.4)",
+              color: "var(--text-secondary)",
               letterSpacing: ".14em",
             }}
           >
@@ -568,7 +568,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
         <div style={{
           fontSize: s(9),
           fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.38)",
+          color: "var(--text-secondary)",
           letterSpacing: ".14em",
           marginBottom: 12,
           display: "flex",
@@ -584,7 +584,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
             const isLastPart = i === (msg.parts || []).length - 1;
             return (
               <div key={i} style={{
-                color: "rgba(255,255,255,0.75)",
+                color: "var(--text-primary)",
                 fontSize: s(15),
                 lineHeight: 1.85,
                 fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
@@ -699,7 +699,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
         {/* Fallback for old format messages (text + toolCalls) */}
         {!msg.parts && msg.text && (
           <div style={{
-            color: "rgba(255,255,255,0.75)",
+            color: "var(--text-primary)",
             fontSize: s(15),
             lineHeight: 1.85,
             fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",

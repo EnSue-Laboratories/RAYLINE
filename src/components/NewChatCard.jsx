@@ -710,14 +710,14 @@ export default function NewChatCard({
           style={{
             fontSize: s(10),
             fontFamily: "'JetBrains Mono', monospace",
-            color: "rgba(255,255,255,0.2)",
+            color: "var(--text-muted)",
             letterSpacing: ".06em",
             cursor: "pointer",
             transition: "color .15s",
             userSelect: "none",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
         >
           ESC TO CANCEL
         </div>
