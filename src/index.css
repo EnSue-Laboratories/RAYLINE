@@ -101,18 +101,19 @@ input:focus         { outline: none; }
 .xterm .xterm-viewport::-webkit-scrollbar { display: none; }
 .xterm .xterm-viewport { scrollbar-width: none; }
 
-/* Slim the xterm overlay (VS Code-style) scrollbar */
-.xterm .xterm-scrollable-element > .scrollbar.vertical {
-  width: 6px !important;
+/* xterm overlay scrollbar — matches Settings page scrollbar style */
+/* xterm 6.x uses .xterm-scrollbar.xterm-vertical / .xterm-slider (10px default, override to 3px) */
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical {
+  width: 3px !important;
 }
-.xterm .xterm-scrollable-element > .scrollbar.vertical .slider {
-  width: 6px !important;
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical .xterm-slider {
+  width: 3px !important;
   border-radius: 99px;
-  background: rgba(255,255,255,0.18) !important;
+  background: rgba(255,255,255,0.15) !important;
   transition: background .15s;
 }
-.xterm .xterm-scrollable-element > .scrollbar.vertical:hover .slider {
-  background: rgba(255,255,255,0.38) !important;
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical:hover .xterm-slider {
+  background: rgba(255,255,255,0.35) !important;
 }
 
 .rayline-terminal-host--opaque .xterm,
@@ -132,14 +133,6 @@ input:focus         { outline: none; }
   box-shadow: none;
 }
 
-.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar {
-  width: 3px;
-}
-
-.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-}
 
 /* ── Range slider ── */
 input[type="range"] {
