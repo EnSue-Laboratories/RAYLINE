@@ -1,8 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
-:root,
-:root[data-theme="dark"] {
-  color-scheme: dark;
+:root {
   --pane-background: #0D0D10;
   --pane-background-rgb: 13, 13, 16;
   --pane-overlay-alpha: 0.82;
@@ -20,74 +18,24 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
-  --term-background: #0D0D10;
-  --term-foreground: rgba(244,247,250,0.88);
-  --term-cursor: rgba(245,247,251,0.98);
-  --term-selection-background: rgba(120,182,255,0.18);
-  --term-selection-inactive-background: rgba(120,182,255,0.1);
-  --term-black: #0f1116;
-  --term-red: #f38ba8;
-  --term-green: #7ed7b9;
-  --term-yellow: #f5c97a;
-  --term-blue: #89b4fa;
-  --term-magenta: #cba6f7;
-  --term-cyan: #74c7ec;
-  --term-white: #bac2de;
-  --term-bright-black: #585b70;
-  --term-bright-red: #f7a6bc;
-  --term-bright-green: #9ce8cf;
-  --term-bright-yellow: #f8d99c;
-  --term-bright-blue: #a6c9ff;
-  --term-bright-magenta: #d9b8fb;
-  --term-bright-cyan: #98dbf3;
-  --term-bright-white: #f5f7fb;
-  --aurora-bg: #0D0D0F;
-  --aurora-glow: rgba(255,255,255,0.018);
+  --mermaid-bg: #0a0a0a;
+  --mermaid-node-bg: #1a1a1a;
+  --mermaid-node-border: rgba(255,255,255,0.25);
+  --mermaid-text: rgba(255,255,255,0.85);
+  --mermaid-line: rgba(255,255,255,0.35);
+  --mermaid-cluster-bg: #111111;
+  --mermaid-edge-label-bg: #0a0a0a;
 }
 
 :root[data-theme="light"],
 :root.light {
-  color-scheme: light;
-  --pane-background: #f8fafc;
-  --pane-background-rgb: 248, 250, 252;
-  --pane-overlay-alpha: 0.82;
-  --pane-background-overlay: rgba(var(--pane-background-rgb), var(--pane-overlay-alpha));
-  --pane-hover-overlay: rgba(226, 232, 240, var(--pane-overlay-alpha));
-  --pane-active-overlay: rgba(203, 213, 225, var(--pane-overlay-alpha));
-  --pane-elevated-rgb: 255, 255, 255;
-  --pane-elevated: rgba(var(--pane-elevated-rgb), 0.72);
-  --pane-hover: #edf2f7;
-  --pane-active: #e2e8f0;
-  --pane-interaction-hover-fill: var(--pane-hover);
-  --pane-interaction-active-fill: var(--pane-active);
-  --pane-interaction-hover-filter: none;
-  --pane-interaction-active-filter: none;
-  --pane-interaction-hover-shadow: none;
-  --pane-interaction-active-shadow: none;
-  --pane-border: rgba(15,23,42,0.1);
-  --term-background: #f8fafc;
-  --term-foreground: rgba(15,23,42,0.88);
-  --term-cursor: rgba(15,23,42,0.96);
-  --term-selection-background: rgba(37,99,235,0.18);
-  --term-selection-inactive-background: rgba(37,99,235,0.1);
-  --term-black: #0f172a;
-  --term-red: #dc2626;
-  --term-green: #047857;
-  --term-yellow: #b45309;
-  --term-blue: #2563eb;
-  --term-magenta: #9333ea;
-  --term-cyan: #0891b2;
-  --term-white: #475569;
-  --term-bright-black: #64748b;
-  --term-bright-red: #ef4444;
-  --term-bright-green: #059669;
-  --term-bright-yellow: #d97706;
-  --term-bright-blue: #3b82f6;
-  --term-bright-magenta: #a855f7;
-  --term-bright-cyan: #06b6d4;
-  --term-bright-white: #0f172a;
-  --aurora-bg: #f8fafc;
-  --aurora-glow: rgba(37,99,235,0.055);
+  --mermaid-bg: #ffffff;
+  --mermaid-node-bg: #ffffff;
+  --mermaid-node-border: #cbd5e1;
+  --mermaid-text: #1f2937;
+  --mermaid-line: #475569;
+  --mermaid-cluster-bg: #f8fafc;
+  --mermaid-edge-label-bg: #ffffff;
 }
 
 *, *::before, *::after {
@@ -103,9 +51,10 @@ html, body, #root {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar        { width: 2px; }
-::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.03); border-radius: 2px; }
+::-webkit-scrollbar               { width: 3px; }
+::-webkit-scrollbar-track         { background: transparent; }
+::-webkit-scrollbar-thumb         { background: rgba(255,255,255,0.15); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover   { background: rgba(255,255,255,0.35); }
 
 /* ── KaTeX dark theme overrides ── */
 .katex { color: inherit; }
@@ -159,13 +108,30 @@ input:focus         { outline: none; }
   to   { opacity: 1; max-height: 60px; }
 }
 
-/* ── xterm transparent background ── */
+/* ── xterm transparent background + slim overlay scrollbar ── */
 .xterm,
 .xterm .xterm-screen,
 .xterm .xterm-viewport,
 .xterm .xterm-scrollable-element {
   background: transparent !important;
   background-color: transparent !important;
+}
+.xterm .xterm-viewport::-webkit-scrollbar { display: none; }
+.xterm .xterm-viewport { scrollbar-width: none; }
+
+/* xterm overlay scrollbar — matches Settings page scrollbar style */
+/* xterm 6.x uses .xterm-scrollbar.xterm-vertical / .xterm-slider (10px default, override to 3px) */
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical {
+  width: 3px !important;
+}
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical .xterm-slider {
+  width: 3px !important;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.15) !important;
+  transition: background .15s;
+}
+.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical:hover .xterm-slider {
+  background: rgba(255,255,255,0.35) !important;
 }
 
 .rayline-terminal-host--opaque .xterm,
@@ -185,14 +151,6 @@ input:focus         { outline: none; }
   box-shadow: none;
 }
 
-.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar {
-  width: 3px;
-}
-
-.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-}
 
 /* ── Range slider ── */
 input[type="range"] {

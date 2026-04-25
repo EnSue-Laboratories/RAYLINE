@@ -18,10 +18,10 @@ import { useMulticaModels } from "./data/multicaModels.jsx";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 import { detectDefaultLocale, normalizeLocale } from "./i18n";
-import { ThemeProvider } from "./contexts/ThemeContext";
 import {
   pinTabPatch,
   runEndedPatch,
@@ -1162,6 +1162,7 @@ export default function App() {
   const [wallpaper, setWallpaper] = useState(null);
   const [locale, setLocale] = useState(() => detectDefaultLocale());
   const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE);
+  const [appTheme, setAppTheme] = useState("dark");
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
   const [defaultPrBranch, setDefaultPrBranch] = useState("main");
   const [coauthorEnabled, setCoauthorEnabled] = useState(true);
@@ -1238,6 +1239,7 @@ export default function App() {
     defaultModel,
     locale,
     fontSize,
+    appTheme,
     sidebarActiveOpacity,
     wallpaper: getPersistedWallpaper(wallpaper),
     projects,
@@ -1256,6 +1258,7 @@ export default function App() {
   }), [
     appBlur,
     appOpacity,
+    appTheme,
     coauthorEnabled,
     coauthorTrailer,
     chromeControlsOnHover,
@@ -1524,6 +1527,7 @@ export default function App() {
         if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
         if (state.locale) setLocale(normalizeLocale(state.locale));
         if (state.fontSize) setFontSize(state.fontSize);
+        if (state.appTheme) setAppTheme(state.appTheme);
         if (state.sidebarActiveOpacity != null) {
           setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
         }
@@ -3556,7 +3560,7 @@ export default function App() {
     : "width .34s cubic-bezier(.16,1,.3,1), min-width .34s cubic-bezier(.16,1,.3,1), border-color .18s ease";
 
   return (
-    <ThemeProvider>
+    <ThemeProvider externalTheme={appTheme} onThemeChange={setAppTheme}>
     <FontSizeContext.Provider value={fontSize}>
     <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative" }}>
       {wallpaper?.dataUrl ? (

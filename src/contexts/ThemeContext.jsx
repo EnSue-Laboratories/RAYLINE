@@ -1,101 +1,80 @@
-/* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
-const THEME_STORAGE_KEY = "rayline.themeMode";
-const DARK_QUERY = "(prefers-color-scheme: dark)";
-const MODES = new Set(["auto", "light", "dark"]);
+export const ThemeContext = createContext({ theme: "dark", setTheme: () => {} });
 
-function normalizeMode(value) {
-  return MODES.has(value) ? value : "auto";
+/**
+ * Returns { theme, setTheme } where theme is "light" | "dark" | "auto".
+ * Calling setTheme applies data-theme to <html> and dispatches rayline:theme-change.
+ */
+export function useTheme() {
+  return useContext(ThemeContext);
 }
 
-function getStoredMode() {
-  try {
-    return normalizeMode(window.localStorage.getItem(THEME_STORAGE_KEY));
-  } catch {
-    return "auto";
+function resolveTheme(theme) {
+  if (theme === "auto") {
+    return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }
+  return theme;
 }
 
-function getSystemResolved() {
-  if (window.matchMedia?.(DARK_QUERY)?.matches) {
-    return "dark";
+function applyThemeToDOM(theme) {
+  const resolved = resolveTheme(theme);
+  const root = document.documentElement;
+  root.dataset.theme = resolved;
+  if (resolved === "light") {
+    root.classList.add("light");
+    root.classList.remove("dark");
+  } else {
+    root.classList.add("dark");
+    root.classList.remove("light");
   }
-  return "light";
-}
-
-function resolveTheme(mode, systemResolved) {
-  return mode === "auto" ? systemResolved : mode;
-}
-
-const ThemeContext = createContext(null);
-
-export function ThemeProvider({ children }) {
-  const [mode, setModeState] = useState(getStoredMode);
-  const [systemResolved, setSystemResolved] = useState(getSystemResolved);
-  const resolved = resolveTheme(mode, systemResolved);
-
-  useEffect(() => {
-    const media = window.matchMedia?.(DARK_QUERY);
-    if (!media) return undefined;
-
-    const handleChange = (event) => {
-      setSystemResolved(event.matches ? "dark" : "light");
-    };
-
-    if (media.addEventListener) {
-      media.addEventListener("change", handleChange);
-    } else {
-      media.addListener?.(handleChange);
-    }
-    return () => {
-      if (media.removeEventListener) {
-        media.removeEventListener("change", handleChange);
-      } else {
-        media.removeListener?.(handleChange);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleStorage = (event) => {
-      if (event.key === THEME_STORAGE_KEY) {
-        setModeState(normalizeMode(event.newValue));
-      }
-    };
-
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = resolved;
-    window.dispatchEvent(new CustomEvent("rayline:theme-change", { detail: { resolved } }));
-  }, [resolved]);
-
-  const setMode = useCallback((nextMode) => {
-    const normalized = normalizeMode(nextMode);
-    setModeState(normalized);
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, normalized);
-    } catch {
-      // Ignore storage failures; the in-memory mode still applies for this window.
-    }
-  }, []);
-
-  const value = useMemo(() => ({ mode, resolved, setMode }), [mode, resolved, setMode]);
-
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
+  window.dispatchEvent(
+    new CustomEvent("rayline:theme-change", { detail: { theme: resolved } })
   );
 }
 
-export function useTheme() {
-  const value = useContext(ThemeContext);
-  if (!value) {
-    throw new Error("useTheme must be used within ThemeProvider");
-  }
-  return value;
+/**
+ * ThemeProvider manages the theme state.
+ * Pass `externalTheme` if you want to initialize from a persisted value.
+ * Pass `onThemeChange` to keep an external state in sync.
+ */
+export function ThemeProvider({ children, externalTheme, onThemeChange }) {
+  const [theme, setThemeState] = useState(externalTheme || "dark");
+  const prevExternalRef = useRef(externalTheme);
+
+  // Sync when externalTheme changes from outside (e.g. loaded from persisted state)
+  useEffect(() => {
+    if (externalTheme && externalTheme !== prevExternalRef.current) {
+      prevExternalRef.current = externalTheme;
+      setThemeState(externalTheme);
+      applyThemeToDOM(externalTheme);
+    }
+  }, [externalTheme]);
+
+  const setTheme = useCallback((t) => {
+    setThemeState(t);
+    applyThemeToDOM(t);
+    onThemeChange?.(t);
+  }, [onThemeChange]);
+
+  // Apply once on mount
+  useEffect(() => {
+    applyThemeToDOM(theme);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-apply when "auto" and system preference changes
+  useEffect(() => {
+    if (theme !== "auto") return;
+    const mq = window.matchMedia?.("(prefers-color-scheme: light)");
+    if (!mq) return;
+    const handler = () => applyThemeToDOM("auto");
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [theme]);
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
