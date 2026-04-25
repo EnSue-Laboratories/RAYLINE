@@ -91,12 +91,12 @@ function IconRailBtn({ onClick, title, children }) {
         display: "flex", alignItems: "center", justifyContent: "center",
         width: 40, height: 40, borderRadius: 8,
         background: "none", border: "none", cursor: "pointer",
-        color: "rgba(255,255,255,0.55)", transition: "background .15s, color .15s",
+        color: "color-mix(in srgb, var(--text-primary) 55%, transparent)", transition: "background .15s, color .15s",
         WebkitAppRegion: "no-drag",
         flexShrink: 0,
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.88)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--control-bg)"; e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 88%, transparent)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 55%, transparent)"; }}
     >
       {children}
     </button>
@@ -290,7 +290,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               fontWeight: 600,
               fontSize: 18,
               letterSpacing: "0.12em",
-              color: "rgba(218,218,222,0.95)",
+              color: "color-mix(in srgb, var(--text-primary) 95%, transparent)",
               userSelect: "none",
               lineHeight: 1,
             }}>
@@ -312,16 +312,16 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               borderRadius: 6,
               background: "none",
               border: "none",
-              color: "rgba(255,255,255,0.4)",
+              color: "color-mix(in srgb, var(--text-primary) 40%, transparent)",
               cursor: "pointer",
               transition: "all .2s",
               WebkitAppRegion: "no-drag",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+              e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 70%, transparent)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = "rgba(255,255,255,0.4)";
+              e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 40%, transparent)";
             }}
           >
             <PanelLeftClose size={17} strokeWidth={1.5} />

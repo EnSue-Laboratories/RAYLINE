@@ -37,6 +37,21 @@
 }
 
 :root[data-theme="light"] {
+  --pane-background: #f0f0f4;
+  --pane-background-rgb: 240, 240, 244;
+  --pane-overlay-alpha: 0.88;
+  --pane-background-overlay: rgba(var(--pane-background-rgb), var(--pane-overlay-alpha));
+  --pane-hover-overlay: rgba(220, 220, 228, var(--pane-overlay-alpha));
+  --pane-active-overlay: rgba(210, 210, 218, var(--pane-overlay-alpha));
+  --pane-elevated-rgb: 248, 248, 252;
+  --pane-elevated: rgba(var(--pane-elevated-rgb), 0.92);
+  --pane-hover: #e8e8ee;
+  --pane-active: #e0e0e8;
+  --pane-interaction-hover-fill: var(--pane-hover);
+  --pane-interaction-active-fill: var(--pane-active);
+  --pane-border: rgba(0,0,0,0.08);
+  --aurora-bg: #f0f0f4;
+  --aurora-glow: rgba(80,100,200,0.04);
   --text-primary: rgba(0, 0, 0, 0.9);
   --text-secondary: #4a5568;
   --text-muted: rgba(0, 0, 0, 0.35);

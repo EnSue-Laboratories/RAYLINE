@@ -72,7 +72,7 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
   return (
     <div style={{ marginBottom: label === "ARGS" ? 8 : 0 }}>
       <div style={{
-        color: "rgba(255,255,255,0.3)",
+        color: "color-mix(in srgb, var(--text-primary) 30%, transparent)",
         marginBottom: 4,
         display: "flex",
         alignItems: "center",
@@ -86,7 +86,7 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
             style={{
               border: "none",
               background: "none",
-              color: "rgba(255,255,255,0.35)",
+              color: "color-mix(in srgb, var(--text-primary) 35%, transparent)",
               cursor: "pointer",
               fontSize: fontScale(10),
               fontFamily: "'JetBrains Mono',monospace",
@@ -98,12 +98,12 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
         )}
       </div>
       <pre style={{
-        color: "rgba(255,255,255,0.5)",
+        color: "color-mix(in srgb, var(--text-primary) 50%, transparent)",
         whiteSpace: "pre-wrap",
         wordBreak: "break-all",
         margin: 0,
         padding: 8,
-        background: "rgba(0,0,0,0.3)",
+        background: "var(--control-bg-subtle)",
         borderRadius: 6,
         fontSize: fontScale(10),
         maxHeight,
@@ -128,8 +128,8 @@ export default function ToolCallBlock({ tool }) {
       style={{
         margin: "8px 0",
         borderRadius: 8,
-        border: "1px solid rgba(255,255,255,0.06)",
-        background: "rgba(255,255,255,0.02)",
+        border: "1px solid var(--pane-border)",
+        background: "var(--control-bg-subtle)",
         overflow: "hidden",
       }}
     >
@@ -143,7 +143,7 @@ export default function ToolCallBlock({ tool }) {
           padding: "8px 12px",
           background: "none",
           border: "none",
-          color: "rgba(255,255,255,0.5)",
+          color: "color-mix(in srgb, var(--text-primary) 50%, transparent)",
           cursor: "pointer",
           fontSize: s(11),
           fontFamily: "'JetBrains Mono',monospace",
@@ -152,7 +152,7 @@ export default function ToolCallBlock({ tool }) {
       >
         <Icon size={13} strokeWidth={1.5} />
         <span style={{
-          color: "rgba(255,255,255,0.7)",
+          color: "color-mix(in srgb, var(--text-primary) 70%, transparent)",
           flexShrink: 1,
           minWidth: 0,
           overflow: "hidden",
@@ -161,7 +161,7 @@ export default function ToolCallBlock({ tool }) {
         }}>{toolLabel}</span>
         {preview && !expanded && (
           <span style={{
-            color: "rgba(255,255,255,0.25)",
+            color: "color-mix(in srgb, var(--text-primary) 25%, transparent)",
             fontSize: s(10),
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -175,10 +175,10 @@ export default function ToolCallBlock({ tool }) {
         {!preview && <span style={{ flex: 1 }} />}
         <span style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
           {isRunning && (
-            <Loader2 size={10} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)", animation: "spin 1s linear infinite" }} />
+            <Loader2 size={10} strokeWidth={2} style={{ color: "color-mix(in srgb, var(--text-primary) 30%, transparent)", animation: "spin 1s linear infinite" }} />
           )}
           {tool.status === "done" && (
-            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: s(10) }}>done</span>
+            <span style={{ color: "color-mix(in srgb, var(--text-primary) 20%, transparent)", fontSize: s(10) }}>done</span>
           )}
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
