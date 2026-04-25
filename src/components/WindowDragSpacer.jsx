@@ -1,4 +1,5 @@
 import {
+  IS_MAC,
   SIDEBAR_CHROME_RAIL_HEIGHT,
   SIDEBAR_CHROME_RAIL_LEFT,
   SIDEBAR_CHROME_RAIL_TOP,
@@ -9,6 +10,7 @@ import {
 const RAIL_HIT_PADDING = 8;
 
 export default function WindowDragSpacer({ reserveSidebarRail = true }) {
+  const showRailReserve = reserveSidebarRail && IS_MAC;
   return (
     <div
       aria-hidden="true"
@@ -19,7 +21,7 @@ export default function WindowDragSpacer({ reserveSidebarRail = true }) {
         position: "relative",
       }}
     >
-      {reserveSidebarRail && (
+      {showRailReserve && (
         <div
           style={{
             position: "absolute",

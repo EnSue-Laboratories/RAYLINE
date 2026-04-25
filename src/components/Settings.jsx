@@ -1,16 +1,16 @@
 import { useState, useCallback, useEffect } from "react";
 import { ArrowLeft, Check, ChevronDown, Image } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { createTranslator } from "../i18n";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
-import { createTranslator } from "../i18n";
-import WindowDragSpacer from "./WindowDragSpacer";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, locale = "en-US", onLocaleChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, onClose }) {
   const s = useFontScale();
   const t = createTranslator(locale);
+  const showUpdaterSettings = platform === "win32";
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
   const [multica, setMultica] = useState(() => loadMulticaState());
   const [multicaServerDraft, setMulticaServerDraft] = useState(() => loadMulticaState().serverUrl || "");
@@ -177,6 +177,33 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const [chooseHover, setChooseHover] = useState(false);
   const [removeHover, setRemoveHover] = useState(false);
 
+  // ── Auto-updater state ──────────────────────────────────────────────────
+  const [appVersion, setAppVersion] = useState(null);
+  const [updaterPhase, setUpdaterPhase] = useState("idle"); // idle|checking|available|not-available|downloading|ready|error
+  const [updateVersion, setUpdateVersion] = useState(null);
+  const [downloadPct, setDownloadPct] = useState(0);
+  const [updateError, setUpdateError] = useState(null);
+
+  useEffect(() => {
+    if (!showUpdaterSettings) return;
+    window.api?.getAppVersion?.().then(setAppVersion).catch(() => {});
+  }, [showUpdaterSettings]);
+
+  useEffect(() => {
+    if (!showUpdaterSettings) return;
+    const unsub = window.api?.onUpdaterStatus?.((data) => {
+      setUpdaterPhase(data.phase);
+      if (data.version) setUpdateVersion(data.version);
+      if (data.percent != null) setDownloadPct(data.percent);
+      if (data.error) setUpdateError(data.error);
+      // After "not-available", reset to idle after 3 s
+      if (data.phase === "not-available") {
+        setTimeout(() => setUpdaterPhase("idle"), 3000);
+      }
+    });
+    return () => unsub?.();
+  }, [showUpdaterSettings]);
+
   return (
     <div
       style={{
@@ -191,7 +218,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <WindowDragSpacer />
+      {/* Drag region */}
+      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0 }} />
 
       {/* Header */}
       <div
@@ -262,125 +290,6 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             }}
           >
             {t("settings.appearance")}
-          </div>
-
-          <div style={{ marginBottom: 24 }}>
-            <div
-              style={{
-                fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
-                marginBottom: 2,
-              }}
-            >
-              {t("settings.language")}
-            </div>
-            <div
-              style={{
-                fontSize: s(11),
-                color: "rgba(255,255,255,0.3)",
-                marginBottom: 10,
-              }}
-            >
-              {t("settings.languageDescription")}
-            </div>
-            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-              <select
-                value={locale}
-                onChange={(e) => onLocaleChange?.(e.target.value)}
-                style={{
-                  width: "100%",
-                  height: 32,
-                  padding: "0 28px 0 10px",
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 7,
-                  color: "rgba(255,255,255,0.9)",
-                  fontFamily: "system-ui, sans-serif",
-                  fontSize: s(12),
-                  outline: "none",
-                  WebkitAppearance: "none",
-                  MozAppearance: "none",
-                  appearance: "none",
-                }}
-              >
-                <option value="en-US">{t("settings.languageEnglish")}</option>
-                <option value="zh-CN">{t("settings.languageChinese")}</option>
-              </select>
-              <ChevronDown
-                size={12}
-                strokeWidth={2}
-                style={{
-                  position: "absolute",
-                  right: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "rgba(255,255,255,0.5)",
-                  pointerEvents: "none",
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 24 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: s(13),
-                    color: "rgba(255,255,255,0.8)",
-                    marginBottom: 2,
-                  }}
-                >
-                  {t("settings.chromeControlsOnHover")}
-                </div>
-                <div
-                  style={{
-                    fontSize: s(11),
-                    color: "rgba(255,255,255,0.3)",
-                  }}
-                >
-                  {t("settings.chromeControlsOnHoverDescription")}
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={chromeControlsOnHover}
-                onClick={() => onChromeControlsOnHoverChange?.(!chromeControlsOnHover)}
-                style={{
-                  flexShrink: 0,
-                  width: 38,
-                  height: 22,
-                  borderRadius: 999,
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: chromeControlsOnHover ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
-                  position: "relative",
-                  cursor: "pointer",
-                  padding: 0,
-                  transition: "background 120ms ease",
-                }}
-              >
-                <span
-                  style={{
-                    position: "absolute",
-                    top: 2,
-                    left: chromeControlsOnHover ? 18 : 2,
-                    width: 16,
-                    height: 16,
-                    borderRadius: "50%",
-                    background: "rgba(255,255,255,0.9)",
-                    transition: "left 120ms ease",
-                  }}
-                />
-              </button>
-            </div>
           </div>
 
           {/* Wallpaper subsection */}
@@ -674,7 +583,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 marginBottom: 2,
               }}
             >
-              {t("settings.multica")}
+              Multica
             </div>
             <div
               style={{
@@ -741,7 +650,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               <input
                 type="text"
                 value={multicaServerDraft}
-                placeholder={t("settings.serverUrlPlaceholder")}
+                placeholder="https://your-multica-server"
                 onChange={(e) => setMulticaServerDraft(e.target.value)}
                 spellCheck={false}
                 style={{
@@ -899,6 +808,84 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
 
           {developerMode && (
             <>
+              {/* TERMINAL section */}
+              <div
+                style={{
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: s(10),
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.25)",
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                  marginBottom: 20,
+                  marginTop: 12,
+                }}
+              >
+                {t("settings.terminal")}
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: s(13),
+                        color: "rgba(255,255,255,0.8)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {t("settings.sidebarTerminal")}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: s(11),
+                        color: "rgba(255,255,255,0.3)",
+                      }}
+                    >
+                      {t("settings.sidebarTerminalDescription")}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={sidebarTerminalEnabled}
+                    onClick={() => onSidebarTerminalEnabledChange?.(!sidebarTerminalEnabled)}
+                    style={{
+                      flexShrink: 0,
+                      width: 38,
+                      height: 22,
+                      borderRadius: 999,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: sidebarTerminalEnabled ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                      position: "relative",
+                      cursor: "pointer",
+                      padding: 0,
+                      transition: "background 120ms ease",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        left: sidebarTerminalEnabled ? 18 : 2,
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        background: "rgba(255,255,255,0.9)",
+                        transition: "left 120ms ease",
+                      }}
+                    />
+                  </button>
+                </div>
+              </div>
+
               {/* NOTIFICATIONS section */}
               <div
                 style={{
@@ -1062,7 +1049,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     color: "rgba(255,255,255,0.8)",
                     marginBottom: 2,
                   }}
-                  >
+                >
                   {t("settings.defaultPrBranch")}
                 </div>
                 <div
@@ -1071,7 +1058,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     color: "rgba(255,255,255,0.3)",
                     marginBottom: 10,
                   }}
-                  >
+                >
                   {t("settings.defaultPrBranchDescription")}
                 </div>
                 <input
@@ -1117,7 +1104,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         color: "rgba(255,255,255,0.8)",
                         marginBottom: 2,
                       }}
-                      >
+                    >
                       {t("settings.autoCoauthor")}
                     </div>
                     <div
@@ -1162,6 +1149,254 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   </button>
                 </div>
               </div>
+            </>
+          )}
+
+          {/* LANGUAGE section */}
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: s(10),
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.25)",
+              letterSpacing: ".12em",
+              textTransform: "uppercase",
+              marginBottom: 20,
+              marginTop: 12,
+            }}
+          >
+            {t("settings.language")}
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: s(13), color: "rgba(255,255,255,0.8)", marginBottom: 10 }}>
+              {t("settings.languageLabel")}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[["en-US", "settings.languageEnglish"], ["zh-CN", "settings.languageChinese"]].map(([lc, key]) => {
+                const selected = locale === lc;
+                return (
+                  <button
+                    key={lc}
+                    type="button"
+                    onClick={() => onLocaleChange?.(lc)}
+                    style={{
+                      padding: "6px 16px",
+                      borderRadius: 7,
+                      background: selected ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.04)",
+                      border: selected ? "1px solid rgba(255,255,255,0.22)" : "1px solid rgba(255,255,255,0.06)",
+                      color: selected ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.5)",
+                      fontSize: s(12),
+                      cursor: "pointer",
+                      transition: "all .2s",
+                      fontFamily: "system-ui, sans-serif",
+                    }}
+                  >
+                    {t(key)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {!showUpdaterSettings && (
+            <div style={{ marginBottom: 24 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: s(13),
+                      color: "rgba(255,255,255,0.8)",
+                      marginBottom: 2,
+                    }}
+                  >
+                    {t("settings.chromeControlsOnHover")}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: s(11),
+                      color: "rgba(255,255,255,0.3)",
+                    }}
+                  >
+                    {t("settings.chromeControlsOnHoverDescription")}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={chromeControlsOnHover}
+                  onClick={() => onChromeControlsOnHoverChange?.(!chromeControlsOnHover)}
+                  style={{
+                    flexShrink: 0,
+                    width: 38,
+                    height: 22,
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: chromeControlsOnHover ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                    position: "relative",
+                    cursor: "pointer",
+                    padding: 0,
+                    transition: "background 120ms ease",
+                  }}
+                >
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      left: chromeControlsOnHover ? 18 : 2,
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      background: "rgba(255,255,255,0.9)",
+                      transition: "left 120ms ease",
+                    }}
+                  />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showUpdaterSettings && (
+            <>
+          {/* UPDATES section */}
+          <div
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: s(10),
+              fontWeight: 600,
+              color: "rgba(255,255,255,0.25)",
+              letterSpacing: ".12em",
+              textTransform: "uppercase",
+              marginBottom: 20,
+              marginTop: 12,
+            }}
+          >
+            {t("settings.updates")}
+          </div>
+
+          <div style={{ marginBottom: 32 }}>
+            {appVersion && (
+              <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono',monospace", marginBottom: 14, letterSpacing: ".04em" }}>
+                {t("settings.currentVersion")}  v{appVersion}
+              </div>
+            )}
+
+            {/* Status text */}
+            {updaterPhase === "available" && updateVersion && (
+              <div style={{ fontSize: s(12), color: "rgba(165,255,210,0.82)", marginBottom: 10 }}>
+                {t("settings.updateAvailable", { version: updateVersion })}
+              </div>
+            )}
+            {updaterPhase === "not-available" && (
+              <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.38)", marginBottom: 10 }}>
+                {t("settings.upToDate")}
+              </div>
+            )}
+            {updaterPhase === "ready" && (
+              <div style={{ fontSize: s(12), color: "rgba(165,255,210,0.82)", marginBottom: 10 }}>
+                {t("settings.readyToInstall")}
+              </div>
+            )}
+            {updaterPhase === "error" && (
+              <div style={{ fontSize: s(12), color: "rgba(255,120,100,0.82)", marginBottom: 10 }}>
+                {t("settings.updateError")}
+                {updateError && <span style={{ opacity: 0.6, marginLeft: 6, fontFamily: "'JetBrains Mono',monospace", fontSize: s(10) }}>{updateError.slice(0, 80)}</span>}
+              </div>
+            )}
+
+            {/* Progress bar when downloading */}
+            {updaterPhase === "downloading" && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.55)", marginBottom: 6 }}>
+                  {t("settings.downloading", { pct: downloadPct })}
+                </div>
+                <div style={{ height: 3, borderRadius: 2, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${downloadPct}%`, background: "rgba(255,255,255,0.4)", transition: "width .3s ease", borderRadius: 2 }} />
+                </div>
+              </div>
+            )}
+
+            {/* Action button */}
+            <div style={{ display: "flex", gap: 8 }}>
+              {(updaterPhase === "idle" || updaterPhase === "not-available") && (
+                <button
+                  type="button"
+                  onClick={() => { setUpdateError(null); window.api?.checkForUpdates?.(); }}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7,
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.75)", fontSize: s(12), cursor: "pointer",
+                    transition: "all .2s", fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  {t("settings.checkUpdates")}
+                </button>
+              )}
+              {updaterPhase === "checking" && (
+                <button
+                  type="button"
+                  disabled
+                  style={{
+                    padding: "6px 14px", borderRadius: 7,
+                    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.38)", fontSize: s(12), cursor: "not-allowed",
+                    fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  {t("settings.checking")}
+                </button>
+              )}
+              {updaterPhase === "available" && (
+                <button
+                  type="button"
+                  onClick={() => window.api?.downloadUpdate?.()}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7,
+                    background: "rgba(165,255,210,0.12)", border: "1px solid rgba(165,255,210,0.2)",
+                    color: "rgba(165,255,210,0.9)", fontSize: s(12), cursor: "pointer",
+                    transition: "all .2s", fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  {t("settings.checkUpdates")}
+                </button>
+              )}
+              {updaterPhase === "ready" && (
+                <button
+                  type="button"
+                  onClick={() => window.api?.installUpdate?.()}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7,
+                    background: "rgba(165,255,210,0.18)", border: "1px solid rgba(165,255,210,0.28)",
+                    color: "rgba(165,255,210,0.95)", fontSize: s(12), cursor: "pointer",
+                    transition: "all .2s", fontFamily: "system-ui, sans-serif", fontWeight: 600,
+                  }}
+                >
+                  {t("settings.installRestart")}
+                </button>
+              )}
+              {updaterPhase === "error" && (
+                <button
+                  type="button"
+                  onClick={() => { setUpdateError(null); window.api?.checkForUpdates?.(); }}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7,
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.6)", fontSize: s(12), cursor: "pointer",
+                    transition: "all .2s", fontFamily: "system-ui, sans-serif",
+                  }}
+                >
+                  {t("settings.retryUpdate")}
+                </button>
+              )}
+            </div>
+          </div>
             </>
           )}
         </div>

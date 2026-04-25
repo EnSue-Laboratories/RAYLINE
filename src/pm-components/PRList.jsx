@@ -3,6 +3,7 @@ import { GitPullRequest, GitMerge, GitPullRequestClosed, Copy, Check, GitBranch 
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 import HoverIconButton from "../components/HoverIconButton";
 import { createTranslator } from "../i18n";
+import { isGitHubOpen, normalizeGitHubState } from "./githubState";
 
 function timeAgo(dateStr, t) {
   const now = Date.now();
@@ -71,7 +72,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
 
   useEffect(() => {
     if (!freshItem || freshItem.number == null) return;
-    const itemState = freshItem.state || "open";
+    const itemState = normalizeGitHubState(freshItem.state);
     if (itemState !== stateFilter) return;
     if (repoFilter && freshItem._repo !== repoFilter) return;
     if (!repos.includes(freshItem._repo)) return;
@@ -113,7 +114,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
   }
 
   function getIcon(item) {
-    if (item.state === "open") {
+    if (isGitHubOpen(item.state, stateFilter)) {
       return <GitPullRequest size={12} color="rgba(63,185,80,0.7)" />;
     }
     if (item.merged_at) {

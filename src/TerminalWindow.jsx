@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import TerminalDrawer from "./components/TerminalDrawer";
+import WindowControls from "./components/WindowControls";
 import useTerminal from "./hooks/useTerminal";
 import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
@@ -16,6 +17,8 @@ export default function TerminalWindow() {
   const announcedReadyRef = useRef(false);
   const [wallpaper, setWallpaper] = useState(null);
   const [hasLoadedWallpaper, setHasLoadedWallpaper] = useState(false);
+  const [platform, setPlatform] = useState(null);
+  const showWindowControls = platform === "win32";
 
   const nudgeActiveTerminalLayout = useCallback(() => {
     focusActiveSession();
@@ -55,6 +58,10 @@ export default function TerminalWindow() {
       nudgeActiveTerminalLayout();
       loadVisualState();
     };
+
+    window.api?.getSystemInfo?.().then((info) => {
+      if (info?.platform) setPlatform(info.platform);
+    }).catch(() => {});
 
     const kickoff = window.setTimeout(() => {
       loadVisualState();
@@ -140,6 +147,8 @@ export default function TerminalWindow() {
         />
       )}
 
+      <WindowControls visible={showWindowControls} />
+
       <div
         style={{
           position: "relative",
@@ -162,6 +171,7 @@ export default function TerminalWindow() {
           registerTerminal={terminal.registerTerminal}
           unregisterTerminal={terminal.unregisterTerminal}
           wallpaper={wallpaper}
+          windowControlsVisible={showWindowControls}
           windowMode
           onRequestClose={() => window.api?.closeCurrentWindow?.()}
         />

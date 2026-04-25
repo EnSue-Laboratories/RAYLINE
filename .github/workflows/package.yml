@@ -1,6 +1,9 @@
 name: Package Desktop App
 
 on:
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       release_tag:
@@ -22,23 +25,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Windows packaging is maintained on the windows branch.
           - os: windows-latest
             label: Windows
             platform: windows
-            checkout_ref: windows
             binary_glob: "*.exe"
           - os: macos-latest
             label: macOS
             platform: macos
-            checkout_ref: ""
             binary_glob: "*.dmg"
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ matrix.checkout_ref || github.ref }}
+          ref: ${{ github.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -52,9 +52,34 @@ jobs:
       - name: Build renderer
         run: npm run build
 
+      # Pre-create the GitHub release so electron-builder can publish assets to it.
+      # If the release already exists (e.g. re-triggered CI), the || true suppresses the error.
+      - name: Create GitHub release (tag push only)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "Automated release for $TAG" \
+            || true
+
       - name: Package Windows app
         if: matrix.platform == 'windows'
-        run: npx electron-builder --config electron-builder.config.cjs --win --publish never --config.npmRebuild=false
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            PUBLISH_FLAG="always"
+          else
+            PUBLISH_FLAG="never"
+          fi
+          npx electron-builder --config electron-builder.config.cjs --win \
+            --publish "$PUBLISH_FLAG" \
+            --config.npmRebuild=false
 
       - name: Package macOS app
         if: matrix.platform == 'macos'
@@ -92,12 +117,29 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-      - name: Upload assets to GitHub release
-        if: github.event_name == 'release' || github.event.inputs.release_tag != ''
+      - name: Upload assets to GitHub release (workflow_dispatch with tag)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != ''
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.release_tag }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          files=()
+          while IFS= read -r -d '' file; do
+            files+=("$file")
+          done < <(find artifact -maxdepth 1 -type f -print0)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No binary files found in artifact/"
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
+
+      - name: Upload assets to GitHub release (release event)
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           files=()
           while IFS= read -r -d '' file; do

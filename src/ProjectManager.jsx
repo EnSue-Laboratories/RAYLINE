@@ -18,6 +18,7 @@ import IssueList from "./pm-components/IssueList";
 import PRList from "./pm-components/PRList";
 import ItemDetail from "./pm-components/ItemDetail";
 import HoverIconButton from "./components/HoverIconButton";
+import WindowControls from "./components/WindowControls";
 import { getPaneInteractionStyle, getPaneSurfaceStyle } from "./utils/paneSurface";
 import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 import { createTranslator, detectDefaultLocale, normalizeLocale } from "./i18n";
@@ -150,12 +151,15 @@ export default function ProjectManager() {
   const [showAccountManager, setShowAccountManager] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
   const [wallpaper, setWallpaper] = useState(null);
+  const [platform, setPlatform] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [showCreate, setShowCreate] = useState(null); // null | "issue" | "pr"
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [freshIssue, setFreshIssue] = useState(null);
   const [freshPR, setFreshPR] = useState(null);
   const t = createTranslator(locale);
+  const showWindowControls = platform === "win32";
+  const dragRegionRight = showWindowControls ? 126 : 0;
 
   const refreshAuth = () =>
     window.ghApi.checkAuth().then(({ ok, user }) => {
@@ -166,6 +170,9 @@ export default function ProjectManager() {
 
   useEffect(() => {
     refreshAuth();
+    window.ghApi.getSystemInfo?.().then((info) => {
+      if (info?.platform) setPlatform(info.platform);
+    }).catch(() => {});
     Promise.all([
       window.ghApi.loadPmState(),
       window.ghApi.loadAppState ? window.ghApi.loadAppState().catch(() => null) : Promise.resolve(null),
@@ -208,6 +215,24 @@ export default function ProjectManager() {
     if (repoFilter === repo) setRepoFilter(null);
   };
 
+  const handleBackFromDetail = () => {
+    if (selectedItem?.type === "issue") {
+      setFreshIssue((item) => (
+        item && item._repo === selectedItem.repo && item.number === selectedItem.number
+          ? null
+          : item
+      ));
+    } else if (selectedItem?.type === "pr") {
+      setFreshPR((item) => (
+        item && item._repo === selectedItem.repo && item.number === selectedItem.number
+          ? null
+          : item
+      ));
+    }
+    setSelectedItem(null);
+    setRefreshSignal((k) => k + 1);
+  };
+
   // Loading state
   if (authOk === null) {
     return (
@@ -223,6 +248,18 @@ export default function ProjectManager() {
           fontSize: 14,
         }}
       >
+        <WindowControls visible={showWindowControls} />
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: dragRegionRight,
+            height: 52,
+            WebkitAppRegion: "drag",
+            zIndex: 100,
+          }}
+        />
         {t("pm.checkingAuth")}
       </div>
     );
@@ -243,6 +280,18 @@ export default function ProjectManager() {
           fontFamily: "system-ui, sans-serif",
         }}
       >
+        <WindowControls visible={showWindowControls} />
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: dragRegionRight,
+            height: 52,
+            WebkitAppRegion: "drag",
+            zIndex: 100,
+          }}
+        />
         <GitHubIcon size={48} />
         <div style={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }}>
           {t("pm.authMissingTitle")}
@@ -295,6 +344,8 @@ export default function ProjectManager() {
         position: "relative",
       }}
     >
+      <WindowControls visible={showWindowControls} />
+
       {/* Background — wallpaper or aurora */}
       {wallpaper?.dataUrl ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
@@ -314,13 +365,13 @@ export default function ProjectManager() {
         </>
       )}
 
-      {/* Drag region */}
+      {/* Drag region — leave the controls hit area clear on Windows */}
       <div
         style={{
           position: "fixed",
           top: 0,
           left: 0,
-          right: 0,
+          right: dragRegionRight,
           height: 52,
           WebkitAppRegion: "drag",
           zIndex: 100,
@@ -527,7 +578,7 @@ export default function ProjectManager() {
               repo={selectedItem.repo}
               number={selectedItem.number}
               type={selectedItem.type}
-              onBack={() => setSelectedItem(null)}
+              onBack={handleBackFromDetail}
               locale={locale}
             />
           ) : activeTab === "issues" ? (

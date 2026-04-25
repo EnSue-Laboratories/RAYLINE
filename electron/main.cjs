@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell, clipboard } = require("electron");
+const { initAutoUpdater, handleCheckForUpdates, handleDownloadUpdate, handleInstallUpdate } = require("./auto-updater.cjs");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -58,6 +59,7 @@ let pmWindow;
 let terminalWindow;
 let terminalWindowRevealTimer = null;
 let pendingPreferredTerminalSessionName = null;
+let sidebarTerminalEnabledPreference = false;
 
 function terminalDebug(event, details = {}, meta = {}) {
   if (!TERMINAL_DEBUG_ENABLED) return;
@@ -83,6 +85,39 @@ function isTerminalWindowOpen() {
 
 function broadcastTerminalWindowState() {
   broadcastToAllWindows("terminal-window-state", { open: isTerminalWindowOpen() });
+}
+
+function rememberTerminalSurfacePreference(state) {
+  if (typeof state?.sidebarTerminalEnabled === "boolean") {
+    sidebarTerminalEnabledPreference = state.sidebarTerminalEnabled;
+  }
+}
+
+function revealSidebarTerminal(payload = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createTerminalWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+  mainWindow.webContents.send("terminal-sidebar-reveal-request", {
+    name: payload.name || null,
+  });
+}
+
+function revealTerminalSurface(payload = {}) {
+  if (payload.reveal === false) return;
+  const isAutoReveal = payload.reveal == null || payload.reveal === "auto";
+  const useSidebar = payload.reveal === "sidebar"
+    || (isAutoReveal && sidebarTerminalEnabledPreference);
+
+  if (useSidebar) {
+    revealSidebarTerminal(payload);
+    return;
+  }
+
+  createTerminalWindow();
 }
 
 function clearTerminalWindowRevealTimer() {
@@ -114,12 +149,9 @@ function getWindowChromeOptions() {
 
   if (isWindows) {
     return {
-      titleBarStyle: "hidden",
-      titleBarOverlay: {
-        color: WINDOW_BACKGROUND,
-        symbolColor: "#C8CBD3",
-        height: 52,
-      },
+      // Keep Windows fully in the client area so our custom controls receive
+      // actual pointer events instead of sitting inside the OS title bar.
+      frame: false,
       autoHideMenuBar: true,
     };
   }
@@ -130,6 +162,10 @@ function getWindowChromeOptions() {
 function applyWindowChromeTweaks(win) {
   if (!win || !isWindows) return;
   win.setMenuBarVisibility(false);
+}
+
+function getEventWindow(event) {
+  return BrowserWindow.fromWebContents(event.sender) || mainWindow || pmWindow || null;
 }
 
 function describeWindow(win) {
@@ -250,9 +286,17 @@ function createWindow() {
     }
   });
 
+  initAutoUpdater(mainWindow);
+
   if (isDev) {
     const port = process.env.VITE_PORT || "5173";
     mainWindow.loadURL(`http://localhost:${port}`);
+    mainWindow.webContents.on("before-input-event", (event, input) => {
+      if (input.key === "F12" && input.type === "keyDown") {
+        mainWindow.webContents.toggleDevTools();
+        event.preventDefault();
+      }
+    });
   } else {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }
@@ -406,7 +450,7 @@ app.whenReady().then(() => {
     }
 
     if (payload.reason === "created") {
-      createTerminalWindow();
+      revealTerminalSurface(payload);
     }
   });
 });
@@ -447,6 +491,11 @@ ipcMain.handle("is-terminal-window-open", () => {
   return isTerminalWindowOpen();
 });
 
+ipcMain.handle("terminal-surface-preference", (_event, state) => {
+  rememberTerminalSurfacePreference(state);
+  return true;
+});
+
 ipcMain.on("terminal-debug-log", (event, payload = {}) => {
   if (!TERMINAL_DEBUG_ENABLED) return;
   const win = BrowserWindow.fromWebContents(event.sender);
@@ -471,11 +520,36 @@ ipcMain.handle("window-close-current", (event) => {
 });
 
 ipcMain.handle("set-window-opacity", (event, opacity) => {
-  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  const win = getEventWindow(event);
   if (!win) return false;
   const v = Number(opacity);
   if (!Number.isFinite(v)) return false;
   win.setOpacity(Math.max(0.2, Math.min(1, v)));
+  return true;
+});
+
+ipcMain.handle("window-minimize", (event) => {
+  const win = getEventWindow(event);
+  if (!win) return false;
+  win.minimize();
+  return true;
+});
+
+ipcMain.handle("window-toggle-maximize", (event) => {
+  const win = getEventWindow(event);
+  if (!win) return false;
+  if (win.isMaximized()) {
+    win.unmaximize();
+    return false;
+  }
+  win.maximize();
+  return true;
+});
+
+ipcMain.handle("window-close", (event) => {
+  const win = getEventWindow(event);
+  if (!win) return false;
+  win.close();
   return true;
 });
 
@@ -665,6 +739,7 @@ const stateFilePath = path.join(app.getPath("userData"), "claudi-state.json");
 
 function persistStateToDisk(state) {
   try {
+    rememberTerminalSurfacePreference(state);
     // Preserve pmRepos from PM window (main app state doesn't include it)
     let existing = {};
     try {
@@ -688,6 +763,12 @@ ipcMain.handle("save-state", async (_event, state) => {
   return persistStateToDisk(state);
 });
 
+// ── Auto-updater ────────────────────────────────────────────────────────────
+ipcMain.handle("updater-check",    () => handleCheckForUpdates());
+ipcMain.handle("updater-download", () => handleDownloadUpdate());
+ipcMain.handle("updater-install",  () => handleInstallUpdate());
+ipcMain.handle("get-app-version",  () => app.getVersion());
+
 ipcMain.on("save-state-sync", (event, state) => {
   event.returnValue = persistStateToDisk(state);
 });
@@ -695,7 +776,9 @@ ipcMain.on("save-state-sync", (event, state) => {
 ipcMain.handle("load-state", async () => {
   try {
     if (fs.existsSync(stateFilePath)) {
-      return JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+      const state = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+      rememberTerminalSurfacePreference(state);
+      return state;
     }
     // Try migrating from old app name
     const oldPaths = [
@@ -706,6 +789,7 @@ ipcMain.handle("load-state", async () => {
       if (fs.existsSync(old)) {
         const data = JSON.parse(fs.readFileSync(old, "utf-8"));
         fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
+        rememberTerminalSurfacePreference(data);
         return data;
       }
     }

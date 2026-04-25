@@ -482,11 +482,13 @@ export default function NewChatCard({
     <div
       style={{
         display: "flex",
+        flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
         flex: 1,
         padding: 24,
         minHeight: 0,
+        gap: 12,
       }}
       onDrop={handleDrop}
       onDragEnter={handleDragEnter}
@@ -702,6 +704,24 @@ export default function NewChatCard({
           </div>
         )}
       </div>
+      {onCancel && (
+        <div
+          onClick={onCancel}
+          style={{
+            fontSize: s(10),
+            fontFamily: "'JetBrains Mono', monospace",
+            color: "rgba(255,255,255,0.2)",
+            letterSpacing: ".06em",
+            cursor: "pointer",
+            transition: "color .15s",
+            userSelect: "none",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+        >
+          ESC TO CANCEL
+        </div>
+      )}
     </div>
   );
 }
