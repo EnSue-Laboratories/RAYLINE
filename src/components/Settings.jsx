@@ -30,6 +30,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     apiKey: "",
     baseURL: "",
   });
+  const [openCodeAdding, setOpenCodeAdding] = useState(false);
   const [openCodeSaving, setOpenCodeSaving] = useState(false);
   const [openCodeMessage, setOpenCodeMessage] = useState("");
 
@@ -172,6 +173,22 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     setOpenCodeMessage("");
   }, []);
 
+  const handleStartOpenCodeAdd = useCallback(() => {
+    setOpenCodeAdding(true);
+    setOpenCodeMessage("");
+  }, []);
+
+  const handleCancelOpenCodeAdd = useCallback(() => {
+    setOpenCodeAdding(false);
+    setOpenCodeMessage("");
+    setOpenCodeDraft((prev) => ({
+      ...prev,
+      modelId: "",
+      label: "",
+      apiKey: "",
+    }));
+  }, []);
+
   const handleSaveOpenCodeModel = useCallback(async () => {
     const providerId = openCodeDraft.providerId.trim();
     const modelId = openCodeDraft.modelId.trim();
@@ -202,6 +219,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         apiKey: "",
       }));
       await refreshOpenCode();
+      setOpenCodeAdding(false);
       setOpenCodeMessage(t("settings.opencodeSaved"));
     } catch (error) {
       setOpenCodeMessage(error?.message || t("settings.opencodeSaveFailed"));
@@ -860,124 +878,166 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               {t("settings.opencodeDescription")}
             </div>
 
-            <div style={{ marginBottom: 12 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: openCodeAdding ? 14 : 12,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: s(12),
+                    color: openCodeStatus.installed && openCodeStatus.configured
+                      ? "rgba(205,255,214,0.88)"
+                      : "rgba(255,255,255,0.72)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {openCodeStatus.installed
+                    ? (openCodeStatus.configured ? t("settings.opencodeConfigured") : t("settings.opencodeInstalled"))
+                    : t("settings.opencodeNotInstalled")}
+                </div>
+                {openCodeStatus.version && (
+                  <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.42)", marginBottom: 2 }}>
+                    {t("settings.version", { value: openCodeStatus.version })}
+                  </div>
+                )}
+                {openCodeStatus.configPath && (
+                  <div
+                    title={openCodeStatus.configPath}
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: s(10),
+                      color: "rgba(255,255,255,0.22)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {openCodeStatus.configPath}
+                  </div>
+                )}
+              </div>
+              {!openCodeAdding && (
+                <button
+                  type="button"
+                  onClick={handleStartOpenCodeAdd}
+                  style={compactButtonStyle(true)}
+                >
+                  <Plus size={12} strokeWidth={1.8} />
+                  {t("settings.opencodeAddModel")}
+                </button>
+              )}
+            </div>
+
+            {openCodeAdding && (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                    gap: 8,
+                    marginBottom: 8,
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={openCodeDraft.providerId}
+                    placeholder={t("settings.opencodeProviderPlaceholder")}
+                    onChange={(e) => updateOpenCodeDraft({ providerId: e.target.value })}
+                    spellCheck={false}
+                    style={inputStyle}
+                  />
+                  <input
+                    type="text"
+                    value={openCodeDraft.modelId}
+                    placeholder={t("settings.opencodeModelPlaceholder")}
+                    onChange={(e) => updateOpenCodeDraft({ modelId: e.target.value })}
+                    spellCheck={false}
+                    style={inputStyle}
+                  />
+                  <input
+                    type="text"
+                    value={openCodeDraft.label}
+                    placeholder={t("settings.opencodeLabelPlaceholder")}
+                    onChange={(e) => updateOpenCodeDraft({ label: e.target.value })}
+                    spellCheck={false}
+                    style={{ ...inputStyle, gridColumn: "1 / -1" }}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                    gap: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  <input
+                    type="password"
+                    value={openCodeDraft.apiKey}
+                    placeholder={t("settings.opencodeApiKeyPlaceholder")}
+                    onChange={(e) => updateOpenCodeDraft({ apiKey: e.target.value })}
+                    spellCheck={false}
+                    style={inputStyle}
+                  />
+                  <input
+                    type="text"
+                    value={openCodeDraft.baseURL}
+                    placeholder={t("settings.opencodeBaseUrlPlaceholder")}
+                    onChange={(e) => updateOpenCodeDraft({ baseURL: e.target.value })}
+                    spellCheck={false}
+                    style={inputStyle}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "flex-start",
+                    marginBottom: 12,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleCancelOpenCodeAdd}
+                    disabled={openCodeSaving}
+                    style={compactButtonStyle(!openCodeSaving)}
+                  >
+                    {t("settings.opencodeCancelAdd")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveOpenCodeModel}
+                    disabled={openCodeSaving || !openCodeDraft.providerId.trim() || !openCodeDraft.modelId.trim()}
+                    style={compactButtonStyle(!openCodeSaving && !!openCodeDraft.providerId.trim() && !!openCodeDraft.modelId.trim())}
+                  >
+                    <Check size={12} strokeWidth={1.8} />
+                    {openCodeSaving ? t("settings.saving") : t("settings.opencodeSaveModel")}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {openCodeMessage && (
               <div
                 style={{
-                  fontSize: s(12),
-                  color: openCodeStatus.installed && openCodeStatus.configured
-                    ? "rgba(205,255,214,0.88)"
-                    : "rgba(255,255,255,0.72)",
-                  marginBottom: 4,
+                  fontSize: s(11),
+                  color: openCodeMessage === t("settings.opencodeSaved")
+                    ? "rgba(205,255,214,0.74)"
+                    : "rgba(255,210,160,0.74)",
+                  marginBottom: 12,
                 }}
               >
-                {openCodeStatus.installed
-                  ? (openCodeStatus.configured ? t("settings.opencodeConfigured") : t("settings.opencodeInstalled"))
-                  : t("settings.opencodeNotInstalled")}
+                {openCodeMessage}
               </div>
-              {openCodeStatus.version && (
-                <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.42)", marginBottom: 2 }}>
-                  {t("settings.version", { value: openCodeStatus.version })}
-                </div>
-              )}
-              {openCodeStatus.configPath && (
-                <div
-                  title={openCodeStatus.configPath}
-                  style={{
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: s(10),
-                    color: "rgba(255,255,255,0.22)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {openCodeStatus.configPath}
-                </div>
-              )}
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                gap: 8,
-                marginBottom: 8,
-              }}
-            >
-              <input
-                type="text"
-                value={openCodeDraft.providerId}
-                placeholder={t("settings.opencodeProviderPlaceholder")}
-                onChange={(e) => updateOpenCodeDraft({ providerId: e.target.value })}
-                spellCheck={false}
-                style={inputStyle}
-              />
-              <input
-                type="text"
-                value={openCodeDraft.modelId}
-                placeholder={t("settings.opencodeModelPlaceholder")}
-                onChange={(e) => updateOpenCodeDraft({ modelId: e.target.value })}
-                spellCheck={false}
-                style={inputStyle}
-              />
-              <input
-                type="text"
-                value={openCodeDraft.label}
-                placeholder={t("settings.opencodeLabelPlaceholder")}
-                onChange={(e) => updateOpenCodeDraft({ label: e.target.value })}
-                spellCheck={false}
-                style={{ ...inputStyle, gridColumn: "1 / -1" }}
-              />
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-                gap: 8,
-                marginBottom: 10,
-              }}
-            >
-              <input
-                type="password"
-                value={openCodeDraft.apiKey}
-                placeholder={t("settings.opencodeApiKeyPlaceholder")}
-                onChange={(e) => updateOpenCodeDraft({ apiKey: e.target.value })}
-                spellCheck={false}
-                style={inputStyle}
-              />
-              <input
-                type="text"
-                value={openCodeDraft.baseURL}
-                placeholder={t("settings.opencodeBaseUrlPlaceholder")}
-                onChange={(e) => updateOpenCodeDraft({ baseURL: e.target.value })}
-                spellCheck={false}
-                style={inputStyle}
-              />
-            </div>
-
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
-              <button
-                type="button"
-                onClick={handleSaveOpenCodeModel}
-                disabled={openCodeSaving || !openCodeDraft.providerId.trim() || !openCodeDraft.modelId.trim()}
-                style={compactButtonStyle(!openCodeSaving && !!openCodeDraft.providerId.trim() && !!openCodeDraft.modelId.trim())}
-              >
-                <Plus size={12} strokeWidth={1.8} />
-                {openCodeSaving ? t("settings.saving") : t("settings.opencodeAddModel")}
-              </button>
-              {openCodeMessage && (
-                <span
-                  style={{
-                    fontSize: s(11),
-                    color: openCodeMessage === t("settings.opencodeSaved")
-                      ? "rgba(205,255,214,0.74)"
-                      : "rgba(255,210,160,0.74)",
-                  }}
-                >
-                  {openCodeMessage}
-                </span>
-              )}
-            </div>
+            )}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {openCodeModels.length === 0 ? (
