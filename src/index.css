@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 :root {
   --pane-background: #0D0D10;
@@ -18,36 +18,11 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
-  --text-primary: rgba(255,255,255,0.92);
-  --control-bg: rgba(255,255,255,0.04);
-  --control-bg-hover: rgba(255,255,255,0.10);
-  --control-border: rgba(255,255,255,0.08);
-  --app-background: #0D0D10;
+  --control-bg-strong: rgba(255,255,255,0.08);
 }
 
 [data-theme="light"] {
-  --pane-background: #F5F5F7;
-  --pane-background-rgb: 245, 245, 247;
-  --pane-overlay-alpha: 0.90;
-  --pane-background-overlay: rgba(var(--pane-background-rgb), var(--pane-overlay-alpha));
-  --pane-hover-overlay: rgba(230, 230, 235, var(--pane-overlay-alpha));
-  --pane-active-overlay: rgba(220, 220, 228, var(--pane-overlay-alpha));
-  --pane-elevated-rgb: 235, 235, 240;
-  --pane-elevated: rgba(var(--pane-elevated-rgb), 0.7);
-  --pane-hover: #EAEAEF;
-  --pane-active: #E2E2E8;
-  --pane-interaction-hover-fill: var(--pane-hover);
-  --pane-interaction-active-fill: var(--pane-active);
-  --pane-interaction-hover-filter: none;
-  --pane-interaction-active-filter: none;
-  --pane-interaction-hover-shadow: none;
-  --pane-interaction-active-shadow: none;
-  --pane-border: rgba(0,0,0,0.06);
-  --text-primary: rgba(0,0,0,0.88);
-  --control-bg: rgba(0,0,0,0.04);
-  --control-bg-hover: rgba(0,0,0,0.10);
-  --control-border: rgba(0,0,0,0.12);
-  --app-background: #F5F5F7;
+  --control-bg-strong: rgba(0,0,0,0.10);
 }
 
 *, *::before, *::after {
@@ -63,10 +38,9 @@ html, body, #root {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar               { width: 3px; }
-::-webkit-scrollbar-track         { background: transparent; }
-::-webkit-scrollbar-thumb         { background: rgba(255,255,255,0.15); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover   { background: rgba(255,255,255,0.35); }
+::-webkit-scrollbar        { width: 2px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.03); border-radius: 2px; }
 
 /* ── KaTeX dark theme overrides ── */
 .katex { color: inherit; }
@@ -120,30 +94,13 @@ input:focus         { outline: none; }
   to   { opacity: 1; max-height: 60px; }
 }
 
-/* ── xterm transparent background + slim overlay scrollbar ── */
+/* ── xterm transparent background ── */
 .xterm,
 .xterm .xterm-screen,
 .xterm .xterm-viewport,
 .xterm .xterm-scrollable-element {
   background: transparent !important;
   background-color: transparent !important;
-}
-.xterm .xterm-viewport::-webkit-scrollbar { display: none; }
-.xterm .xterm-viewport { scrollbar-width: none; }
-
-/* xterm overlay scrollbar — matches Settings page scrollbar style */
-/* xterm 6.x uses .xterm-scrollbar.xterm-vertical / .xterm-slider (10px default, override to 3px) */
-.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical {
-  width: 3px !important;
-}
-.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical .xterm-slider {
-  width: 3px !important;
-  border-radius: 99px;
-  background: rgba(255,255,255,0.15) !important;
-  transition: background .15s;
-}
-.xterm .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical:hover .xterm-slider {
-  background: rgba(255,255,255,0.35) !important;
 }
 
 .rayline-terminal-host--opaque .xterm,
@@ -163,6 +120,14 @@ input:focus         { outline: none; }
   box-shadow: none;
 }
 
+.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar {
+  width: 3px;
+}
+
+.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
 
 /* ── Range slider ── */
 input[type="range"] {
