@@ -221,7 +221,7 @@ function PointerSlider({ min, max, step, value, onChange }) {
           top: "50%",
           height: 8,
           borderRadius: 999,
-          background: "rgba(255,255,255,0.1)",
+          background: "var(--control-bg-active)",
           transform: "translateY(-50%)",
         }}
       />
@@ -233,7 +233,7 @@ function PointerSlider({ min, max, step, value, onChange }) {
           width: `${percent}%`,
           height: 8,
           borderRadius: 999,
-          background: "rgba(255,255,255,0.82)",
+          background: "var(--text-primary)",
           transform: "translateY(-50%)",
         }}
       />
@@ -245,9 +245,9 @@ function PointerSlider({ min, max, step, value, onChange }) {
           width: 22,
           height: 22,
           borderRadius: "50%",
-          border: "1px solid rgba(255,255,255,0.32)",
-          background: "rgba(246,248,255,0.96)",
-          boxShadow: dragging ? "0 0 0 10px rgba(255,255,255,0.05)" : "0 8px 24px rgba(0,0,0,0.22)",
+          border: "1px solid var(--control-border-active)",
+          background: "var(--control-thumb-bg)",
+          boxShadow: dragging ? "0 0 0 10px var(--control-bg-strong)" : "0 8px 24px rgba(0,0,0,0.22)",
           transform: `translateY(-50%) scale(${dragging ? 1.05 : 1})`,
           transition: dragging ? "none" : "box-shadow .14s ease, transform .14s ease",
         }}
@@ -308,10 +308,10 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
         style={{
           margin: "12px 0",
           borderRadius: 10,
-          border: "1px solid rgba(255,255,255,0.06)",
-          background: "rgba(255,255,255,0.02)",
+          border: "1px solid var(--control-bg-strong)",
+          background: "var(--control-bg-subtle)",
           padding: "18px 16px",
-          color: "rgba(255,255,255,0.28)",
+          color: "var(--text-muted)",
           fontSize: s(11),
           fontFamily: "'JetBrains Mono',monospace",
           letterSpacing: ".08em",
@@ -328,8 +328,8 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
         style={{
           margin: "12px 0",
           borderRadius: 10,
-          border: "1px solid rgba(255,120,120,0.18)",
-          background: "rgba(120,0,0,0.12)",
+          border: "1px solid var(--danger-border)",
+          background: "var(--danger-bg)",
           padding: "14px 16px",
         }}
       >
@@ -337,7 +337,7 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
           style={{
             fontSize: s(10),
             fontFamily: "'JetBrains Mono',monospace",
-            color: "rgba(255,180,180,0.75)",
+            color: "var(--danger-text)",
             letterSpacing: ".08em",
             marginBottom: 8,
           }}
@@ -347,7 +347,7 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
         <div
           style={{
             fontSize: s(13),
-            color: "rgba(255,220,220,0.8)",
+            color: "var(--danger-text-strong)",
             fontFamily: "system-ui,-apple-system,sans-serif",
           }}
         >
@@ -433,8 +433,8 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
       style={{
         margin: "12px 0",
         borderRadius: 12,
-        border: "1px solid rgba(255,255,255,0.08)",
-        background: "rgba(255,255,255,0.025)",
+        border: "1px solid var(--control-border)",
+        background: "var(--control-bg)",
         overflow: "hidden",
       }}
     >
@@ -446,12 +446,12 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
           padding: "10px 14px 0",
         }}
       >
-        <SlidersHorizontal size={14} strokeWidth={1.8} style={{ color: "rgba(255,255,255,0.4)" }} />
+        <SlidersHorizontal size={14} strokeWidth={1.8} style={{ color: "var(--text-muted)" }} />
         <span
           style={{
             fontSize: s(10),
             fontFamily: "'JetBrains Mono',monospace",
-            color: "rgba(255,255,255,0.3)",
+            color: "var(--text-muted)",
             letterSpacing: ".1em",
           }}
         >
@@ -473,7 +473,7 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
             <div
               style={{
                 fontSize: s(15),
-                color: "rgba(255,255,255,0.86)",
+                color: "var(--text-primary)",
                 fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
                 lineHeight: 1.35,
               }}
@@ -484,7 +484,7 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
               <div
                 style={{
                   fontSize: s(11),
-                  color: "rgba(255,255,255,0.35)",
+                  color: "var(--text-muted)",
                   fontFamily: "system-ui,-apple-system,sans-serif",
                   lineHeight: 1.5,
                   marginTop: 2,
@@ -500,8 +500,8 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
                 display: "flex",
                 alignItems: "center",
                 gap: 4,
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.07)",
+                background: "var(--control-bg)",
+                border: "1px solid var(--control-bg-strong)",
                 borderRadius: 999,
                 padding: "3px 7px 3px 9px",
                 whiteSpace: "nowrap",
@@ -534,7 +534,7 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
                   border: "none",
                   outline: "none",
                   background: "transparent",
-                  color: "rgba(255,255,255,0.82)",
+                  color: "var(--text-primary)",
                   fontSize: s(11),
                   fontFamily: "'JetBrains Mono',monospace",
                   textAlign: "right",
@@ -545,7 +545,7 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
                   style={{
                     fontSize: s(10.5),
                     fontFamily: "'JetBrains Mono',monospace",
-                    color: "rgba(255,255,255,0.42)",
+                    color: "var(--text-muted)",
                   }}
                 >
                   {control.unit}
@@ -557,9 +557,9 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
               style={{
                 fontSize: s(12),
                 fontFamily: "'JetBrains Mono',monospace",
-                color: "rgba(255,255,255,0.75)",
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                color: "var(--text-secondary)",
+                background: "var(--control-bg-strong)",
+                border: "1px solid var(--control-border)",
                 borderRadius: 999,
                 padding: "4px 9px",
                 whiteSpace: "nowrap",
@@ -595,7 +595,7 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
                   style={{
                     fontSize: s(10),
                     fontFamily: "'JetBrains Mono',monospace",
-                    color: active ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.22)",
+                    color: active ? "var(--text-secondary)" : "var(--text-disabled)",
                     textAlign: index === 0 ? "left" : index === config.options.length - 1 ? "right" : "center",
                     transition: "color .15s ease",
                   }}
@@ -620,7 +620,7 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
             style={{
               fontSize: s(10),
               fontFamily: "'JetBrains Mono',monospace",
-              color: isBoundControl ? "rgba(170,220,255,0.52)" : "rgba(255,255,255,0.22)",
+              color: isBoundControl ? "var(--accent-muted)" : "var(--text-disabled)",
               letterSpacing: ".06em",
             }}
           >
@@ -638,16 +638,16 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
               onMouseLeave={() => setButtonHovered(false)}
               style={{
                 border: submitted
-                  ? "1px solid rgba(255,255,255,0.10)"
+                  ? "1px solid var(--control-bg-active)"
                   : buttonHovered
-                    ? "1px solid rgba(255,255,255,0.14)"
-                    : "1px solid rgba(255,255,255,0.07)",
+                    ? "1px solid var(--control-border-hover)"
+                    : "1px solid var(--control-bg-strong)",
                 background: submitted
-                  ? "rgba(255,255,255,0.09)"
+                  ? "var(--control-bg-active)"
                   : buttonHovered
-                    ? "rgba(255,255,255,0.085)"
-                    : "rgba(255,255,255,0.045)",
-                color: submitted ? "rgba(255,255,255,0.72)" : canSubmit ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.28)",
+                    ? "var(--control-bg-active)"
+                    : "var(--control-bg)",
+                color: submitted ? "var(--text-secondary)" : canSubmit ? "var(--text-secondary)" : "var(--text-muted)",
                 borderRadius: 999,
                 padding: "6px 11px",
                 cursor: canSubmit ? "pointer" : "default",
@@ -655,7 +655,7 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
                 fontFamily: "'JetBrains Mono',monospace",
                 letterSpacing: ".08em",
                 textTransform: "uppercase",
-                boxShadow: submitted ? "none" : "inset 0 1px 0 rgba(255,255,255,0.03)",
+                boxShadow: submitted ? "none" : "inset 0 1px 0 var(--control-highlight)",
                 transition: "all .15s ease",
               }}
             >
