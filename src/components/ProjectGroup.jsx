@@ -1,4 +1,4 @@
-import { memo, useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, FolderClosed, Plus, MoreHorizontal, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
@@ -6,12 +6,7 @@ import { getMOrMulticaFallback } from "../data/models";
 import { relativeTime } from "../utils/time";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 
-const PROJECT_CONVO_MAX_HEIGHT = 320;
-const PROJECT_CONVO_BASE_ROW_HEIGHT = 76;
-const PROJECT_CONVO_VIRTUALIZE_AFTER = 8;
-const PROJECT_CONVO_OVERSCAN = 3;
-
-function ProjectGroup({
+export default function ProjectGroup({
   project,
   active,
   onSelect,
@@ -85,7 +80,7 @@ function ProjectGroup({
           style={{
             display: "flex",
             alignItems: "center",
-            color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
+            color: "rgba(255,255,255,0.25)",
             transform: `rotate(${expanded ? 90 : 0}deg)`,
             transition: "transform .15s",
             flexShrink: 0,
@@ -99,7 +94,7 @@ function ProjectGroup({
           style={{
             display: "flex",
             alignItems: "center",
-            color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
+            color: "rgba(255,255,255,0.3)",
             flexShrink: 0,
           }}
         >
@@ -113,7 +108,7 @@ function ProjectGroup({
             minWidth: 0,
             fontSize: s(11),
             fontFamily: "'JetBrains Mono', monospace",
-            color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
+            color: "rgba(255,255,255,0.4)",
             letterSpacing: ".04em",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -133,7 +128,7 @@ function ProjectGroup({
                 transform: "translateY(-50%)",
                 fontSize: s(9),
                 fontFamily: "'JetBrains Mono', monospace",
-                color: "color-mix(in srgb, var(--text-primary) 16%, transparent)",
+                color: "rgba(255,255,255,0.15)",
                 letterSpacing: ".04em",
                 opacity: headerHovered ? 0 : 1,
                 pointerEvents: "none",
@@ -168,14 +163,14 @@ function ProjectGroup({
                 justifyContent: "center",
                 background: "none",
                 border: "none",
-                color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
+                color: "rgba(255,255,255,0.25)",
                 cursor: "pointer",
                 padding: 3,
                 borderRadius: 4,
                 transition: "color .15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 71%, transparent)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 27%, transparent)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
             >
               <Plus size={11} strokeWidth={1.5} />
             </button>
@@ -190,14 +185,14 @@ function ProjectGroup({
                 justifyContent: "center",
                 background: "none",
                 border: "none",
-                color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
+                color: "rgba(255,255,255,0.25)",
                 cursor: "pointer",
                 padding: 3,
                 borderRadius: 4,
                 transition: "color .15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 71%, transparent)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 27%, transparent)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
             >
               <MoreHorizontal size={11} strokeWidth={1.5} />
             </button>
@@ -205,15 +200,158 @@ function ProjectGroup({
         </div>
       </div>
 
+      {/* Conversation list */}
       {expanded && (
-        <ConversationList
-          convos={project.convos}
-          active={active}
-          onSelect={onSelect}
-          onDelete={onDelete}
-          multicaModels={multicaModels}
-          s={s}
-        />
+      <div
+        className="folder-convo-scroll"
+        style={{
+          maxHeight: 320,
+          overflowY: project.convos.length > 4 ? "auto" : "visible",
+          overflowX: "hidden",
+        }}
+      >
+      {project.convos.map((c) => {
+        const isActive = c.id === active;
+        const cm = getMOrMulticaFallback(c.model, multicaModels);
+
+        return (
+          <div
+            key={c.id}
+            onClick={() => onSelect(c.id)}
+            style={{
+              position: "relative",
+              padding: "12px 6px 12px 28px",
+              borderRadius: 8,
+              cursor: "pointer",
+              marginBottom: 1,
+              transition: "all .12s",
+              ...(isActive ? getPaneInteractionStyle("active") : getPaneInteractionStyle("idle")),
+            }}
+            onMouseEnter={(e) => {
+              if (!isActive) applyPaneInteractionStyle(e.currentTarget, "hover");
+              const actions = e.currentTarget.querySelector(".convo-actions");
+              if (actions) actions.style.opacity = "1";
+            }}
+            onMouseLeave={(e) => {
+              if (!isActive) applyPaneInteractionStyle(e.currentTarget, "idle");
+              const actions = e.currentTarget.querySelector(".convo-actions");
+              if (actions) actions.style.opacity = "0";
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+              <div style={{ flex: 1, minWidth: 0, paddingRight: 18 }}>
+                <div
+                  style={{
+                    fontSize: s(12.5),
+                    color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    fontFamily: "system-ui,sans-serif",
+                    marginBottom: 4,
+                  }}
+                >
+                  {c.title}
+                </div>
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: "rgba(255,255,255,0.3)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    fontFamily: "'Lato',system-ui,sans-serif",
+                    fontWeight: 300,
+                  }}
+                >
+                  {c.lastPreview || "Empty"}
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="convo-actions"
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 6,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: 0,
+                transition: "opacity .15s",
+              }}
+            >
+              <button
+                onClick={(e) => onDelete(c.id, e)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "rgba(255,255,255,0.25)",
+                  cursor: "pointer",
+                  padding: 1,
+                  transition: "color .15s",
+                  display: "flex",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(200,80,80,0.5)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+              >
+                <Trash2 size={12} strokeWidth={1.5} />
+              </button>
+            </div>
+
+            <div
+              style={{
+                marginTop: 6,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: s(9),
+                  fontFamily: "'JetBrains Mono',monospace",
+                  color: "rgba(255,255,255,0.35)",
+                  letterSpacing: ".08em",
+                  minWidth: 0,
+                }}
+              >
+                {cm.tag}
+              </div>
+
+              {c.isStreaming && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    flexShrink: 0,
+                    transform: "translateX(-2px)",
+                    fontSize: s(8.5),
+                    fontFamily: "'JetBrains Mono',monospace",
+                    color: "rgba(165,255,210,0.5)",
+                    letterSpacing: ".08em",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: "rgba(165,255,210,0.5)",
+                      animation: "dotPulse 1.2s ease-in-out infinite",
+                    }}
+                  />
+                  RUNNING
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      </div>
       )}
 
       {/* Context menu portal */}
@@ -226,9 +364,9 @@ function ProjectGroup({
             left: menuPos.left,
             zIndex: 400,
             minWidth: 180,
-            background: "var(--pane-elevated)",
+            background: "rgba(8,8,12,0.55)",
             backdropFilter: "blur(48px) saturate(1.2)",
-            border: "1px solid var(--pane-border)",
+            border: "1px solid rgba(255,255,255,0.06)",
             borderRadius: 10,
             padding: 3,
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
@@ -254,7 +392,7 @@ function ProjectGroup({
           />
 
           {/* Divider */}
-          <div style={{ height: 1, background: "var(--control-bg)", margin: "3px 8px" }} />
+          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "3px 8px" }} />
 
           <MenuBtn
             s={s}
@@ -272,260 +410,6 @@ function ProjectGroup({
   );
 }
 
-function ConversationList({ convos, active, onSelect, onDelete, multicaModels, s }) {
-  const [scrollTop, setScrollTop] = useState(0);
-  const rowHeight = Math.max(
-    PROJECT_CONVO_BASE_ROW_HEIGHT,
-    Math.ceil(s(PROJECT_CONVO_BASE_ROW_HEIGHT))
-  );
-  const shouldVirtualize = convos.length > PROJECT_CONVO_VIRTUALIZE_AFTER;
-  const viewportHeight = Math.min(PROJECT_CONVO_MAX_HEIGHT, convos.length * rowHeight);
-
-  const handleScroll = useCallback((event) => {
-    setScrollTop(event.currentTarget.scrollTop);
-  }, []);
-
-  const totalHeight = convos.length * rowHeight;
-  const scrollOffset = Math.min(scrollTop, Math.max(0, totalHeight - viewportHeight));
-  const startIndex = Math.max(
-    0,
-    Math.floor(scrollOffset / rowHeight) - PROJECT_CONVO_OVERSCAN
-  );
-  const endIndex = Math.min(
-    convos.length,
-    Math.ceil((scrollOffset + viewportHeight) / rowHeight) + PROJECT_CONVO_OVERSCAN
-  );
-  const visibleConvos = useMemo(
-    () => convos.slice(startIndex, endIndex),
-    [convos, endIndex, startIndex]
-  );
-
-  if (!shouldVirtualize) {
-    return (
-      <div
-        className="folder-convo-scroll"
-        style={{
-          maxHeight: PROJECT_CONVO_MAX_HEIGHT,
-          overflowY: convos.length > 4 ? "auto" : "visible",
-          overflowX: "hidden",
-          contain: "layout paint style",
-        }}
-      >
-        {convos.map((c) => (
-          <ConversationRow
-            key={c.id}
-            conversation={c}
-            active={active}
-            onSelect={onSelect}
-            onDelete={onDelete}
-            multicaModels={multicaModels}
-            rowHeight={rowHeight}
-            s={s}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="folder-convo-scroll"
-      onScroll={handleScroll}
-      style={{
-        height: viewportHeight,
-        maxHeight: PROJECT_CONVO_MAX_HEIGHT,
-        overflowY: "auto",
-        overflowX: "hidden",
-        position: "relative",
-        contain: "layout paint style",
-      }}
-    >
-      <div style={{ height: totalHeight, position: "relative" }}>
-        {visibleConvos.map((c, index) => (
-          <ConversationRow
-            key={c.id}
-            conversation={c}
-            active={active}
-            onSelect={onSelect}
-            onDelete={onDelete}
-            multicaModels={multicaModels}
-            rowHeight={rowHeight}
-            s={s}
-            style={{
-              position: "absolute",
-              top: (startIndex + index) * rowHeight,
-              left: 0,
-              right: 0,
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const ConversationRow = memo(function ConversationRow({
-  conversation: c,
-  active,
-  onSelect,
-  onDelete,
-  multicaModels,
-  rowHeight,
-  s,
-  style,
-}) {
-  const isActive = c.id === active;
-  const cm = getMOrMulticaFallback(c.model, multicaModels);
-
-  const handleSelect = useCallback(() => {
-    onSelect(c.id);
-  }, [c.id, onSelect]);
-
-  const handleDelete = useCallback((event) => {
-    onDelete(c.id, event);
-  }, [c.id, onDelete]);
-
-  return (
-    <div
-      onClick={handleSelect}
-      style={{
-        position: "relative",
-        height: rowHeight - 1,
-        padding: "11px 6px 10px 28px",
-        borderRadius: 8,
-        cursor: "pointer",
-        marginBottom: 1,
-        overflow: "hidden",
-        contain: "layout paint style",
-        transition: "background .12s, box-shadow .12s, color .12s",
-        ...(isActive ? getPaneInteractionStyle("active") : getPaneInteractionStyle("idle")),
-        ...style,
-      }}
-      onMouseEnter={(e) => {
-        if (!isActive) applyPaneInteractionStyle(e.currentTarget, "hover");
-        const actions = e.currentTarget.querySelector(".convo-actions");
-        if (actions) actions.style.opacity = "1";
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) applyPaneInteractionStyle(e.currentTarget, "idle");
-        const actions = e.currentTarget.querySelector(".convo-actions");
-        if (actions) actions.style.opacity = "0";
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
-        <div style={{ flex: 1, minWidth: 0, paddingRight: 18 }}>
-          <div
-            style={{
-              fontSize: s(12.5),
-              color: isActive ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 49%, transparent)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              fontFamily: "system-ui,sans-serif",
-              marginBottom: 4,
-            }}
-          >
-            {c.title}
-          </div>
-          <div
-            style={{
-              fontSize: s(11),
-              color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              fontFamily: "'Lato',system-ui,sans-serif",
-              fontWeight: 300,
-            }}
-          >
-            {c.lastPreview || "Empty"}
-          </div>
-        </div>
-      </div>
-
-      <div
-        className="convo-actions"
-        style={{
-          position: "absolute",
-          top: 12,
-          right: 6,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: 0,
-          transition: "opacity .15s",
-        }}
-      >
-        <button
-          onClick={handleDelete}
-          style={{
-            background: "none",
-            border: "none",
-            color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
-            cursor: "pointer",
-            padding: 1,
-            transition: "color .15s",
-            display: "flex",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--danger-soft-text)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 27%, transparent)"; }}
-        >
-          <Trash2 size={12} strokeWidth={1.5} />
-        </button>
-      </div>
-
-      <div
-        style={{
-          marginTop: 6,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-        }}
-      >
-        <div
-          style={{
-            fontSize: s(9),
-            fontFamily: "'JetBrains Mono',monospace",
-            color: "color-mix(in srgb, var(--text-primary) 38%, transparent)",
-            letterSpacing: ".08em",
-            minWidth: 0,
-          }}
-        >
-          {cm.tag}
-        </div>
-
-        {c.isStreaming && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              flexShrink: 0,
-              transform: "translateX(-2px)",
-              fontSize: s(8.5),
-              fontFamily: "'JetBrains Mono',monospace",
-              color: "var(--badge-open-text)",
-              letterSpacing: ".08em",
-            }}
-          >
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "var(--badge-open-text)",
-                animation: "dotPulse 1.2s ease-in-out infinite",
-              }}
-            />
-            RUNNING
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}, areConversationRowsEqual);
-
 function MenuBtn({ s, label, onClick, danger = false }) {
   return (
     <button
@@ -537,7 +421,7 @@ function MenuBtn({ s, label, onClick, danger = false }) {
         background: "transparent",
         border: "none",
         borderRadius: 7,
-        color: danger ? "var(--danger-soft-text)" : "color-mix(in srgb, var(--text-primary) 60%, transparent)",
+        color: danger ? "rgba(210,80,80,0.7)" : "rgba(255,255,255,0.55)",
         fontSize: s(11),
         fontFamily: "system-ui, sans-serif",
         cursor: "pointer",
@@ -545,110 +429,15 @@ function MenuBtn({ s, label, onClick, danger = false }) {
         transition: "all .12s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--control-bg)";
-        e.currentTarget.style.color = danger ? "var(--danger-soft-text)" : "color-mix(in srgb, var(--text-primary) 92%, transparent)";
+        e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+        e.currentTarget.style.color = danger ? "rgba(220,90,90,1)" : "rgba(255,255,255,0.85)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = danger ? "var(--danger-soft-text)" : "color-mix(in srgb, var(--text-primary) 60%, transparent)";
+        e.currentTarget.style.color = danger ? "rgba(210,80,80,0.7)" : "rgba(255,255,255,0.55)";
       }}
     >
       {label}
     </button>
   );
 }
-
-function hasConvoId(convos, id) {
-  if (!id) return false;
-  return convos.some((c) => c.id === id);
-}
-
-function sameTags(a = [], b = []) {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
-
-function sameConversationData(a, b) {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  return (
-    a.id === b.id &&
-    a.title === b.title &&
-    a.lastPreview === b.lastPreview &&
-    a.model === b.model &&
-    a.isStreaming === b.isStreaming &&
-    sameTags(a.tags || [], b.tags || [])
-  );
-}
-
-function sameConversationList(a = [], b = []) {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) {
-    if (!sameConversationData(a[i], b[i])) return false;
-  }
-  return true;
-}
-
-function sameVirtualStyle(a = {}, b = {}) {
-  return (
-    a.position === b.position &&
-    a.top === b.top &&
-    a.left === b.left &&
-    a.right === b.right
-  );
-}
-
-function areConversationRowsEqual(prev, next) {
-  const wasActive = prev.conversation.id === prev.active;
-  const isActive = next.conversation.id === next.active;
-  return (
-    wasActive === isActive &&
-    prev.onSelect === next.onSelect &&
-    prev.onDelete === next.onDelete &&
-    prev.multicaModels === next.multicaModels &&
-    prev.rowHeight === next.rowHeight &&
-    prev.s === next.s &&
-    sameConversationData(prev.conversation, next.conversation) &&
-    sameVirtualStyle(prev.style, next.style)
-  );
-}
-
-function areProjectGroupsEqual(prev, next) {
-  if (
-    prev.onSelect !== next.onSelect ||
-    prev.onDelete !== next.onDelete ||
-    prev.onNewInProject !== next.onNewInProject ||
-    prev.onToggleCollapse !== next.onToggleCollapse ||
-    prev.onHideProject !== next.onHideProject ||
-    prev.searchActive !== next.searchActive ||
-    prev.multicaModels !== next.multicaModels
-  ) {
-    return false;
-  }
-
-  const prevProject = prev.project;
-  const nextProject = next.project;
-  if (
-    prevProject.cwdRoot !== nextProject.cwdRoot ||
-    prevProject.name !== nextProject.name ||
-    prevProject.collapsed !== nextProject.collapsed ||
-    prevProject.hidden !== nextProject.hidden ||
-    prevProject.latestTs !== nextProject.latestTs ||
-    !sameConversationList(prevProject.convos, nextProject.convos)
-  ) {
-    return false;
-  }
-
-  if (prev.active === next.active) return true;
-  return (
-    !hasConvoId(prevProject.convos, prev.active) &&
-    !hasConvoId(nextProject.convos, next.active)
-  );
-}
-
-export default memo(ProjectGroup, areProjectGroupsEqual);

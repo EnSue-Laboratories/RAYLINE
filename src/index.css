@@ -18,6 +18,37 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
+
+  /* ── Semantic tokens (WS-C dropdown family) ── */
+  --badge-open-bg:     rgba(99, 210, 130, 0.14);
+  --badge-open-border: rgba(99, 210, 130, 0.30);
+  --badge-open-text:   #63d282;
+  --control-bg:        rgba(255,255,255,0.07);
+  --control-bg-strong: rgba(255,255,255,0.12);
+  --control-border:    rgba(255,255,255,0.10);
+  --danger-soft-bg:    rgba(239, 68, 68, 0.12);
+  --danger-soft-border:rgba(239, 68, 68, 0.28);
+  --danger-soft-text:  #f87171;
+  --state-warning-text:#fbbf24;
+}
+
+[data-theme="light"] {
+  --pane-background:    #f5f5f7;
+  --pane-background-rgb:245,245,247;
+  --pane-elevated:      rgba(255,255,255,0.80);
+  --pane-border:        rgba(0,0,0,0.08);
+
+  /* ── Semantic tokens (WS-C dropdown family) ── */
+  --badge-open-bg:     rgba(22, 163, 74, 0.12);
+  --badge-open-border: rgba(22, 163, 74, 0.28);
+  --badge-open-text:   #16a34a;
+  --control-bg:        rgba(0,0,0,0.05);
+  --control-bg-strong: rgba(0,0,0,0.09);
+  --control-border:    rgba(0,0,0,0.12);
+  --danger-soft-bg:    rgba(220, 38, 38, 0.09);
+  --danger-soft-border:rgba(220, 38, 38, 0.24);
+  --danger-soft-text:  #dc2626;
+  --state-warning-text:#d97706;
 }
 
 *, *::before, *::after {
