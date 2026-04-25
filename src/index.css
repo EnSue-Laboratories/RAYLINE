@@ -18,6 +18,9 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
+  --text-primary: rgba(255,255,255,0.92);
+  --control-bg: rgba(255,255,255,0.05);
+  --control-border: rgba(255,255,255,0.10);
 }
 
 *, *::before, *::after {
@@ -208,6 +211,9 @@ input[type="range"]::-webkit-slider-thumb {
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(31,41,55,0.10);
+  --text-primary: rgba(26,33,43,0.92);
+  --control-bg: rgba(255,255,255,0.72);
+  --control-border: rgba(31,41,55,0.10);
   --state-warning-soft-bg: rgba(217,150,40,0.10);
   --state-warning-soft-border: rgba(217,150,40,0.20);
   --state-warning-soft-text: rgba(139,92,21,0.92);
