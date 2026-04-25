@@ -38,7 +38,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ matrix.platform == 'windows' && 'main' || github.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
