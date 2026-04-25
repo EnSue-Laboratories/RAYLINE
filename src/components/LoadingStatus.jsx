@@ -44,6 +44,15 @@ function formatDuration(ms) {
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
+function formatCost(cost) {
+  if (!Number.isFinite(cost)) return "$0";
+  if (cost <= 0) return "$0";
+  if (cost < 0.0001) return "<$0.0001";
+  if (cost < 0.01) return `$${cost.toFixed(4)}`;
+  if (cost < 1) return `$${cost.toFixed(3)}`;
+  return `$${cost.toFixed(2)}`;
+}
+
 // Coarse "resets in" label for plan-quota windows (5h / 7d).
 // resetsAtSec is unix epoch seconds; nowMs is wall clock (param so the
 // component can re-render against its existing `now` tick).
@@ -170,11 +179,14 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
     isCodex &&
     !hasExplicitContextWindow &&
     contextUsed > configuredContextWindow * 1.2;
+  const costUsd = Number(usage?.cost_usd);
+  const hasCost = Number.isFinite(costUsd);
   const contextPct = contextUsed
     ? Math.max(0, Math.min(100, (contextUsed / contextWindow) * 100))
     : 0;
 
-  const hasUsage = contextUsed > 0 && !isLikelyCumulativeCodexUsage;
+  const hasTokenUsage = contextUsed > 0 && !isLikelyCumulativeCodexUsage;
+  const hasUsage = hasTokenUsage || hasCost;
 
   const fiveHour = rateLimits?.five_hour;
   const sevenDay = rateLimits?.seven_day;
@@ -260,31 +272,42 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
       {/* Line 2: token breakdown + context */}
       {hasUsage && (
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", color: secondaryColor, fontVariantNumeric: "tabular-nums" }}>
-          <span>
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>in </span>
-            {formatCompact(inputTokens)}
-          </span>
-          {sep}
-          <span>
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>out </span>
-            {formatCompact(outputTokens)}
-          </span>
-          {(cacheRead + cacheCreate) > 0 && (
+          {hasTokenUsage && (
             <>
+              <span>
+                <span style={{ color: "rgba(255,255,255,0.22)" }}>in </span>
+                {formatCompact(inputTokens)}
+              </span>
               {sep}
               <span>
-                <span style={{ color: "rgba(255,255,255,0.22)" }}>cached </span>
-                {formatCompact(cacheRead + cacheCreate)}
+                <span style={{ color: "rgba(255,255,255,0.22)" }}>out </span>
+                {formatCompact(outputTokens)}
+              </span>
+              {(cacheRead + cacheCreate) > 0 && (
+                <>
+                  {sep}
+                  <span>
+                    <span style={{ color: "rgba(255,255,255,0.22)" }}>cached </span>
+                    {formatCompact(cacheRead + cacheCreate)}
+                  </span>
+                </>
+              )}
+              {sep}
+              <span>
+                <span style={{ color: "rgba(255,255,255,0.22)" }}>ctx </span>
+                {formatCompact(contextUsed)}
+                <span style={{ color: "rgba(255,255,255,0.22)" }}>/{formatCompact(contextWindow)}</span>
+                <span style={{ marginLeft: 5, color: "rgba(255,255,255,0.42)" }}>{pctLabel}</span>
               </span>
             </>
           )}
-          {sep}
-          <span>
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>ctx </span>
-            {formatCompact(contextUsed)}
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>/{formatCompact(contextWindow)}</span>
-            <span style={{ marginLeft: 5, color: "rgba(255,255,255,0.42)" }}>{pctLabel}</span>
-          </span>
+          {hasTokenUsage && hasCost && sep}
+          {hasCost && (
+            <span>
+              <span style={{ color: "rgba(255,255,255,0.22)" }}>cost </span>
+              {formatCost(costUsd)}
+            </span>
+          )}
         </div>
       )}
 

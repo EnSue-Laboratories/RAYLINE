@@ -14,16 +14,12 @@ function sanitizeModel(entry) {
   const modelId = safeString(entry.modelId || entry.model);
   if (!providerId || !modelId) return null;
 
-  const contextWindow = Number(entry.contextWindow);
   return {
     id: `${providerId}/${modelId}`,
     providerId,
     modelId,
     label: safeString(entry.label),
     baseURL: safeString(entry.baseURL),
-    contextWindow: Number.isFinite(contextWindow) && contextWindow > 0
-      ? Math.round(contextWindow)
-      : null,
     addedAt: Number.isFinite(entry.addedAt) ? entry.addedAt : Date.now(),
     updatedAt: Number.isFinite(entry.updatedAt) ? entry.updatedAt : Date.now(),
   };
@@ -114,6 +110,5 @@ export function openCodeEntryToModel(entry) {
     cliFlag: `${providerId}/${modelId}`,
     providerId,
     modelId,
-    ...(entry.contextWindow ? { contextWindow: entry.contextWindow } : {}),
   };
 }

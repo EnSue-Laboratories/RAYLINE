@@ -206,6 +206,27 @@ function extractOpenCodeText(event) {
   return candidates.find((value) => typeof value === "string" && value.length > 0) || "";
 }
 
+const OPENCODE_TOOL_NAMES = {
+  bash: "Bash",
+  edit: "Edit",
+  grep: "Grep",
+  glob: "Glob",
+  read: "Read",
+  write: "Write",
+};
+
+function normalizeOpenCodeToolName(name) {
+  const raw = typeof name === "string" ? name : "";
+  return OPENCODE_TOOL_NAMES[raw.toLowerCase()] || raw || "tool";
+}
+
+function normalizeOpenCodeToolArgs(name, input) {
+  const args = input && typeof input === "object" ? { ...input } : {};
+  if (args.filePath && !args.file_path) args.file_path = args.filePath;
+  if (name === "Bash" && args.cmd && !args.command) args.command = args.cmd;
+  return args;
+}
+
 function extractOpenCodeSessionId(event) {
   return (
     event?.sessionID ||
@@ -219,14 +240,65 @@ function extractOpenCodeSessionId(event) {
 
 function extractOpenCodeTool(event) {
   const part = event?.part || {};
-  const input = event?.input ?? part.input ?? part.args ?? part.parameters ?? {};
-  const output = event?.output ?? part.output ?? part.result ?? null;
+  const state = part.state && typeof part.state === "object" ? part.state : {};
+  const name = normalizeOpenCodeToolName(event?.tool || event?.name || part.tool || part.name || part.type);
+  const input = event?.input ?? state.input ?? part.input ?? part.args ?? part.parameters ?? {};
+  const output = event?.output ?? state.output ?? part.output ?? part.result ?? null;
+  const status = state.status || part.status || event.status || "";
   return {
-    id: event?.id || part.id || "oc" + uid(),
-    name: event?.tool || event?.name || part.tool || part.name || part.type || "tool",
-    args: input && typeof input === "object" ? input : { value: input },
-    result: output,
-    status: output == null ? "running" : "done",
+    id: event?.callID || part.callID || event?.id || part.id || "oc" + uid(),
+    name,
+    args: normalizeOpenCodeToolArgs(name, input),
+    result: output ?? state.error ?? null,
+    status: status === "completed" || output != null ? "done" : "running",
+    _opencodeTime: state.time?.start || part.time?.start || event?.timestamp || Date.now(),
+  };
+}
+
+function buildOpenCodeTextPart(event) {
+  const part = event?.part || {};
+  const text = event.type === "opencode_stdout" ? event.text : extractOpenCodeText(event);
+  if (!text) return null;
+  return {
+    type: "text",
+    id: part.id || event.id || "oct" + uid(),
+    text,
+    _opencodeTime: part.time?.start || event.timestamp || Date.now(),
+  };
+}
+
+function sortOpenCodeParts(parts) {
+  return [...parts].sort((a, b) => {
+    const at = Number.isFinite(a?._opencodeTime) ? a._opencodeTime : Number.POSITIVE_INFINITY;
+    const bt = Number.isFinite(b?._opencodeTime) ? b._opencodeTime : Number.POSITIVE_INFINITY;
+    if (at !== bt) return at - bt;
+    return 0;
+  });
+}
+
+function upsertOpenCodePart(parts, nextPart) {
+  const idx = parts.findIndex((part) => part.type === nextPart.type && part.id === nextPart.id);
+  if (idx >= 0) {
+    const updated = [...parts];
+    updated[idx] = { ...updated[idx], ...nextPart };
+    return sortOpenCodeParts(updated);
+  }
+  return sortOpenCodeParts([...parts, nextPart]);
+}
+
+function normalizeOpenCodeUsage(part, previousUsage) {
+  const tokens = part?.tokens;
+  if (!tokens || typeof tokens !== "object") return previousUsage || null;
+  const previousCost = Number.isFinite(previousUsage?.cost_usd) ? previousUsage.cost_usd : 0;
+  const stepCost = Number(part.cost);
+  return {
+    input_tokens: tokens.input ?? 0,
+    output_tokens: tokens.output ?? 0,
+    total_tokens: tokens.total ?? null,
+    cache_read_input_tokens: tokens.cache?.read ?? 0,
+    cache_creation_input_tokens: tokens.cache?.write ?? 0,
+    reasoning_tokens: tokens.reasoning ?? 0,
+    ...(Number.isFinite(stepCost) ? { cost_usd: previousCost + stepCost } : {}),
   };
 }
 
@@ -688,26 +760,14 @@ export default function useAgent() {
           } else if (event.type === "tool_use") {
             const am = ensureAssistant();
             const tool = extractOpenCodeTool(event);
-            const parts = cloneParts(am.parts);
-            const existingIdx = parts.findIndex((part) => part.type === "tool" && part.id === tool.id);
-            if (existingIdx >= 0) {
-              parts[existingIdx] = { ...parts[existingIdx], ...tool };
-            } else {
-              parts.push({ type: "tool", ...tool });
-            }
+            const parts = upsertOpenCodePart(cloneParts(am.parts), { type: "tool", ...tool });
             msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
             lastMsg = msgs[msgs.length - 1];
           } else if (event.type === "text" || event.type === "opencode_stdout") {
-            const text = event.type === "opencode_stdout" ? event.text : extractOpenCodeText(event);
-            if (text) {
+            const textPart = buildOpenCodeTextPart(event);
+            if (textPart) {
               const am = ensureAssistant();
-              const parts = cloneParts(am.parts);
-              const lastPart = parts[parts.length - 1];
-              if (lastPart?.type === "text" && event.type !== "opencode_stdout") {
-                parts[parts.length - 1] = { ...lastPart, text: `${lastPart.text || ""}${text}` };
-              } else {
-                parts.push({ type: "text", text });
-              }
+              const parts = upsertOpenCodePart(cloneParts(am.parts), textPart);
               msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
               lastMsg = msgs[msgs.length - 1];
             }
@@ -719,10 +779,15 @@ export default function useAgent() {
             lastMsg = msgs[msgs.length - 1];
             nextIsStreaming = false;
           } else if (event.type === "step_finish") {
+            const am = ensureAssistant();
+            const usage = normalizeOpenCodeUsage(event.part, am._usage);
+            if (usage) {
+              msgs[msgs.length - 1] = { ...am, _usage: usage };
+              lastMsg = msgs[msgs.length - 1];
+            }
             const reason = event.reason || event.part?.reason || event.status || "";
             if (/^(stop|done|complete|completed|end_turn)$/i.test(String(reason))) {
-              const am = ensureAssistant();
-              msgs[msgs.length - 1] = freezeElapsed({ ...am, isStreaming: false, isThinking: false });
+              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
               lastMsg = msgs[msgs.length - 1];
               nextIsStreaming = false;
             }

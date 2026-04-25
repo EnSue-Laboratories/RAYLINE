@@ -29,7 +29,6 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     label: "",
     apiKey: "",
     baseURL: "",
-    contextWindow: "",
   });
   const [openCodeSaving, setOpenCodeSaving] = useState(false);
   const [openCodeMessage, setOpenCodeMessage] = useState("");
@@ -183,7 +182,6 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     setOpenCodeSaving(true);
     setOpenCodeMessage("");
     try {
-      const contextWindow = Number(openCodeDraft.contextWindow);
       await window.api?.opencodeSaveConfig?.({
         providerId,
         modelId,
@@ -196,14 +194,12 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         modelId,
         label: openCodeDraft.label,
         baseURL: openCodeDraft.baseURL,
-        contextWindow: Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : null,
       });
       setOpenCodeDraft((prev) => ({
         ...prev,
         modelId: "",
         label: "",
         apiKey: "",
-        contextWindow: "",
       }));
       await refreshOpenCode();
       setOpenCodeMessage(t("settings.opencodeSaved"));
@@ -930,15 +926,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 placeholder={t("settings.opencodeLabelPlaceholder")}
                 onChange={(e) => updateOpenCodeDraft({ label: e.target.value })}
                 spellCheck={false}
-                style={inputStyle}
-              />
-              <input
-                type="number"
-                min={1}
-                value={openCodeDraft.contextWindow}
-                placeholder={t("settings.opencodeContextPlaceholder")}
-                onChange={(e) => updateOpenCodeDraft({ contextWindow: e.target.value })}
-                style={inputStyle}
+                style={{ ...inputStyle, gridColumn: "1 / -1" }}
               />
             </div>
             <div

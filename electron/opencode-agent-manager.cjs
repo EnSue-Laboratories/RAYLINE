@@ -106,7 +106,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, cwd, images, files,
     return null;
   }
 
-  const args = ["run", "--format", "json", "--dangerously-skip-permissions"];
+  const args = ["run", "--format", "json", "--dangerously-skip-permissions", "--dir", launchCwd];
   const nativeSessionId = resumeSessionId || sessionId;
 
   if (nativeSessionId) {
