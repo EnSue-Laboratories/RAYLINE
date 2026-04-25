@@ -339,9 +339,9 @@ const iconBtnStyle = {
   width: 24,
   height: 24,
   borderRadius: 6,
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.06)",
-  color: "rgba(255,255,255,0.45)",
+  background: "transparent",
+  border: "none",
+  color: "rgba(255,255,255,0.4)",
   cursor: "pointer",
   flexShrink: 0,
   WebkitAppRegion: "no-drag",
@@ -391,7 +391,7 @@ function useHover(baseStyle, hoverStyle) {
 
 function IconButton({ onClick, title, children }) {
   const hover = useHover(iconBtnStyle, {
-    background: "rgba(255,255,255,0.09)",
+    background: "rgba(255,255,255,0.07)",
     color: "rgba(255,255,255,0.8)",
   });
 
@@ -738,7 +738,7 @@ function SessionTerminal({
         document.fonts.ready.then(() => {
           if (cancelled) return;
           scheduleDeferredFits([0, 80], "fonts-ready");
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       const ro = new ResizeObserver(() => {
@@ -1173,8 +1173,8 @@ export default function TerminalDrawer({
           }}
         />
       )}
-      {/* Spacer that clears the window controls area on Windows */}
-      {windowControlsVisible && (
+      {/* Spacer that clears the window controls area on Windows (drawer mode only) */}
+      {windowControlsVisible && !windowMode && (
         <div style={{ height: WINDOW_DRAG_HEIGHT, flexShrink: 0 }} />
       )}
 
@@ -1187,17 +1187,12 @@ export default function TerminalDrawer({
           overflow: "hidden",
         }}
       >
-        <div
-          style={{
-            position: "relative",
-          }}
-        >
-          {/* Header */}
+        <div style={{ position: "relative" }}>
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: windowMode ? "flex-end" : "space-between",
+              justifyContent: "space-between",
               height: WINDOW_DRAG_HEIGHT,
               padding: windowMode && isMac
                 ? `0 14px 0 ${MAC_TRAFFIC_LIGHT_SAFE_WIDTH + 8}px`
@@ -1205,52 +1200,42 @@ export default function TerminalDrawer({
               WebkitAppRegion: "drag",
             }}
           >
-            {!windowMode && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 7,
-                  WebkitAppRegion: "drag",
-                }}
-              >
-                <TerminalIcon
-                  size={13}
-                  strokeWidth={1.5}
-                  color="rgba(255,255,255,0.35)"
-                />
-                <span
-                  style={{
+            {/* Left: TERMINALS label (drawer) or + button (window) */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, WebkitAppRegion: "no-drag" }}>
+              {windowMode ? (
+                <IconButton onClick={handleCreate} title="New terminal">
+                  <Plus size={13} strokeWidth={1.5} />
+                </IconButton>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 7, WebkitAppRegion: "drag" }}>
+                  <TerminalIcon size={13} strokeWidth={1.5} color="rgba(255,255,255,0.35)" />
+                  <span style={{
                     fontSize: s(10),
                     fontFamily: FONT_FAMILY,
                     color: "rgba(255,255,255,0.35)",
                     letterSpacing: ".08em",
                     userSelect: "none",
-                  }}
-                >
-                  TERMINALS
-                </span>
-              </div>
-            )}
-
-            {/* Right: action buttons */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                WebkitAppRegion: "no-drag",
-              }}
-            >
-              <IconButton onClick={handleCreate} title="New terminal">
-                <Plus size={13} strokeWidth={1.5} />
-              </IconButton>
-              {(!windowMode || !windowControlsVisible) && (
-                <IconButton onClick={windowMode ? onRequestClose : onToggleDrawer} title={windowMode ? "Close window" : "Close drawer"}>
-                  <X size={13} strokeWidth={1.5} />
-                </IconButton>
+                  }}>
+                    TERMINALS
+                  </span>
+                </div>
               )}
             </div>
+
+            {/* Right: action buttons (drawer only; window mode uses OS controls) */}
+            {!windowMode ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, WebkitAppRegion: "no-drag" }}>
+                <IconButton onClick={handleCreate} title="New terminal">
+                  <Plus size={13} strokeWidth={1.5} />
+                </IconButton>
+                <IconButton onClick={onToggleDrawer} title="Close drawer">
+                  <X size={13} strokeWidth={1.5} />
+                </IconButton>
+              </div>
+            ) : windowControlsVisible && (
+              /* no-drag spacer covering the WindowControls (3 × 30px + gaps ≈ 108px, +12px right offset) */
+              <div style={{ width: 120, flexShrink: 0, WebkitAppRegion: "no-drag" }} />
+            )}
           </div>
 
           {/* Tab bar — only when there are multiple sessions */}
