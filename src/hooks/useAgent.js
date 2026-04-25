@@ -193,6 +193,54 @@ function normalizeCodexToolResult(output) {
   }
 }
 
+function extractOpenCodeText(event) {
+  if (!event || typeof event !== "object") return "";
+  const candidates = [
+    event.text,
+    event.delta,
+    event.content,
+    event.message,
+    event.part?.text,
+    event.part?.content,
+  ];
+  return candidates.find((value) => typeof value === "string" && value.length > 0) || "";
+}
+
+function extractOpenCodeSessionId(event) {
+  return (
+    event?.sessionID ||
+    event?.session_id ||
+    event?.sessionId ||
+    event?.session?.id ||
+    event?.part?.sessionID ||
+    null
+  );
+}
+
+function extractOpenCodeTool(event) {
+  const part = event?.part || {};
+  const input = event?.input ?? part.input ?? part.args ?? part.parameters ?? {};
+  const output = event?.output ?? part.output ?? part.result ?? null;
+  return {
+    id: event?.id || part.id || "oc" + uid(),
+    name: event?.tool || event?.name || part.tool || part.name || part.type || "tool",
+    args: input && typeof input === "object" ? input : { value: input },
+    result: output,
+    status: output == null ? "running" : "done",
+  };
+}
+
+function extractOpenCodeError(event) {
+  if (!event || typeof event !== "object") return "";
+  return (
+    (typeof event.message === "string" && event.message) ||
+    (typeof event.error === "string" && event.error) ||
+    (typeof event.error?.message === "string" && event.error.message) ||
+    (typeof event.error?.data?.message === "string" && event.error.data.message) ||
+    "OpenCode run failed."
+  );
+}
+
 export default function useAgent() {
   const [conversations, setConversations] = useState(new Map());
   const cleanupRefs = useRef([]);
@@ -614,6 +662,71 @@ export default function useAgent() {
           const am = ensureAssistant();
           msgs[msgs.length - 1] = { ...am, _compacting: true };
           lastMsg = msgs[msgs.length - 1];
+        }
+
+        // --- OpenCode JSONL stream events ---
+        else if (
+          event.type === "opencode_stdout" ||
+          event.type === "step_start" ||
+          event.type === "tool_use" ||
+          event.type === "text" ||
+          event.type === "step_finish" ||
+          event.type === "error"
+        ) {
+          const sessionId = extractOpenCodeSessionId(event);
+          if (sessionId) {
+            convo._opencodeSessionId = sessionId;
+            console.log("[useAgent] Captured OpenCode session ID:", {
+              conversationId,
+              sessionId,
+              eventType: event.type,
+            });
+          }
+
+          if (event.type === "step_start") {
+            ensureAssistant();
+          } else if (event.type === "tool_use") {
+            const am = ensureAssistant();
+            const tool = extractOpenCodeTool(event);
+            const parts = cloneParts(am.parts);
+            const existingIdx = parts.findIndex((part) => part.type === "tool" && part.id === tool.id);
+            if (existingIdx >= 0) {
+              parts[existingIdx] = { ...parts[existingIdx], ...tool };
+            } else {
+              parts.push({ type: "tool", ...tool });
+            }
+            msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
+            lastMsg = msgs[msgs.length - 1];
+          } else if (event.type === "text" || event.type === "opencode_stdout") {
+            const text = event.type === "opencode_stdout" ? event.text : extractOpenCodeText(event);
+            if (text) {
+              const am = ensureAssistant();
+              const parts = cloneParts(am.parts);
+              const lastPart = parts[parts.length - 1];
+              if (lastPart?.type === "text" && event.type !== "opencode_stdout") {
+                parts[parts.length - 1] = { ...lastPart, text: `${lastPart.text || ""}${text}` };
+              } else {
+                parts.push({ type: "text", text });
+              }
+              msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
+              lastMsg = msgs[msgs.length - 1];
+            }
+          } else if (event.type === "error") {
+            const am = ensureAssistant();
+            const parts = cloneParts(am.parts);
+            parts.push({ type: "text", text: `**Error:** ${extractOpenCodeError(event)}` });
+            msgs[msgs.length - 1] = freezeElapsed({ ...am, parts, isStreaming: false, isThinking: false });
+            lastMsg = msgs[msgs.length - 1];
+            nextIsStreaming = false;
+          } else if (event.type === "step_finish") {
+            const reason = event.reason || event.part?.reason || event.status || "";
+            if (/^(stop|done|complete|completed|end_turn)$/i.test(String(reason))) {
+              const am = ensureAssistant();
+              msgs[msgs.length - 1] = freezeElapsed({ ...am, isStreaming: false, isThinking: false });
+              lastMsg = msgs[msgs.length - 1];
+              nextIsStreaming = false;
+            }
+          }
         }
 
         // --- Codex JSONL stream events ---

@@ -15,6 +15,7 @@ import MulticaSetupModal from "./components/MulticaSetupModal";
 import NewProjectModal from "./components/NewProjectModal";
 import { DEFAULT_MODEL_ID, getMOrMulticaFallback, isMulticaModelId, MODELS, normalizeModelId } from "./data/models";
 import { useMulticaModels } from "./data/multicaModels.jsx";
+import { useOpenCodeModels } from "./data/openCodeModels.jsx";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
@@ -1149,6 +1150,7 @@ export default function App() {
   const { closeWindow: closeTerminalWindow, openWindow: openTerminalWindow } = terminal;
   const { prefersReducedMotion } = useWindowActivity();
   const { models: multicaModels } = useMulticaModels();
+  const { models: openCodeModels } = useOpenCodeModels();
 
   // convos: array of { id, sessionId, title, model, ts }
   const [convoList, setConvoList] = useState([]);
@@ -1227,8 +1229,8 @@ export default function App() {
     [active, persistableConversations]
   );
   const dispatchAvailableModels = useMemo(
-    () => [...MODELS, ...multicaModels],
-    [multicaModels]
+    () => [...MODELS, ...openCodeModels, ...multicaModels],
+    [multicaModels, openCodeModels]
   );
   const persistStatePayload = useMemo(() => ({
     convos: persistableConversations,
@@ -2217,17 +2219,21 @@ export default function App() {
 
     const nextCodexThreadId = data._codexThreadId || null;
     const nextClaudeSessionId = data._claudeSessionId || null;
+    const nextOpenCodeSessionId = data._opencodeSessionId || null;
     const hasNewCodexThreadId =
       nextCodexThreadId && normalizedConvo.providerSessions?.codex !== nextCodexThreadId;
     const hasNewClaudeSessionId =
       nextClaudeSessionId && normalizedConvo.providerSessions?.claude !== nextClaudeSessionId;
+    const hasNewOpenCodeSessionId =
+      nextOpenCodeSessionId && normalizedConvo.providerSessions?.opencode !== nextOpenCodeSessionId;
 
-    if (!hasNewCodexThreadId && !hasNewClaudeSessionId) return;
+    if (!hasNewCodexThreadId && !hasNewClaudeSessionId && !hasNewOpenCodeSessionId) return;
 
     logSessionState("captureProviderSession", {
       conversationId: active,
       nextCodexThreadId,
       nextClaudeSessionId,
+      nextOpenCodeSessionId,
       lastProvider: normalizedConvo.lastProvider || null,
       sessionId: normalizedConvo.sessionId || null,
       sessionProvider: normalizedConvo.sessionProvider || null,
@@ -2285,6 +2291,30 @@ export default function App() {
               activate: true,
               preferPendingActive: true,
               lastProvider: next.lastProvider || "claude",
+            }
+          );
+        }
+        if (hasNewOpenCodeSessionId) {
+          next = upsertConversationSession(
+            next,
+            {
+              id:
+                activeSession?.provider === "opencode" && !activeSession.nativeSessionId
+                  ? activeSession.id
+                  : undefined,
+              provider: "opencode",
+              nativeSessionId: nextOpenCodeSessionId,
+              model: next.model,
+              syncedThroughMessageCount: Math.max(
+                activeSession?.syncedThroughMessageCount || 0,
+                next.archivedMessages?.length || 0
+              ),
+              origin: "capture",
+            },
+            {
+              activate: true,
+              preferPendingActive: true,
+              lastProvider: next.lastProvider || "opencode",
             }
           );
         }
@@ -3665,7 +3695,7 @@ export default function App() {
             draftsCollapsed={draftsCollapsed}
             onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
             developerMode={developerMode}
-            multicaModels={multicaModels}
+            multicaModels={[...openCodeModels, ...multicaModels]}
             hasUpdate={hasUpdate}
           />
         </div>
