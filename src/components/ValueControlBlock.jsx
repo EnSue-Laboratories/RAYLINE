@@ -259,6 +259,49 @@ function PointerSlider({ min, max, step, value, onChange }) {
 export default function ValueControlBlock({ json, isStreaming, onAnswer, onControlChange, canControlTarget }) {
   const s = useFontScale();
 
+  // Parse/normalize eagerly but never short-circuit — all hooks must run in the same order.
+  // Errors from normalizeControlBlock are captured and rendered at the bottom.
+  const parsed = useMemo(() => {
+    if (isStreaming) return { ok: false, streaming: true };
+    try {
+      return { ok: true, ...normalizeControlBlock(json) };
+    } catch (err) {
+      return { ok: false, error: err };
+    }
+  }, [json, isStreaming]);
+
+  const control = parsed.ok ? parsed.control : null;
+  const config = parsed.ok ? parsed.config : null;
+  const fallbackInitial = 0;
+  const initialSliderValue = config ? config.initial : fallbackInitial;
+
+  const cachedDraftValue = controlDraftCache.get(json);
+  const [sliderValue, setSliderValue] = useState(
+    Number.isFinite(cachedDraftValue) ? cachedDraftValue : initialSliderValue
+  );
+  const [valueDraft, setValueDraft] = useState(() =>
+    config
+      ? formatNumber(config.getValue(Number.isFinite(cachedDraftValue) ? cachedDraftValue : config.initial))
+      : ""
+  );
+  const [submitted, setSubmitted] = useState(false);
+  const [buttonHovered, setButtonHovered] = useState(false);
+
+  useEffect(() => {
+    if (!config) return;
+    const nextValue = Number.isFinite(controlDraftCache.get(json))
+      ? controlDraftCache.get(json)
+      : config.initial;
+    setSliderValue(nextValue);
+    setValueDraft(formatNumber(config.getValue(nextValue)));
+    setSubmitted(false);
+  }, [json, config, config?.initial]);
+
+  const value = useMemo(
+    () => (config ? config.getValue(sliderValue) : 0),
+    [config, sliderValue]
+  );
+
   if (isStreaming) {
     return (
       <div
@@ -279,10 +322,7 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
     );
   }
 
-  let normalized;
-  try {
-    normalized = normalizeControlBlock(json);
-  } catch (error) {
+  if (!parsed.ok) {
     return (
       <div
         style={{
@@ -311,33 +351,11 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
             fontFamily: "system-ui,-apple-system,sans-serif",
           }}
         >
-          {error.message}
+          {parsed.error?.message}
         </div>
       </div>
     );
   }
-
-  const { control, config } = normalized;
-  const cachedDraftValue = controlDraftCache.get(json);
-  const [sliderValue, setSliderValue] = useState(
-    Number.isFinite(cachedDraftValue) ? cachedDraftValue : config.initial
-  );
-  const [valueDraft, setValueDraft] = useState(() =>
-    formatNumber(config.getValue(Number.isFinite(cachedDraftValue) ? cachedDraftValue : config.initial))
-  );
-  const [submitted, setSubmitted] = useState(false);
-  const [buttonHovered, setButtonHovered] = useState(false);
-
-  useEffect(() => {
-    const nextValue = Number.isFinite(controlDraftCache.get(json))
-      ? controlDraftCache.get(json)
-      : config.initial;
-    setSliderValue(nextValue);
-    setValueDraft(formatNumber(config.getValue(nextValue)));
-    setSubmitted(false);
-  }, [json, config.initial]);
-
-  const value = useMemo(() => config.getValue(sliderValue), [config, sliderValue]);
   const valueText = `${formatNumber(value)}${control.unit || ""}`;
   const selectedLabel = config.selectedLabel ? config.selectedLabel(sliderValue) : null;
   const valueFieldWidth = `${Math.min(Math.max(valueDraft.length + 0.35, 3), 5.5)}ch`;
