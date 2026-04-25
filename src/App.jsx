@@ -19,6 +19,7 @@ import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 import { detectDefaultLocale, normalizeLocale } from "./i18n";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import {
   pinTabPatch,
   runEndedPatch,
@@ -3388,6 +3389,7 @@ export default function App() {
     : "width .34s cubic-bezier(.16,1,.3,1), min-width .34s cubic-bezier(.16,1,.3,1), border-color .18s ease";
 
   return (
+    <ThemeProvider>
     <FontSizeContext.Provider value={fontSize}>
     <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative" }}>
       {wallpaper?.dataUrl ? (
@@ -3601,5 +3603,6 @@ export default function App() {
       </div>
     </div>
     </FontSizeContext.Provider>
+    </ThemeProvider>
   );
 }

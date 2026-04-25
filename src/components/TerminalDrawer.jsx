@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { getResolvedThemeMode } from "../contexts/ThemeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { getWallpaperImageFilter } from "../utils/wallpaper";
 import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../windowChrome";
@@ -29,21 +30,6 @@ function getWallpaperOpacityValue(wallpaper) {
 
 function getTerminalWallpaperOverlayAlpha(wallpaper) {
   return 0.52 + getWallpaperOpacityValue(wallpaper) * 0.18;
-}
-
-function getResolvedThemeMode(detail) {
-  const candidate = detail?.resolved || detail?.mode || detail?.theme;
-  if (candidate === "light" || candidate === "dark") return candidate;
-
-  if (typeof document !== "undefined") {
-    const root = document.documentElement;
-    if (root.dataset.theme === "light" || root.dataset.theme === "dark") {
-      return root.dataset.theme;
-    }
-    if (root.classList.contains("light")) return "light";
-  }
-
-  return "dark";
 }
 
 function readRootCssVar(name, fallback) {
@@ -82,27 +68,6 @@ function getTerminalTheme(opaqueBackground, mode = "dark") {
     brightCyan: readRootCssVar("--term-bright-cyan", "#98dbf3"),
     brightWhite: readRootCssVar("--term-bright-white", "#f5f7fb"),
   };
-}
-
-function serializeTerminalBuffer(term) {
-  const serializeAddon = term?.__raylineSerializeAddon;
-  if (serializeAddon?.serialize) {
-    try {
-      return serializeAddon.serialize();
-    } catch {
-      // Fall through to the public buffer API fallback.
-    }
-  }
-
-  const buffer = term?.buffer?.active;
-  if (!buffer?.getLine || !Number.isFinite(buffer.length)) return "";
-
-  const lines = [];
-  for (let row = 0; row < buffer.length; row += 1) {
-    const line = buffer.getLine(row);
-    lines.push(line?.translateToString(true) ?? "");
-  }
-  return lines.join("\r\n");
 }
 
 function emitTerminalDebug(event, details = {}) {
@@ -473,8 +438,6 @@ function SessionTerminal({
   const lastSyncedPtySizeRef = useRef("");
   const mouseGestureRef = useRef(null);
   const themeModeRef = useRef(getResolvedThemeMode());
-  const pendingScrollbackRef = useRef("");
-  const [themeRevision, setThemeRevision] = useState(0);
 
   // Stable refs so the async IIFE captures up-to-date callbacks without
   // restarting the effect every time parent re-renders.
@@ -491,14 +454,17 @@ function SessionTerminal({
 
   useEffect(() => {
     const handleThemeChange = (event) => {
-      themeModeRef.current = getResolvedThemeMode(event.detail);
-      pendingScrollbackRef.current = serializeTerminalBuffer(termRef.current);
-      setThemeRevision((revision) => revision + 1);
+      const nextMode = getResolvedThemeMode(event.detail);
+      themeModeRef.current = nextMode;
+      const term = termRef.current;
+      if (!term) return;
+      term.options.theme = getTerminalTheme(opaqueBackground, nextMode);
+      term.refresh(0, term.rows - 1);
     };
 
     window.addEventListener("rayline:theme-change", handleThemeChange);
     return () => window.removeEventListener("rayline:theme-change", handleThemeChange);
-  }, []);
+  }, [opaqueBackground]);
 
   const teardown = useCallback(() => {
     fitTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -536,7 +502,7 @@ function SessionTerminal({
 
       const el = document.createElement("div");
       el.className = `rayline-terminal-host${opaqueBackground ? " rayline-terminal-host--opaque" : ""}`;
-      el.style.cssText = `width:100%;height:100%;background:${opaqueBackground ? TERMINAL_OPAQUE_BG : "transparent"};`;
+      el.style.cssText = `width:100%;height:100%;background:${opaqueBackground ? "var(--term-background)" : "transparent"};`;
       xtermElRef.current = el;
       containerRef.current.appendChild(el);
 
@@ -780,11 +746,7 @@ function SessionTerminal({
 
       registerRef.current(sessionName, term);
 
-      const pendingScrollback = pendingScrollbackRef.current;
-      pendingScrollbackRef.current = "";
-      if (pendingScrollback) {
-        term.write(pendingScrollback);
-      } else if (window.api?.terminalRead) {
+      if (window.api?.terminalRead) {
         try {
           const result = await window.api.terminalRead({ name: sessionName, lines: 500 });
           if (!cancelled && result?.ok && result.lines?.length) {
@@ -838,7 +800,7 @@ function SessionTerminal({
       emitTerminalDebug("session:teardown", { sessionName });
       teardown();
     };
-  }, [opaqueBackground, plainClickMovesCursor, promptSelectionEditing, promptUndoShortcut, sessionName, teardown, themeRevision]);
+  }, [opaqueBackground, plainClickMovesCursor, promptSelectionEditing, promptUndoShortcut, sessionName, teardown]);
 
   useEffect(() => {
     const logActiveState = (phase) => {
