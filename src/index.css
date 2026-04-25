@@ -20,8 +20,34 @@
   --pane-border: rgba(255,255,255,0.06);
   --text-primary: rgba(255,255,255,0.92);
   --control-bg: rgba(255,255,255,0.04);
+  --control-bg-hover: rgba(255,255,255,0.10);
   --control-border: rgba(255,255,255,0.08);
   --app-background: #0D0D10;
+}
+
+[data-theme="light"] {
+  --pane-background: #F5F5F7;
+  --pane-background-rgb: 245, 245, 247;
+  --pane-overlay-alpha: 0.90;
+  --pane-background-overlay: rgba(var(--pane-background-rgb), var(--pane-overlay-alpha));
+  --pane-hover-overlay: rgba(230, 230, 235, var(--pane-overlay-alpha));
+  --pane-active-overlay: rgba(220, 220, 228, var(--pane-overlay-alpha));
+  --pane-elevated-rgb: 235, 235, 240;
+  --pane-elevated: rgba(var(--pane-elevated-rgb), 0.7);
+  --pane-hover: #EAEAEF;
+  --pane-active: #E2E2E8;
+  --pane-interaction-hover-fill: var(--pane-hover);
+  --pane-interaction-active-fill: var(--pane-active);
+  --pane-interaction-hover-filter: none;
+  --pane-interaction-active-filter: none;
+  --pane-interaction-hover-shadow: none;
+  --pane-interaction-active-shadow: none;
+  --pane-border: rgba(0,0,0,0.06);
+  --text-primary: rgba(0,0,0,0.88);
+  --control-bg: rgba(0,0,0,0.04);
+  --control-bg-hover: rgba(0,0,0,0.10);
+  --control-border: rgba(0,0,0,0.12);
+  --app-background: #F5F5F7;
 }
 
 *, *::before, *::after {

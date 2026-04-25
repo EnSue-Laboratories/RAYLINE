@@ -244,7 +244,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             height: 28,
             borderRadius: 7,
             background: backHover
-              ? "var(--control-bg)"
+              ? "var(--control-bg-hover)"
               : "var(--control-bg)",
             border: "1px solid var(--control-border)",
             color: backHover
@@ -499,7 +499,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       padding: "6px 14px",
                       borderRadius: 7,
                       background: removeHover
-                        ? "var(--control-bg)"
+                        ? "var(--control-bg-hover)"
                         : "var(--control-bg)",
                       border: "1px solid var(--control-border)",
                       color: "color-mix(in srgb, var(--text-primary) 49%, transparent)",
