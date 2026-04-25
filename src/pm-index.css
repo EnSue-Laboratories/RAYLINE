@@ -1,1 +1,6 @@
-/* PM-specific styles only. Shared theme tokens and global base styles live in index.css. */
+@import "./index.css";
+
+:root {
+  --pm-modal-backdrop: color-mix(in srgb, var(--pane-background) 45%, transparent);
+  --pm-modal-backdrop-blur: 6px;
+}

@@ -18,24 +18,17 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
-  --mermaid-bg: #0a0a0a;
-  --mermaid-node-bg: #1a1a1a;
-  --mermaid-node-border: rgba(255,255,255,0.25);
-  --mermaid-text: rgba(255,255,255,0.85);
-  --mermaid-line: rgba(255,255,255,0.35);
-  --mermaid-cluster-bg: #111111;
-  --mermaid-edge-label-bg: #0a0a0a;
+  --text-primary: rgba(255, 255, 255, 0.9);
+  --text-muted: rgba(255, 255, 255, 0.25);
+  --bg-secondary: var(--pane-elevated);
+  --scrollbar-thumb: rgba(255,255,255,.08);
+  --scrollbar-track: transparent;
 }
 
-:root[data-theme="light"],
-:root.light {
-  --mermaid-bg: #ffffff;
-  --mermaid-node-bg: #ffffff;
-  --mermaid-node-border: #cbd5e1;
-  --mermaid-text: #1f2937;
-  --mermaid-line: #475569;
-  --mermaid-cluster-bg: #f8fafc;
-  --mermaid-edge-label-bg: #ffffff;
+:root[data-theme="light"] {
+  --text-primary: rgba(0, 0, 0, 0.9);
+  --text-muted: rgba(0, 0, 0, 0.35);
+  --scrollbar-thumb: rgba(0,0,0,.08);
 }
 
 *, *::before, *::after {
@@ -51,19 +44,18 @@ html, body, #root {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar               { width: 3px; }
-::-webkit-scrollbar-track         { background: transparent; }
-::-webkit-scrollbar-thumb         { background: rgba(255,255,255,0.15); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover   { background: rgba(255,255,255,0.35); }
+::-webkit-scrollbar        { width: 2px; }
+::-webkit-scrollbar-track  { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb  { background: var(--scrollbar-thumb); border-radius: 2px; }
 
 /* ── KaTeX dark theme overrides ── */
-.katex { color: inherit; }
-.katex-display { margin: 12px 0; overflow-x: auto; overflow-y: hidden; }
+.katex { color: var(--text-primary); }
+.katex-display { margin: 12px 0; overflow-x: auto; overflow-y: hidden; background: var(--bg-secondary); }
 .katex-display > .katex { text-align: center; }
 
 /* ── Form resets ── */
 textarea::placeholder,
-input::placeholder  { color: rgba(255, 255, 255, 0.25); }
+input::placeholder  { color: var(--text-muted); }
 textarea:focus,
 input:focus         { outline: none; }
 
@@ -151,6 +143,14 @@ input:focus         { outline: none; }
   box-shadow: none;
 }
 
+.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar {
+  width: 3px;
+}
+
+.rayline-terminal-host .xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+}
 
 /* ── Range slider ── */
 input[type="range"] {
