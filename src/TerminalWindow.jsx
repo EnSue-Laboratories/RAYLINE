@@ -147,8 +147,6 @@ export default function TerminalWindow() {
         />
       )}
 
-      <WindowControls visible={showWindowControls} />
-
       <div
         style={{
           position: "relative",
@@ -176,6 +174,10 @@ export default function TerminalWindow() {
           onRequestClose={() => window.api?.closeCurrentWindow?.()}
         />
       </div>
+
+      {/* Rendered last so its no-drag region overrides the TerminalDrawer header's
+          drag region in Electron's paint-order drag resolution. */}
+      <WindowControls visible={showWindowControls} />
     </div>
   );
 }
