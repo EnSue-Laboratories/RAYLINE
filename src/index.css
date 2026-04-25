@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600&family=Inter+Tight:wght@400;500;600;700&family=Lato:wght@300;400;700&family=Newsreader:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 :root {
+  /* ── Pane geometry ── */
   --pane-background: #0D0D10;
   --pane-background-rgb: 13, 13, 16;
   --pane-overlay-alpha: 0.82;
@@ -18,6 +19,86 @@
   --pane-interaction-hover-shadow: none;
   --pane-interaction-active-shadow: none;
   --pane-border: rgba(255,255,255,0.06);
+
+  /* ── Semantic surface ── */
+  --bg-primary:    #0D0D10;
+  --bg-secondary:  #111114;
+  --bg-tertiary:   #18181C;
+  --surface-glass: rgba(255,255,255,0.04);
+  --hover-overlay: rgba(255,255,255,0.05);
+
+  /* ── Typography ── */
+  --text-primary:   rgba(255,255,255,0.92);
+  --text-secondary: rgba(255,255,255,0.55);
+  --text-muted:     rgba(255,255,255,0.30);
+
+  /* ── Borders ── */
+  --border:        rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.18);
+
+  /* ── Accent ── */
+  --accent: #7B68EE;
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.40);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.55);
+
+  /* ── Status: success (green) ── */
+  --success-bg: rgba(34,197,94,0.14);
+  --success-fg: #4ADE80;
+
+  /* ── Status: error (red) ── */
+  --error-bg: rgba(239,68,68,0.14);
+  --error-fg: #F87171;
+}
+
+/* ── Light theme overrides ── */
+[data-theme="light"] {
+  /* Pane geometry */
+  --pane-background: #F5F5F7;
+  --pane-background-rgb: 245, 245, 247;
+  --pane-overlay-alpha: 0.88;
+  --pane-background-overlay: rgba(var(--pane-background-rgb), var(--pane-overlay-alpha));
+  --pane-hover-overlay: rgba(230, 230, 232, var(--pane-overlay-alpha));
+  --pane-active-overlay: rgba(220, 220, 222, var(--pane-overlay-alpha));
+  --pane-elevated-rgb: 255, 255, 255;
+  --pane-elevated: rgba(var(--pane-elevated-rgb), 0.75);
+  --pane-hover: #EBEBED;
+  --pane-active: #E0E0E3;
+  --pane-interaction-hover-fill: var(--pane-hover);
+  --pane-interaction-active-fill: var(--pane-active);
+  --pane-border: rgba(0,0,0,0.08);
+
+  /* Semantic surface */
+  --bg-primary:    #F5F5F7;
+  --bg-secondary:  #EBEBED;
+  --bg-tertiary:   #E2E2E5;
+  --surface-glass: rgba(255,255,255,0.60);
+  --hover-overlay: rgba(0,0,0,0.04);
+
+  /* Typography */
+  --text-primary:   rgba(0,0,0,0.88);
+  --text-secondary: rgba(0,0,0,0.50);
+  --text-muted:     rgba(0,0,0,0.30);
+
+  /* Borders */
+  --border:        rgba(0,0,0,0.10);
+  --border-strong: rgba(0,0,0,0.22);
+
+  /* Accent */
+  --accent: #5B48D8;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.12);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.18);
+
+  /* Status: success */
+  --success-bg: rgba(22,163,74,0.12);
+  --success-fg: #16A34A;
+
+  /* Status: error */
+  --error-bg: rgba(220,38,38,0.10);
+  --error-fg: #DC2626;
 }
 
 *, *::before, *::after {
