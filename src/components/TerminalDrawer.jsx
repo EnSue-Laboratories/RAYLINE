@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Plus, Terminal as TerminalIcon } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { getResolvedThemeMode } from "../contexts/ThemeContext";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { getWallpaperImageFilter } from "../utils/wallpaper";
 import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../windowChrome";
@@ -31,30 +32,41 @@ function getTerminalWallpaperOverlayAlpha(wallpaper) {
   return 0.52 + getWallpaperOpacityValue(wallpaper) * 0.18;
 }
 
-function getTerminalTheme(opaqueBackground) {
+function readRootCssVar(name, fallback) {
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+function getTerminalTheme(opaqueBackground, mode = "dark") {
+  const background = mode === "light" ? "#f8fafc" : TERMINAL_OPAQUE_BG;
+  const foreground = mode === "light" ? "rgba(15,23,42,0.88)" : "rgba(244,247,250,0.88)";
+  const cursor = mode === "light" ? "rgba(15,23,42,0.96)" : "rgba(245,247,251,0.98)";
+  const selectionBackground = mode === "light" ? "rgba(37,99,235,0.18)" : "rgba(120,182,255,0.18)";
+  const selectionInactiveBackground = mode === "light" ? "rgba(37,99,235,0.1)" : "rgba(120,182,255,0.1)";
+
   return {
-    background: opaqueBackground ? TERMINAL_OPAQUE_BG : XTERM_TRANSPARENT,
-    foreground: "rgba(244,247,250,0.88)",
-    cursor: "rgba(245,247,251,0.98)",
-    cursorAccent: opaqueBackground ? TERMINAL_OPAQUE_BG : XTERM_TRANSPARENT,
-    selectionBackground: "rgba(120,182,255,0.18)",
-    selectionInactiveBackground: "rgba(120,182,255,0.1)",
-    black: "#0f1116",
-    red: "#f38ba8",
-    green: "#7ed7b9",
-    yellow: "#f5c97a",
-    blue: "#89b4fa",
-    magenta: "#cba6f7",
-    cyan: "#74c7ec",
-    white: "#bac2de",
-    brightBlack: "#585b70",
-    brightRed: "#f7a6bc",
-    brightGreen: "#9ce8cf",
-    brightYellow: "#f8d99c",
-    brightBlue: "#a6c9ff",
-    brightMagenta: "#d9b8fb",
-    brightCyan: "#98dbf3",
-    brightWhite: "#f5f7fb",
+    background: opaqueBackground ? readRootCssVar("--term-background", background) : XTERM_TRANSPARENT,
+    foreground: readRootCssVar("--term-foreground", foreground),
+    cursor: readRootCssVar("--term-cursor", cursor),
+    cursorAccent: opaqueBackground ? readRootCssVar("--term-background", background) : XTERM_TRANSPARENT,
+    selectionBackground: readRootCssVar("--term-selection-background", selectionBackground),
+    selectionInactiveBackground: readRootCssVar("--term-selection-inactive-background", selectionInactiveBackground),
+    black: readRootCssVar("--term-black", "#0f1116"),
+    red: readRootCssVar("--term-red", "#f38ba8"),
+    green: readRootCssVar("--term-green", "#7ed7b9"),
+    yellow: readRootCssVar("--term-yellow", "#f5c97a"),
+    blue: readRootCssVar("--term-blue", "#89b4fa"),
+    magenta: readRootCssVar("--term-magenta", "#cba6f7"),
+    cyan: readRootCssVar("--term-cyan", "#74c7ec"),
+    white: readRootCssVar("--term-white", "#bac2de"),
+    brightBlack: readRootCssVar("--term-bright-black", "#585b70"),
+    brightRed: readRootCssVar("--term-bright-red", "#f7a6bc"),
+    brightGreen: readRootCssVar("--term-bright-green", "#9ce8cf"),
+    brightYellow: readRootCssVar("--term-bright-yellow", "#f8d99c"),
+    brightBlue: readRootCssVar("--term-bright-blue", "#a6c9ff"),
+    brightMagenta: readRootCssVar("--term-bright-magenta", "#d9b8fb"),
+    brightCyan: readRootCssVar("--term-bright-cyan", "#98dbf3"),
+    brightWhite: readRootCssVar("--term-bright-white", "#f5f7fb"),
   };
 }
 
@@ -425,6 +437,7 @@ function SessionTerminal({
   const fitTimersRef = useRef([]);
   const lastSyncedPtySizeRef = useRef("");
   const mouseGestureRef = useRef(null);
+  const themeModeRef = useRef(getResolvedThemeMode());
 
   // Stable refs so the async IIFE captures up-to-date callbacks without
   // restarting the effect every time parent re-renders.
@@ -438,6 +451,20 @@ function SessionTerminal({
   useEffect(() => { registerRef.current = registerTerminal; }, [registerTerminal]);
   useEffect(() => { unregRef.current = unregisterTerminal; }, [unregisterTerminal]);
   useEffect(() => { activeRef.current = isActive; }, [isActive]);
+
+  useEffect(() => {
+    const handleThemeChange = (event) => {
+      const nextMode = getResolvedThemeMode(event.detail);
+      themeModeRef.current = nextMode;
+      const term = termRef.current;
+      if (!term) return;
+      term.options.theme = getTerminalTheme(opaqueBackground, nextMode);
+      term.refresh(0, term.rows - 1);
+    };
+
+    window.addEventListener("rayline:theme-change", handleThemeChange);
+    return () => window.removeEventListener("rayline:theme-change", handleThemeChange);
+  }, [opaqueBackground]);
 
   const teardown = useCallback(() => {
     fitTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -475,12 +502,12 @@ function SessionTerminal({
 
       const el = document.createElement("div");
       el.className = `rayline-terminal-host${opaqueBackground ? " rayline-terminal-host--opaque" : ""}`;
-      el.style.cssText = `width:100%;height:100%;background:${opaqueBackground ? TERMINAL_OPAQUE_BG : "transparent"};`;
+      el.style.cssText = `width:100%;height:100%;background:${opaqueBackground ? "var(--term-background)" : "transparent"};`;
       xtermElRef.current = el;
       containerRef.current.appendChild(el);
 
       const term = new Terminal({
-        theme: getTerminalTheme(opaqueBackground),
+        theme: getTerminalTheme(opaqueBackground, themeModeRef.current),
         fontFamily: FONT_FAMILY,
         fontSize: 13,
         fontWeight: "400",
