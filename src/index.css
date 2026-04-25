@@ -30,6 +30,8 @@
   --danger-soft-border:rgba(239, 68, 68, 0.28);
   --danger-soft-text:  #f87171;
   --state-warning-text:#fbbf24;
+  --text-primary:      #FAFAFA;
+  --app-background:    #0D0D10;
 }
 
 [data-theme="light"] {
@@ -49,6 +51,8 @@
   --danger-soft-border:rgba(220, 38, 38, 0.24);
   --danger-soft-text:  #dc2626;
   --state-warning-text:#d97706;
+  --text-primary:      #1F2937;
+  --app-background:    #FFFFFF;
 }
 
 *, *::before, *::after {
