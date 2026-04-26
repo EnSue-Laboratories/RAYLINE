@@ -862,7 +862,8 @@ export default function useAgent() {
             if (thinkingPart) {
               const am = ensureAssistant();
               const parts = upsertOpenCodePart(cloneParts(am.parts), thinkingPart);
-              msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: false };
+              const stillThinking = !Number.isFinite(thinkingPart.durationMs);
+              msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: stillThinking };
               lastMsg = msgs[msgs.length - 1];
             }
           } else if (event.type === "text" || event.type === "opencode_stdout") {
