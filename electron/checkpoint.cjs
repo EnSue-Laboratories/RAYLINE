@@ -6,6 +6,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { promisify } = require("util");
+const { createLogger } = require("./logger.cjs");
 
 const execFileAsync = promisify(execFile);
 const MAX_CAPTURED_UNTRACKED_FILE_BYTES = 512 * 1024;
@@ -147,9 +148,7 @@ const SKIPPED_BINARY_EXTENSIONS = new Set([
 // Logging
 // ---------------------------------------------------------------------------
 
-function log(...args) {
-  console.log("[checkpoint]", ...args);
-}
+const log = createLogger("checkpoint");
 
 function splitNullTerminated(stdout) {
   if (!stdout) return [];

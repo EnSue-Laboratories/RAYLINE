@@ -23,6 +23,7 @@ import { FontSizeContext } from "./contexts/FontSizeContext";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 import { detectDefaultLocale, normalizeLocale } from "./i18n";
+import { createLogger } from "./utils/logger";
 import {
   pinTabPatch,
   runEndedPatch,
@@ -36,13 +37,8 @@ import {
 } from "./utils/tabs";
 import { playChime } from "./utils/chime";
 
-function logCheckpoint(...args) {
-  console.log("[checkpoint-ui]", ...args);
-}
-
-function logSendFlow(...args) {
-  console.log("[send-flow]", ...args);
-}
+const logCheckpoint = createLogger("checkpoint-ui");
+const logSendFlow = createLogger("send-flow");
 
 function getModelThinkingValue(model) {
   return typeof model?.thinking === "boolean" ? model.thinking : undefined;
@@ -57,9 +53,7 @@ const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
 const DEFAULT_FONT_SIZE = 17;
 const EMPTY_CONVERSATION_DATA = { messages: [], isStreaming: false, error: null };
 
-function logSessionState(...args) {
-  console.log("[session-state]", ...args);
-}
+const logSessionState = createLogger("session-state");
 
 function getMainRepoRoot(dir) {
   if (!dir) return dir;

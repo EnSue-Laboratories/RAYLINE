@@ -1,8 +1,7 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
+const { createLogger } = require("./logger.cjs");
 
-function logCheckpoint(...args) {
-  console.log("[checkpoint-preload]", ...args);
-}
+const logCheckpoint = createLogger("checkpoint-preload");
 
 contextBridge.exposeInMainWorld("api", {
   agentStart: (opts) => ipcRenderer.send("agent-start", opts),

@@ -22,6 +22,7 @@ const path = require("path");
 const fs = require("fs");
 const { app } = require("electron");
 const { WebSocketServer } = require("ws");
+const { createLogger } = require("./logger.cjs");
 
 // node-pty is a native module — require lazily so syntax-check passes even
 // when binaries are not yet compiled for the current Electron version.
@@ -87,9 +88,7 @@ let sessionStateCallback = null;
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function log(...args) {
-  console.log("[terminal-manager]", ...args);
-}
+const log = createLogger("terminal-manager");
 
 function emitSessionState(reason, details = {}) {
   if (!sessionStateCallback) return;

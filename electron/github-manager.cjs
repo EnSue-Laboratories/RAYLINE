@@ -1,5 +1,6 @@
 const { execFile, spawn } = require("child_process");
 const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli, execFileCli } = require("./cli-bin-resolver.cjs");
+const { createLogger } = require("./logger.cjs");
 
 // node-pty is a native module — load lazily so the manager still loads even
 // if the prebuild is missing for the current Electron version.
@@ -10,9 +11,7 @@ try {
   console.error("[github-manager] node-pty failed to load:", e.message);
 }
 
-function log(...args) {
-  console.log("[github-manager]", ...args);
-}
+const log = createLogger("github-manager");
 
 let cachedGhBin = null;
 

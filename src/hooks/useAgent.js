@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { createLogger } from "../utils/logger";
 
 let _msgId = 0;
 const uid = () => "m" + (++_msgId) + "-" + Date.now();
+const log = createLogger("useAgent");
 
 // Helper: deep-clone parts array (each part is a new object)
 function cloneParts(parts) {
@@ -488,7 +490,7 @@ export default function useAgent() {
 
         if (event.session_id && convo._claudeSessionId !== event.session_id) {
           convo._claudeSessionId = event.session_id;
-          console.log("[useAgent] Captured Claude session ID:", {
+          log("Captured Claude session ID:", {
             conversationId,
             sessionId: event.session_id,
             eventType: event.type,
@@ -736,13 +738,13 @@ export default function useAgent() {
         } else if (event.type === "user") {
           // Capture the UUID from user events — needed for rewind/edit
           if (event.uuid) {
-            console.log("[useAgent] User event UUID:", event.uuid, "has tool_result:",
+            log("User event UUID:", event.uuid, "has tool_result:",
               event.message?.content?.some?.(b => b.type === "tool_result"));
             // Find the last user message and store the Claude-assigned UUID
             for (let mi = msgs.length - 1; mi >= 0; mi--) {
               if (msgs[mi].role === "user" && !msgs[mi].claudeUuid) {
                 msgs[mi] = { ...msgs[mi], claudeUuid: event.uuid };
-                console.log("[useAgent] Stored claudeUuid on user msg:", msgs[mi].text?.slice(0, 50));
+                log("Stored claudeUuid on user msg:", msgs[mi].text?.slice(0, 50));
                 break;
               }
             }
@@ -851,7 +853,7 @@ export default function useAgent() {
           const sessionId = extractOpenCodeSessionId(event);
           if (sessionId) {
             convo._opencodeSessionId = sessionId;
-            console.log("[useAgent] Captured OpenCode session ID:", {
+            log("Captured OpenCode session ID:", {
               conversationId,
               sessionId,
               eventType: event.type,
@@ -912,14 +914,14 @@ export default function useAgent() {
         // --- Codex JSONL stream events ---
         else if (event.type === "session_meta" && event.payload?.id) {
           convo._codexThreadId = event.payload.id;
-          console.log("[useAgent] Captured Codex thread ID:", {
+          log("Captured Codex thread ID:", {
             conversationId,
             threadId: event.payload.id,
             source: "session_meta",
           });
         } else if (event.type === "thread.started") {
           convo._codexThreadId = event.thread_id;
-          console.log("[useAgent] Captured Codex thread ID:", {
+          log("Captured Codex thread ID:", {
             conversationId,
             threadId: event.thread_id,
             source: "thread.started",
@@ -1211,7 +1213,7 @@ export default function useAgent() {
   const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, thinking, cwd, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
     const expectedPendingId = pendingStartsRef.current.get(conversationId);
     if (pendingId && expectedPendingId !== pendingId) {
-      console.log("[useAgent] Skipping stale or cancelled pending start", { conversationId, pendingId, expectedPendingId });
+      log("Skipping stale or cancelled pending start", { conversationId, pendingId, expectedPendingId });
       return false;
     }
     if (pendingId) pendingStartsRef.current.delete(conversationId);

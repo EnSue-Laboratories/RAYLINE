@@ -4,12 +4,10 @@ const os = require("os");
 const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { findSessionCwd, moveSession } = require("./session-reader.cjs");
 const { fetchClaudeUsage } = require("./claude-usage-fetcher.cjs");
+const { createLogger } = require("./logger.cjs");
 
 const activeAgents = new Map();
-
-function log(...args) {
-  console.log("[agent-manager]", ...args);
-}
+const log = createLogger("agent-manager");
 
 function isDirectory(dirPath) {
   try {
