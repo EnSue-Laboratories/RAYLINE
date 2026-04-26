@@ -1023,6 +1023,24 @@ function normalizeOpenCodeConfigInput(input) {
   };
 }
 
+function getOpenCodeProviderConfig(providerId) {
+  const id = String(providerId || "").trim();
+  if (!id || !/^[a-zA-Z0-9_.-]+$/.test(id)) {
+    return { apiKey: "", baseURL: "" };
+  }
+  const configPath = getOpenCodeConfigPath();
+  const config = readJsonFileLoose(configPath) || {};
+  const provider = config.provider && typeof config.provider === "object" ? config.provider : {};
+  const entry = provider[id];
+  const options = entry && typeof entry === "object" && entry.options && typeof entry.options === "object"
+    ? entry.options
+    : {};
+  return {
+    apiKey: typeof options.apiKey === "string" ? options.apiKey : "",
+    baseURL: typeof options.baseURL === "string" ? options.baseURL : "",
+  };
+}
+
 function saveOpenCodeConfig(input) {
   const normalized = normalizeOpenCodeConfigInput(input);
   const configPath = getOpenCodeConfigPath();
@@ -1101,6 +1119,10 @@ ipcMain.handle("opencode-status", async () => {
 
 ipcMain.handle("opencode-save-config", (_event, input) => {
   return saveOpenCodeConfig(input);
+});
+
+ipcMain.handle("opencode-get-provider-config", (_event, providerId) => {
+  return getOpenCodeProviderConfig(providerId);
 });
 
 ipcMain.handle("system-info", () => ({

@@ -64,6 +64,7 @@ contextBridge.exposeInMainWorld("api", {
   checkCliInstalled: (options) => ipcRenderer.invoke("check-cli-installed", options),
   opencodeStatus: () => ipcRenderer.invoke("opencode-status"),
   opencodeSaveConfig: (input) => ipcRenderer.invoke("opencode-save-config", input),
+  opencodeGetProviderConfig: (providerId) => ipcRenderer.invoke("opencode-get-provider-config", providerId),
   shellRun: ({ command, cwd }) => ipcRenderer.invoke("shell-run", { command, cwd }),
 
   // Git operations
