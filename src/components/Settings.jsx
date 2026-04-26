@@ -217,21 +217,33 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     });
   }, []);
 
-  const handleStartOpenCodeDuplicate = useCallback((model) => {
+  const handleStartOpenCodeDuplicate = useCallback(async (model) => {
     setOpenCodeAdding(true);
     setOpenCodeEditingId("");
     setOpenCodeDuplicateSourceId(model.id);
     setOpenCodeProviderOpen(false);
     setOpenCodeProviderHighlight(0);
     setOpenCodeMessage("");
-    const sourceModelId = model.modelId || "";
+    const providerId = model.providerId || "openrouter";
     const sourceLabel = model.label || "";
+    let providerConfig = { apiKey: "", baseURL: "" };
+    try {
+      const fetched = await window.api?.opencodeGetProviderConfig?.(providerId);
+      if (fetched && typeof fetched === "object") {
+        providerConfig = {
+          apiKey: typeof fetched.apiKey === "string" ? fetched.apiKey : "",
+          baseURL: typeof fetched.baseURL === "string" ? fetched.baseURL : "",
+        };
+      }
+    } catch {
+      providerConfig = { apiKey: "", baseURL: "" };
+    }
     setOpenCodeDraft({
-      providerId: model.providerId || "openrouter",
-      modelId: sourceModelId ? `${sourceModelId}-copy` : "",
+      providerId,
+      modelId: model.modelId || "",
       label: sourceLabel ? `${sourceLabel} (copy)` : "",
-      apiKey: "",
-      baseURL: model.baseURL || "",
+      apiKey: providerConfig.apiKey,
+      baseURL: model.baseURL || providerConfig.baseURL || "",
       enabled: model.enabled !== false,
       thinking: Boolean(model.thinking),
     });
