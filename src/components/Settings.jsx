@@ -7,8 +7,9 @@ import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
 import { useOpenCodeModels } from "../data/openCodeModels.jsx";
+import WindowDragSpacer from "./WindowDragSpacer";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, windowControlsVisible = false, onClose }) {
   const s = useFontScale();
   const t = createTranslator(locale);
   const showUpdaterSettings = platform === "win32";
@@ -425,7 +426,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
       }}
     >
       {/* Drag region */}
-      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0 }} />
+      <div style={{ marginRight: windowControlsVisible ? 126 : 0 }}>
+        <WindowDragSpacer />
+      </div>
 
       {/* Header */}
       <div

@@ -3742,6 +3742,7 @@ export default function App() {
           platform={platform}
           locale={locale}
           onLocaleChange={setLocale}
+          windowControlsVisible={showWindowControls}
           onClose={() => setShowSettings(false)}
         />
       ) : (
