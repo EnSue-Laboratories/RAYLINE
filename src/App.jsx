@@ -3,6 +3,7 @@ import AuroraCanvas from "./components/AuroraCanvas";
 import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
 import SidebarChromeRail from "./components/SidebarChromeRail";
+import SidebarWindowsHeader from "./components/SidebarWindowsHeader";
 import DispatchCard from "./components/DispatchCard.jsx";
 import ChatArea     from "./components/ChatArea";
 import TerminalDrawer from "./components/TerminalDrawer";
@@ -1292,9 +1293,7 @@ export default function App() {
   );
   const showWindowControls = platform === "win32";
   const useWindowsSidebarChrome = showWindowControls;
-  const sidebarWidth = useWindowsSidebarChrome
-    ? (sidebarOpen ? 220 : 52)
-    : (sidebarOpen ? SIDEBAR_WIDTH : 0);
+  const sidebarWidth = sidebarOpen ? (useWindowsSidebarChrome ? 220 : SIDEBAR_WIDTH) : 0;
 
   useEffect(() => {
     window.api?.getSystemInfo?.().then((info) => {
@@ -3634,7 +3633,16 @@ export default function App() {
 
       <WindowControls visible={showWindowControls} />
 
-      {!useWindowsSidebarChrome && (
+      {useWindowsSidebarChrome ? (
+        <SidebarWindowsHeader
+          sidebarOpen={sidebarOpen}
+          settingsOpen={showSettings}
+          onToggleSidebar={() => setSidebarOpen((o) => !o)}
+          onNew={handleNew}
+          onOpenSettings={() => setShowSettings((open) => !open)}
+          hasUpdate={hasUpdate}
+        />
+      ) : (
         <SidebarChromeRail
           sidebarOpen={sidebarOpen}
           settingsOpen={showSettings}
@@ -3658,7 +3666,7 @@ export default function App() {
         style={{
           width: sidebarWidth,
           minWidth: sidebarWidth,
-          borderRight: `1px solid ${sidebarOpen || useWindowsSidebarChrome ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0)"}`,
+          borderRight: `1px solid ${sidebarOpen ? "rgba(255,255,255,0.025)" : "rgba(255,255,255,0)"}`,
           display: "flex",
           flexDirection: "column",
           position: "relative",
