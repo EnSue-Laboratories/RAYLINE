@@ -164,12 +164,12 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
   const searchActive = search.length > 0;
 
   const cwdShort = cwd ? (() => {
-    const parts = cwd.split("/");
+    const parts = cwd.split(/[\\/]+/);
     const wtIdx = parts.indexOf(".worktrees");
     if (wtIdx >= 0 && wtIdx + 1 < parts.length) {
       return `${parts[wtIdx - 1]} / ${parts[wtIdx + 1]}`;
     }
-    return parts.slice(-2).join("/");
+    return parts.filter(Boolean).slice(-2).join("/");
   })() : null;
 
   // ── Windows collapsed: sidebar fully hidden; SidebarWindowsHeader overlay takes over ──
