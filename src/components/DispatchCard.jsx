@@ -74,13 +74,6 @@ function getDefaultPlannerModelId(availableModels, defaultModel) {
     || "";
 }
 
-function resolveTargetModelId(modelId, availableModels, fallbackModel = "sonnet") {
-  const models = Array.isArray(availableModels) ? availableModels : [];
-  if (models.some((m) => m.id === modelId)) return modelId;
-  if (models.some((m) => m.id === fallbackModel)) return fallbackModel;
-  return models[0]?.id || "";
-}
-
 function modelPayload(model) {
   if (!model) return null;
   return {
@@ -103,9 +96,7 @@ export default function DispatchCard({
 }) {
   const t = useMemo(() => createTranslator(locale), [locale]);
   const [tab, setTab] = useState("auto"); // "auto" | "custom"
-  const [globalModel, setGlobalModel] = useState(() =>
-    resolveTargetModelId(defaultModel, availableModels)
-  );
+  const [globalModel, setGlobalModel] = useState(defaultModel);
   const [customRows, setCustomRows] = useState([]);
   const [autoBrief, setAutoBrief] = useState("");
   const [autoPlannerModel, setAutoPlannerModel] = useState(() =>
@@ -122,20 +113,12 @@ export default function DispatchCard({
     () => (availableModels || []).filter((m) => m.provider === "claude" || m.provider === "codex"),
     [availableModels]
   );
-  const validModelIds = useMemo(
-    () => new Set((availableModels || []).map((m) => m.id)),
-    [availableModels]
-  );
 
   useEffect(() => {
     if (!plannerModels.length) return;
     if (plannerModels.some((m) => m.id === autoPlannerModel)) return;
     setAutoPlannerModel(getDefaultPlannerModelId(availableModels, defaultModel));
   }, [plannerModels, autoPlannerModel, availableModels, defaultModel]);
-
-  useEffect(() => {
-    setGlobalModel((current) => resolveTargetModelId(current || defaultModel, availableModels));
-  }, [availableModels, defaultModel]);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
@@ -177,8 +160,9 @@ export default function DispatchCard({
         cwd: currentCwd,
         plannerModel: modelPayload(plannerModel),
         targetModels: availableModels.map(modelPayload).filter(Boolean),
-        defaultTargetModel: resolveTargetModelId(globalModel, availableModels),
+        defaultTargetModel: globalModel,
       });
+      const validModelIds = new Set(availableModels.map((m) => m.id));
       const usedBranches = new Set();
       const rows = (result?.rows || [])
         .map((row, index) => makeCustomRowFromPlan(row, index, validModelIds, usedBranches))
@@ -198,7 +182,7 @@ export default function DispatchCard({
     } finally {
       setAutoLoading(false);
     }
-  }, [autoBrief, autoPlannerModel, plannerModels, currentCwd, availableModels, validModelIds, globalModel, t]);
+  }, [autoBrief, autoPlannerModel, plannerModels, currentCwd, availableModels, globalModel, t]);
 
   const handleSubmit = useCallback(async () => {
     if (tab === "auto") return;
@@ -222,19 +206,15 @@ export default function DispatchCard({
     setBanner(null);
     setSubmitting(true);
 
-    const defaultTargetModel = resolveTargetModelId(globalModel, availableModels);
-    const payload = rowsToRun.map((r) => {
-      const rowModel = validModelIds.has(r.model) ? r.model : "";
-      return {
-        prompt: r.prompt.trim(),
-        attachments: r.attachments,
-        model: rowModel || defaultTargetModel,
-        cwd: r.cwd || currentCwd,
-        branch: r.branch.trim(),
-        issueContext: r.issue ? `Issue #${r.issue.number}: ${r.issue.title}` : undefined,
-        tag: r.issue ? `#${r.issue.number}` : undefined,
-      };
-    });
+    const payload = rowsToRun.map((r) => ({
+      prompt: r.prompt.trim(),
+      attachments: r.attachments,
+      model: r.model || globalModel,
+      cwd: r.cwd || currentCwd,
+      branch: r.branch.trim(),
+      issueContext: r.issue ? `Issue #${r.issue.number}: ${r.issue.title}` : undefined,
+      tag: r.issue ? `#${r.issue.number}` : undefined,
+    }));
 
     let results;
     try {
@@ -266,7 +246,7 @@ export default function DispatchCard({
 
     const successBranches = new Set(results.filter((x) => x.ok).map((x) => x.row.branch));
     setCustomRows((prev) => prev.filter((r) => !successBranches.has(r.branch.trim())));
-  }, [tab, customRows, currentCwd, globalModel, availableModels, validModelIds, onDispatch, onClose, t]);
+  }, [tab, customRows, currentCwd, globalModel, onDispatch, onClose, t]);
 
   return (
     <div style={backdropStyle}>
