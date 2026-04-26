@@ -1697,6 +1697,48 @@ ipcMain.handle("git-worktree-list", async (_event, cwd) => {
   }
 });
 
+// Repair all corrupt loose git objects mentioned in a git error message.
+// Handles both "stored in PATH" and "unable to read sha1 file of FILE (HASH)" formats.
+async function repairAllCorruptObjects(errMessage, cwd) {
+  // 1. Collect all explicitly listed file paths from "(stored in PATH)"
+  const filesToDelete = new Set();
+  const storedRe = /\(stored in ([^)]+)\)/gi;
+  let m;
+  while ((m = storedRe.exec(errMessage)) !== null) {
+    filesToDelete.add(m[1].trim());
+  }
+
+  // 2. Determine objects dir from stored paths (or fall back to cwd)
+  let objectsDir = path.join(cwd, ".git", "objects");
+  let repoRoot = cwd;
+  if (filesToDelete.size > 0) {
+    const first = [...filesToDelete][0];
+    // first = repo/.git/objects/xx/hashfile → up 2 = objects dir
+    objectsDir = path.dirname(path.dirname(first));
+    // objects/ → .git/ → repo/
+    repoRoot = path.dirname(path.dirname(objectsDir));
+  }
+
+  // 3. Find every 40-char hash in the error and add its constructed loose path
+  const hashRe = /\b([0-9a-f]{40})\b/gi;
+  while ((m = hashRe.exec(errMessage)) !== null) {
+    filesToDelete.add(path.join(objectsDir, m[1].slice(0, 2), m[1].slice(2)));
+  }
+
+  // 4. Delete all corrupt files; if delete fails, truncate to 0 bytes so git skips it
+  for (const looseFile of filesToDelete) {
+    try { if (fs.existsSync(looseFile)) fs.unlinkSync(looseFile); } catch {}
+    if (fs.existsSync(looseFile)) {
+      try { fs.writeFileSync(looseFile, Buffer.alloc(0)); } catch {}
+    }
+  }
+
+  // 5. Fetch to restore objects from remote (may fail for repos with no remote)
+  try { await git(["fetch", "--prune", "--quiet"], repoRoot); } catch {}
+
+  return repoRoot;
+}
+
 ipcMain.handle("git-worktree-add", async (_event, cwd, worktreePath, branchName, options = {}) => {
   // Ensure .worktrees/ directory exists and is gitignored
   const wtDir = path.dirname(worktreePath);
@@ -1719,7 +1761,51 @@ ipcMain.handle("git-worktree-add", async (_event, cwd, worktreePath, branchName,
   } else if (startPoint) {
     args.push(startPoint);
   }
-  await git(args, cwd);
+
+  // Attempt worktree creation with structured error recovery:
+  // Phase 1 → Phase 2 (retry) → Phase 3 (branch-exists cleanup) → Phase 4 (final retry)
+  let worktreeErr = null;
+  try { await git(args, cwd); } catch (e) { worktreeErr = e; }
+
+  if (worktreeErr) {
+    const msg1 = worktreeErr.message;
+    let repairRepoRoot = cwd;
+
+    // Phase 1: single recovery action based on the first error
+    if (/corrupt\s+loose\s+object|loose\s+object.*is\s+corrupt|unable to read sha1 file|Could not reset index/i.test(msg1)) {
+      repairRepoRoot = await repairAllCorruptObjects(msg1, cwd);
+    } else if (/not a valid object name[^']*'?HEAD'?/i.test(msg1)) {
+      await git(["commit", "--allow-empty", "-m", "init"], cwd);
+    } else if (/a branch named .* already exists/i.test(msg1)) {
+      try { await git(["branch", "-D", branchName], cwd); } catch {}
+    } else {
+      throw worktreeErr;
+    }
+
+    // Phase 2: first retry
+    worktreeErr = null;
+    try { await git(args, cwd); } catch (e) { worktreeErr = e; }
+
+    // Phase 3: the first attempt may have created the branch before failing;
+    // if so, clean it up and retry once more.
+    if (worktreeErr && /a branch named .* already exists/i.test(worktreeErr.message)) {
+      try { await git(["branch", "-D", branchName], cwd); } catch {}
+      worktreeErr = null;
+      try { await git(args, cwd); } catch (e) { worktreeErr = e; }
+    }
+
+    // Phase 4: still failing — throw a helpful error for object problems, rethrow otherwise
+    if (worktreeErr) {
+      if (/corrupt|unable to read sha1|Could not reset index/i.test(worktreeErr.message)) {
+        throw new Error(
+          `Repository has corrupt or missing git objects that could not be repaired automatically.\n` +
+          `Please fix your repository:\n  cd "${repairRepoRoot}"\n  git fetch --prune\n  git fsck`
+        );
+      }
+      throw worktreeErr;
+    }
+  }
+
   return { success: true, path: worktreePath };
 });
 
