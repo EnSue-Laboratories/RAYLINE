@@ -565,7 +565,7 @@ const STRINGS = {
     "settings.opencodeMissingModel": "提供商和模型名称必填。",
     "settings.opencodeSaved": "OpenCode 模型已保存。",
     "settings.opencodeSaveFailed": "保存 OpenCode 配置失败。",
-    "settings.opencodeThinking": "思考过程",
+    "settings.opencodeThinking": "显示思考过程",
     "settings.opencodeThinkingDescription": "传递 --thinking，并将 OpenCode 的推理过程折叠显示。",
     "settings.opencodeThinkingBadge": "正在思考",
     "settings.opencodeDisabledBadge": "已禁用",
