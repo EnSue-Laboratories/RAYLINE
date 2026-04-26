@@ -60,15 +60,10 @@ export function useOpenCodeModels() {
     return () => window.removeEventListener("opencode-refresh", handleRefresh);
   }, [refresh]);
 
-  const configuredModels = useMemo(
-    () => (state.models || []).map(openCodeEntryToModel).filter(Boolean),
-    [state.models]
-  );
-
   const models = useMemo(() => {
     if (!status.installed || !status.configured) return [];
-    return configuredModels;
-  }, [configuredModels, status.configured, status.installed]);
+    return (state.models || []).map(openCodeEntryToModel).filter(Boolean);
+  }, [state.models, status.configured, status.installed]);
 
   const saveModel = useCallback((entry) => {
     const next = upsertOpenCodeModel(entry);
@@ -93,7 +88,6 @@ export function useOpenCodeModels() {
 
   return {
     models,
-    configuredModels,
     rawModels: state.models || [],
     status,
     loading,
