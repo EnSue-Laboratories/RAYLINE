@@ -57,13 +57,21 @@ function findPendingMulticaToolIdx(parts, name) {
 function mergeUsage(prev, incoming) {
   if (!incoming) return prev || null;
   const base = prev || {};
+  const incomingCost = Number(incoming.cost_usd);
+  const baseCost = Number(base.cost_usd);
   return {
     input_tokens: incoming.input_tokens ?? base.input_tokens ?? 0,
     output_tokens: incoming.output_tokens ?? base.output_tokens ?? 0,
+    reasoning_tokens: incoming.reasoning_tokens ?? base.reasoning_tokens ?? 0,
     cache_creation_input_tokens:
       incoming.cache_creation_input_tokens ?? base.cache_creation_input_tokens ?? 0,
     cache_read_input_tokens:
       incoming.cache_read_input_tokens ?? base.cache_read_input_tokens ?? 0,
+    ...(incomingCost > 0
+      ? { cost_usd: incomingCost }
+      : baseCost > 0
+        ? { cost_usd: baseCost }
+        : {}),
     ...(Number.isFinite(incoming.total_tokens)
       ? { total_tokens: incoming.total_tokens }
       : Number.isFinite(base.total_tokens)
@@ -380,6 +388,7 @@ function normalizeOpenCodeUsage(part, previousUsage) {
   if (!tokens || typeof tokens !== "object") return previousUsage || null;
   const previousCost = Number.isFinite(previousUsage?.cost_usd) ? previousUsage.cost_usd : 0;
   const stepCost = Number(part.cost);
+  const safeStepCost = Number.isFinite(stepCost) && stepCost > 0 ? stepCost : 0;
   return {
     input_tokens: tokens.input ?? 0,
     output_tokens: tokens.output ?? 0,
@@ -387,7 +396,7 @@ function normalizeOpenCodeUsage(part, previousUsage) {
     cache_read_input_tokens: tokens.cache?.read ?? 0,
     cache_creation_input_tokens: tokens.cache?.write ?? 0,
     reasoning_tokens: tokens.reasoning ?? 0,
-    ...(Number.isFinite(stepCost) ? { cost_usd: previousCost + stepCost } : {}),
+    ...(previousCost > 0 || safeStepCost > 0 ? { cost_usd: previousCost + safeStepCost } : {}),
   };
 }
 
@@ -1151,11 +1160,13 @@ export default function useAgent() {
       });
     });
 
-    cleanupRefs.current = [offStream, offDone, offError];
+    const cleanupFns = [offStream, offDone, offError];
+    const usageHydrationTimers = usageHydrationTimersRef.current;
+    cleanupRefs.current = cleanupFns;
     return () => {
-      cleanupRefs.current.forEach((fn) => fn?.());
-      usageHydrationTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
-      usageHydrationTimersRef.current.clear();
+      cleanupFns.forEach((fn) => fn?.());
+      usageHydrationTimers.forEach((timerId) => window.clearTimeout(timerId));
+      usageHydrationTimers.clear();
     };
   }, []);
 
