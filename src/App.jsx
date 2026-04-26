@@ -43,6 +43,10 @@ function logSendFlow(...args) {
   console.log("[send-flow]", ...args);
 }
 
+function getModelThinkingValue(model) {
+  return typeof model?.thinking === "boolean" ? model.thinking : undefined;
+}
+
 const SHELL_TRANSCRIPT_LIMIT = 12000;
 const SHELL_TERMINAL_TIMEOUT_MS = 15000;
 const LAB_CONTROL_ENDPOINT = "http://127.0.0.1:4001/control";
@@ -937,6 +941,7 @@ function serializeMessagesForState(messages) {
         ...(part.status ? { status: part.status } : {}),
         ...(part.kind ? { kind: part.kind } : {}),
         ...(part.title ? { title: part.title } : {}),
+        ...(Number.isFinite(part.durationMs) ? { durationMs: part.durationMs } : {}),
       }));
     }
     if (Array.isArray(message.images) && message.images.length > 0) next.images = message.images;
@@ -1230,6 +1235,10 @@ export default function App() {
   );
   const dispatchAvailableModels = useMemo(
     () => [...MODELS, ...openCodeModels, ...multicaModels],
+    [multicaModels, openCodeModels]
+  );
+  const dynamicModels = useMemo(
+    () => [...openCodeModels, ...multicaModels],
     [multicaModels, openCodeModels]
   );
   const persistStatePayload = useMemo(() => ({
@@ -2052,7 +2061,7 @@ export default function App() {
     dispatchId,
     tags,
   }) => {
-    const provider = getMOrMulticaFallback(modelId).provider || "claude";
+    const provider = getMOrMulticaFallback(modelId, dynamicModels).provider || "claude";
     const seedSession = createConversationSession({
       provider,
       nativeSessionId: null,
@@ -2075,7 +2084,7 @@ export default function App() {
       dispatchId,
       tags,
     });
-  }, []);
+  }, [dynamicModels]);
 
   const handleNew = () => {
     setShowNewChatCard(true);
@@ -2498,7 +2507,7 @@ export default function App() {
           }));
         const images = imageAttachments?.map((a) => a.dataUrl);
         const files = attachments?.filter((a) => a.type === "file");
-        const m = getMOrMulticaFallback(normalizedConversation.model);
+        const m = getMOrMulticaFallback(normalizedConversation.model, dynamicModels);
         const currentProvider = m.provider || "claude";
         // Multica context must be resolved BEFORE prepareMessage so a missing
         // context doesn't leave an orphan streaming assistant bubble.
@@ -2721,6 +2730,7 @@ export default function App() {
           model: m.cliFlag,
           provider: m.provider || "claude",
           effort: m.effort,
+          thinking: getModelThinkingValue(m),
           cwd: effectiveCwd,
           images:
             currentProvider === "multica"
@@ -2772,7 +2782,7 @@ export default function App() {
         sendInFlightConversationIdsRef.current.delete(conversationId);
       }
     },
-    [buildMulticaBootstrapPrompt, cwd, draftsPath, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
+    [buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
   );
 
   const handleSend = useCallback(
@@ -2827,7 +2837,7 @@ export default function App() {
         const effectiveCwd = getEffectiveConversationCwd(convo, cwd, draftsPath);
         const normalizedConversation = normalizeConversationState(convo);
         const activeSession = getActiveConversationSession(normalizedConversation);
-        const currentProvider = getMOrMulticaFallback(normalizedConversation.model).provider || "claude";
+        const currentProvider = getMOrMulticaFallback(normalizedConversation.model, dynamicModels).provider || "claude";
         const currentMessageCount = getConversation(convoId).messages.length;
         const isFirstMessage = currentMessageCount === 0;
         let result;
@@ -2914,7 +2924,7 @@ export default function App() {
         titleText: text,
       });
     },
-    [activeConvo, active, activeData, appendLocalMessages, createConversationDraft, cwd, defaultModel, draftsPath, enqueueQueuedMessage, getConversation, sendMessageToConversation]
+    [activeConvo, active, activeData, appendLocalMessages, createConversationDraft, cwd, defaultModel, draftsPath, dynamicModels, enqueueQueuedMessage, getConversation, sendMessageToConversation]
   );
 
   // Process queued messages when streaming ends
@@ -3213,7 +3223,7 @@ export default function App() {
     async (messageIndex, newText) => {
       if (!activeConvo) return;
       const normalizedConvo = normalizeConversationState(activeConvo);
-      const m = getMOrMulticaFallback(normalizedConvo.model);
+      const m = getMOrMulticaFallback(normalizedConvo.model, dynamicModels);
       const convoCwd = getEffectiveConversationCwd(activeConvo, cwd, draftsPath);
       const currentMessages = getConversation(active).messages;
 
@@ -3307,6 +3317,7 @@ export default function App() {
         model: m.cliFlag,
         provider: currentProvider,
         effort: m.effort,
+        thinking: getModelThinkingValue(m),
         cwd: convoCwd,
         multicaContext,
         multicaToken,
@@ -3340,14 +3351,14 @@ export default function App() {
         );
       }
     },
-    [activeConvo, active, buildMulticaBootstrapPrompt, cwd, draftsPath, editAndResend, ensureMulticaContextForConversation, getConversation, resolveConversationLastProvider, resolveConversationProviderSession]
+    [activeConvo, active, buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, editAndResend, ensureMulticaContextForConversation, getConversation, resolveConversationLastProvider, resolveConversationProviderSession]
   );
 
   const handleModelChange = (modelId) => {
-    const nextProvider = getMOrMulticaFallback(modelId).provider || "claude";
+    const nextProvider = getMOrMulticaFallback(modelId, dynamicModels).provider || "claude";
     const normalizedActiveConvo = activeConvo ? normalizeConversationState(activeConvo) : null;
     const currentProvider =
-      getMOrMulticaFallback(normalizedActiveConvo?.model).provider
+      getMOrMulticaFallback(normalizedActiveConvo?.model, dynamicModels).provider
       || normalizedActiveConvo?.lastProvider
       || "claude";
     logSessionState("handleModelChange", {

@@ -2,11 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import { ChevronRight, Loader2, Check } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-export default function ThinkingBlock({ text, isThinking }) {
+export default function ThinkingBlock({ text, isThinking, durationMs }) {
   const [open, setOpen] = useState(false);
   const s = useFontScale();
   const hasText = Boolean(text && text.trim().length > 0);
-  const startTime = useRef(Date.now());
+  const startTime = useRef(0);
   const [elapsed, setElapsed] = useState(0);
 
   // Track thinking duration
@@ -19,15 +19,12 @@ export default function ThinkingBlock({ text, isThinking }) {
     return () => clearInterval(interval);
   }, [isThinking]);
 
-  // Freeze elapsed when thinking stops
-  const finalElapsed = useRef(0);
-  useEffect(() => {
-    if (!isThinking && elapsed > 0) {
-      finalElapsed.current = elapsed;
-    }
-  }, [isThinking, elapsed]);
-
-  const seconds = isThinking ? elapsed : (finalElapsed.current || elapsed);
+  const explicitSeconds = Number.isFinite(durationMs)
+    ? Math.max(0, Math.round(durationMs / 1000))
+    : null;
+  const seconds = isThinking
+    ? elapsed
+    : (explicitSeconds ?? elapsed);
 
   function formatDuration(s) {
     if (s < 1) return "";

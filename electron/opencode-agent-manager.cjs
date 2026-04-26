@@ -83,7 +83,26 @@ function shouldEmitStderrError({ stderrBuffer, exitCode, signal, cancelled, sawJ
   return exitCode !== 0 || Boolean(signal) || !sawJsonEvent;
 }
 
-function startOpenCodeAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents) {
+function inferThinkingModel(model) {
+  const value = String(model || "").toLowerCase();
+  return (
+    /deepseek.*(?:r1|reasoner|v4|v3[._-]?[12])/.test(value) ||
+    /(?:^|[/:._-])r1(?:$|[/:._-])/.test(value) ||
+    value.includes("reasoning") ||
+    value.includes("thinking") ||
+    value.includes("qwq") ||
+    value.includes("qwen3") ||
+    value.includes("glm-4.6")
+  );
+}
+
+function shouldEnableThinking(model, thinking) {
+  if (thinking === true) return true;
+  if (thinking === false) return false;
+  return inferThinkingModel(model);
+}
+
+function startOpenCodeAgent({ conversationId, prompt, model, thinking, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents) {
   cancelOpenCodeAgent(conversationId);
 
   const openCodeBin = resolveOpenCodeBin();
@@ -108,12 +127,14 @@ function startOpenCodeAgent({ conversationId, prompt, model, cwd, images, files,
 
   const args = ["run", "--format", "json", "--dangerously-skip-permissions", "--dir", launchCwd];
   const nativeSessionId = resumeSessionId || sessionId;
+  const thinkingEnabled = shouldEnableThinking(model, thinking);
 
   if (nativeSessionId) {
     args.push("--session", nativeSessionId);
     if (forkSession) args.push("--fork");
   }
   if (model) args.push("--model", model);
+  if (thinkingEnabled) args.push("--thinking");
 
   const promptFiles = Array.isArray(files) ? [...files] : [];
   if (Array.isArray(images) && images.length > 0) {
@@ -137,7 +158,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, cwd, images, files,
   const fullPrompt = buildRayLinePrompt(prompt, files);
   args.push("--", fullPrompt);
 
-  log("Starting opencode agent:", { conversationId, model, cwd: launchCwd, sessionId: nativeSessionId || null });
+  log("Starting opencode agent:", { conversationId, model, thinking: thinkingEnabled, cwd: launchCwd, sessionId: nativeSessionId || null });
   log("Full args:", args.filter((arg) => arg !== fullPrompt).join(" "));
   log("Prompt:", fullPrompt.slice(0, 100));
 

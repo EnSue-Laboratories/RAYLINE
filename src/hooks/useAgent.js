@@ -176,7 +176,9 @@ function normalizeCodexToolArgs(payload) {
     if (parsed && typeof parsed === "object") {
       return parsed.cmd && !parsed.command ? { ...parsed, command: parsed.cmd } : parsed;
     }
-  } catch {}
+  } catch {
+    // Fall through to the raw string payload shape below.
+  }
 
   return payload?.type === "custom_tool_call" ? { input: raw } : { value: raw };
 }
@@ -265,6 +267,93 @@ function buildOpenCodeTextPart(event) {
     text,
     _opencodeTime: part.time?.start || event.timestamp || Date.now(),
   };
+}
+
+function extractOpenCodeReasoningText(event) {
+  if (!event || typeof event !== "object") return "";
+  const part = event.part || {};
+  const candidates = [
+    event.thinking,
+    event.reasoning,
+    event.text,
+    event.content,
+    part.text,
+    part.content,
+  ];
+  return candidates.find((value) => typeof value === "string" && value.length > 0) || "";
+}
+
+function buildOpenCodeThinkingPart(event) {
+  const part = event?.part || {};
+  const text = extractOpenCodeReasoningText(event);
+  if (!text) return null;
+  const startedAt = Number(part.time?.start);
+  const endedAt = Number(part.time?.end);
+  return {
+    type: "thinking",
+    id: part.id || event.id || "ocr" + uid(),
+    text,
+    _opencodeTime: Number.isFinite(startedAt) ? startedAt : event.timestamp || Date.now(),
+    ...(Number.isFinite(startedAt) && Number.isFinite(endedAt) && endedAt >= startedAt
+      ? { durationMs: endedAt - startedAt }
+      : {}),
+  };
+}
+
+const THINK_TAG_RE = /<(?<tag>think|thinking|antThinking)\b[^>]*>(?<text>[\s\S]*?)<\/\k<tag>>/gi;
+
+function splitOpenCodeTextAndThinkingParts(event) {
+  const textPart = buildOpenCodeTextPart(event);
+  if (!textPart) return [];
+  const rawText = textPart.text || "";
+  const trimmed = rawText.trim();
+
+  if (event.type === "opencode_stdout" && /^Thinking:\s*/i.test(trimmed)) {
+    return [{
+      ...textPart,
+      type: "thinking",
+      id: `${textPart.id}-thinking`,
+      text: trimmed.replace(/^Thinking:\s*/i, ""),
+    }];
+  }
+
+  const pieces = [];
+  let lastIndex = 0;
+  let match;
+  THINK_TAG_RE.lastIndex = 0;
+
+  while ((match = THINK_TAG_RE.exec(rawText)) !== null) {
+    const before = rawText.slice(lastIndex, match.index);
+    if (before.trim()) {
+      pieces.push({
+        ...textPart,
+        id: `${textPart.id}-text-${pieces.length}`,
+        text: before,
+      });
+    }
+
+    const thinkingText = (match.groups?.text || "").trim();
+    if (thinkingText) {
+      pieces.push({
+        ...textPart,
+        type: "thinking",
+        id: `${textPart.id}-thinking-${pieces.length}`,
+        text: thinkingText,
+      });
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  const after = rawText.slice(lastIndex);
+  if (after.trim()) {
+    pieces.push({
+      ...textPart,
+      id: `${textPart.id}-text-${pieces.length}`,
+      text: after,
+    });
+  }
+
+  return pieces.length > 0 ? pieces : [textPart];
 }
 
 function sortOpenCodeParts(parts) {
@@ -573,7 +662,11 @@ export default function useAgent() {
               if (toolIdx >= 0) {
                 const newJson = (parts[toolIdx].argsJson || "") + (delta.partial_json || "");
                 let newArgs = parts[toolIdx].args;
-                try { newArgs = JSON.parse(newJson); } catch {}
+                try {
+                  newArgs = JSON.parse(newJson);
+                } catch {
+                  // Keep accumulating partial JSON until it becomes parseable.
+                }
                 parts[toolIdx] = { ...parts[toolIdx], argsJson: newJson, args: newArgs };
               }
               updateAssistant({ parts, isStreaming: true, _streamState: streamState });
@@ -607,7 +700,7 @@ export default function useAgent() {
           // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
           // Usage here is per-API-call, not cumulative — skip it to avoid flicker;
           // the `result` event below owns the authoritative cumulative usage.
-          const am = ensureAssistant();
+          ensureAssistant();
           const parts = cloneParts(lastMsg.parts);
           const hasStreamParts = parts.length > 0;
           if (!hasStreamParts && event.message?.content) {
@@ -741,6 +834,7 @@ export default function useAgent() {
           event.type === "opencode_stdout" ||
           event.type === "step_start" ||
           event.type === "tool_use" ||
+          event.type === "reasoning" ||
           event.type === "text" ||
           event.type === "step_finish" ||
           event.type === "error"
@@ -763,12 +857,23 @@ export default function useAgent() {
             const parts = upsertOpenCodePart(cloneParts(am.parts), { type: "tool", ...tool });
             msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
             lastMsg = msgs[msgs.length - 1];
-          } else if (event.type === "text" || event.type === "opencode_stdout") {
-            const textPart = buildOpenCodeTextPart(event);
-            if (textPart) {
+          } else if (event.type === "reasoning") {
+            const thinkingPart = buildOpenCodeThinkingPart(event);
+            if (thinkingPart) {
               const am = ensureAssistant();
-              const parts = upsertOpenCodePart(cloneParts(am.parts), textPart);
-              msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
+              const parts = upsertOpenCodePart(cloneParts(am.parts), thinkingPart);
+              msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: false };
+              lastMsg = msgs[msgs.length - 1];
+            }
+          } else if (event.type === "text" || event.type === "opencode_stdout") {
+            const textParts = splitOpenCodeTextAndThinkingParts(event);
+            if (textParts.length > 0) {
+              const am = ensureAssistant();
+              const parts = textParts.reduce(
+                (acc, textPart) => upsertOpenCodePart(acc, textPart),
+                cloneParts(am.parts)
+              );
+              msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: false };
               lastMsg = msgs[msgs.length - 1];
             }
           } else if (event.type === "error") {
@@ -1091,7 +1196,7 @@ export default function useAgent() {
     });
   }, []);
 
-  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
+  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, thinking, cwd, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
     const expectedPendingId = pendingStartsRef.current.get(conversationId);
     if (pendingId && expectedPendingId !== pendingId) {
       console.log("[useAgent] Skipping stale or cancelled pending start", { conversationId, pendingId, expectedPendingId });
@@ -1099,7 +1204,7 @@ export default function useAgent() {
     }
     if (pendingId) pendingStartsRef.current.delete(conversationId);
     if (window.api) {
-      const payload = { conversationId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession };
+      const payload = { conversationId, sessionId, prompt, model, provider, effort, thinking, cwd, images, files, resumeSessionId, forkSession };
       if (provider === "multica") {
         payload._multica = multicaContext;
         payload._multicaToken = multicaToken;
@@ -1131,7 +1236,7 @@ export default function useAgent() {
     }
   }, []);
 
-  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, cwd, multicaContext, multicaToken }) => {
+  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, thinking, cwd, multicaContext, multicaToken }) => {
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId);
@@ -1152,6 +1257,7 @@ export default function useAgent() {
           model,
           provider,
           effort,
+          thinking,
           cwd,
           _multica: multicaContext,
           _multicaToken: multicaToken,
@@ -1166,6 +1272,7 @@ export default function useAgent() {
         model,
         provider,
         effort,
+        thinking,
         cwd,
       });
       return true;

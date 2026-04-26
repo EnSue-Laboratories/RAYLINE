@@ -29,6 +29,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     label: "",
     apiKey: "",
     baseURL: "",
+    thinking: false,
   });
   const [openCodeAdding, setOpenCodeAdding] = useState(false);
   const [openCodeSaving, setOpenCodeSaving] = useState(false);
@@ -186,6 +187,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
       modelId: "",
       label: "",
       apiKey: "",
+      thinking: false,
     }));
   }, []);
 
@@ -211,12 +213,14 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         modelId,
         label: openCodeDraft.label,
         baseURL: openCodeDraft.baseURL,
+        thinking: openCodeDraft.thinking,
       });
       setOpenCodeDraft((prev) => ({
         ...prev,
         modelId: "",
         label: "",
         apiKey: "",
+        thinking: false,
       }));
       await refreshOpenCode();
       setOpenCodeAdding(false);
@@ -232,6 +236,14 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     removeOpenCodeModel(modelKey);
     setOpenCodeMessage("");
   }, [removeOpenCodeModel]);
+
+  const handleToggleOpenCodeThinking = useCallback((model) => {
+    saveOpenCodeModel({
+      ...model,
+      thinking: !model.thinking,
+    });
+    setOpenCodeMessage("");
+  }, [saveOpenCodeModel]);
 
   const sliderPct = (value, min, max) => ((value - min) / (max - min)) * 100;
   const imgBlurPct = sliderPct(local.imgBlur || 0, 0, 32);
@@ -997,6 +1009,71 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 <div
                   style={{
                     display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "8px 10px",
+                    marginBottom: 10,
+                    borderRadius: 7,
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    background: "rgba(255,255,255,0.025)",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: s(12),
+                        color: "rgba(255,255,255,0.76)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {t("settings.opencodeThinking")}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: s(10),
+                        color: "rgba(255,255,255,0.3)",
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {t("settings.opencodeThinkingDescription")}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={openCodeDraft.thinking}
+                    onClick={() => updateOpenCodeDraft({ thinking: !openCodeDraft.thinking })}
+                    style={{
+                      flexShrink: 0,
+                      width: 38,
+                      height: 22,
+                      borderRadius: 999,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: openCodeDraft.thinking ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                      position: "relative",
+                      cursor: "pointer",
+                      padding: 0,
+                      transition: "background 120ms ease",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        left: openCodeDraft.thinking ? 18 : 2,
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        background: "rgba(255,255,255,0.9)",
+                        transition: "left 120ms ease",
+                      }}
+                    />
+                  </button>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
                     gap: 8,
                     flexWrap: "wrap",
                     alignItems: "center",
@@ -1061,14 +1138,40 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   <div style={{ minWidth: 0 }}>
                     <div
                       style={{
-                        fontSize: s(12),
-                        color: "rgba(255,255,255,0.76)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        minWidth: 0,
                       }}
                     >
-                      {model.label || `${model.providerId}/${model.modelId}`}
+                      <span
+                        style={{
+                          fontSize: s(12),
+                          color: "rgba(255,255,255,0.76)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {model.label || `${model.providerId}/${model.modelId}`}
+                      </span>
+                      {model.thinking && (
+                        <span
+                          style={{
+                            flexShrink: 0,
+                            padding: "2px 5px",
+                            borderRadius: 5,
+                            border: "1px solid rgba(180,220,255,0.18)",
+                            background: "rgba(180,220,255,0.08)",
+                            color: "rgba(210,230,255,0.62)",
+                            fontSize: s(9),
+                            fontFamily: "'JetBrains Mono', monospace",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {t("settings.opencodeThinkingBadge")}
+                        </span>
+                      )}
                     </div>
                     <div
                       style={{
@@ -1083,25 +1186,58 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       {model.providerId}/{model.modelId}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveOpenCodeModel(model.id)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 28,
-                      height: 28,
-                      borderRadius: 7,
-                      background: "rgba(255,255,255,0.03)",
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      color: "rgba(255,255,255,0.45)",
-                      cursor: "pointer",
-                    }}
-                    title={t("settings.opencodeRemoveModel")}
-                  >
-                    <Trash2 size={13} strokeWidth={1.7} />
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={model.thinking}
+                      onClick={() => handleToggleOpenCodeThinking(model)}
+                      style={{
+                        width: 34,
+                        height: 20,
+                        borderRadius: 999,
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        background: model.thinking ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                        position: "relative",
+                        cursor: "pointer",
+                        padding: 0,
+                        transition: "background 120ms ease",
+                      }}
+                      title={t("settings.opencodeToggleThinking")}
+                    >
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: 2,
+                          left: model.thinking ? 16 : 2,
+                          width: 14,
+                          height: 14,
+                          borderRadius: "50%",
+                          background: "rgba(255,255,255,0.9)",
+                          transition: "left 120ms ease",
+                        }}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveOpenCodeModel(model.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        color: "rgba(255,255,255,0.45)",
+                        cursor: "pointer",
+                      }}
+                      title={t("settings.opencodeRemoveModel")}
+                    >
+                      <Trash2 size={13} strokeWidth={1.7} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

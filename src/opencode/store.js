@@ -8,11 +8,25 @@ function safeString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function inferThinkingDefault(providerId, modelId) {
+  const value = `${providerId}/${modelId}`.toLowerCase();
+  return (
+    /deepseek.*(?:r1|reasoner|v4|v3[._-]?[12])/.test(value) ||
+    /(?:^|[/:._-])r1(?:$|[/:._-])/.test(value) ||
+    value.includes("reasoning") ||
+    value.includes("thinking") ||
+    value.includes("qwq") ||
+    value.includes("qwen3") ||
+    value.includes("glm-4.6")
+  );
+}
+
 function sanitizeModel(entry) {
   if (!entry || typeof entry !== "object") return null;
   const providerId = safeString(entry.providerId || entry.provider);
   const modelId = safeString(entry.modelId || entry.model);
   if (!providerId || !modelId) return null;
+  const explicitThinking = typeof entry.thinking === "boolean";
 
   return {
     id: `${providerId}/${modelId}`,
@@ -20,6 +34,7 @@ function sanitizeModel(entry) {
     modelId,
     label: safeString(entry.label),
     baseURL: safeString(entry.baseURL),
+    thinking: explicitThinking ? entry.thinking : inferThinkingDefault(providerId, modelId),
     addedAt: Number.isFinite(entry.addedAt) ? entry.addedAt : Date.now(),
     updatedAt: Number.isFinite(entry.updatedAt) ? entry.updatedAt : Date.now(),
   };
@@ -110,5 +125,6 @@ export function openCodeEntryToModel(entry) {
     cliFlag: `${providerId}/${modelId}`,
     providerId,
     modelId,
+    thinking: Boolean(entry.thinking),
   };
 }
