@@ -5,7 +5,14 @@ const fs = require("fs");
 const os = require("os");
 const { startAgent, cancelAgent, cancelAll, rewindFiles, respondPermission } = require("./agent-manager.cjs");
 const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
-const { startOpenCodeAgent, cancelOpenCodeAgent, cancelAllOpenCode, resolveOpenCodeBin } = require("./opencode-agent-manager.cjs");
+const {
+  startOpenCodeAgent,
+  cancelOpenCodeAgent,
+  cancelAllOpenCode,
+  resolveOpenCodeBin,
+  buildOpenCodeEnv,
+  shouldEnableThinking,
+} = require("./opencode-agent-manager.cjs");
 const {
   startMulticaAgent,
   cancelMulticaAgent,
@@ -1145,6 +1152,9 @@ Turn the user's high-level request into editable Custom Dispatch rows.
 Output only valid JSON with this shape:
 {"rows":[{"title":"short label","prompt":"self-contained agent task","branch":"kebab-case-branch","model":"exact-model-id"}]}
 
+Do not output markdown, prose, caveats, questions, explanations, chain-of-thought, thinking tags, or reasoning text.
+Your entire final answer must be parseable by JSON.parse.
+
 Rules:
 - Create 1 to 6 rows. Use one row when the work is not safely parallelizable.
 - Do not create GitHub issue rows. This planner only fills the Custom dispatch screen.
@@ -1154,7 +1164,8 @@ Rules:
 - Prefer Codex/GPT models for bug finding, regressions, CI/test failures, correctness checks, code review, refactors, and repo-wide reasoning.
 - Prefer Claude models for creative/product work, UX strategy, new feature design, frontend implementation, visual polish, copy, and exploratory UI iteration.
 - Prefer higher-reasoning variants for architecture, risky migrations, or unclear requirements; prefer medium/default variants for straightforward implementation.
-- If no exact model is clearly best, use the user's default target model.`;
+- If no exact model is clearly best, use the user's default target model.
+- If the user's request is ambiguous, make the most reasonable rows anyway instead of asking a question.`;
 
 function compactDispatchModel(model = {}) {
   const id = typeof model.id === "string" ? model.id : "";
@@ -1196,32 +1207,122 @@ function buildDispatchPlannerPrompt({ instructions, cwd, targetModels, defaultTa
   ].join("\n\n");
 }
 
+function buildDispatchPlannerRepairPrompt({ plannerPrompt, invalidOutput, parseError }) {
+  return [
+    "Your previous dispatch planner response was not valid JSON.",
+    `Parse error: ${parseError || "(unknown)"}`,
+    "Convert the original request into the required JSON shape now.",
+    "Return only valid JSON. Do not include markdown, prose, explanations, chain-of-thought, thinking tags, or reasoning text.",
+    "Original planner request:",
+    plannerPrompt,
+    "Previous invalid response with known reasoning blocks removed:",
+    stripPlannerReasoningBlocks(invalidOutput).slice(0, 4000),
+  ].join("\n\n");
+}
+
+function stripPlannerReasoningBlocks(text) {
+  return String(text || "")
+    .replace(/<(?:think|thinking|reasoning)>[\s\S]*?<\/(?:think|thinking|reasoning)>/gi, "")
+    .replace(/^Thinking:\s*[\s\S]*?(?=^```|^[{[])/gim, "")
+    .trim();
+}
+
+function findJsonValueEnd(text, start) {
+  const opening = text[start];
+  const expectedClose = opening === "{" ? "}" : opening === "[" ? "]" : "";
+  if (!expectedClose) return -1;
+
+  const stack = [expectedClose];
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start + 1; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === "\"") {
+      inString = true;
+    } else if (ch === "{" || ch === "[") {
+      stack.push(ch === "{" ? "}" : "]");
+    } else if (ch === "}" || ch === "]") {
+      if (stack.pop() !== ch) return -1;
+      if (stack.length === 0) return i + 1;
+    }
+  }
+
+  return -1;
+}
+
+function normalizeDispatchPlanPayload(parsed) {
+  const rows = Array.isArray(parsed) ? parsed : parsed?.rows;
+  if (!Array.isArray(rows)) return null;
+  const normalizedRows = rows.slice(0, 8).map((row) => ({
+    title: String(row?.title || "").trim(),
+    prompt: String(row?.prompt || "").trim(),
+    branch: String(row?.branch || "").trim(),
+    model: String(row?.model || "").trim(),
+  })).filter((row) => row.prompt || row.title);
+  return { rows: normalizedRows };
+}
+
+function parseDispatchPlanCandidate(jsonText) {
+  try {
+    return normalizeDispatchPlanPayload(JSON.parse(jsonText));
+  } catch {
+    return null;
+  }
+}
+
+function findDispatchPlanInText(text) {
+  const sources = [];
+  const raw = String(text || "");
+  const fencedMatches = raw.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi);
+  for (const match of fencedMatches) {
+    if (match[1]?.trim()) sources.push(match[1].trim());
+  }
+  const stripped = stripPlannerReasoningBlocks(raw);
+  if (stripped && stripped !== raw) sources.push(stripped);
+  sources.push(raw);
+
+  let sawRowsPayload = false;
+  for (const source of sources) {
+    for (let i = 0; i < source.length; i += 1) {
+      if (source[i] !== "{" && source[i] !== "[") continue;
+      const end = findJsonValueEnd(source, i);
+      if (end <= i) continue;
+      const plan = parseDispatchPlanCandidate(source.slice(i, end));
+      if (!plan) continue;
+      sawRowsPayload = true;
+      if (plan.rows.length > 0) return { plan, sawRowsPayload };
+      i = end - 1;
+    }
+  }
+
+  return { plan: null, sawRowsPayload };
+}
+
 function parseDispatchPlanJson(text) {
   const raw = String(text || "").trim();
   if (!raw) throw new Error("Planner returned no output.");
 
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = (fenced ? fenced[1].trim() : raw).trim();
-  const arrayStart = candidate.indexOf("[");
-  const arrayEnd = candidate.lastIndexOf("]");
-  const objectStart = candidate.indexOf("{");
-  const objectEnd = candidate.lastIndexOf("}");
-  const jsonText = arrayStart >= 0 && (arrayStart < objectStart || objectStart === -1) && arrayEnd > arrayStart
-    ? candidate.slice(arrayStart, arrayEnd + 1)
-    : (objectStart >= 0 && objectEnd > objectStart ? candidate.slice(objectStart, objectEnd + 1) : candidate);
-  const parsed = JSON.parse(jsonText);
-  const rows = Array.isArray(parsed) ? parsed : parsed?.rows;
-  if (!Array.isArray(rows) || rows.length === 0) {
+  const { plan, sawRowsPayload } = findDispatchPlanInText(raw);
+  if (!plan) {
+    if (sawRowsPayload) throw new Error("Planner did not return any dispatch rows.");
+    throw new Error("Planner returned output that did not contain the required JSON rows.");
+  }
+  if (plan.rows.length === 0) {
     throw new Error("Planner did not return any dispatch rows.");
   }
-  return {
-    rows: rows.slice(0, 8).map((row) => ({
-      title: String(row?.title || "").trim(),
-      prompt: String(row?.prompt || "").trim(),
-      branch: String(row?.branch || "").trim(),
-      model: String(row?.model || "").trim(),
-    })).filter((row) => row.prompt || row.title),
-  };
+  return plan;
 }
 
 function runClaudeDispatchPlanner({ prompt, plannerModel, cwd }) {
@@ -1344,6 +1445,154 @@ function runCodexDispatchPlanner({ prompt, plannerModel, cwd }) {
   });
 }
 
+function extractOpenCodePlannerError(event) {
+  if (!event || typeof event !== "object") return "";
+  if (event.type === "error") {
+    return String(event.message || event.error?.message || event.error || "").trim();
+  }
+  if (event.type === "session.error") {
+    const properties = event.properties || {};
+    return String(
+      properties.error?.message ||
+      properties.error ||
+      properties.message ||
+      ""
+    ).trim();
+  }
+  return "";
+}
+
+function isOpenCodePlannerReasoningEvent(event) {
+  const type = String(event?.type || event?.part?.type || event?.properties?.part?.type || "").toLowerCase();
+  return type === "reasoning" || type === "thinking" || type.includes("reasoning");
+}
+
+function collectOpenCodePlannerText(event, state) {
+  if (!event || typeof event !== "object") return;
+  if (event.type === "error" || event.type === "session.error") return;
+  const part = event.part || event.properties?.part;
+  if (part?.id && part?.type) state.partTypes.set(part.id, part.type);
+  if (isOpenCodePlannerReasoningEvent(event)) return;
+
+  const parts = Array.isArray(event.parts)
+    ? event.parts
+    : (Array.isArray(event.message?.parts) ? event.message.parts : []);
+  for (const item of parts) {
+    if (!item || item.type !== "text" || typeof item.text !== "string") continue;
+    if (item.id) state.partTextById.set(item.id, item.text);
+    else state.chunks.push(item.text);
+  }
+  if (parts.length > 0) return;
+
+  if (part?.type === "reasoning" || part?.type === "thinking") return;
+  if (part?.type === "text" && typeof part.text === "string") {
+    if (part.id) state.partTextById.set(part.id, part.text);
+    else state.chunks.push(part.text);
+    return;
+  }
+
+  if (event.type === "message.part.delta") {
+    const partId = event.properties?.partID;
+    const delta = event.properties?.delta;
+    const partType = partId ? state.partTypes.get(partId) : event.properties?.type;
+    if (partType && partType !== "text") return;
+    if (partId && typeof delta === "string") {
+      state.partTextById.set(partId, `${state.partTextById.get(partId) || ""}${delta}`);
+    }
+    return;
+  }
+
+  const directText = event.type === "text" || event.role === "assistant" || event.message?.role === "assistant"
+    ? [event.text, event.delta, event.content, event.message]
+      .find((value) => typeof value === "string" && value.length > 0)
+    : null;
+  if (directText) {
+    state.chunks.push(directText);
+  }
+}
+
+function runOpenCodeDispatchPlanner({ prompt, plannerModel, cwd }) {
+  return new Promise((resolve, reject) => {
+    const openCodeBin = resolveOpenCodeBin();
+    if (!openCodeBin) {
+      reject(new Error("Unable to locate the OpenCode CLI binary"));
+      return;
+    }
+
+    const model = plannerModel?.cliFlag || String(plannerModel?.id || "").replace(/^opencode:/, "");
+    const launchCwd = cwd && fs.existsSync(cwd) ? cwd : process.cwd();
+    const fullPrompt = `${DISPATCH_PLANNER_SYSTEM_PROMPT}\n\n${prompt}`;
+    const args = [
+      "run",
+      "--format", "json",
+      "--dangerously-skip-permissions",
+      "--dir", launchCwd,
+    ];
+    if (model) args.push("--model", model);
+    if (shouldEnableThinking(model, plannerModel?.thinking)) args.push("--thinking");
+    args.push("--", fullPrompt);
+
+    const child = spawnCli(openCodeBin, args, {
+      cwd: launchCwd,
+      env: buildOpenCodeEnv(),
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let settled = false;
+    let buffer = "";
+    let err = "";
+    let plannerError = "";
+    const textState = {
+      chunks: [],
+      partTextById: new Map(),
+      partTypes: new Map(),
+    };
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+    const parseLine = (line) => {
+      if (!line.trim()) return;
+      try {
+        const event = JSON.parse(line);
+        collectOpenCodePlannerText(event, textState);
+        plannerError = extractOpenCodePlannerError(event) || plannerError;
+      } catch {
+        textState.chunks.push(`${line}\n`);
+      }
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(reject, new Error("Dispatch planner timed out."));
+    }, DISPATCH_PLAN_TIMEOUT_MS);
+
+    child.stdout.on("data", (c) => {
+      buffer += c.toString();
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) parseLine(line);
+    });
+    child.stderr.on("data", (c) => { err += c.toString(); });
+    child.on("close", (code) => {
+      if (buffer.trim()) parseLine(buffer);
+      const textFromParts = Array.from(textState.partTextById.values()).join("");
+      const text = (textFromParts || textState.chunks.join("")).trim();
+      if (code !== 0 && !text) {
+        finish(reject, new Error(plannerError || err.trim() || `OpenCode planner exited with code ${code}.`));
+        return;
+      }
+      if (plannerError && !text) {
+        finish(reject, new Error(plannerError));
+        return;
+      }
+      finish(resolve, text);
+    });
+    child.on("error", (error) => finish(reject, error));
+  });
+}
+
 async function runDispatchPlanner(opts = {}) {
   const plannerModel = opts.plannerModel || {};
   const prompt = buildDispatchPlannerPrompt({
@@ -1353,11 +1602,31 @@ async function runDispatchPlanner(opts = {}) {
     defaultTargetModel: opts.defaultTargetModel,
   });
 
-  const provider = plannerModel.provider === "codex" ? "codex" : "claude";
+  const provider = plannerModel.provider === "codex"
+    ? "codex"
+    : (plannerModel.provider === "opencode" ? "opencode" : "claude");
   const text = provider === "codex"
     ? await runCodexDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd })
-    : await runClaudeDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd });
-  return parseDispatchPlanJson(text);
+    : provider === "opencode"
+      ? await runOpenCodeDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd })
+      : await runClaudeDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd });
+
+  try {
+    return parseDispatchPlanJson(text);
+  } catch (error) {
+    if (provider !== "opencode") throw error;
+    const repairPrompt = buildDispatchPlannerRepairPrompt({
+      plannerPrompt: prompt,
+      invalidOutput: text,
+      parseError: error?.message || String(error),
+    });
+    const repairedText = await runOpenCodeDispatchPlanner({
+      prompt: repairPrompt,
+      plannerModel,
+      cwd: opts.cwd,
+    });
+    return parseDispatchPlanJson(repairedText);
+  }
 }
 
 ipcMain.handle("dispatch-plan", async (_event, opts = {}) => {
