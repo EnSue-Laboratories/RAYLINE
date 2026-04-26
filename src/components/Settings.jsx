@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { ArrowLeft, Check, ChevronDown, Image, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, Image, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { createTranslator } from "../i18n";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
@@ -35,6 +35,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   });
   const [openCodeAdding, setOpenCodeAdding] = useState(false);
   const [openCodeEditingId, setOpenCodeEditingId] = useState("");
+  const [openCodeDuplicateSourceId, setOpenCodeDuplicateSourceId] = useState("");
   const [openCodeProviderOpen, setOpenCodeProviderOpen] = useState(false);
   const [openCodeProviderHighlight, setOpenCodeProviderHighlight] = useState(0);
   const [openCodeSaving, setOpenCodeSaving] = useState(false);
@@ -183,6 +184,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const handleStartOpenCodeAdd = useCallback(() => {
     setOpenCodeAdding(true);
     setOpenCodeEditingId("");
+    setOpenCodeDuplicateSourceId("");
     setOpenCodeProviderOpen(false);
     setOpenCodeProviderHighlight(0);
     setOpenCodeMessage("");
@@ -200,6 +202,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const handleStartOpenCodeEdit = useCallback((model) => {
     setOpenCodeAdding(true);
     setOpenCodeEditingId(model.id);
+    setOpenCodeDuplicateSourceId("");
     setOpenCodeProviderOpen(false);
     setOpenCodeProviderHighlight(0);
     setOpenCodeMessage("");
@@ -214,9 +217,30 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     });
   }, []);
 
+  const handleStartOpenCodeDuplicate = useCallback((model) => {
+    setOpenCodeAdding(true);
+    setOpenCodeEditingId("");
+    setOpenCodeDuplicateSourceId(model.id);
+    setOpenCodeProviderOpen(false);
+    setOpenCodeProviderHighlight(0);
+    setOpenCodeMessage("");
+    const sourceModelId = model.modelId || "";
+    const sourceLabel = model.label || "";
+    setOpenCodeDraft({
+      providerId: model.providerId || "openrouter",
+      modelId: sourceModelId ? `${sourceModelId}-copy` : "",
+      label: sourceLabel ? `${sourceLabel} (copy)` : "",
+      apiKey: "",
+      baseURL: model.baseURL || "",
+      enabled: model.enabled !== false,
+      thinking: Boolean(model.thinking),
+    });
+  }, []);
+
   const handleCancelOpenCodeAdd = useCallback(() => {
     setOpenCodeAdding(false);
     setOpenCodeEditingId("");
+    setOpenCodeDuplicateSourceId("");
     setOpenCodeProviderOpen(false);
     setOpenCodeProviderHighlight(0);
     setOpenCodeMessage("");
@@ -238,6 +262,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
       setOpenCodeMessage(t("settings.opencodeMissingModel"));
       return;
     }
+    const nextModelKey = `${providerId}/${modelId}`;
+    if (openCodeDuplicateSourceId && openCodeDuplicateSourceId === nextModelKey) {
+      setOpenCodeMessage(t("settings.opencodeDuplicateConflict"));
+      return;
+    }
     setOpenCodeSaving(true);
     setOpenCodeMessage("");
     try {
@@ -256,7 +285,6 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         enabled: openCodeDraft.enabled !== false,
         thinking: openCodeDraft.thinking,
       });
-      const nextModelKey = `${providerId}/${modelId}`;
       if (openCodeEditingId && openCodeEditingId !== nextModelKey) {
         removeOpenCodeModel(openCodeEditingId);
       }
@@ -272,6 +300,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
       await refreshOpenCode();
       setOpenCodeAdding(false);
       setOpenCodeEditingId("");
+      setOpenCodeDuplicateSourceId("");
       setOpenCodeProviderOpen(false);
       setOpenCodeProviderHighlight(0);
       setOpenCodeMessage(t("settings.opencodeSaved"));
@@ -280,7 +309,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     } finally {
       setOpenCodeSaving(false);
     }
-  }, [openCodeDraft, openCodeEditingId, refreshOpenCode, removeOpenCodeModel, saveOpenCodeModel, t]);
+  }, [openCodeDraft, openCodeDuplicateSourceId, openCodeEditingId, refreshOpenCode, removeOpenCodeModel, saveOpenCodeModel, t]);
 
   const handleRemoveOpenCodeModel = useCallback((modelKey) => {
     removeOpenCodeModel(modelKey);
@@ -1237,9 +1266,13 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   <input
                     type="password"
                     value={openCodeDraft.apiKey}
-                    placeholder={openCodeEditingId
-                      ? t("settings.opencodeApiKeyEditPlaceholder")
-                      : t("settings.opencodeApiKeyPlaceholder")}
+                    placeholder={
+                      openCodeDuplicateSourceId
+                        ? t("settings.opencodeDuplicateApiKeyPlaceholder")
+                        : openCodeEditingId
+                          ? t("settings.opencodeApiKeyEditPlaceholder")
+                          : t("settings.opencodeApiKeyPlaceholder")
+                    }
                     onChange={(e) => updateOpenCodeDraft({ apiKey: e.target.value })}
                     spellCheck={false}
                     style={inputStyle}
@@ -1348,7 +1381,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       ? t("settings.saving")
                       : openCodeEditingId
                         ? t("settings.opencodeUpdateModel")
-                        : t("settings.opencodeSaveModel")}
+                        : openCodeDuplicateSourceId
+                          ? t("settings.opencodeDuplicateSubmit")
+                          : t("settings.opencodeSaveModel")}
                   </button>
                 </div>
               </div>
@@ -1512,6 +1547,26 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                       title={t("settings.opencodeEditModel")}
                     >
                       <Pencil size={13} strokeWidth={1.7} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartOpenCodeDuplicate(model)}
+                      aria-label={t("settings.opencodeDuplicateModel")}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        color: "rgba(255,255,255,0.45)",
+                        cursor: "pointer",
+                      }}
+                      title={t("settings.opencodeDuplicateModel")}
+                    >
+                      <Copy size={13} strokeWidth={1.7} />
                     </button>
                     <button
                       type="button"
