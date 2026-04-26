@@ -1,0 +1,54 @@
+- generic [ref=e3]:
+  - generic "Window controls":
+    - button "Collapse sidebar" [ref=e6] [cursor=pointer]:
+      - generic:
+        - img
+    - button "New chat" [ref=e7] [cursor=pointer]:
+      - generic:
+        - img
+    - button "Settings" [ref=e8] [cursor=pointer]:
+      - generic:
+        - img
+  - generic [ref=e9]:
+    - generic [ref=e12]:
+      - generic [ref=e15]:
+        - button "New Chat" [ref=e16] [cursor=pointer]:
+          - img [ref=e17]
+          - text: New Chat
+        - button "Dispatch" [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+          - text: Dispatch
+        - button "New Project" [ref=e23] [cursor=pointer]:
+          - img [ref=e24]
+          - text: New Project
+        - button "GitHub Projects" [ref=e26] [cursor=pointer]:
+          - img [ref=e27]
+          - text: GitHub Projects
+      - generic [ref=e30]:
+        - generic [ref=e31]: NO CONVERSATIONS
+        - generic [ref=e32]: Start typing to begin
+      - generic [ref=e33]:
+        - button "SELECT FOLDER" [ref=e34] [cursor=pointer]:
+          - img [ref=e35]
+          - text: SELECT FOLDER
+        - generic [ref=e37]: 0 CHATS
+    - generic [ref=e38]:
+      - generic [ref=e44]:
+        - button "SONNET" [ref=e46] [cursor=pointer]:
+          - text: SONNET
+          - img [ref=e47]
+        - button "Toggle terminal" [ref=e49] [cursor=pointer]:
+          - img [ref=e50]
+      - img "RayLine" [ref=e54]:
+        - generic [ref=e55]:
+          - generic [ref=e56]: R
+          - generic [ref=e58]: "Y"
+          - generic [ref=e59]: L
+          - generic [ref=e60]: I
+          - generic [ref=e61]: "N"
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - textbox "Ask anything..." [ref=e70]
+          - button [disabled] [ref=e71]:
+            - img [ref=e72]
+        - generic [ref=e74]: ENTER TO SEND // SHIFT+ENTER NEWLINE // PASTE IMAGES

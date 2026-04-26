@@ -1,24 +1,49 @@
-import { useState, useCallback, useEffect } from "react";
-import { ArrowLeft, Check, ChevronDown, Image } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { ArrowLeft, Check, ChevronDown, Image, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { createTranslator } from "../i18n";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { DEFAULT_WALLPAPER, normalizeWallpaper } from "../utils/wallpaper";
 import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
+import { useOpenCodeModels } from "../data/openCodeModels.jsx";
+import WindowDragSpacer from "./WindowDragSpacer";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, windowControlsVisible = false, onClose }) {
   const s = useFontScale();
   const t = createTranslator(locale);
   const showUpdaterSettings = platform === "win32";
   const [local, setLocal] = useState(() => normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
   const [multica, setMultica] = useState(() => loadMulticaState());
   const [multicaServerDraft, setMulticaServerDraft] = useState(() => loadMulticaState().serverUrl || "");
+  const {
+    rawModels: openCodeModels,
+    status: openCodeStatus,
+    loading: openCodeLoading,
+    refresh: refreshOpenCode,
+    saveModel: saveOpenCodeModel,
+    removeModel: removeOpenCodeModel,
+  } = useOpenCodeModels();
+  const [openCodeDraft, setOpenCodeDraft] = useState({
+    providerId: "openrouter",
+    modelId: "",
+    label: "",
+    apiKey: "",
+    baseURL: "",
+    enabled: true,
+    thinking: false,
+  });
+  const [openCodeAdding, setOpenCodeAdding] = useState(false);
+  const [openCodeEditingId, setOpenCodeEditingId] = useState("");
+  const [openCodeProviderOpen, setOpenCodeProviderOpen] = useState(false);
+  const [openCodeProviderHighlight, setOpenCodeProviderHighlight] = useState(0);
+  const [openCodeSaving, setOpenCodeSaving] = useState(false);
+  const [openCodeMessage, setOpenCodeMessage] = useState("");
+  const openCodeProviderRef = useRef(null);
 
   // Sync from parent when wallpaper prop changes externally
   useEffect(() => {
     // Local edits should reset when the persisted wallpaper changes outside this panel.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocal(normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER });
   }, [wallpaper]);
 
@@ -150,6 +175,126 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     window.dispatchEvent(new CustomEvent("open-multica-setup"));
   }, [multicaServerDirty, normalizedMulticaServerDraft]);
 
+  const updateOpenCodeDraft = useCallback((patch) => {
+    setOpenCodeDraft((prev) => ({ ...prev, ...patch }));
+    setOpenCodeMessage("");
+  }, []);
+
+  const handleStartOpenCodeAdd = useCallback(() => {
+    setOpenCodeAdding(true);
+    setOpenCodeEditingId("");
+    setOpenCodeProviderOpen(false);
+    setOpenCodeProviderHighlight(0);
+    setOpenCodeMessage("");
+    setOpenCodeDraft((prev) => ({
+      ...prev,
+      modelId: "",
+      label: "",
+      apiKey: "",
+      baseURL: "",
+      enabled: true,
+      thinking: false,
+    }));
+  }, []);
+
+  const handleStartOpenCodeEdit = useCallback((model) => {
+    setOpenCodeAdding(true);
+    setOpenCodeEditingId(model.id);
+    setOpenCodeProviderOpen(false);
+    setOpenCodeProviderHighlight(0);
+    setOpenCodeMessage("");
+    setOpenCodeDraft({
+      providerId: model.providerId || "openrouter",
+      modelId: model.modelId || "",
+      label: model.label || "",
+      apiKey: "",
+      baseURL: model.baseURL || "",
+      enabled: model.enabled !== false,
+      thinking: Boolean(model.thinking),
+    });
+  }, []);
+
+  const handleCancelOpenCodeAdd = useCallback(() => {
+    setOpenCodeAdding(false);
+    setOpenCodeEditingId("");
+    setOpenCodeProviderOpen(false);
+    setOpenCodeProviderHighlight(0);
+    setOpenCodeMessage("");
+    setOpenCodeDraft((prev) => ({
+      ...prev,
+      modelId: "",
+      label: "",
+      apiKey: "",
+      baseURL: "",
+      enabled: true,
+      thinking: false,
+    }));
+  }, []);
+
+  const handleSaveOpenCodeModel = useCallback(async () => {
+    const providerId = openCodeDraft.providerId.trim();
+    const modelId = openCodeDraft.modelId.trim();
+    if (!providerId || !modelId) {
+      setOpenCodeMessage(t("settings.opencodeMissingModel"));
+      return;
+    }
+    setOpenCodeSaving(true);
+    setOpenCodeMessage("");
+    try {
+      await window.api?.opencodeSaveConfig?.({
+        providerId,
+        modelId,
+        apiKey: openCodeDraft.apiKey,
+        baseURL: openCodeDraft.baseURL,
+        setDefault: true,
+      });
+      saveOpenCodeModel({
+        providerId,
+        modelId,
+        label: openCodeDraft.label,
+        baseURL: openCodeDraft.baseURL,
+        enabled: openCodeDraft.enabled !== false,
+        thinking: openCodeDraft.thinking,
+      });
+      const nextModelKey = `${providerId}/${modelId}`;
+      if (openCodeEditingId && openCodeEditingId !== nextModelKey) {
+        removeOpenCodeModel(openCodeEditingId);
+      }
+      setOpenCodeDraft((prev) => ({
+        ...prev,
+        modelId: "",
+        label: "",
+        apiKey: "",
+        baseURL: "",
+        enabled: true,
+        thinking: false,
+      }));
+      await refreshOpenCode();
+      setOpenCodeAdding(false);
+      setOpenCodeEditingId("");
+      setOpenCodeProviderOpen(false);
+      setOpenCodeProviderHighlight(0);
+      setOpenCodeMessage(t("settings.opencodeSaved"));
+    } catch (error) {
+      setOpenCodeMessage(error?.message || t("settings.opencodeSaveFailed"));
+    } finally {
+      setOpenCodeSaving(false);
+    }
+  }, [openCodeDraft, openCodeEditingId, refreshOpenCode, removeOpenCodeModel, saveOpenCodeModel, t]);
+
+  const handleRemoveOpenCodeModel = useCallback((modelKey) => {
+    removeOpenCodeModel(modelKey);
+    setOpenCodeMessage("");
+  }, [removeOpenCodeModel]);
+
+  const handleToggleOpenCodeEnabled = useCallback((model) => {
+    saveOpenCodeModel({
+      ...model,
+      enabled: model.enabled === false,
+    });
+    setOpenCodeMessage("");
+  }, [saveOpenCodeModel]);
+
   const sliderPct = (value, min, max) => ((value - min) / (max - min)) * 100;
   const imgBlurPct = sliderPct(local.imgBlur || 0, 0, 32);
   const imgOpacityPct = sliderPct(local.imgOpacity || 0, 0, 100);
@@ -171,6 +316,68 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     cursor: "pointer",
     accentColor: "white",
   });
+
+  const inputStyle = {
+    width: "100%",
+    boxSizing: "border-box",
+    height: 32,
+    padding: "0 10px",
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 7,
+    color: "rgba(255,255,255,0.9)",
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: s(12),
+    outline: "none",
+  };
+
+  const compactButtonStyle = (active = true) => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "6px 12px",
+    borderRadius: 7,
+    background: active ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    color: active ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.38)",
+    fontSize: s(12),
+    cursor: active ? "pointer" : "not-allowed",
+    transition: "all .2s",
+    fontFamily: "system-ui, sans-serif",
+  });
+
+  const openCodeProviderOptions = useMemo(() => [
+    ...new Set([
+      ...(openCodeStatus.supportedProviders || []),
+      ...(openCodeStatus.providers || []),
+      "openrouter",
+    ].map((provider) => String(provider || "").trim()).filter(Boolean)),
+  ].sort((a, b) => a.localeCompare(b)), [openCodeStatus.providers, openCodeStatus.supportedProviders]);
+
+  const openCodeProviderQuery = openCodeDraft.providerId.trim().toLowerCase();
+  const filteredOpenCodeProviderOptions = openCodeProviderOptions
+    .filter((provider) => !openCodeProviderQuery || provider.toLowerCase().includes(openCodeProviderQuery))
+    .slice(0, 12);
+
+  useEffect(() => {
+    setOpenCodeProviderHighlight(0);
+  }, [openCodeProviderQuery, filteredOpenCodeProviderOptions.length]);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (!openCodeProviderRef.current?.contains(event.target)) {
+        setOpenCodeProviderOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, []);
+
+  const selectOpenCodeProvider = useCallback((providerId) => {
+    updateOpenCodeDraft({ providerId });
+    setOpenCodeProviderOpen(false);
+    setOpenCodeProviderHighlight(0);
+  }, [updateOpenCodeDraft]);
 
   // Hover state refs for buttons
   const [backHover, setBackHover] = useState(false);
@@ -219,7 +426,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
       }}
     >
       {/* Drag region */}
-      <div style={{ height: 52, WebkitAppRegion: "drag", flexShrink: 0 }} />
+      <div style={{ marginRight: windowControlsVisible ? 126 : 0 }}>
+        <WindowDragSpacer />
+      </div>
 
       {/* Header */}
       <div
@@ -724,6 +933,609 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   {t("settings.disconnect")}
                 </button>
               )}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 28, position: "relative" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: 2,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: s(13),
+                  color: "rgba(255,255,255,0.8)",
+                }}
+              >
+                {t("settings.opencode")}
+              </div>
+              <button
+                type="button"
+                onClick={() => refreshOpenCode()}
+                disabled={openCodeLoading}
+                style={compactButtonStyle(!openCodeLoading)}
+                title={t("settings.opencodeRefresh")}
+              >
+                <RefreshCw size={12} strokeWidth={1.8} />
+                {openCodeLoading ? t("settings.checking") : t("settings.refresh")}
+              </button>
+            </div>
+            <div
+              style={{
+                fontSize: s(11),
+                color: "rgba(255,255,255,0.3)",
+                marginBottom: 12,
+              }}
+            >
+              {t("settings.opencodeDescription")}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: openCodeAdding ? 14 : 12,
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: s(12),
+                    color: openCodeStatus.installed && openCodeStatus.configured
+                      ? "rgba(205,255,214,0.88)"
+                      : "rgba(255,255,255,0.72)",
+                    marginBottom: 4,
+                  }}
+                >
+                  {openCodeStatus.installed
+                    ? (openCodeStatus.configured ? t("settings.opencodeConfigured") : t("settings.opencodeInstalled"))
+                    : t("settings.opencodeNotInstalled")}
+                </div>
+                {openCodeStatus.version && (
+                  <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.42)", marginBottom: 2 }}>
+                    {t("settings.version", { value: openCodeStatus.version })}
+                  </div>
+                )}
+                {openCodeStatus.configPath && (
+                  <div
+                    title={openCodeStatus.configPath}
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: s(10),
+                      color: "rgba(255,255,255,0.22)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {openCodeStatus.configPath}
+                  </div>
+                )}
+              </div>
+              {(!openCodeAdding || openCodeEditingId) && (
+                <button
+                  type="button"
+                  onClick={handleStartOpenCodeAdd}
+                  style={compactButtonStyle(true)}
+                >
+                  <Plus size={12} strokeWidth={1.8} />
+                  {t("settings.opencodeAddModel")}
+                </button>
+              )}
+            </div>
+
+            {openCodeAdding && (
+              <div
+                role={openCodeEditingId ? "dialog" : undefined}
+                aria-label={openCodeEditingId ? t("settings.opencodeEditModel") : undefined}
+                style={openCodeEditingId ? {
+                  position: "absolute",
+                  zIndex: 60,
+                  top: 92,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: "min(620px, calc(100% - 48px))",
+                  boxSizing: "border-box",
+                  padding: 14,
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "rgba(12,14,22,0.72)",
+                  backdropFilter: "blur(38px) saturate(1.15)",
+                  boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
+                  WebkitAppRegion: "no-drag",
+                } : undefined}
+              >
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: "rgba(255,255,255,0.55)",
+                    marginBottom: 8,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    letterSpacing: ".02em",
+                  }}
+                >
+                  {openCodeEditingId ? t("settings.opencodeEditModel") : t("settings.opencodeAddModel")}
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                    gap: 8,
+                    marginBottom: 8,
+                  }}
+                >
+                  <div
+                    ref={openCodeProviderRef}
+                    style={{
+                      position: "relative",
+                      minWidth: 0,
+                    }}
+                  >
+                    <input
+                      type="text"
+                      role="combobox"
+                      aria-expanded={openCodeProviderOpen}
+                      aria-autocomplete="list"
+                      aria-controls="opencode-provider-options"
+                      value={openCodeDraft.providerId}
+                      placeholder={t("settings.opencodeProviderPlaceholder")}
+                      onChange={(e) => {
+                        updateOpenCodeDraft({ providerId: e.target.value });
+                        setOpenCodeProviderOpen(true);
+                        setOpenCodeProviderHighlight(0);
+                      }}
+                      onFocus={() => setOpenCodeProviderOpen(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setOpenCodeProviderOpen(true);
+                          setOpenCodeProviderHighlight((idx) => (
+                            filteredOpenCodeProviderOptions.length
+                              ? Math.min(idx + 1, filteredOpenCodeProviderOptions.length - 1)
+                              : 0
+                          ));
+                        } else if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setOpenCodeProviderHighlight((idx) => Math.max(idx - 1, 0));
+                        } else if (e.key === "Enter" && openCodeProviderOpen && filteredOpenCodeProviderOptions[openCodeProviderHighlight]) {
+                          e.preventDefault();
+                          selectOpenCodeProvider(filteredOpenCodeProviderOptions[openCodeProviderHighlight]);
+                        } else if (e.key === "Escape") {
+                          setOpenCodeProviderOpen(false);
+                        }
+                      }}
+                      spellCheck={false}
+                      style={{ ...inputStyle, paddingRight: 34 }}
+                      title={t("settings.opencodeProviderSelect")}
+                    />
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        position: "absolute",
+                        top: 1,
+                        right: 1,
+                        width: 30,
+                        height: 30,
+                        borderLeft: "1px solid rgba(255,255,255,0.06)",
+                        borderRadius: "0 6px 6px 0",
+                        background: "rgba(255,255,255,0.03)",
+                        color: "rgba(255,255,255,0.58)",
+                        display: "grid",
+                        placeItems: "center",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      <ChevronDown
+                        size={14}
+                        strokeWidth={2.2}
+                        style={{
+                          transform: openCodeProviderOpen ? "rotate(180deg)" : "rotate(0deg)",
+                          transition: "transform .16s ease",
+                        }}
+                      />
+                    </span>
+                    {openCodeProviderOpen && filteredOpenCodeProviderOptions.length > 0 && (
+                      <div
+                        id="opencode-provider-options"
+                        role="listbox"
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 5px)",
+                          left: 0,
+                          right: 0,
+                          zIndex: 80,
+                          maxHeight: 196,
+                          overflowY: "auto",
+                          padding: 4,
+                          borderRadius: 8,
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          background: "linear-gradient(180deg, rgba(20,24,34,0.24), rgba(8,10,16,0.16))",
+                          backdropFilter: "blur(42px) saturate(1.35)",
+                          WebkitBackdropFilter: "blur(42px) saturate(1.35)",
+                          boxShadow: "0 18px 54px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06)",
+                        }}
+                      >
+                        {filteredOpenCodeProviderOptions.map((provider, index) => {
+                          const active = index === openCodeProviderHighlight;
+                          const selected = provider === openCodeDraft.providerId.trim();
+                          return (
+                            <button
+                              key={provider}
+                              type="button"
+                              role="option"
+                              aria-selected={selected}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                selectOpenCodeProvider(provider);
+                              }}
+                              onMouseEnter={() => setOpenCodeProviderHighlight(index)}
+                              style={{
+                                width: "100%",
+                                height: 30,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 8,
+                                padding: "0 8px",
+                                border: "none",
+                                borderRadius: 6,
+                                background: active
+                                  ? "rgba(255,255,255,0.1)"
+                                  : selected
+                                    ? "rgba(255,255,255,0.06)"
+                                    : "transparent",
+                                color: selected ? "rgba(210,232,255,0.95)" : "rgba(255,255,255,0.74)",
+                                cursor: "pointer",
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: s(11),
+                                textAlign: "left",
+                                transition: "background .14s ease, color .14s ease",
+                              }}
+                            >
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {provider}
+                              </span>
+                              {selected && <Check size={12} strokeWidth={2.4} style={{ flex: "0 0 auto" }} />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={openCodeDraft.modelId}
+                    placeholder={t("settings.opencodeModelPlaceholder")}
+                    onChange={(e) => updateOpenCodeDraft({ modelId: e.target.value })}
+                    spellCheck={false}
+                    style={inputStyle}
+                  />
+                  <input
+                    type="text"
+                    value={openCodeDraft.label}
+                    placeholder={t("settings.opencodeLabelPlaceholder")}
+                    onChange={(e) => updateOpenCodeDraft({ label: e.target.value })}
+                    spellCheck={false}
+                    style={{ ...inputStyle, gridColumn: "1 / -1" }}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                    gap: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  <input
+                    type="password"
+                    value={openCodeDraft.apiKey}
+                    placeholder={openCodeEditingId
+                      ? t("settings.opencodeApiKeyEditPlaceholder")
+                      : t("settings.opencodeApiKeyPlaceholder")}
+                    onChange={(e) => updateOpenCodeDraft({ apiKey: e.target.value })}
+                    spellCheck={false}
+                    style={inputStyle}
+                  />
+                  <input
+                    type="text"
+                    value={openCodeDraft.baseURL}
+                    placeholder={t("settings.opencodeBaseUrlPlaceholder")}
+                    onChange={(e) => updateOpenCodeDraft({ baseURL: e.target.value })}
+                    spellCheck={false}
+                    style={inputStyle}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "8px 10px",
+                    marginBottom: 10,
+                    borderRadius: 7,
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    background: "rgba(255,255,255,0.025)",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: s(12),
+                        color: "rgba(255,255,255,0.76)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {t("settings.opencodeThinking")}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: s(10),
+                        color: "rgba(255,255,255,0.3)",
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {t("settings.opencodeThinkingDescription")}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={openCodeDraft.thinking}
+                    aria-label={t("settings.opencodeThinking")}
+                    onClick={() => updateOpenCodeDraft({ thinking: !openCodeDraft.thinking })}
+                    style={{
+                      flexShrink: 0,
+                      width: 38,
+                      height: 22,
+                      borderRadius: 999,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: openCodeDraft.thinking ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                      position: "relative",
+                      cursor: "pointer",
+                      padding: 0,
+                      transition: "background 120ms ease",
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 2,
+                        left: openCodeDraft.thinking ? 18 : 2,
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        background: "rgba(255,255,255,0.9)",
+                        transition: "left 120ms ease",
+                      }}
+                    />
+                  </button>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "flex-start",
+                    marginBottom: 12,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleCancelOpenCodeAdd}
+                    disabled={openCodeSaving}
+                    style={compactButtonStyle(!openCodeSaving)}
+                  >
+                    {t("settings.opencodeCancelAdd")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveOpenCodeModel}
+                    disabled={openCodeSaving || !openCodeDraft.providerId.trim() || !openCodeDraft.modelId.trim()}
+                    style={compactButtonStyle(!openCodeSaving && !!openCodeDraft.providerId.trim() && !!openCodeDraft.modelId.trim())}
+                  >
+                    <Check size={12} strokeWidth={1.8} />
+                    {openCodeSaving
+                      ? t("settings.saving")
+                      : openCodeEditingId
+                        ? t("settings.opencodeUpdateModel")
+                        : t("settings.opencodeSaveModel")}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {openCodeMessage && (
+              <div
+                style={{
+                  fontSize: s(11),
+                  color: openCodeMessage === t("settings.opencodeSaved")
+                    ? "rgba(205,255,214,0.74)"
+                    : "rgba(255,210,160,0.74)",
+                  marginBottom: 12,
+                }}
+              >
+                {openCodeMessage}
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {openCodeModels.length === 0 ? (
+                <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.28)" }}>
+                  {t("settings.opencodeNoModels")}
+                </div>
+              ) : openCodeModels.map((model) => (
+                <div
+                  key={model.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    padding: "7px 8px 7px 10px",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    borderRadius: 7,
+                    background: "rgba(255,255,255,0.025)",
+                    opacity: model.enabled === false ? 0.55 : 1,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        minWidth: 0,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: s(12),
+                          color: "rgba(255,255,255,0.76)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {model.label || `${model.providerId}/${model.modelId}`}
+                      </span>
+                      {model.thinking && (
+                        <span
+                          style={{
+                            flexShrink: 0,
+                            padding: "2px 5px",
+                            borderRadius: 5,
+                            border: "1px solid rgba(180,220,255,0.18)",
+                            background: "rgba(180,220,255,0.08)",
+                            color: "rgba(210,230,255,0.62)",
+                            fontSize: s(9),
+                            fontFamily: "'JetBrains Mono', monospace",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {t("settings.opencodeThinkingBadge")}
+                        </span>
+                      )}
+                      {model.enabled === false && (
+                        <span
+                          style={{
+                            flexShrink: 0,
+                            padding: "2px 5px",
+                            borderRadius: 5,
+                            border: "1px solid rgba(255,255,255,0.10)",
+                            background: "rgba(255,255,255,0.04)",
+                            color: "rgba(255,255,255,0.42)",
+                            fontSize: s(9),
+                            fontFamily: "'JetBrains Mono', monospace",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {t("settings.opencodeDisabledBadge")}
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: s(10),
+                        color: "rgba(255,255,255,0.28)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {model.providerId}/{model.modelId}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={model.enabled !== false}
+                      aria-label={model.enabled !== false
+                        ? t("settings.opencodeDisableModel")
+                        : t("settings.opencodeEnableModel")}
+                      onClick={() => handleToggleOpenCodeEnabled(model)}
+                      style={{
+                        width: 34,
+                        height: 20,
+                        borderRadius: 999,
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        background: model.enabled !== false ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                        position: "relative",
+                        cursor: "pointer",
+                        padding: 0,
+                        transition: "background 120ms ease",
+                      }}
+                      title={model.enabled !== false
+                        ? t("settings.opencodeDisableModel")
+                        : t("settings.opencodeEnableModel")}
+                    >
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: 2,
+                          left: model.enabled !== false ? 16 : 2,
+                          width: 14,
+                          height: 14,
+                          borderRadius: "50%",
+                          background: "rgba(255,255,255,0.9)",
+                          transition: "left 120ms ease",
+                        }}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartOpenCodeEdit(model)}
+                      aria-label={t("settings.opencodeEditModel")}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        color: "rgba(255,255,255,0.45)",
+                        cursor: "pointer",
+                      }}
+                      title={t("settings.opencodeEditModel")}
+                    >
+                      <Pencil size={13} strokeWidth={1.7} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveOpenCodeModel(model.id)}
+                      aria-label={t("settings.opencodeRemoveModel")}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        color: "rgba(255,255,255,0.45)",
+                        cursor: "pointer",
+                      }}
+                      title={t("settings.opencodeRemoveModel")}
+                    >
+                      <Trash2 size={13} strokeWidth={1.7} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

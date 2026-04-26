@@ -29,11 +29,42 @@ export function isMulticaModelId(id) {
   return typeof id === "string" && id.startsWith("multica:");
 }
 
-export function getMOrMulticaFallback(id, multicaModels) {
+export function isOpenCodeModelId(id) {
+  return typeof id === "string" && id.startsWith("opencode:");
+}
+
+export function parseOpenCodeModelId(id) {
+  if (!isOpenCodeModelId(id)) return null;
+  const value = id.slice("opencode:".length).trim();
+  const slashIndex = value.indexOf("/");
+  if (slashIndex <= 0 || slashIndex >= value.length - 1) return null;
+  return {
+    providerId: value.slice(0, slashIndex),
+    modelId: value.slice(slashIndex + 1),
+    cliFlag: value,
+  };
+}
+
+export function getMOrMulticaFallback(id, extraModels = []) {
+  const dynamicHit = extraModels?.find((m) => m.id === id);
+  if (dynamicHit) return dynamicHit;
+
   if (isMulticaModelId(id)) {
-    const hit = multicaModels?.find((m) => m.id === id);
-    if (hit) return hit;
     return { id, name: "Multica agent", tag: "MULTICA", provider: "multica" };
+  }
+  if (isOpenCodeModelId(id)) {
+    const parsed = parseOpenCodeModelId(id);
+    if (parsed) {
+      return {
+        id,
+        name: `OpenCode ${parsed.providerId}/${parsed.modelId}`,
+        tag: "OPENCODE",
+        provider: "opencode",
+        cliFlag: parsed.cliFlag,
+        providerId: parsed.providerId,
+        modelId: parsed.modelId,
+      };
+    }
   }
   return getM(id);
 }

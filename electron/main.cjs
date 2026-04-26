@@ -5,6 +5,7 @@ const fs = require("fs");
 const os = require("os");
 const { startAgent, cancelAgent, cancelAll, rewindFiles, respondPermission } = require("./agent-manager.cjs");
 const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
+const { startOpenCodeAgent, cancelOpenCodeAgent, cancelAllOpenCode, resolveOpenCodeBin } = require("./opencode-agent-manager.cjs");
 const {
   startMulticaAgent,
   cancelMulticaAgent,
@@ -17,7 +18,7 @@ const {
   multicaListMessages,
   subscribeMulticaAgent,
 } = require("./multica-manager.cjs");
-const { buildSpawnPath, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
+const { buildSpawnPath, resolveCliBin, spawnCli, execFileCli } = require("./cli-bin-resolver.cjs");
 const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
@@ -41,6 +42,10 @@ const WALLPAPER_MIME_TYPES = {
   bmp: "image/bmp",
   avif: "image/avif",
 };
+const OPENCODE_SUPPORTED_PROVIDERS_TTL_MS = 10 * 60 * 1000;
+
+let opencodeSupportedProvidersCache = [];
+let opencodeSupportedProvidersCachedAt = 0;
 
 // Override app name (in dev, Electron uses its own binary name)
 app.setName("RayLine");
@@ -634,6 +639,8 @@ ipcMain.on("agent-start", (event, opts) => {
     });
   } else if (opts.provider === "codex") {
     startCodexAgent(opts, event.sender);
+  } else if (opts.provider === "opencode") {
+    startOpenCodeAgent(opts, event.sender);
   } else {
     startAgent(opts, event.sender);
   }
@@ -642,6 +649,7 @@ ipcMain.on("agent-start", (event, opts) => {
 ipcMain.on("agent-cancel", (_event, { conversationId }) => {
   cancelAgent(conversationId);
   cancelCodexAgent(conversationId);
+  cancelOpenCodeAgent(conversationId);
   cancelMulticaAgent(conversationId).catch((err) => {
     console.error("[multica] cancel failed", { conversationId, error: err?.message || String(err) });
   });
@@ -650,6 +658,8 @@ ipcMain.on("agent-cancel", (_event, { conversationId }) => {
 ipcMain.on("agent-edit-resend", (event, opts) => {
   if (opts.provider === "codex") {
     startCodexAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
+  } else if (opts.provider === "opencode") {
+    startOpenCodeAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
   } else {
     startAgent({ ...opts, forkSession: true }, event.sender);
   }
@@ -811,6 +821,249 @@ const CLI_INSTALL_CHECK_TTL_MS = 5000;
 let cliInstallCheckCache = null;
 let cliInstallCheckCacheAt = 0;
 
+function stripJsonComments(input) {
+  let output = "";
+  let inString = false;
+  let quote = "";
+  let escaped = false;
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i];
+    const next = input[i + 1];
+    if (inString) {
+      output += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === quote) {
+        inString = false;
+        quote = "";
+      }
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      inString = true;
+      quote = char;
+      output += char;
+      continue;
+    }
+    if (char === "/" && next === "/") {
+      while (i < input.length && input[i] !== "\n") i += 1;
+      output += "\n";
+      continue;
+    }
+    if (char === "/" && next === "*") {
+      i += 2;
+      while (i < input.length && !(input[i] === "*" && input[i + 1] === "/")) i += 1;
+      i += 1;
+      continue;
+    }
+    output += char;
+  }
+  return output;
+}
+
+function readJsonFileLoose(filePath) {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    const raw = fs.readFileSync(filePath, "utf-8");
+    if (!raw.trim()) return {};
+    return JSON.parse(stripJsonComments(raw));
+  } catch {
+    return null;
+  }
+}
+
+function getOpenCodeConfigPath() {
+  return path.join(os.homedir(), ".config", "opencode", "opencode.json");
+}
+
+function getOpenCodeAuthPath() {
+  const xdgData = process.env.XDG_DATA_HOME;
+  return path.join(xdgData || path.join(os.homedir(), ".local", "share"), "opencode", "auth.json");
+}
+
+function collectAuthProviders(authConfig) {
+  if (!authConfig || typeof authConfig !== "object") return [];
+  if (authConfig.provider && typeof authConfig.provider === "object") {
+    return Object.keys(authConfig.provider);
+  }
+  if (authConfig.providers && typeof authConfig.providers === "object") {
+    return Object.keys(authConfig.providers);
+  }
+  return Object.keys(authConfig).filter((key) => {
+    const value = authConfig[key];
+    return value && typeof value === "object";
+  });
+}
+
+function hasProviderCredential(providerConfig, authProviders) {
+  if (!providerConfig || typeof providerConfig !== "object") return false;
+  const providerIds = Object.keys(providerConfig);
+  if (providerIds.some((provider) => authProviders.includes(provider))) return true;
+  return providerIds.some((provider) => {
+    const apiKey = providerConfig[provider]?.options?.apiKey;
+    return typeof apiKey === "string" && apiKey.trim().length > 0;
+  });
+}
+
+function getOpenCodeStatusSync() {
+  const bin = resolveOpenCodeBin();
+  const configPath = getOpenCodeConfigPath();
+  const authPath = getOpenCodeAuthPath();
+  const config = readJsonFileLoose(configPath) || {};
+  const auth = readJsonFileLoose(authPath) || {};
+  const providerConfig = config.provider && typeof config.provider === "object" ? config.provider : {};
+  const configProviders = Object.keys(providerConfig);
+  const authProviders = collectAuthProviders(auth);
+  const providers = [...new Set([...configProviders, ...authProviders])].sort();
+  const configured = Boolean(
+    bin &&
+    providers.length > 0 &&
+    config.model &&
+    hasProviderCredential(providerConfig, authProviders)
+  );
+
+  return {
+    installed: Boolean(bin),
+    configured,
+    binPath: bin || "",
+    configPath,
+    configExists: fs.existsSync(configPath),
+    authPath,
+    authExists: fs.existsSync(authPath),
+    model: typeof config.model === "string" ? config.model : "",
+    smallModel: typeof config.small_model === "string" ? config.small_model : "",
+    providers,
+  };
+}
+
+function parseOpenCodeModelProviders(output) {
+  const providers = new Set();
+  for (const rawLine of String(output || "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const slashIndex = line.indexOf("/");
+    if (slashIndex <= 0) continue;
+    const providerId = line.slice(0, slashIndex).trim();
+    if (/^[a-zA-Z0-9_.-]+$/.test(providerId)) providers.add(providerId);
+  }
+  return [...providers].sort((a, b) => a.localeCompare(b));
+}
+
+function getOpenCodeSupportedProviders(bin, { force = false } = {}) {
+  return new Promise((resolve) => {
+    if (!bin) {
+      resolve([]);
+      return;
+    }
+
+    const now = Date.now();
+    if (
+      !force &&
+      opencodeSupportedProvidersCache.length > 0 &&
+      now - opencodeSupportedProvidersCachedAt < OPENCODE_SUPPORTED_PROVIDERS_TTL_MS
+    ) {
+      resolve(opencodeSupportedProvidersCache);
+      return;
+    }
+
+    execFileCli(
+      bin,
+      ["models"],
+      {
+        encoding: "utf-8",
+        timeout: 12000,
+        maxBuffer: 4 * 1024 * 1024,
+        env: { ...process.env, PATH: buildSpawnPath() },
+      },
+      (_error, stdout) => {
+        const providers = parseOpenCodeModelProviders(stdout);
+        if (providers.length > 0) {
+          opencodeSupportedProvidersCache = providers;
+          opencodeSupportedProvidersCachedAt = Date.now();
+        }
+        resolve(providers.length > 0 ? providers : opencodeSupportedProvidersCache);
+      }
+    );
+  });
+}
+
+function getOpenCodeVersion(bin) {
+  return new Promise((resolve) => {
+    if (!bin) {
+      resolve("");
+      return;
+    }
+    execFileCli(
+      bin,
+      ["--version"],
+      { encoding: "utf-8", timeout: 5000, env: { ...process.env, PATH: buildSpawnPath() } },
+      (_error, stdout, stderr) => {
+        resolve(String(stdout || stderr || "").trim().split(/\r?\n/)[0] || "");
+      }
+    );
+  });
+}
+
+function normalizeOpenCodeConfigInput(input) {
+  const providerId = String(input?.providerId || "").trim();
+  const modelId = String(input?.modelId || "").trim();
+  if (!providerId || !/^[a-zA-Z0-9_.-]+$/.test(providerId)) {
+    throw new Error("Provider ID must contain only letters, numbers, dots, underscores, or hyphens.");
+  }
+  if (!modelId || /[\r\n]/.test(modelId)) {
+    throw new Error("Model ID is required.");
+  }
+  return {
+    providerId,
+    modelId,
+    apiKey: typeof input?.apiKey === "string" ? input.apiKey.trim() : "",
+    baseURL: typeof input?.baseURL === "string" ? input.baseURL.trim() : "",
+    setDefault: input?.setDefault !== false,
+  };
+}
+
+function saveOpenCodeConfig(input) {
+  const normalized = normalizeOpenCodeConfigInput(input);
+  const configPath = getOpenCodeConfigPath();
+  const existing = readJsonFileLoose(configPath);
+  const config = existing && typeof existing === "object" ? existing : {};
+  const provider = config.provider && typeof config.provider === "object" ? { ...config.provider } : {};
+  const currentProvider = provider[normalized.providerId] && typeof provider[normalized.providerId] === "object"
+    ? { ...provider[normalized.providerId] }
+    : {};
+  const models = currentProvider.models && typeof currentProvider.models === "object"
+    ? { ...currentProvider.models }
+    : {};
+  const options = currentProvider.options && typeof currentProvider.options === "object"
+    ? { ...currentProvider.options }
+    : {};
+
+  models[normalized.modelId] = models[normalized.modelId] && typeof models[normalized.modelId] === "object"
+    ? models[normalized.modelId]
+    : {};
+  if (normalized.apiKey) options.apiKey = normalized.apiKey;
+  if (normalized.baseURL) options.baseURL = normalized.baseURL;
+
+  provider[normalized.providerId] = {
+    ...currentProvider,
+    models,
+    ...(Object.keys(options).length > 0 ? { options } : {}),
+  };
+
+  const nextConfig = {
+    "$schema": config.$schema || "https://opencode.ai/config.json",
+    ...config,
+    provider,
+    ...(normalized.setDefault ? { model: `${normalized.providerId}/${normalized.modelId}` } : {}),
+  };
+
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
+  fs.writeFileSync(configPath, JSON.stringify(nextConfig, null, 2) + "\n");
+  cliInstallCheckCache = null;
+  return getOpenCodeStatusSync();
+}
+
 function getCliInstalledSnapshot({ force = false } = {}) {
   const now = Date.now();
   if (!force && cliInstallCheckCache && (now - cliInstallCheckCacheAt) < CLI_INSTALL_CHECK_TTL_MS) {
@@ -820,6 +1073,7 @@ function getCliInstalledSnapshot({ force = false } = {}) {
   cliInstallCheckCache = {
     claude: Boolean(resolveCliBin("claude", { envVarName: "CLAUDE_BIN" })),
     codex: Boolean(resolveCliBin("codex", { envVarName: "CODEX_BIN" })),
+    opencode: Boolean(resolveOpenCodeBin()),
   };
   cliInstallCheckCacheAt = Date.now();
   return cliInstallCheckCache;
@@ -830,6 +1084,23 @@ function getCliInstalledSnapshot({ force = false } = {}) {
 // redirect the user to the installation guide instead.
 ipcMain.handle("check-cli-installed", (_event, options = {}) => {
   return getCliInstalledSnapshot(options);
+});
+
+ipcMain.handle("opencode-status", async () => {
+  const status = getOpenCodeStatusSync();
+  const [version, supportedProviders] = await Promise.all([
+    getOpenCodeVersion(status.binPath),
+    getOpenCodeSupportedProviders(status.binPath),
+  ]);
+  return {
+    ...status,
+    version,
+    supportedProviders: [...new Set([...supportedProviders, ...status.providers])].sort(),
+  };
+});
+
+ipcMain.handle("opencode-save-config", (_event, input) => {
+  return saveOpenCodeConfig(input);
 });
 
 ipcMain.handle("system-info", () => ({
@@ -2001,5 +2272,6 @@ app.on("before-quit", () => {
   }
   cancelAll();
   cancelAllCodex();
+  cancelAllOpenCode();
   terminalManager.stopServer();
 });

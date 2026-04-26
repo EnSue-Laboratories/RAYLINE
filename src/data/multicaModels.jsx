@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { loadMulticaState, saveMulticaState } from "../multica/store";
+import { useOpenCodeModels } from "./openCodeModels.jsx";
 import ModelPicker from "../components/ModelPicker";
 
 export function multicaAgentToModel(agent, state) {
@@ -69,5 +70,14 @@ export function useMulticaModels() {
 
 export function ModelPickerWithMultica({ value, onChange }) {
   const { models, error, loading } = useMulticaModels();
-  return <ModelPicker value={value} onChange={onChange} extraModels={models} extraError={error} extraLoading={loading} />;
+  const { models: openCodeModels } = useOpenCodeModels();
+  return (
+    <ModelPicker
+      value={value}
+      onChange={onChange}
+      extraModels={[...openCodeModels, ...models]}
+      extraError={error}
+      extraLoading={loading}
+    />
+  );
 }

@@ -9,11 +9,12 @@ const VIEWPORT_PADDING = 8;
 const MIN_MENU_WIDTH = 220;
 const PREFERRED_MAX_HEIGHT = 420;
 const CLI_RECHECK_INTERVAL_MS = 5000;
-const DEFAULT_CLI_INSTALL_STATUS = { claude: true, codex: true };
+const DEFAULT_CLI_INSTALL_STATUS = { claude: true, codex: true, opencode: false };
 
 const PROVIDER_INSTALL_GUIDES = {
   claude: { url: "https://docs.claude.com/en/docs/claude-code/setup", label: "Install Claude Code\u2026" },
   codex:  { url: "https://developers.openai.com/codex/cli",           label: "Install Codex CLI\u2026"   },
+  opencode: { url: "https://opencode.ai/docs/cli/",                    label: "Install OpenCode\u2026"    },
 };
 
 function extractMulticaErrorStatus(err) {
@@ -215,13 +216,15 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
         >
           {(() => {
             const all = [...MODELS, ...extraModels];
-            return ["claude", "codex", "multica"].map((provider, gi) => {
+            return ["claude", "codex", "opencode", "multica"].map((provider, gi) => {
               const entries = all.filter((mm) => mm.provider === provider);
               const isMulticaEmpty = provider === "multica" && entries.length === 0;
+              const isOpenCodeEmpty = provider === "opencode" && entries.length === 0;
               const guide = PROVIDER_INSTALL_GUIDES[provider];
               const cliKnown = !guide || Object.prototype.hasOwnProperty.call(cliInstalled || {}, provider);
               const cliUnknown = Boolean(guide) && !cliKnown;
               const cliMissing = Boolean(guide) && cliKnown && cliInstalled[provider] === false;
+              if (isOpenCodeEmpty && m.provider !== "opencode") return null;
               return (
                 <div key={provider}>
                   {gi > 0 && <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "4px 8px" }} />}

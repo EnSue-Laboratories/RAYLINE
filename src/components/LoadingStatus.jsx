@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { getM } from "../data/models";
+import { getM, isOpenCodeModelId } from "../data/models";
 
 // Hard-coded rotating status phrases — cycles while the agent is working.
 const PHRASES = [
@@ -42,6 +42,20 @@ function formatDuration(ms) {
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${m}:${String(r).padStart(2, "0")}`;
+}
+
+function formatCost(cost) {
+  if (!Number.isFinite(cost)) return "$0";
+  if (cost <= 0) return "$0";
+  if (cost < 0.0001) return "<$0.0001";
+  if (cost < 0.01) return `$${cost.toFixed(4)}`;
+  if (cost < 1) return `$${cost.toFixed(3)}`;
+  return `$${cost.toFixed(2)}`;
+}
+
+function nonNegativeNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
 // Coarse "resets in" label for plan-quota windows (5h / 7d).
@@ -117,7 +131,6 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
   const [now, setNow] = useState(() => Date.now());
   const [phraseIdx, setPhraseIdx] = useState(0);
   const phraseRef = useRef(0);
-  const finalElapsedRef = useRef(null);
 
   useEffect(() => {
     if (!isStreaming) return;
@@ -132,49 +145,50 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
     };
   }, [isStreaming]);
 
-  // Freeze elapsed at stream end (same mount) so the footer shows total runtime.
-  useEffect(() => {
-    if (!isStreaming && startedAt && finalElapsedRef.current == null) {
-      finalElapsedRef.current = Date.now() - startedAt;
-    }
-  }, [isStreaming, startedAt]);
-
   // Prefer a persisted elapsed value from the message itself — this survives
   // reloads, whereas `Date.now() - _startedAt` would drift across sessions.
   const elapsedMs = isStreaming
     ? (startedAt ? now - startedAt : 0)
-    : (frozenElapsedMs ?? finalElapsedRef.current ?? 0);
+    : (frozenElapsedMs ?? (startedAt ? now - startedAt : 0));
 
-  const model = modelId ? getM(modelId) : null;
+  const isOpenCode = isOpenCodeModelId(modelId);
+  const model = modelId && !isOpenCode ? getM(modelId) : null;
   const isCodex = model?.provider === "codex";
-  const rawInputTokens = usage?.input_tokens || 0;
-  const outputTokens = usage?.output_tokens || 0;
-  const cacheRead = usage?.cache_read_input_tokens || 0;
-  const cacheCreate = usage?.cache_creation_input_tokens || 0;
+  const isClaude = model?.provider === "claude";
+  const rawInputTokens = nonNegativeNumber(usage?.input_tokens);
+  const outputTokens = nonNegativeNumber(usage?.output_tokens);
+  const reasoningTokens = nonNegativeNumber(usage?.reasoning_tokens);
+  const cacheRead = nonNegativeNumber(usage?.cache_read_input_tokens);
+  const cacheCreate = nonNegativeNumber(usage?.cache_creation_input_tokens);
   // Claude's `input_tokens` field excludes cached portions; users read "in" as
   // the total prompt size, so fold cache read/create into it. `cached` still
   // shows the breakdown of how much of that was served from cache.
-  const inputTokens = isCodex
-    ? rawInputTokens
-    : rawInputTokens + cacheRead + cacheCreate;
-  const derivedContextUsed = isCodex
-    ? rawInputTokens + outputTokens
-    : inputTokens + outputTokens;
+  const inputTokens = isClaude
+    ? rawInputTokens + cacheRead + cacheCreate
+    : rawInputTokens;
+  const derivedContextUsed = inputTokens + outputTokens + reasoningTokens;
   const contextUsed = Number.isFinite(usage?.total_tokens) && usage.total_tokens > 0
     ? usage.total_tokens
     : derivedContextUsed;
-  const configuredContextWindow = model?.contextWindow || DEFAULT_CONTEXT_WINDOW;
-  const contextWindow = usage?.context_window || configuredContextWindow;
-  const hasExplicitContextWindow = Number.isFinite(usage?.context_window);
+  const configuredContextWindow = model?.contextWindow || (isOpenCode ? null : DEFAULT_CONTEXT_WINDOW);
+  const sourceContextWindow = Number.isFinite(usage?.context_window) && usage.context_window > 0
+    ? usage.context_window
+    : null;
+  const contextWindow = sourceContextWindow || configuredContextWindow;
+  const hasContextWindow = Number.isFinite(contextWindow) && contextWindow > 0;
+  const hasExplicitContextWindow = Boolean(sourceContextWindow);
   const isLikelyCumulativeCodexUsage =
     isCodex &&
     !hasExplicitContextWindow &&
     contextUsed > configuredContextWindow * 1.2;
-  const contextPct = contextUsed
+  const costUsd = Number(usage?.cost_usd);
+  const hasCost = Number.isFinite(costUsd) && costUsd > 0;
+  const contextPct = contextUsed && hasContextWindow
     ? Math.max(0, Math.min(100, (contextUsed / contextWindow) * 100))
     : 0;
 
-  const hasUsage = contextUsed > 0 && !isLikelyCumulativeCodexUsage;
+  const hasTokenUsage = contextUsed > 0 && !isLikelyCumulativeCodexUsage;
+  const hasUsage = hasTokenUsage || hasCost;
 
   const fiveHour = rateLimits?.five_hour;
   const sevenDay = rateLimits?.seven_day;
@@ -260,31 +274,55 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
       {/* Line 2: token breakdown + context */}
       {hasUsage && (
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", color: secondaryColor, fontVariantNumeric: "tabular-nums" }}>
-          <span>
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>in </span>
-            {formatCompact(inputTokens)}
-          </span>
-          {sep}
-          <span>
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>out </span>
-            {formatCompact(outputTokens)}
-          </span>
-          {(cacheRead + cacheCreate) > 0 && (
+          {hasTokenUsage && (
             <>
+              <span>
+                <span style={{ color: "rgba(255,255,255,0.22)" }}>in </span>
+                {formatCompact(inputTokens)}
+              </span>
               {sep}
               <span>
-                <span style={{ color: "rgba(255,255,255,0.22)" }}>cached </span>
-                {formatCompact(cacheRead + cacheCreate)}
+                <span style={{ color: "rgba(255,255,255,0.22)" }}>out </span>
+                {formatCompact(outputTokens)}
+              </span>
+              {reasoningTokens > 0 && (
+                <>
+                  {sep}
+                  <span>
+                    <span style={{ color: "rgba(255,255,255,0.22)" }}>think </span>
+                    {formatCompact(reasoningTokens)}
+                  </span>
+                </>
+              )}
+              {(cacheRead + cacheCreate) > 0 && (
+                <>
+                  {sep}
+                  <span>
+                    <span style={{ color: "rgba(255,255,255,0.22)" }}>cached </span>
+                    {formatCompact(cacheRead + cacheCreate)}
+                  </span>
+                </>
+              )}
+              {sep}
+              <span>
+                <span style={{ color: "rgba(255,255,255,0.22)" }}>ctx </span>
+                {formatCompact(contextUsed)}
+                {hasContextWindow && (
+                  <>
+                    <span style={{ color: "rgba(255,255,255,0.22)" }}>/{formatCompact(contextWindow)}</span>
+                    <span style={{ marginLeft: 5, color: "rgba(255,255,255,0.42)" }}>{pctLabel}</span>
+                  </>
+                )}
               </span>
             </>
           )}
-          {sep}
-          <span>
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>ctx </span>
-            {formatCompact(contextUsed)}
-            <span style={{ color: "rgba(255,255,255,0.22)" }}>/{formatCompact(contextWindow)}</span>
-            <span style={{ marginLeft: 5, color: "rgba(255,255,255,0.42)" }}>{pctLabel}</span>
-          </span>
+          {hasTokenUsage && hasCost && sep}
+          {hasCost && (
+            <span>
+              <span style={{ color: "rgba(255,255,255,0.22)" }}>cost </span>
+              {formatCost(costUsd)}
+            </span>
+          )}
         </div>
       )}
 

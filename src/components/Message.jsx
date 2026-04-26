@@ -195,7 +195,7 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
 // Wrap them in inline code so they display as-is instead of breaking rendering
 function sanitizeText(text) {
   if (!text) return text;
-  return text.replace(/<\/?(?:thinking|antThinking)[^>]*>/gi, (match) => `\`${match}\``);
+  return text.replace(/<\/?(?:think|thinking|antThinking)[^>]*>/gi, (match) => `\`${match}\``);
 }
 
 const CONTROL_BLOCK_RE = /```control\s*\n([\s\S]*?)```/g;
@@ -613,7 +613,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
               : msg.isThinking;
             return (
               <div key={"think-" + i} data-copy-image-ignore="true">
-                <ThinkingBlock text={part.text} isThinking={isPartThinking} />
+                <ThinkingBlock text={part.text} isThinking={isPartThinking} durationMs={part.durationMs} />
               </div>
             );
           }

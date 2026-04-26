@@ -57,13 +57,21 @@ function findPendingMulticaToolIdx(parts, name) {
 function mergeUsage(prev, incoming) {
   if (!incoming) return prev || null;
   const base = prev || {};
+  const incomingCost = Number(incoming.cost_usd);
+  const baseCost = Number(base.cost_usd);
   return {
     input_tokens: incoming.input_tokens ?? base.input_tokens ?? 0,
     output_tokens: incoming.output_tokens ?? base.output_tokens ?? 0,
+    reasoning_tokens: incoming.reasoning_tokens ?? base.reasoning_tokens ?? 0,
     cache_creation_input_tokens:
       incoming.cache_creation_input_tokens ?? base.cache_creation_input_tokens ?? 0,
     cache_read_input_tokens:
       incoming.cache_read_input_tokens ?? base.cache_read_input_tokens ?? 0,
+    ...(incomingCost > 0
+      ? { cost_usd: incomingCost }
+      : baseCost > 0
+        ? { cost_usd: baseCost }
+        : {}),
     ...(Number.isFinite(incoming.total_tokens)
       ? { total_tokens: incoming.total_tokens }
       : Number.isFinite(base.total_tokens)
@@ -176,7 +184,9 @@ function normalizeCodexToolArgs(payload) {
     if (parsed && typeof parsed === "object") {
       return parsed.cmd && !parsed.command ? { ...parsed, command: parsed.cmd } : parsed;
     }
-  } catch {}
+  } catch {
+    // Fall through to the raw string payload shape below.
+  }
 
   return payload?.type === "custom_tool_call" ? { input: raw } : { value: raw };
 }
@@ -191,6 +201,214 @@ function normalizeCodexToolResult(output) {
   } catch {
     return output;
   }
+}
+
+function extractOpenCodeText(event) {
+  if (!event || typeof event !== "object") return "";
+  const candidates = [
+    event.text,
+    event.delta,
+    event.content,
+    event.message,
+    event.part?.text,
+    event.part?.content,
+  ];
+  return candidates.find((value) => typeof value === "string" && value.length > 0) || "";
+}
+
+const OPENCODE_TOOL_NAMES = {
+  bash: "Bash",
+  edit: "Edit",
+  grep: "Grep",
+  glob: "Glob",
+  read: "Read",
+  write: "Write",
+};
+
+function normalizeOpenCodeToolName(name) {
+  const raw = typeof name === "string" ? name : "";
+  return OPENCODE_TOOL_NAMES[raw.toLowerCase()] || raw || "tool";
+}
+
+function normalizeOpenCodeToolArgs(name, input) {
+  const args = input && typeof input === "object" ? { ...input } : {};
+  if (args.filePath && !args.file_path) args.file_path = args.filePath;
+  if (name === "Bash" && args.cmd && !args.command) args.command = args.cmd;
+  return args;
+}
+
+function extractOpenCodeSessionId(event) {
+  return (
+    event?.sessionID ||
+    event?.session_id ||
+    event?.sessionId ||
+    event?.session?.id ||
+    event?.part?.sessionID ||
+    null
+  );
+}
+
+function extractOpenCodeTool(event) {
+  const part = event?.part || {};
+  const state = part.state && typeof part.state === "object" ? part.state : {};
+  const name = normalizeOpenCodeToolName(event?.tool || event?.name || part.tool || part.name || part.type);
+  const input = event?.input ?? state.input ?? part.input ?? part.args ?? part.parameters ?? {};
+  const output = event?.output ?? state.output ?? part.output ?? part.result ?? null;
+  const status = state.status || part.status || event.status || "";
+  return {
+    id: event?.callID || part.callID || event?.id || part.id || "oc" + uid(),
+    name,
+    args: normalizeOpenCodeToolArgs(name, input),
+    result: output ?? state.error ?? null,
+    status: status === "completed" || output != null ? "done" : "running",
+    _opencodeTime: state.time?.start || part.time?.start || event?.timestamp || Date.now(),
+  };
+}
+
+function buildOpenCodeTextPart(event) {
+  const part = event?.part || {};
+  const text = event.type === "opencode_stdout" ? event.text : extractOpenCodeText(event);
+  if (!text) return null;
+  return {
+    type: "text",
+    id: part.id || event.id || "oct" + uid(),
+    text,
+    _opencodeTime: part.time?.start || event.timestamp || Date.now(),
+  };
+}
+
+function extractOpenCodeReasoningText(event) {
+  if (!event || typeof event !== "object") return "";
+  const part = event.part || {};
+  const candidates = [
+    event.thinking,
+    event.reasoning,
+    event.text,
+    event.content,
+    part.text,
+    part.content,
+  ];
+  return candidates.find((value) => typeof value === "string" && value.length > 0) || "";
+}
+
+function buildOpenCodeThinkingPart(event) {
+  const part = event?.part || {};
+  const text = extractOpenCodeReasoningText(event);
+  if (!text) return null;
+  const startedAt = Number(part.time?.start);
+  const endedAt = Number(part.time?.end);
+  return {
+    type: "thinking",
+    id: part.id || event.id || "ocr" + uid(),
+    text,
+    _opencodeTime: Number.isFinite(startedAt) ? startedAt : event.timestamp || Date.now(),
+    ...(Number.isFinite(startedAt) && Number.isFinite(endedAt) && endedAt >= startedAt
+      ? { durationMs: endedAt - startedAt }
+      : {}),
+  };
+}
+
+const THINK_TAG_RE = /<(?<tag>think|thinking|antThinking)\b[^>]*>(?<text>[\s\S]*?)<\/\k<tag>>/gi;
+
+function splitOpenCodeTextAndThinkingParts(event) {
+  const textPart = buildOpenCodeTextPart(event);
+  if (!textPart) return [];
+  const rawText = textPart.text || "";
+  const trimmed = rawText.trim();
+
+  if (event.type === "opencode_stdout" && /^Thinking:\s*/i.test(trimmed)) {
+    return [{
+      ...textPart,
+      type: "thinking",
+      id: `${textPart.id}-thinking`,
+      text: trimmed.replace(/^Thinking:\s*/i, ""),
+    }];
+  }
+
+  const pieces = [];
+  let lastIndex = 0;
+  let match;
+  THINK_TAG_RE.lastIndex = 0;
+
+  while ((match = THINK_TAG_RE.exec(rawText)) !== null) {
+    const before = rawText.slice(lastIndex, match.index);
+    if (before.trim()) {
+      pieces.push({
+        ...textPart,
+        id: `${textPart.id}-text-${pieces.length}`,
+        text: before,
+      });
+    }
+
+    const thinkingText = (match.groups?.text || "").trim();
+    if (thinkingText) {
+      pieces.push({
+        ...textPart,
+        type: "thinking",
+        id: `${textPart.id}-thinking-${pieces.length}`,
+        text: thinkingText,
+      });
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  const after = rawText.slice(lastIndex);
+  if (after.trim()) {
+    pieces.push({
+      ...textPart,
+      id: `${textPart.id}-text-${pieces.length}`,
+      text: after,
+    });
+  }
+
+  return pieces.length > 0 ? pieces : [textPart];
+}
+
+function sortOpenCodeParts(parts) {
+  return [...parts].sort((a, b) => {
+    const at = Number.isFinite(a?._opencodeTime) ? a._opencodeTime : Number.POSITIVE_INFINITY;
+    const bt = Number.isFinite(b?._opencodeTime) ? b._opencodeTime : Number.POSITIVE_INFINITY;
+    if (at !== bt) return at - bt;
+    return 0;
+  });
+}
+
+function upsertOpenCodePart(parts, nextPart) {
+  const idx = parts.findIndex((part) => part.type === nextPart.type && part.id === nextPart.id);
+  if (idx >= 0) {
+    const updated = [...parts];
+    updated[idx] = { ...updated[idx], ...nextPart };
+    return sortOpenCodeParts(updated);
+  }
+  return sortOpenCodeParts([...parts, nextPart]);
+}
+
+function normalizeOpenCodeUsage(part, previousUsage) {
+  const tokens = part?.tokens;
+  if (!tokens || typeof tokens !== "object") return previousUsage || null;
+  const previousCost = Number.isFinite(previousUsage?.cost_usd) ? previousUsage.cost_usd : 0;
+  const stepCost = Number(part.cost);
+  const safeStepCost = Number.isFinite(stepCost) && stepCost > 0 ? stepCost : 0;
+  return {
+    input_tokens: tokens.input ?? 0,
+    output_tokens: tokens.output ?? 0,
+    total_tokens: tokens.total ?? null,
+    cache_read_input_tokens: tokens.cache?.read ?? 0,
+    cache_creation_input_tokens: tokens.cache?.write ?? 0,
+    reasoning_tokens: tokens.reasoning ?? 0,
+    ...(previousCost > 0 || safeStepCost > 0 ? { cost_usd: previousCost + safeStepCost } : {}),
+  };
+}
+
+function extractOpenCodeError(event) {
+  if (!event || typeof event !== "object") return "";
+  return (
+    (typeof event.message === "string" && event.message) ||
+    (typeof event.error === "string" && event.error) ||
+    (typeof event.error?.message === "string" && event.error.message) ||
+    (typeof event.error?.data?.message === "string" && event.error.data.message) ||
+    "OpenCode run failed."
+  );
 }
 
 export default function useAgent() {
@@ -453,7 +671,11 @@ export default function useAgent() {
               if (toolIdx >= 0) {
                 const newJson = (parts[toolIdx].argsJson || "") + (delta.partial_json || "");
                 let newArgs = parts[toolIdx].args;
-                try { newArgs = JSON.parse(newJson); } catch {}
+                try {
+                  newArgs = JSON.parse(newJson);
+                } catch {
+                  // Keep accumulating partial JSON until it becomes parseable.
+                }
                 parts[toolIdx] = { ...parts[toolIdx], argsJson: newJson, args: newArgs };
               }
               updateAssistant({ parts, isStreaming: true, _streamState: streamState });
@@ -487,7 +709,7 @@ export default function useAgent() {
           // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
           // Usage here is per-API-call, not cumulative — skip it to avoid flicker;
           // the `result` event below owns the authoritative cumulative usage.
-          const am = ensureAssistant();
+          ensureAssistant();
           const parts = cloneParts(lastMsg.parts);
           const hasStreamParts = parts.length > 0;
           if (!hasStreamParts && event.message?.content) {
@@ -614,6 +836,77 @@ export default function useAgent() {
           const am = ensureAssistant();
           msgs[msgs.length - 1] = { ...am, _compacting: true };
           lastMsg = msgs[msgs.length - 1];
+        }
+
+        // --- OpenCode JSONL stream events ---
+        else if (
+          event.type === "opencode_stdout" ||
+          event.type === "step_start" ||
+          event.type === "tool_use" ||
+          event.type === "reasoning" ||
+          event.type === "text" ||
+          event.type === "step_finish" ||
+          event.type === "error"
+        ) {
+          const sessionId = extractOpenCodeSessionId(event);
+          if (sessionId) {
+            convo._opencodeSessionId = sessionId;
+            console.log("[useAgent] Captured OpenCode session ID:", {
+              conversationId,
+              sessionId,
+              eventType: event.type,
+            });
+          }
+
+          if (event.type === "step_start") {
+            ensureAssistant();
+          } else if (event.type === "tool_use") {
+            const am = ensureAssistant();
+            const tool = extractOpenCodeTool(event);
+            const parts = upsertOpenCodePart(cloneParts(am.parts), { type: "tool", ...tool });
+            msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
+            lastMsg = msgs[msgs.length - 1];
+          } else if (event.type === "reasoning") {
+            const thinkingPart = buildOpenCodeThinkingPart(event);
+            if (thinkingPart) {
+              const am = ensureAssistant();
+              const parts = upsertOpenCodePart(cloneParts(am.parts), thinkingPart);
+              const stillThinking = !Number.isFinite(thinkingPart.durationMs);
+              msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: stillThinking };
+              lastMsg = msgs[msgs.length - 1];
+            }
+          } else if (event.type === "text" || event.type === "opencode_stdout") {
+            const textParts = splitOpenCodeTextAndThinkingParts(event);
+            if (textParts.length > 0) {
+              const am = ensureAssistant();
+              const parts = textParts.reduce(
+                (acc, textPart) => upsertOpenCodePart(acc, textPart),
+                cloneParts(am.parts)
+              );
+              msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: false };
+              lastMsg = msgs[msgs.length - 1];
+            }
+          } else if (event.type === "error") {
+            const am = ensureAssistant();
+            const parts = cloneParts(am.parts);
+            parts.push({ type: "text", text: `**Error:** ${extractOpenCodeError(event)}` });
+            msgs[msgs.length - 1] = freezeElapsed({ ...am, parts, isStreaming: false, isThinking: false });
+            lastMsg = msgs[msgs.length - 1];
+            nextIsStreaming = false;
+          } else if (event.type === "step_finish") {
+            const am = ensureAssistant();
+            const usage = normalizeOpenCodeUsage(event.part, am._usage);
+            if (usage) {
+              msgs[msgs.length - 1] = { ...am, _usage: usage };
+              lastMsg = msgs[msgs.length - 1];
+            }
+            const reason = event.reason || event.part?.reason || event.status || "";
+            if (/^(stop|done|complete|completed|end_turn)$/i.test(String(reason))) {
+              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
+              lastMsg = msgs[msgs.length - 1];
+              nextIsStreaming = false;
+            }
+          }
         }
 
         // --- Codex JSONL stream events ---
@@ -867,11 +1160,13 @@ export default function useAgent() {
       });
     });
 
-    cleanupRefs.current = [offStream, offDone, offError];
+    const cleanupFns = [offStream, offDone, offError];
+    const usageHydrationTimers = usageHydrationTimersRef.current;
+    cleanupRefs.current = cleanupFns;
     return () => {
-      cleanupRefs.current.forEach((fn) => fn?.());
-      usageHydrationTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
-      usageHydrationTimersRef.current.clear();
+      cleanupFns.forEach((fn) => fn?.());
+      usageHydrationTimers.forEach((timerId) => window.clearTimeout(timerId));
+      usageHydrationTimers.clear();
     };
   }, []);
 
@@ -913,7 +1208,7 @@ export default function useAgent() {
     });
   }, []);
 
-  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
+  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, thinking, cwd, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
     const expectedPendingId = pendingStartsRef.current.get(conversationId);
     if (pendingId && expectedPendingId !== pendingId) {
       console.log("[useAgent] Skipping stale or cancelled pending start", { conversationId, pendingId, expectedPendingId });
@@ -921,7 +1216,7 @@ export default function useAgent() {
     }
     if (pendingId) pendingStartsRef.current.delete(conversationId);
     if (window.api) {
-      const payload = { conversationId, sessionId, prompt, model, provider, effort, cwd, images, files, resumeSessionId, forkSession };
+      const payload = { conversationId, sessionId, prompt, model, provider, effort, thinking, cwd, images, files, resumeSessionId, forkSession };
       if (provider === "multica") {
         payload._multica = multicaContext;
         payload._multicaToken = multicaToken;
@@ -953,7 +1248,7 @@ export default function useAgent() {
     }
   }, []);
 
-  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, cwd, multicaContext, multicaToken }) => {
+  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, thinking, cwd, multicaContext, multicaToken }) => {
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId);
@@ -974,6 +1269,7 @@ export default function useAgent() {
           model,
           provider,
           effort,
+          thinking,
           cwd,
           _multica: multicaContext,
           _multicaToken: multicaToken,
@@ -988,6 +1284,7 @@ export default function useAgent() {
         model,
         provider,
         effort,
+        thinking,
         cwd,
       });
       return true;
