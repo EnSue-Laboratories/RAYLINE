@@ -1152,11 +1152,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                           overflowY: "auto",
                           padding: 4,
                           borderRadius: 8,
-                          border: "1px solid rgba(255,255,255,0.14)",
-                          background: "linear-gradient(180deg, rgba(20,24,34,0.58), rgba(8,10,16,0.44))",
-                          backdropFilter: "blur(34px) saturate(1.25)",
-                          WebkitBackdropFilter: "blur(34px) saturate(1.25)",
-                          boxShadow: "0 18px 54px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.08)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          background: "linear-gradient(180deg, rgba(20,24,34,0.24), rgba(8,10,16,0.16))",
+                          backdropFilter: "blur(42px) saturate(1.35)",
+                          WebkitBackdropFilter: "blur(42px) saturate(1.35)",
+                          boxShadow: "0 18px 54px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06)",
                         }}
                       >
                         {filteredOpenCodeProviderOptions.map((provider, index) => {
@@ -1184,9 +1184,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                                 border: "none",
                                 borderRadius: 6,
                                 background: active
-                                  ? "rgba(180,220,255,0.18)"
+                                  ? "rgba(255,255,255,0.1)"
                                   : selected
-                                    ? "rgba(180,220,255,0.08)"
+                                    ? "rgba(255,255,255,0.06)"
                                     : "transparent",
                                 color: selected ? "rgba(210,232,255,0.95)" : "rgba(255,255,255,0.74)",
                                 cursor: "pointer",
