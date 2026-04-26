@@ -42,6 +42,10 @@ const WALLPAPER_MIME_TYPES = {
   bmp: "image/bmp",
   avif: "image/avif",
 };
+const OPENCODE_SUPPORTED_PROVIDERS_TTL_MS = 10 * 60 * 1000;
+
+let opencodeSupportedProvidersCache = [];
+let opencodeSupportedProvidersCachedAt = 0;
 
 // Override app name (in dev, Electron uses its own binary name)
 app.setName("RayLine");
@@ -934,6 +938,56 @@ function getOpenCodeStatusSync() {
   };
 }
 
+function parseOpenCodeModelProviders(output) {
+  const providers = new Set();
+  for (const rawLine of String(output || "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const slashIndex = line.indexOf("/");
+    if (slashIndex <= 0) continue;
+    const providerId = line.slice(0, slashIndex).trim();
+    if (/^[a-zA-Z0-9_.-]+$/.test(providerId)) providers.add(providerId);
+  }
+  return [...providers].sort((a, b) => a.localeCompare(b));
+}
+
+function getOpenCodeSupportedProviders(bin, { force = false } = {}) {
+  return new Promise((resolve) => {
+    if (!bin) {
+      resolve([]);
+      return;
+    }
+
+    const now = Date.now();
+    if (
+      !force &&
+      opencodeSupportedProvidersCache.length > 0 &&
+      now - opencodeSupportedProvidersCachedAt < OPENCODE_SUPPORTED_PROVIDERS_TTL_MS
+    ) {
+      resolve(opencodeSupportedProvidersCache);
+      return;
+    }
+
+    execFileCli(
+      bin,
+      ["models"],
+      {
+        encoding: "utf-8",
+        timeout: 12000,
+        maxBuffer: 4 * 1024 * 1024,
+        env: { ...process.env, PATH: buildSpawnPath() },
+      },
+      (_error, stdout) => {
+        const providers = parseOpenCodeModelProviders(stdout);
+        if (providers.length > 0) {
+          opencodeSupportedProvidersCache = providers;
+          opencodeSupportedProvidersCachedAt = Date.now();
+        }
+        resolve(providers.length > 0 ? providers : opencodeSupportedProvidersCache);
+      }
+    );
+  });
+}
+
 function getOpenCodeVersion(bin) {
   return new Promise((resolve) => {
     if (!bin) {
@@ -1034,8 +1088,15 @@ ipcMain.handle("check-cli-installed", (_event, options = {}) => {
 
 ipcMain.handle("opencode-status", async () => {
   const status = getOpenCodeStatusSync();
-  const version = await getOpenCodeVersion(status.binPath);
-  return { ...status, version };
+  const [version, supportedProviders] = await Promise.all([
+    getOpenCodeVersion(status.binPath),
+    getOpenCodeSupportedProviders(status.binPath),
+  ]);
+  return {
+    ...status,
+    version,
+    supportedProviders: [...new Set([...supportedProviders, ...status.providers])].sort(),
+  };
 });
 
 ipcMain.handle("opencode-save-config", (_event, input) => {

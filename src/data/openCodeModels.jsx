@@ -14,6 +14,7 @@ const EMPTY_STATUS = {
   configPath: "",
   authPath: "",
   providers: [],
+  supportedProviders: [],
 };
 
 function normalizeStatus(status) {
@@ -24,6 +25,7 @@ function normalizeStatus(status) {
     installed: Boolean(status.installed),
     configured: Boolean(status.configured),
     providers: Array.isArray(status.providers) ? status.providers.filter(Boolean) : [],
+    supportedProviders: Array.isArray(status.supportedProviders) ? status.supportedProviders.filter(Boolean) : [],
   };
 }
 
