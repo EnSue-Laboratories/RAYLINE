@@ -66,7 +66,9 @@ function makeCustomRowFromPlan(plan, index, validModelIds, usedBranches) {
 }
 
 function getDefaultPlannerModelId(availableModels, defaultModel) {
-  const plannerModels = (availableModels || []).filter((m) => m.provider === "claude" || m.provider === "codex");
+  const plannerModels = (availableModels || []).filter((m) => (
+    m.provider === "claude" || m.provider === "codex" || m.provider === "opencode"
+  ));
   if (plannerModels.some((m) => m.id === defaultModel)) return defaultModel;
   return plannerModels.find((m) => m.id === "gpt55-med")?.id
     || plannerModels.find((m) => m.provider === "claude" && m.id === "sonnet")?.id
@@ -90,7 +92,13 @@ function modelPayload(model) {
     provider: model.provider,
     cliFlag: model.cliFlag,
     effort: model.effort,
+    thinking: model.thinking,
   };
+}
+
+function cleanDispatchPlanError(error, fallback) {
+  const raw = error?.message || String(error || "") || fallback;
+  return raw.replace(/^Error invoking remote method 'dispatch-plan':\s*/i, "") || fallback;
 }
 
 export default function DispatchCard({
@@ -119,7 +127,9 @@ export default function DispatchCard({
   const [banner, setBanner] = useState(null);
 
   const plannerModels = useMemo(
-    () => (availableModels || []).filter((m) => m.provider === "claude" || m.provider === "codex"),
+    () => (availableModels || []).filter((m) => (
+      m.provider === "claude" || m.provider === "codex" || m.provider === "opencode"
+    )),
     [availableModels]
   );
   const validModelIds = useMemo(
@@ -194,7 +204,7 @@ export default function DispatchCard({
       setAutoNote(t("dispatch.autoFilled", { count: rows.length }));
       setTab("custom");
     } catch (e) {
-      setAutoError(e?.message || t("dispatch.autoErrorFailed"));
+      setAutoError(cleanDispatchPlanError(e, t("dispatch.autoErrorFailed")));
     } finally {
       setAutoLoading(false);
     }

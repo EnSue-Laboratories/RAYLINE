@@ -714,4 +714,11 @@ function cancelAllOpenCode() {
   }
 }
 
-module.exports = { startOpenCodeAgent, cancelOpenCodeAgent, cancelAllOpenCode, resolveOpenCodeBin };
+module.exports = {
+  startOpenCodeAgent,
+  cancelOpenCodeAgent,
+  cancelAllOpenCode,
+  resolveOpenCodeBin,
+  buildOpenCodeEnv,
+  shouldEnableThinking,
+};
