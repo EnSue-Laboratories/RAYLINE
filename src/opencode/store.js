@@ -27,6 +27,7 @@ function sanitizeModel(entry) {
   const modelId = safeString(entry.modelId || entry.model);
   if (!providerId || !modelId) return null;
   const explicitThinking = typeof entry.thinking === "boolean";
+  const explicitEnabled = typeof entry.enabled === "boolean";
 
   return {
     id: `${providerId}/${modelId}`,
@@ -34,6 +35,7 @@ function sanitizeModel(entry) {
     modelId,
     label: safeString(entry.label),
     baseURL: safeString(entry.baseURL),
+    enabled: explicitEnabled ? entry.enabled : true,
     thinking: explicitThinking ? entry.thinking : inferThinkingDefault(providerId, modelId),
     addedAt: Number.isFinite(entry.addedAt) ? entry.addedAt : Date.now(),
     updatedAt: Number.isFinite(entry.updatedAt) ? entry.updatedAt : Date.now(),
@@ -91,15 +93,15 @@ export function upsertOpenCodeModel(entry) {
   if (!incoming) return current;
 
   const existing = current.models.find((model) => model.id === incoming.id);
-  const models = [
-    {
-      ...existing,
-      ...incoming,
-      addedAt: existing?.addedAt || incoming.addedAt || Date.now(),
-      updatedAt: Date.now(),
-    },
-    ...current.models.filter((model) => model.id !== incoming.id),
-  ];
+  const nextModel = {
+    ...existing,
+    ...incoming,
+    addedAt: existing?.addedAt || incoming.addedAt || Date.now(),
+    updatedAt: Date.now(),
+  };
+  const models = existing
+    ? current.models.map((model) => (model.id === incoming.id ? nextModel : model))
+    : [nextModel, ...current.models];
 
   return saveOpenCodeState({ models });
 }
@@ -115,6 +117,7 @@ export function openCodeEntryToModel(entry) {
   const providerId = safeString(entry?.providerId);
   const modelId = safeString(entry?.modelId);
   if (!providerId || !modelId) return null;
+  if (entry?.enabled === false) return null;
 
   const label = safeString(entry.label) || `${providerId}/${modelId}`;
   return {

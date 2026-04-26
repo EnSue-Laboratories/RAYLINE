@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { ArrowLeft, Check, ChevronDown, Image, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Image, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { createTranslator } from "../i18n";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
@@ -29,9 +29,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     label: "",
     apiKey: "",
     baseURL: "",
+    enabled: true,
     thinking: false,
   });
   const [openCodeAdding, setOpenCodeAdding] = useState(false);
+  const [openCodeEditingId, setOpenCodeEditingId] = useState("");
   const [openCodeSaving, setOpenCodeSaving] = useState(false);
   const [openCodeMessage, setOpenCodeMessage] = useState("");
 
@@ -176,17 +178,45 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
 
   const handleStartOpenCodeAdd = useCallback(() => {
     setOpenCodeAdding(true);
-    setOpenCodeMessage("");
-  }, []);
-
-  const handleCancelOpenCodeAdd = useCallback(() => {
-    setOpenCodeAdding(false);
+    setOpenCodeEditingId("");
     setOpenCodeMessage("");
     setOpenCodeDraft((prev) => ({
       ...prev,
       modelId: "",
       label: "",
       apiKey: "",
+      baseURL: "",
+      enabled: true,
+      thinking: false,
+    }));
+  }, []);
+
+  const handleStartOpenCodeEdit = useCallback((model) => {
+    setOpenCodeAdding(true);
+    setOpenCodeEditingId(model.id);
+    setOpenCodeMessage("");
+    setOpenCodeDraft({
+      providerId: model.providerId || "openrouter",
+      modelId: model.modelId || "",
+      label: model.label || "",
+      apiKey: "",
+      baseURL: model.baseURL || "",
+      enabled: model.enabled !== false,
+      thinking: Boolean(model.thinking),
+    });
+  }, []);
+
+  const handleCancelOpenCodeAdd = useCallback(() => {
+    setOpenCodeAdding(false);
+    setOpenCodeEditingId("");
+    setOpenCodeMessage("");
+    setOpenCodeDraft((prev) => ({
+      ...prev,
+      modelId: "",
+      label: "",
+      apiKey: "",
+      baseURL: "",
+      enabled: true,
       thinking: false,
     }));
   }, []);
@@ -213,34 +243,42 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         modelId,
         label: openCodeDraft.label,
         baseURL: openCodeDraft.baseURL,
+        enabled: openCodeDraft.enabled !== false,
         thinking: openCodeDraft.thinking,
       });
+      const nextModelKey = `${providerId}/${modelId}`;
+      if (openCodeEditingId && openCodeEditingId !== nextModelKey) {
+        removeOpenCodeModel(openCodeEditingId);
+      }
       setOpenCodeDraft((prev) => ({
         ...prev,
         modelId: "",
         label: "",
         apiKey: "",
+        baseURL: "",
+        enabled: true,
         thinking: false,
       }));
       await refreshOpenCode();
       setOpenCodeAdding(false);
+      setOpenCodeEditingId("");
       setOpenCodeMessage(t("settings.opencodeSaved"));
     } catch (error) {
       setOpenCodeMessage(error?.message || t("settings.opencodeSaveFailed"));
     } finally {
       setOpenCodeSaving(false);
     }
-  }, [openCodeDraft, refreshOpenCode, saveOpenCodeModel, t]);
+  }, [openCodeDraft, openCodeEditingId, refreshOpenCode, removeOpenCodeModel, saveOpenCodeModel, t]);
 
   const handleRemoveOpenCodeModel = useCallback((modelKey) => {
     removeOpenCodeModel(modelKey);
     setOpenCodeMessage("");
   }, [removeOpenCodeModel]);
 
-  const handleToggleOpenCodeThinking = useCallback((model) => {
+  const handleToggleOpenCodeEnabled = useCallback((model) => {
     saveOpenCodeModel({
       ...model,
-      thinking: !model.thinking,
+      enabled: model.enabled === false,
     });
     setOpenCodeMessage("");
   }, [saveOpenCodeModel]);
@@ -851,7 +889,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             </div>
           </div>
 
-          <div style={{ marginBottom: 28 }}>
+          <div style={{ marginBottom: 28, position: "relative" }}>
             <div
               style={{
                 display: "flex",
@@ -934,7 +972,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   </div>
                 )}
               </div>
-              {!openCodeAdding && (
+              {(!openCodeAdding || openCodeEditingId) && (
                 <button
                   type="button"
                   onClick={handleStartOpenCodeAdd}
@@ -947,7 +985,37 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
             </div>
 
             {openCodeAdding && (
-              <>
+              <div
+                role={openCodeEditingId ? "dialog" : undefined}
+                aria-label={openCodeEditingId ? t("settings.opencodeEditModel") : undefined}
+                style={openCodeEditingId ? {
+                  position: "absolute",
+                  zIndex: 60,
+                  top: 92,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: "min(620px, calc(100% - 48px))",
+                  boxSizing: "border-box",
+                  padding: 14,
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "rgba(12,14,22,0.72)",
+                  backdropFilter: "blur(38px) saturate(1.15)",
+                  boxShadow: "0 24px 70px rgba(0,0,0,0.45)",
+                  WebkitAppRegion: "no-drag",
+                } : undefined}
+              >
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: "rgba(255,255,255,0.55)",
+                    marginBottom: 8,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    letterSpacing: ".02em",
+                  }}
+                >
+                  {openCodeEditingId ? t("settings.opencodeEditModel") : t("settings.opencodeAddModel")}
+                </div>
                 <div
                   style={{
                     display: "grid",
@@ -992,7 +1060,9 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                   <input
                     type="password"
                     value={openCodeDraft.apiKey}
-                    placeholder={t("settings.opencodeApiKeyPlaceholder")}
+                    placeholder={openCodeEditingId
+                      ? t("settings.opencodeApiKeyEditPlaceholder")
+                      : t("settings.opencodeApiKeyPlaceholder")}
                     onChange={(e) => updateOpenCodeDraft({ apiKey: e.target.value })}
                     spellCheck={false}
                     style={inputStyle}
@@ -1043,6 +1113,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     type="button"
                     role="switch"
                     aria-checked={openCodeDraft.thinking}
+                    aria-label={t("settings.opencodeThinking")}
                     onClick={() => updateOpenCodeDraft({ thinking: !openCodeDraft.thinking })}
                     style={{
                       flexShrink: 0,
@@ -1096,10 +1167,14 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     style={compactButtonStyle(!openCodeSaving && !!openCodeDraft.providerId.trim() && !!openCodeDraft.modelId.trim())}
                   >
                     <Check size={12} strokeWidth={1.8} />
-                    {openCodeSaving ? t("settings.saving") : t("settings.opencodeSaveModel")}
+                    {openCodeSaving
+                      ? t("settings.saving")
+                      : openCodeEditingId
+                        ? t("settings.opencodeUpdateModel")
+                        : t("settings.opencodeSaveModel")}
                   </button>
                 </div>
-              </>
+              </div>
             )}
 
             {openCodeMessage && (
@@ -1133,6 +1208,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     border: "1px solid rgba(255,255,255,0.06)",
                     borderRadius: 7,
                     background: "rgba(255,255,255,0.025)",
+                    opacity: model.enabled === false ? 0.55 : 1,
                   }}
                 >
                   <div style={{ minWidth: 0 }}>
@@ -1172,6 +1248,23 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                           {t("settings.opencodeThinkingBadge")}
                         </span>
                       )}
+                      {model.enabled === false && (
+                        <span
+                          style={{
+                            flexShrink: 0,
+                            padding: "2px 5px",
+                            borderRadius: 5,
+                            border: "1px solid rgba(255,255,255,0.10)",
+                            background: "rgba(255,255,255,0.04)",
+                            color: "rgba(255,255,255,0.42)",
+                            fontSize: s(9),
+                            fontFamily: "'JetBrains Mono', monospace",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {t("settings.opencodeDisabledBadge")}
+                        </span>
+                      )}
                     </div>
                     <div
                       style={{
@@ -1190,26 +1283,31 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     <button
                       type="button"
                       role="switch"
-                      aria-checked={model.thinking}
-                      onClick={() => handleToggleOpenCodeThinking(model)}
+                      aria-checked={model.enabled !== false}
+                      aria-label={model.enabled !== false
+                        ? t("settings.opencodeDisableModel")
+                        : t("settings.opencodeEnableModel")}
+                      onClick={() => handleToggleOpenCodeEnabled(model)}
                       style={{
                         width: 34,
                         height: 20,
                         borderRadius: 999,
                         border: "1px solid rgba(255,255,255,0.12)",
-                        background: model.thinking ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
+                        background: model.enabled !== false ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
                         position: "relative",
                         cursor: "pointer",
                         padding: 0,
                         transition: "background 120ms ease",
                       }}
-                      title={t("settings.opencodeToggleThinking")}
+                      title={model.enabled !== false
+                        ? t("settings.opencodeDisableModel")
+                        : t("settings.opencodeEnableModel")}
                     >
                       <span
                         style={{
                           position: "absolute",
                           top: 2,
-                          left: model.thinking ? 16 : 2,
+                          left: model.enabled !== false ? 16 : 2,
                           width: 14,
                           height: 14,
                           borderRadius: "50%",
@@ -1220,7 +1318,28 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                     </button>
                     <button
                       type="button"
+                      onClick={() => handleStartOpenCodeEdit(model)}
+                      aria-label={t("settings.opencodeEditModel")}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 28,
+                        height: 28,
+                        borderRadius: 7,
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        color: "rgba(255,255,255,0.45)",
+                        cursor: "pointer",
+                      }}
+                      title={t("settings.opencodeEditModel")}
+                    >
+                      <Pencil size={13} strokeWidth={1.7} />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleRemoveOpenCodeModel(model.id)}
+                      aria-label={t("settings.opencodeRemoveModel")}
                       style={{
                         display: "flex",
                         alignItems: "center",
