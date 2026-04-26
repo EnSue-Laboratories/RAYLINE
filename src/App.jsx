@@ -1156,7 +1156,9 @@ export default function App() {
   const { closeWindow: closeTerminalWindow, openWindow: openTerminalWindow } = terminal;
   const { prefersReducedMotion } = useWindowActivity();
   const { models: multicaModels } = useMulticaModels();
-  const { models: openCodeModels } = useOpenCodeModels();
+  const {
+    configuredModels: configuredOpenCodeModels,
+  } = useOpenCodeModels();
 
   // convos: array of { id, sessionId, title, model, ts }
   const [convoList, setConvoList] = useState([]);
@@ -1235,12 +1237,12 @@ export default function App() {
     [active, persistableConversations]
   );
   const dispatchAvailableModels = useMemo(
-    () => [...MODELS, ...openCodeModels, ...multicaModels],
-    [multicaModels, openCodeModels]
+    () => [...MODELS, ...configuredOpenCodeModels, ...multicaModels],
+    [configuredOpenCodeModels, multicaModels]
   );
   const dynamicModels = useMemo(
-    () => [...openCodeModels, ...multicaModels],
-    [multicaModels, openCodeModels]
+    () => [...configuredOpenCodeModels, ...multicaModels],
+    [configuredOpenCodeModels, multicaModels]
   );
   const persistStatePayload = useMemo(() => ({
     convos: persistableConversations,
@@ -3714,7 +3716,7 @@ export default function App() {
             draftsCollapsed={draftsCollapsed}
             onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
             developerMode={developerMode}
-            multicaModels={[...openCodeModels, ...multicaModels]}
+            multicaModels={[...configuredOpenCodeModels, ...multicaModels]}
             hasUpdate={hasUpdate}
           />
         </div>
