@@ -1846,6 +1846,7 @@ export default function App() {
   }, [checkCwdRecovery]);
 
   const handleSelect = useCallback(async (id) => {
+    setShowSettings(false);
     setShowNewChatCard(false);
     setActive(id);
     setConvoList((p) => p.map((c) => (c.id === id ? withTabPatch(c, markSeenPatch()) : c)));
@@ -2086,6 +2087,7 @@ export default function App() {
   }, [dynamicModels]);
 
   const handleNew = () => {
+    setShowSettings(false);
     setShowNewChatCard(true);
   };
 
@@ -2142,6 +2144,7 @@ export default function App() {
     });
     setConvoList((p) => [n, ...p]);
     setActive(id);
+    setShowSettings(false);
     setShowNewChatCard(false);
     if (cwdRoot) {
       setProjects((prev) => (
@@ -2829,6 +2832,7 @@ export default function App() {
         convoId = id;
         setConvoList((p) => [convo, ...p]);
         setActive(id);
+        setShowSettings(false);
       }
 
       if (isShellCommand) {
@@ -3024,6 +3028,7 @@ export default function App() {
     setConvoList((p) => [n, ...p]);
     if (!opts.suppressActivate) {
       setActive(id);
+      setShowSettings(false);
       setShowNewChatCard(false);
     }
 
@@ -3086,6 +3091,7 @@ export default function App() {
     const firstSuccess = results.find((r) => r.ok);
     if (firstSuccess) {
       setActive(firstSuccess.chatId);
+      setShowSettings(false);
       setShowNewChatCard(false);
     }
     return { dispatchId, results };
