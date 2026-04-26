@@ -1,9 +1,9 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { createTranslator } from "../i18n";
-import { Plus, Search, Trash2, PanelLeftClose, PanelLeftOpen, FolderOpen, Settings as SettingsIcon, ChevronRight, Workflow, FolderPlus } from "lucide-react";
+import { Plus, Search, Trash2, FolderOpen, ChevronRight, Workflow, FolderPlus } from "lucide-react";
 import WindowDragSpacer from "./WindowDragSpacer";
-import { SIDEBAR_TOGGLE_SIZE, SIDEBAR_TOGGLE_TOP, WINDOW_DRAG_HEIGHT } from "../windowChrome";
+import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
 import { getMOrMulticaFallback } from "../data/models";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
@@ -82,26 +82,6 @@ function groupConvosByProject(convos, projectsMeta, draftsPath) {
   return { projectGroups: sorted, drafts };
 }
 
-function IconRailBtn({ onClick, title, children }) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        width: 40, height: 40, borderRadius: 8,
-        background: "none", border: "none", cursor: "pointer",
-        color: "rgba(255,255,255,0.55)", transition: "background .15s, color .15s",
-        WebkitAppRegion: "no-drag",
-        flexShrink: 0,
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.88)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(255,255,255,0.55)"; }}
-    >
-      {children}
-    </button>
-  );
-}
 
 function GitHubIcon({ size = 12 }) {
   return (
@@ -184,149 +164,22 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
   const searchActive = search.length > 0;
 
   const cwdShort = cwd ? (() => {
-    const parts = cwd.split("/");
+    const parts = cwd.split(/[\\/]+/);
     const wtIdx = parts.indexOf(".worktrees");
     if (wtIdx >= 0 && wtIdx + 1 < parts.length) {
       return `${parts[wtIdx - 1]} / ${parts[wtIdx + 1]}`;
     }
-    return parts.slice(-2).join("/");
+    return parts.filter(Boolean).slice(-2).join("/");
   })() : null;
 
-  // ── Icon-rail collapsed state ──────────────────────────────────────────────
-  if (windowsChrome && !isOpen) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%", alignItems: "center", WebkitAppRegion: "no-drag" }}>
-        {/* Drag region: logo on top, expand toggle below */}
-        <div style={{ height: WINDOW_DRAG_HEIGHT, width: "100%", WebkitAppRegion: "drag", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 0, position: "relative" }}>
-          <button
-            onClick={() => window.open("https://ensuechat.com")}
-            title="Ensue Chat"
-            style={{
-              position: "absolute", top: 10,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 24, height: 24, padding: 0,
-              background: "none", border: "none", cursor: "pointer",
-              borderRadius: 6, opacity: 0.82, transition: "opacity .15s, transform .15s",
-              WebkitAppRegion: "no-drag",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "scale(1.08)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.82"; e.currentTarget.style.transform = "scale(1)"; }}
-          >
-            <img src={`${import.meta.env.BASE_URL}favicon.svg`} style={{ width: 24, height: 24, borderRadius: 5, display: "block" }} draggable={false} />
-          </button>
-        </div>
-
-        {/* Action icons */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 0" }}>
-          <IconRailBtn onClick={onToggleSidebar} title={t("chromeRail.expandSidebar")}><PanelLeftOpen size={17} strokeWidth={1.5} /></IconRailBtn>
-          <IconRailBtn onClick={onNew} title={t("sidebar.newChat")}><Plus size={17} strokeWidth={1.5} /></IconRailBtn>
-          <IconRailBtn onClick={onOpenDispatch} title={t("sidebar.dispatch")}><Workflow size={17} strokeWidth={1.5} /></IconRailBtn>
-          <IconRailBtn onClick={onOpenNewProject} title={t("sidebar.newProject")}><FolderPlus size={17} strokeWidth={1.5} /></IconRailBtn>
-          {developerMode && <IconRailBtn onClick={onOpenProjectManager} title={t("sidebar.githubProjects")}><GitHubIcon size={17} /></IconRailBtn>}
-        </div>
-
-        <div style={{ flex: 1 }} />
-
-        {/* Footer icons */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "10px 0 14px" }}>
-          <IconRailBtn onClick={onPickFolder} title={cwdShort || t("sidebar.selectFolder")}><FolderOpen size={16} strokeWidth={1.5} /></IconRailBtn>
-          <div style={{ position: "relative" }}>
-            <IconRailBtn onClick={onOpenSettings} title={t("settings.title")}><SettingsIcon size={16} strokeWidth={1.5} /></IconRailBtn>
-            {hasUpdate && (
-              <span style={{
-                position: "absolute",
-                top: 4,
-                right: 4,
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: "#FF8C42",
-                boxShadow: "0 0 5px rgba(255,140,66,0.8)",
-                pointerEvents: "none",
-              }} />
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // ── Windows collapsed: sidebar fully hidden; SidebarWindowsHeader overlay takes over ──
+  if (windowsChrome && !isOpen) return null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {windowsChrome ? (
-        <div
-          style={{
-            height: WINDOW_DRAG_HEIGHT,
-            WebkitAppRegion: "drag",
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-start",
-            paddingLeft: 18,
-            position: "relative",
-          }}
-        >
-          <button
-            onClick={() => window.open("https://ensuechat.com")}
-            title="RayLine"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: 0,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              opacity: 0.82,
-              transition: "opacity .15s",
-              WebkitAppRegion: "no-drag",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.82"; }}
-          >
-            <img src={`${import.meta.env.BASE_URL}favicon.svg`} style={{ width: 22, height: 22, borderRadius: 5, display: "block", flexShrink: 0 }} draggable={false} />
-            <span style={{
-              fontFamily: "'Barlow Condensed', 'Inter Tight', sans-serif",
-              fontWeight: 600,
-              fontSize: 18,
-              letterSpacing: "0.12em",
-              color: "rgba(218,218,222,0.95)",
-              userSelect: "none",
-              lineHeight: 1,
-            }}>
-              R<span style={{ color: "#FF4422", letterSpacing: 0 }}>/</span>YLINE<span style={{ color: "#FF4422", letterSpacing: 0 }}>.</span>
-            </span>
-          </button>
-
-          <button
-            onClick={onToggleSidebar}
-            style={{
-              position: "absolute",
-              top: SIDEBAR_TOGGLE_TOP,
-              right: 10,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: SIDEBAR_TOGGLE_SIZE,
-              height: SIDEBAR_TOGGLE_SIZE,
-              borderRadius: 6,
-              background: "none",
-              border: "none",
-              color: "rgba(255,255,255,0.4)",
-              cursor: "pointer",
-              transition: "all .2s",
-              WebkitAppRegion: "no-drag",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "rgba(255,255,255,0.7)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "rgba(255,255,255,0.4)";
-            }}
-          >
-            <PanelLeftClose size={17} strokeWidth={1.5} />
-          </button>
-        </div>
+        /* SidebarWindowsHeader (fixed overlay) 自己提供拖拽区域，这里不再设 drag */
+        <div style={{ height: WINDOW_DRAG_HEIGHT, flexShrink: 0 }} />
       ) : (
         <WindowDragSpacer />
       )}
@@ -765,43 +618,6 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           <FolderOpen size={10} strokeWidth={1.5} />
           {cwdShort || t("sidebar.selectFolder")}
         </button>
-        {windowsChrome && (
-          <button
-            onClick={onOpenSettings}
-            style={{
-              position: "relative",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 22,
-              height: 22,
-              borderRadius: 5,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "rgba(255,255,255,0.45)",
-              transition: "color .2s",
-              padding: 0,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.72)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
-          >
-            <SettingsIcon size={12} strokeWidth={1.5} />
-            {hasUpdate && (
-              <span style={{
-                position: "absolute",
-                top: 0,
-                right: 0,
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#FF8C42",
-                boxShadow: "0 0 4px rgba(255,140,66,0.7)",
-                pointerEvents: "none",
-              }} />
-            )}
-          </button>
-        )}
         <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.38)", letterSpacing: ".06em" }}>
           {t("sidebar.chatsCount", { value: convos.length })}
         </span>

@@ -520,7 +520,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
           inside the drag hit-area. On macOS, WindowDragSpacer reserves the
           sidebar chrome rail as a no-drag zone. */}
       <div style={{ marginRight: windowControlsVisible ? topTabsRight : 0 }}>
-        <WindowDragSpacer />
+        <WindowDragSpacer reserveWindowsHeader={windowControlsVisible && !sidebarOpen} />
       </div>
 
       {showHeaderTabs && (
