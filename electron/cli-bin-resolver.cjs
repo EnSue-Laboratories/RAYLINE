@@ -94,6 +94,7 @@ function getUserBinDirs() {
     programFiles && path.join(programFiles, "nodejs"),
     programFiles && path.join(programFiles, "Git", "bin"),
     programFiles && path.join(programFiles, "Git", "cmd"),
+    programFiles && path.join(programFiles, "GitHub CLI"),
     programFilesX86 && path.join(programFilesX86, "nodejs"),
   ].filter(Boolean);
 
