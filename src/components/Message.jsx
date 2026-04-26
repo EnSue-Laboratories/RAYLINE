@@ -279,6 +279,11 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
   const isSystem = msg.role === "system";
   const isShellCommand = msg.mode === "shell-command";
   const hasThinkingPart = Boolean(msg.parts?.some((part) => part.type === "thinking"));
+  const lastUnkeyedThinkingIndex = Array.isArray(msg.parts)
+    ? msg.parts.reduce((latest, part, index) => (
+        part.type === "thinking" && !part._streamKey ? index : latest
+      ), -1)
+    : -1;
   const activeThinkingByStreamKey = msg._streamState?.activeThinking || {};
   const assistantCaptureRef = useRef(null);
   const assistantText = useMemo(() => {
@@ -610,7 +615,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
           if (part.type === "thinking") {
             const isPartThinking = part._streamKey
               ? Boolean(activeThinkingByStreamKey[part._streamKey])
-              : msg.isThinking;
+              : Boolean(msg.isThinking && i === lastUnkeyedThinkingIndex && !Number.isFinite(part.durationMs));
             return (
               <div key={"think-" + i} data-copy-image-ignore="true">
                 <ThinkingBlock text={part.text} isThinking={isPartThinking} durationMs={part.durationMs} />
