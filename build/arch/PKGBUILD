@@ -1,0 +1,46 @@
+# Maintainer: Ensue Laboratories <contact@ensue.dev>
+pkgname=rayline
+pkgver=0.1.7
+pkgrel=1
+pkgdesc="RayLine — a desktop client for Claude Code"
+arch=('x86_64')
+url="https://github.com/EnSue-Laboratories/RAYLINE"
+license=('LicenseRef-proprietary')
+depends=(
+    'c-ares'
+    'ffmpeg'
+    'gtk3'
+    'http-parser'
+    'libevent'
+    'libvpx'
+    'libxslt'
+    'libxss'
+    'minizip'
+    'nss'
+    're2'
+    'snappy'
+    'libnotify'
+    'libappindicator-gtk3'
+)
+options=('!strip')
+source=(
+    'rayline-app.tar.gz'
+    'icon.png'
+    'rayline.desktop'
+)
+sha256sums=('SKIP' 'SKIP' 'SKIP')
+
+package() {
+    install -dm755 "${pkgdir}/opt/RayLine"
+    cp -r "${srcdir}/linux-unpacked/"* "${pkgdir}/opt/RayLine/"
+    chmod 4755 "${pkgdir}/opt/RayLine/chrome-sandbox"
+
+    install -dm755 "${pkgdir}/usr/bin"
+    ln -s "/opt/RayLine/ensue" "${pkgdir}/usr/bin/rayline"
+
+    install -Dm644 "${srcdir}/icon.png" \
+        "${pkgdir}/usr/share/pixmaps/rayline.png"
+
+    install -Dm644 "${srcdir}/rayline.desktop" \
+        "${pkgdir}/usr/share/applications/rayline.desktop"
+}

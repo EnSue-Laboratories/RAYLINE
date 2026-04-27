@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=RayLine
+Comment=RayLine — a desktop client for Claude Code
+Exec=/opt/RayLine/ensue %U
+Icon=rayline
+Terminal=false
+Type=Application
+Categories=Development;
+StartupNotify=true
