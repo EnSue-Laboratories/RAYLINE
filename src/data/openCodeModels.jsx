@@ -61,9 +61,9 @@ export function useOpenCodeModels() {
   }, [refresh]);
 
   const models = useMemo(() => {
-    if (!status.installed || !status.configured) return [];
+    if (!status.installed) return [];
     return (state.models || []).map(openCodeEntryToModel).filter(Boolean);
-  }, [state.models, status.configured, status.installed]);
+  }, [state.models, status.installed]);
 
   const saveModel = useCallback((entry) => {
     const next = upsertOpenCodeModel(entry);

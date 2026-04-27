@@ -48,6 +48,16 @@ function getModelThinkingValue(model) {
   return typeof model?.thinking === "boolean" ? model.thinking : undefined;
 }
 
+function getOpenCodeRuntimeConfig(model) {
+  if (!model || model.provider !== "opencode") return undefined;
+  return {
+    providerId: typeof model.providerId === "string" ? model.providerId : "",
+    modelId: typeof model.modelId === "string" ? model.modelId : "",
+    apiKey: typeof model.apiKey === "string" ? model.apiKey : "",
+    baseURL: typeof model.baseURL === "string" ? model.baseURL : "",
+  };
+}
+
 const SHELL_TRANSCRIPT_LIMIT = 12000;
 const SHELL_TERMINAL_TIMEOUT_MS = 15000;
 const LAB_CONTROL_ENDPOINT = "http://127.0.0.1:4001/control";
@@ -2733,6 +2743,7 @@ export default function App() {
           provider: m.provider || "claude",
           effort: m.effort,
           thinking: getModelThinkingValue(m),
+          openCodeConfig: getOpenCodeRuntimeConfig(m),
           cwd: effectiveCwd,
           images:
             currentProvider === "multica"
@@ -3323,6 +3334,7 @@ export default function App() {
         provider: currentProvider,
         effort: m.effort,
         thinking: getModelThinkingValue(m),
+        openCodeConfig: getOpenCodeRuntimeConfig(m),
         cwd: convoCwd,
         multicaContext,
         multicaToken,

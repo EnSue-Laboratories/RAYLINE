@@ -242,7 +242,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
       providerId,
       modelId: model.modelId || "",
       label: sourceLabel ? `${sourceLabel} (copy)` : "",
-      apiKey: providerConfig.apiKey,
+      apiKey: model.apiKey || providerConfig.apiKey || "",
       baseURL: model.baseURL || providerConfig.baseURL || "",
       enabled: model.enabled !== false,
       thinking: Boolean(model.thinking),
@@ -282,10 +282,14 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     setOpenCodeSaving(true);
     setOpenCodeMessage("");
     try {
+      const existingModel = openCodeModels.find((model) => (
+        model.id === openCodeEditingId || model.id === nextModelKey
+      ));
+      const nextApiKey = openCodeDraft.apiKey || (openCodeEditingId ? existingModel?.apiKey || "" : "");
       await window.api?.opencodeSaveConfig?.({
         providerId,
         modelId,
-        apiKey: openCodeDraft.apiKey,
+        apiKey: nextApiKey,
         baseURL: openCodeDraft.baseURL,
         setDefault: true,
       });
@@ -293,6 +297,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         providerId,
         modelId,
         label: openCodeDraft.label,
+        apiKey: nextApiKey,
         baseURL: openCodeDraft.baseURL,
         enabled: openCodeDraft.enabled !== false,
         thinking: openCodeDraft.thinking,
@@ -321,7 +326,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     } finally {
       setOpenCodeSaving(false);
     }
-  }, [openCodeDraft, openCodeDuplicateSourceId, openCodeEditingId, refreshOpenCode, removeOpenCodeModel, saveOpenCodeModel, t]);
+  }, [openCodeDraft, openCodeDuplicateSourceId, openCodeEditingId, openCodeModels, refreshOpenCode, removeOpenCodeModel, saveOpenCodeModel, t]);
 
   const handleRemoveOpenCodeModel = useCallback((modelKey) => {
     removeOpenCodeModel(modelKey);
@@ -394,6 +399,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
       "openrouter",
     ].map((provider) => String(provider || "").trim()).filter(Boolean)),
   ].sort((a, b) => a.localeCompare(b)), [openCodeStatus.providers, openCodeStatus.supportedProviders]);
+  const openCodeReady = openCodeStatus.configured || openCodeModels.some((model) => model.apiKey || model.baseURL);
 
   const openCodeProviderQuery = openCodeDraft.providerId.trim().toLowerCase();
   const filteredOpenCodeProviderOptions = openCodeProviderOptions
@@ -1029,14 +1035,14 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 <div
                   style={{
                     fontSize: s(12),
-                    color: openCodeStatus.installed && openCodeStatus.configured
+                    color: openCodeStatus.installed && openCodeReady
                       ? "rgba(205,255,214,0.88)"
                       : "rgba(255,255,255,0.72)",
                     marginBottom: 4,
                   }}
                 >
                   {openCodeStatus.installed
-                    ? (openCodeStatus.configured ? t("settings.opencodeConfigured") : t("settings.opencodeInstalled"))
+                    ? (openCodeReady ? t("settings.opencodeConfigured") : t("settings.opencodeInstalled"))
                     : t("settings.opencodeNotInstalled")}
                 </div>
                 {openCodeStatus.version && (

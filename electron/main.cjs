@@ -10,7 +10,7 @@ const {
   cancelOpenCodeAgent,
   cancelAllOpenCode,
   resolveOpenCodeBin,
-  buildOpenCodeEnv,
+  createOpenCodeRuntimeEnv,
   shouldEnableThinking,
 } = require("./opencode-agent-manager.cjs");
 const {
@@ -1067,8 +1067,6 @@ function saveOpenCodeConfig(input) {
   models[normalized.modelId] = models[normalized.modelId] && typeof models[normalized.modelId] === "object"
     ? models[normalized.modelId]
     : {};
-  if (normalized.apiKey) options.apiKey = normalized.apiKey;
-  if (normalized.baseURL) options.baseURL = normalized.baseURL;
 
   provider[normalized.providerId] = {
     ...currentProvider,
@@ -1531,10 +1529,11 @@ function runOpenCodeDispatchPlanner({ prompt, plannerModel, cwd }) {
     if (model) args.push("--model", model);
     if (shouldEnableThinking(model, plannerModel?.thinking)) args.push("--thinking");
     args.push("--", fullPrompt);
+    const runtime = createOpenCodeRuntimeEnv(plannerModel?.openCodeConfig, model);
 
     const child = spawnCli(openCodeBin, args, {
       cwd: launchCwd,
-      env: buildOpenCodeEnv(),
+      env: runtime.env,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -1551,6 +1550,7 @@ function runOpenCodeDispatchPlanner({ prompt, plannerModel, cwd }) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      runtime.cleanup();
       fn(value);
     };
     const parseLine = (line) => {
