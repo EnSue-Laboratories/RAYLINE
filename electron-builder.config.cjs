@@ -85,6 +85,7 @@ module.exports = {
     category: "Development",
     icon: "public/icon.png",
     maintainer: "Ensue Laboratories <contact@ensue.dev>",
+    artifactName: "${productName}-${version}.${ext}",
     target: ["AppImage", "deb", "rpm", "pacman", "tar.gz"],
   },
   asarUnpack: [
