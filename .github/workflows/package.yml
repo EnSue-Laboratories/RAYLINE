@@ -262,6 +262,7 @@ jobs:
         run: |
           useradd -m builder
           chown -R builder:builder .
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Create GitHub release (tag push only)
         if: startsWith(github.ref, 'refs/tags/')
