@@ -15,6 +15,7 @@ const path = require("path");
 const os = require("os");
 const https = require("https");
 const { execFileSync } = require("child_process");
+const { createLogger } = require("./logger.cjs");
 
 const CACHE_DIR = path.join(os.homedir(), ".cache", "rayline");
 const CACHE_FILE = path.join(CACHE_DIR, "claude-usage.json");
@@ -30,9 +31,7 @@ let memCache = null; // { ts, data } — data is the normalized shape or null
 let memCacheTime = 0;
 let memCacheMaxAge = CACHE_MAX_AGE_S;
 
-function log(...args) {
-  console.log("[claude-usage]", ...args);
-}
+const log = createLogger("claude-usage");
 
 function ensureCacheDir() {
   try {

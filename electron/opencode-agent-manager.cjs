@@ -3,13 +3,11 @@ const fs = require("fs");
 const os = require("os");
 const net = require("net");
 const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
+const { createLogger } = require("./logger.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
-
-function log(...args) {
-  console.log("[opencode-agent-manager]", ...args);
-}
+const log = createLogger("opencode-agent-manager");
 
 function isDirectory(dirPath) {
   try {

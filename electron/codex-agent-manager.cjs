@@ -3,14 +3,12 @@ const fs = require("fs");
 const os = require("os");
 const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { loadSessionMessages } = require("./session-reader.cjs");
+const { createLogger } = require("./logger.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
 const SESSION_SNAPSHOT_RETRY_DELAYS_MS = [0, 150, 500, 1200, 2500];
-
-function log(...args) {
-  console.log("[codex-agent-manager]", ...args);
-}
+const log = createLogger("codex-agent-manager");
 
 function isDirectory(dirPath) {
   try {

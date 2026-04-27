@@ -1,8 +1,19 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
-function logCheckpoint(...args) {
-  console.log("[checkpoint-preload]", ...args);
-}
+// Inlined logger: sandboxed preload cannot require relative files.
+const VERBOSE_PRELOAD_LOGS = (() => {
+  const truthy = /^(1|true|yes|on)$/i;
+  const debug = String(process.env.RAYLINE_DEBUG || "").trim();
+  if (truthy.test(String(process.env.RAYLINE_VERBOSE_LOGS || ""))) return true;
+  if (truthy.test(debug)) return true;
+  return debug
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .some((t) => t === "rayline:*" || t === "rayline:checkpoint-preload" || t === "checkpoint-preload");
+})();
+const logCheckpoint = (...args) => {
+  if (VERBOSE_PRELOAD_LOGS) console.log("[checkpoint-preload]", ...args);
+};
 
 contextBridge.exposeInMainWorld("api", {
   agentStart: (opts) => ipcRenderer.send("agent-start", opts),

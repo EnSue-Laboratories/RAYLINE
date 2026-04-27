@@ -30,6 +30,7 @@ const { listSessions, loadSessionMessages, moveSession } = require("./session-re
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
 const ghManager = require("./github-manager.cjs");
+const { createLogger, isTruthyFlag, isVerboseLoggingEnabled } = require("./logger.cjs");
 
 const isDev = !app.isPackaged;
 const isMac = process.platform === "darwin";
@@ -38,7 +39,7 @@ const SHELL_COMMAND_TIMEOUT_MS = 15000;
 const SHELL_OUTPUT_LIMIT = 128 * 1024;
 const DISPATCH_PLAN_TIMEOUT_MS = 90000;
 const WINDOW_BACKGROUND = "#0D0D10";
-const TERMINAL_DEBUG_ENABLED = /^(1|true|yes|on)$/i.test(String(process.env.RAYLINE_TERMINAL_DEBUG || ""));
+const TERMINAL_DEBUG_ENABLED = isVerboseLoggingEnabled("terminal-debug") || isTruthyFlag(process.env.RAYLINE_TERMINAL_DEBUG);
 const WALLPAPER_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"];
 const WALLPAPER_MIME_TYPES = {
   png: "image/png",
@@ -72,6 +73,8 @@ let terminalWindow;
 let terminalWindowRevealTimer = null;
 let pendingPreferredTerminalSessionName = null;
 let sidebarTerminalEnabledPreference = false;
+const log = createLogger("main");
+const logCheckpointMain = createLogger("checkpoint-main");
 
 function terminalDebug(event, details = {}, meta = {}) {
   if (!TERMINAL_DEBUG_ENABLED) return;
@@ -425,7 +428,7 @@ app.whenReady().then(() => {
 
   // Start terminal session WebSocket server + write MCP config
   terminalManager.startServer().then((port) => {
-    console.log("[main] Terminal WebSocket server on port", port);
+    log("Terminal WebSocket server on port", port);
     const mcpConfig = {
       mcpServers: {
         "terminal-sessions": {
@@ -696,10 +699,10 @@ ipcMain.handle("rewind-files", async (_event, opts) => {
 
 ipcMain.handle("checkpoint-create", async (_event, cwdPath) => {
   const startedAt = Date.now();
-  console.log("[checkpoint-main] checkpoint-create", { cwdPath });
+  logCheckpointMain("checkpoint-create", { cwdPath });
   try {
     const result = await createCheckpoint(cwdPath);
-    console.log("[checkpoint-main] checkpoint-create:success", {
+    logCheckpointMain("checkpoint-create:success", {
       cwdPath,
       durationMs: Date.now() - startedAt,
       result,
@@ -717,10 +720,10 @@ ipcMain.handle("checkpoint-create", async (_event, cwdPath) => {
 
 ipcMain.handle("checkpoint-restore", async (_event, cwdPath, ref) => {
   const startedAt = Date.now();
-  console.log("[checkpoint-main] checkpoint-restore", { cwdPath, ref });
+  logCheckpointMain("checkpoint-restore", { cwdPath, ref });
   try {
     const result = await restoreCheckpoint(cwdPath, ref);
-    console.log("[checkpoint-main] checkpoint-restore:success", {
+    logCheckpointMain("checkpoint-restore:success", {
       cwdPath,
       ref,
       durationMs: Date.now() - startedAt,

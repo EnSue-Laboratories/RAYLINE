@@ -68,6 +68,12 @@ npm run dev:electron
 
 That starts the Vite renderer on port `5199` and launches Electron against it.
 
+Verbose debug logging is quiet by default. To enable it while capturing a dev log:
+
+```bash
+RAYLINE_VERBOSE_LOGS=1 VITE_RAYLINE_VERBOSE_LOGS=1 npm run dev:electron 2>&1 | tee dev1.log
+```
+
 Claude and Codex are available as soon as their CLIs resolve on your `PATH`. Use **Settings** to connect Multica, and open **GitHub Projects** to finish `gh` authentication if you want the built-in repo/issue/PR tooling.
 
 If Electron or `node-pty` was updated, rebuild the native module first:
