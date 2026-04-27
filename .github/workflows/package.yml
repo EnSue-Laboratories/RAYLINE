@@ -293,7 +293,7 @@ jobs:
         run: |
           rm -rf artifact
           mkdir -p artifact
-          find release -maxdepth 1 -type f -name "*.pkg.tar.zst" -exec cp {} artifact/ \;
+          find release -maxdepth 1 -type f -name "*.pacman" -exec cp {} artifact/ \;
           count=$(find artifact -maxdepth 1 -type f | wc -l | tr -d ' ')
           if [ "$count" -eq 0 ]; then
             echo "No pacman packages found in release/"
