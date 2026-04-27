@@ -243,9 +243,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Install system dependencies
-        run: |
-          pacman -Sy --noconfirm git base-devel nodejs npm python github-cli libxcrypt-compat
-          ldconfig
+        run: pacman -Sy --noconfirm git base-devel nodejs npm python github-cli
 
       - name: Check out repository
         uses: actions/checkout@v4
@@ -258,11 +256,21 @@ jobs:
       - name: Build renderer
         run: npm run build
 
+      - name: Build app (unpacked)
+        run: npx electron-builder --config electron-builder.config.cjs --linux dir
+
+      - name: Prepare PKGBUILD sources
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" build/arch/PKGBUILD
+          tar -czf build/arch/rayline-app.tar.gz -C release linux-unpacked
+          cp public/icon.png build/arch/icon.png
+
       - name: Set up non-root build user
         run: |
           useradd -m builder
-          chown -R builder:builder .
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          chown -R builder:builder build/arch
 
       - name: Create GitHub release (tag push only)
         if: startsWith(github.ref, 'refs/tags/')
@@ -275,29 +283,21 @@ jobs:
             --notes "Automated release for $TAG" \
             || true
 
-      - name: Package Linux (pacman)
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Build pacman package
         shell: bash
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            PUBLISH_FLAG="always"
-          else
-            PUBLISH_FLAG="never"
-          fi
-          sudo -u builder env HOME=/home/builder GH_TOKEN="$GH_TOKEN" \
-            npx electron-builder --config electron-builder.config.cjs --linux pacman \
-            --publish "$PUBLISH_FLAG"
+          cd build/arch
+          sudo -u builder env HOME=/home/builder makepkg -f --nodeps
 
       - name: Collect packaged files
         shell: bash
         run: |
           rm -rf artifact
           mkdir -p artifact
-          find release -maxdepth 1 -type f -name "*.pacman" -exec cp {} artifact/ \;
+          find build/arch -maxdepth 1 -type f -name "*.pkg.tar.zst" -exec cp {} artifact/ \;
           count=$(find artifact -maxdepth 1 -type f | wc -l | tr -d ' ')
           if [ "$count" -eq 0 ]; then
-            echo "No pacman packages found in release/"
+            echo "No pacman packages found"
             exit 1
           fi
           find artifact -maxdepth 1 -type f -print
