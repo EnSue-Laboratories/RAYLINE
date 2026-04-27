@@ -10,7 +10,7 @@ import TerminalDrawer from "./components/TerminalDrawer";
 import WindowControls from "./components/WindowControls";
 import useAgent     from "./hooks/useAgent";
 import useTerminal  from "./hooks/useTerminal";
-import useWindowActivity from "./hooks/useWindowActivity";
+import { usePrefersReducedMotion } from "./hooks/useWindowActivity";
 import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
 import NewProjectModal from "./components/NewProjectModal";
@@ -532,6 +532,8 @@ function normalizeQueuedAttachment(attachment) {
       dataUrl: attachment.dataUrl,
       ...(typeof attachment.name === "string" ? { name: attachment.name } : {}),
       ...(typeof attachment.path === "string" ? { path: attachment.path } : {}),
+      ...(typeof attachment.storagePath === "string" ? { storagePath: attachment.storagePath } : {}),
+      ...(typeof attachment.mime === "string" ? { mime: attachment.mime } : {}),
     };
   }
 
@@ -546,6 +548,25 @@ function normalizeQueuedAttachment(attachment) {
     };
   }
 
+  return null;
+}
+
+function serializeMessageImageForState(image) {
+  if (typeof image === "string") return image;
+  if (!image || typeof image !== "object") return null;
+
+  if (typeof image.storagePath === "string" && image.storagePath) {
+    return {
+      type: "rayline-stored-image",
+      storagePath: image.storagePath,
+      ...(typeof image.mime === "string" ? { mime: image.mime } : {}),
+      ...(typeof image.name === "string" ? { name: image.name } : {}),
+      ...(typeof image.originalPath === "string" ? { originalPath: image.originalPath } : {}),
+      ...(typeof image.path === "string" ? { originalPath: image.path } : {}),
+    };
+  }
+
+  if (typeof image.dataUrl === "string") return image.dataUrl;
   return null;
 }
 
@@ -949,7 +970,10 @@ function serializeMessagesForState(messages) {
         ...(Number.isFinite(part.durationMs) ? { durationMs: part.durationMs } : {}),
       }));
     }
-    if (Array.isArray(message.images) && message.images.length > 0) next.images = message.images;
+    if (Array.isArray(message.images) && message.images.length > 0) {
+      const images = message.images.map(serializeMessageImageForState).filter(Boolean);
+      if (images.length > 0) next.images = images;
+    }
     if (Array.isArray(message.files) && message.files.length > 0) next.files = message.files;
     if (message.claudeUuid) next.claudeUuid = message.claudeUuid;
     if (message._usage) next._usage = message._usage;
@@ -1158,7 +1182,7 @@ export default function App() {
   } = useAgent();
   const terminal = useTerminal();
   const { closeWindow: closeTerminalWindow, openWindow: openTerminalWindow } = terminal;
-  const { prefersReducedMotion } = useWindowActivity();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const { models: multicaModels } = useMulticaModels();
   const { models: openCodeModels } = useOpenCodeModels();
 
@@ -2510,8 +2534,17 @@ export default function App() {
             dataUrl: a.dataUrl,
             ...(typeof a.name === "string" ? { name: a.name } : {}),
             ...(typeof a.path === "string" ? { path: a.path } : {}),
+            ...(typeof a.storagePath === "string" ? { storagePath: a.storagePath } : {}),
+            ...(typeof a.mime === "string" ? { mime: a.mime } : {}),
           }));
         const images = imageAttachments?.map((a) => a.dataUrl);
+        const displayImages = imageAttachments?.map((a) => ({
+          dataUrl: a.dataUrl,
+          ...(typeof a.name === "string" ? { name: a.name } : {}),
+          ...(typeof a.path === "string" ? { path: a.path } : {}),
+          ...(typeof a.storagePath === "string" ? { storagePath: a.storagePath } : {}),
+          ...(typeof a.mime === "string" ? { mime: a.mime } : {}),
+        }));
         const files = attachments?.filter((a) => a.type === "file");
         const m = getMOrMulticaFallback(normalizedConversation.model, dynamicModels);
         const currentProvider = m.provider || "claude";
@@ -2680,7 +2713,7 @@ export default function App() {
         const pendingId = prepareMessage({
           conversationId,
           prompt: text,
-          images: images?.length ? images : undefined,
+          images: displayImages?.length ? displayImages : undefined,
           files: files?.length ? files : undefined,
         });
 
@@ -3604,7 +3637,10 @@ export default function App() {
   // ── Render ─────────────────────────────────────────────────────────────────
   const sidebarPaneTransition = prefersReducedMotion
     ? "none"
-    : "width .34s cubic-bezier(.16,1,.3,1), min-width .34s cubic-bezier(.16,1,.3,1), border-color .18s ease";
+    : "border-color .18s ease";
+  const sidebarContentTransition = prefersReducedMotion
+    ? "none"
+    : "opacity .16s ease, transform .22s cubic-bezier(.16,1,.3,1)";
 
   return (
     <FontSizeContext.Provider value={fontSize}>
@@ -3699,6 +3735,9 @@ export default function App() {
             width: useWindowsSidebarChrome ? "100%" : SIDEBAR_WIDTH,
             minWidth: useWindowsSidebarChrome ? "100%" : SIDEBAR_WIDTH,
             height: "100%",
+            opacity: sidebarOpen ? 1 : 0,
+            transform: sidebarOpen ? "translateX(0)" : "translateX(-12px)",
+            transition: sidebarContentTransition,
             pointerEvents: useWindowsSidebarChrome || sidebarOpen ? "auto" : "none",
           }}
         >

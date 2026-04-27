@@ -51,3 +51,32 @@ export default function useWindowActivity() {
 
   return activity;
 }
+
+export function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    () => readWindowActivity().prefersReducedMotion
+  );
+
+  useEffect(() => {
+    const media = typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia(REDUCED_MOTION_QUERY)
+      : null;
+    if (!media) return undefined;
+
+    const sync = () => setPrefersReducedMotion(media.matches);
+
+    if (media.addEventListener) {
+      media.addEventListener("change", sync);
+      return () => media.removeEventListener("change", sync);
+    }
+
+    if (media.addListener) {
+      media.addListener(sync);
+      return () => media.removeListener(sync);
+    }
+
+    return undefined;
+  }, []);
+
+  return prefersReducedMotion;
+}

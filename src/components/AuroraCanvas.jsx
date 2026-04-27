@@ -11,6 +11,13 @@ export default function AuroraCanvas() {
   const tRef = useRef(0);
   const lastFrameAtRef = useRef(0);
   const { isVisible, isFocused, prefersReducedMotion } = useWindowActivity();
+  const frameBudgetRef = useRef(FOCUSED_FRAME_MS);
+
+  useEffect(() => {
+    frameBudgetRef.current = prefersReducedMotion
+      ? REDUCED_MOTION_FRAME_MS
+      : (isFocused ? FOCUSED_FRAME_MS : BACKGROUND_FRAME_MS);
+  }, [isFocused, prefersReducedMotion]);
 
   useEffect(() => {
     const c = ref.current;
@@ -62,12 +69,9 @@ export default function AuroraCanvas() {
       }
     };
 
-    const frameBudget = prefersReducedMotion
-      ? REDUCED_MOTION_FRAME_MS
-      : (isFocused ? FOCUSED_FRAME_MS : BACKGROUND_FRAME_MS);
-
     const draw = (now) => {
       if (!isVisible) return;
+      const frameBudget = frameBudgetRef.current;
       const lastFrameAt = lastFrameAtRef.current;
       if (lastFrameAt && (now - lastFrameAt) < frameBudget) {
         raf = requestAnimationFrame(draw);
@@ -91,7 +95,7 @@ export default function AuroraCanvas() {
       if (raf != null) cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, [isFocused, isVisible, prefersReducedMotion]);
+  }, [isVisible]);
 
   return (
     <canvas

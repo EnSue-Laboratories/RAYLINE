@@ -9,6 +9,13 @@ export default function Grain() {
   const ref = useRef(null);
   const fiRef = useRef(0);
   const { isVisible, isFocused, prefersReducedMotion } = useWindowActivity();
+  const frameBudgetRef = useRef(FOCUSED_GRAIN_FRAME_MS);
+
+  useEffect(() => {
+    frameBudgetRef.current = prefersReducedMotion
+      ? REDUCED_MOTION_GRAIN_FRAME_MS
+      : (isFocused ? FOCUSED_GRAIN_FRAME_MS : BACKGROUND_GRAIN_FRAME_MS);
+  }, [isFocused, prefersReducedMotion]);
 
   useEffect(() => {
     const c = ref.current;
@@ -34,14 +41,11 @@ export default function Grain() {
     };
     gen();
 
-    const frameBudget = prefersReducedMotion
-      ? REDUCED_MOTION_GRAIN_FRAME_MS
-      : (isFocused ? FOCUSED_GRAIN_FRAME_MS : BACKGROUND_GRAIN_FRAME_MS);
     const schedule = () => {
       if (!isVisible) return;
       tm = setTimeout(() => {
         raf = requestAnimationFrame(loop);
-      }, frameBudget);
+      }, frameBudgetRef.current);
     };
     const loop = () => {
       if (!isVisible) return;
@@ -60,7 +64,7 @@ export default function Grain() {
       if (raf != null) cancelAnimationFrame(raf);
       window.removeEventListener("resize", gen);
     };
-  }, [isFocused, isVisible, prefersReducedMotion]);
+  }, [isVisible]);
 
   return (
     <canvas
