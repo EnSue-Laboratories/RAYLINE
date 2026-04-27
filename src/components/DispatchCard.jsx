@@ -76,9 +76,10 @@ function getDefaultPlannerModelId(availableModels, defaultModel) {
     || "";
 }
 
-function modelPayload(model) {
+function modelPayload(model, options = {}) {
   if (!model) return null;
-  return {
+  const includeRuntimeConfig = Boolean(options?.includeRuntimeConfig);
+  const payload = {
     id: model.id,
     name: model.name || model.label || model.id,
     tag: model.tag,
@@ -87,6 +88,15 @@ function modelPayload(model) {
     effort: model.effort,
     thinking: model.thinking,
   };
+  if (includeRuntimeConfig && model.provider === "opencode") {
+    payload.openCodeConfig = {
+      providerId: typeof model.providerId === "string" ? model.providerId : "",
+      modelId: typeof model.modelId === "string" ? model.modelId : "",
+      apiKey: typeof model.apiKey === "string" ? model.apiKey : "",
+      baseURL: typeof model.baseURL === "string" ? model.baseURL : "",
+    };
+  }
+  return payload;
 }
 
 function cleanDispatchPlanError(error, fallback) {
@@ -168,7 +178,7 @@ export default function DispatchCard({
       const result = await window.api.dispatchPlan({
         instructions: brief,
         cwd: currentCwd,
-        plannerModel: modelPayload(plannerModel),
+        plannerModel: modelPayload(plannerModel, { includeRuntimeConfig: true }),
         targetModels: availableModels.map(modelPayload).filter(Boolean),
         defaultTargetModel: globalModel,
       });

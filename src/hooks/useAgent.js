@@ -1210,7 +1210,7 @@ export default function useAgent() {
     });
   }, []);
 
-  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, thinking, cwd, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
+  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, effort, thinking, openCodeConfig, cwd, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
     const expectedPendingId = pendingStartsRef.current.get(conversationId);
     if (pendingId && expectedPendingId !== pendingId) {
       log("Skipping stale or cancelled pending start", { conversationId, pendingId, expectedPendingId });
@@ -1218,7 +1218,7 @@ export default function useAgent() {
     }
     if (pendingId) pendingStartsRef.current.delete(conversationId);
     if (window.api) {
-      const payload = { conversationId, sessionId, prompt, model, provider, effort, thinking, cwd, images, files, resumeSessionId, forkSession };
+      const payload = { conversationId, sessionId, prompt, model, provider, effort, thinking, openCodeConfig, cwd, images, files, resumeSessionId, forkSession };
       if (provider === "multica") {
         payload._multica = multicaContext;
         payload._multicaToken = multicaToken;
@@ -1250,7 +1250,7 @@ export default function useAgent() {
     }
   }, []);
 
-  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, thinking, cwd, multicaContext, multicaToken }) => {
+  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, effort, thinking, openCodeConfig, cwd, multicaContext, multicaToken }) => {
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId);
@@ -1272,6 +1272,7 @@ export default function useAgent() {
           provider,
           effort,
           thinking,
+          openCodeConfig,
           cwd,
           _multica: multicaContext,
           _multicaToken: multicaToken,
@@ -1287,6 +1288,7 @@ export default function useAgent() {
         provider,
         effort,
         thinking,
+        openCodeConfig,
         cwd,
       });
       return true;

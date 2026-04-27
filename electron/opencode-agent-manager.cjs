@@ -101,7 +101,7 @@ function shouldEnableThinking(model, thinking) {
   return inferThinkingModel(model);
 }
 
-function buildOpenCodeEnv() {
+function buildOpenCodeEnv(extra = {}) {
   return {
     ...process.env,
     FORCE_COLOR: "0",
@@ -110,6 +110,7 @@ function buildOpenCodeEnv() {
     CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
     CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",
     CLAUDI_TERMINAL_MCP_CONFIG: global.mcpConfigPath || "",
+    ...extra,
   };
 }
 
@@ -166,6 +167,67 @@ function parseOpenCodeModel(model) {
     providerID: model.slice(0, slashIndex),
     modelID: model.slice(slashIndex + 1),
   };
+}
+
+function safeConfigString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeOpenCodeRuntimeConfig(openCodeConfig, model) {
+  const parsedModel = parseOpenCodeModel(model);
+  const providerId = safeConfigString(openCodeConfig?.providerId) || parsedModel?.providerID || "";
+  const modelId = safeConfigString(openCodeConfig?.modelId) || parsedModel?.modelID || "";
+  const apiKey = safeConfigString(openCodeConfig?.apiKey);
+  const baseURL = safeConfigString(openCodeConfig?.baseURL);
+  if (!providerId || !/^[a-zA-Z0-9_.-]+$/.test(providerId)) return null;
+  if (!apiKey && !baseURL) return null;
+  return { providerId, modelId, apiKey, baseURL };
+}
+
+function createOpenCodeRuntimeEnv(openCodeConfig, model) {
+  const normalized = normalizeOpenCodeRuntimeConfig(openCodeConfig, model);
+  if (!normalized) return { env: buildOpenCodeEnv(), cleanup: () => {} };
+
+  const envPatch = {};
+  const providerOptions = {};
+  if (normalized.apiKey) {
+    envPatch.RAYLINE_OPENCODE_API_KEY = normalized.apiKey;
+    providerOptions.apiKey = "{env:RAYLINE_OPENCODE_API_KEY}";
+  }
+  if (normalized.baseURL) {
+    envPatch.RAYLINE_OPENCODE_BASE_URL = normalized.baseURL;
+    providerOptions.baseURL = "{env:RAYLINE_OPENCODE_BASE_URL}";
+  }
+
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "rayline-opencode-"));
+  const configPath = path.join(configDir, "opencode.json");
+  fs.writeFileSync(configPath, JSON.stringify({
+    "$schema": "https://opencode.ai/config.json",
+    provider: {
+      [normalized.providerId]: { options: providerOptions },
+    },
+  }, null, 2) + "\n", { mode: 0o600 });
+
+  return {
+    env: buildOpenCodeEnv({
+      ...envPatch,
+      OPENCODE_CONFIG: configPath,
+    }),
+    cleanup: () => {
+      fs.rmSync(configDir, { recursive: true, force: true });
+    },
+  };
+}
+
+function cleanupOpenCodeRuntime(state) {
+  if (!state?.configCleanup) return;
+  const cleanup = state.configCleanup;
+  state.configCleanup = null;
+  try {
+    cleanup();
+  } catch (error) {
+    log("Failed to remove temporary OpenCode config:", error.message);
+  }
 }
 
 function buildPromptParts(fullPrompt, images) {
@@ -381,6 +443,7 @@ function finishOpenCodeAgent(conversationId, state, webContents, { exitCode = 0,
   state.done = true;
   if (state.abortController && !state.cancelled) state.abortController.abort();
   if (state.child && !state.child.killed) state.child.kill("SIGTERM");
+  cleanupOpenCodeRuntime(state);
   if (error && !state.cancelled) webContents.send("agent-error", { conversationId, error });
   webContents.send("agent-done", {
     conversationId,
@@ -391,8 +454,9 @@ function finishOpenCodeAgent(conversationId, state, webContents, { exitCode = 0,
   });
 }
 
-function startOpenCodeServerAgent({ conversationId, prompt, model, images, files, sessionId, resumeSessionId, forkSession }, webContents, openCodeBin, launchCwd) {
+function startOpenCodeServerAgent({ conversationId, prompt, model, openCodeConfig, images, files, sessionId, resumeSessionId, forkSession }, webContents, openCodeBin, launchCwd) {
   const nativeSessionId = resumeSessionId || sessionId;
+  const runtime = createOpenCodeRuntimeEnv(openCodeConfig, model);
   const state = {
     child: null,
     webContents,
@@ -408,6 +472,7 @@ function startOpenCodeServerAgent({ conversationId, prompt, model, images, files
     partStarts: new Map(),
     partText: new Map(),
     messageRoles: new Map(),
+    configCleanup: runtime.cleanup,
   };
 
   activeAgents.set(conversationId, state);
@@ -422,7 +487,7 @@ function startOpenCodeServerAgent({ conversationId, prompt, model, images, files
 
     const child = spawnCli(openCodeBin, args, {
       cwd: launchCwd,
-      env: buildOpenCodeEnv(),
+      env: runtime.env,
       stdio: ["ignore", "pipe", "pipe"],
     });
     state.child = child;
@@ -506,7 +571,7 @@ function startOpenCodeServerAgent({ conversationId, prompt, model, images, files
   return state;
 }
 
-function startOpenCodeAgent({ conversationId, prompt, model, thinking, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents) {
+function startOpenCodeAgent({ conversationId, prompt, model, thinking, openCodeConfig, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents) {
   cancelOpenCodeAgent(conversationId);
 
   const openCodeBin = resolveOpenCodeBin();
@@ -534,7 +599,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, thinking, cwd, imag
   const thinkingEnabled = shouldEnableThinking(model, thinking);
 
   if (thinkingEnabled) {
-    return startOpenCodeServerAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents, openCodeBin, launchCwd);
+    return startOpenCodeServerAgent({ conversationId, prompt, model, openCodeConfig, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents, openCodeBin, launchCwd);
   }
 
   if (nativeSessionId) {
@@ -565,6 +630,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, thinking, cwd, imag
 
   const fullPrompt = buildRayLinePrompt(prompt, files);
   args.push("--", fullPrompt);
+  const runtime = createOpenCodeRuntimeEnv(openCodeConfig, model);
 
   log("Starting opencode agent:", { conversationId, model, thinking: thinkingEnabled, cwd: launchCwd, sessionId: nativeSessionId || null });
   log("Full args:", args.filter((arg) => arg !== fullPrompt).join(" "));
@@ -572,7 +638,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, thinking, cwd, imag
 
   const child = spawnCli(openCodeBin, args, {
     cwd: launchCwd,
-    env: buildOpenCodeEnv(),
+    env: runtime.env,
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -582,6 +648,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, thinking, cwd, imag
     sawJsonEvent: false,
     sessionId: nativeSessionId || null,
     lastErrorMessage: null,
+    configCleanup: runtime.cleanup,
   };
 
   activeAgents.set(conversationId, state);
@@ -637,6 +704,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, thinking, cwd, imag
     if (state.cancelled) {
       if (isCurrentState) {
         activeAgents.delete(conversationId);
+        cleanupOpenCodeRuntime(state);
         webContents.send("agent-done", {
           conversationId,
           exitCode,
@@ -662,6 +730,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, thinking, cwd, imag
     }
 
     activeAgents.delete(conversationId);
+    cleanupOpenCodeRuntime(state);
     webContents.send("agent-done", {
       conversationId,
       exitCode,
@@ -675,6 +744,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, thinking, cwd, imag
     const isCurrentState = activeAgents.get(conversationId) === state;
     log("Spawn error:", err.message);
     if (isCurrentState) activeAgents.delete(conversationId);
+    cleanupOpenCodeRuntime(state);
     webContents.send("agent-error", { conversationId, error: err.message });
     if (isCurrentState) {
       webContents.send("agent-done", { conversationId, exitCode: -1, provider: "opencode" });
@@ -709,6 +779,7 @@ function cancelAllOpenCode() {
     state.cancelled = true;
     if (state.abortController) state.abortController.abort();
     if (state.child) state.child.kill("SIGTERM");
+    cleanupOpenCodeRuntime(state);
   }
 }
 
@@ -718,5 +789,6 @@ module.exports = {
   cancelAllOpenCode,
   resolveOpenCodeBin,
   buildOpenCodeEnv,
+  createOpenCodeRuntimeEnv,
   shouldEnableThinking,
 };

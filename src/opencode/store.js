@@ -34,6 +34,7 @@ function sanitizeModel(entry) {
     providerId,
     modelId,
     label: safeString(entry.label),
+    apiKey: safeString(entry.apiKey),
     baseURL: safeString(entry.baseURL),
     enabled: explicitEnabled ? entry.enabled : true,
     thinking: explicitThinking ? entry.thinking : inferThinkingDefault(providerId, modelId),
@@ -128,6 +129,8 @@ export function openCodeEntryToModel(entry) {
     cliFlag: `${providerId}/${modelId}`,
     providerId,
     modelId,
+    apiKey: safeString(entry.apiKey),
+    baseURL: safeString(entry.baseURL),
     thinking: Boolean(entry.thinking),
   };
 }
