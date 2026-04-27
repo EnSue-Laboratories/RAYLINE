@@ -243,7 +243,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Install system dependencies
-        run: pacman -Sy --noconfirm git base-devel nodejs npm python github-cli
+        run: pacman -Sy --noconfirm git base-devel nodejs npm python github-cli libxcrypt-compat
 
       - name: Check out repository
         uses: actions/checkout@v4
