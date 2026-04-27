@@ -142,3 +142,185 @@ jobs:
             exit 1
           fi
           gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
+
+  package-linux:
+    name: Package Linux (deb, rpm, AppImage, tar.gz)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y rpm fakeroot
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build renderer
+        run: npm run build
+
+      - name: Create GitHub release (tag push only)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "Automated release for $TAG" \
+            || true
+
+      - name: Package Linux (deb, rpm, AppImage, tar.gz)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            PUBLISH_FLAG="always"
+          else
+            PUBLISH_FLAG="never"
+          fi
+          npx electron-builder --config electron-builder.config.cjs --linux deb rpm AppImage tar.gz \
+            --publish "$PUBLISH_FLAG"
+
+      - name: Collect packaged files
+        shell: bash
+        run: |
+          rm -rf artifact
+          mkdir -p artifact
+          find release -maxdepth 1 -type f \( \
+            -name "*.deb" -o \
+            -name "*.rpm" -o \
+            -name "*.AppImage" -o \
+            -name "*.tar.gz" \
+          \) -exec cp {} artifact/ \;
+          count=$(find artifact -maxdepth 1 -type f | wc -l | tr -d ' ')
+          if [ "$count" -eq 0 ]; then
+            echo "No Linux packages found in release/"
+            exit 1
+          fi
+          find artifact -maxdepth 1 -type f -print
+
+      - name: Upload workflow artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rayline-linux
+          path: artifact/*
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload assets to GitHub release (workflow_dispatch with tag)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          files=()
+          while IFS= read -r -d '' file; do
+            files+=("$file")
+          done < <(find artifact -maxdepth 1 -type f -print0)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No binary files found in artifact/"
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
+
+  package-linux-pacman:
+    name: Package Linux (pacman)
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    timeout-minutes: 45
+    steps:
+      - name: Install system dependencies
+        run: pacman -Sy --noconfirm git base-devel nodejs npm python github-cli
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build renderer
+        run: npm run build
+
+      - name: Set up non-root build user
+        run: |
+          useradd -m builder
+          chown -R builder:builder .
+
+      - name: Create GitHub release (tag push only)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "Automated release for $TAG" \
+            || true
+
+      - name: Package Linux (pacman)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            PUBLISH_FLAG="always"
+          else
+            PUBLISH_FLAG="never"
+          fi
+          sudo -u builder env HOME=/home/builder GH_TOKEN="$GH_TOKEN" \
+            npx electron-builder --config electron-builder.config.cjs --linux pacman \
+            --publish "$PUBLISH_FLAG"
+
+      - name: Collect packaged files
+        shell: bash
+        run: |
+          rm -rf artifact
+          mkdir -p artifact
+          find release -maxdepth 1 -type f -name "*.pkg.tar.zst" -exec cp {} artifact/ \;
+          count=$(find artifact -maxdepth 1 -type f | wc -l | tr -d ' ')
+          if [ "$count" -eq 0 ]; then
+            echo "No pacman packages found in release/"
+            exit 1
+          fi
+          find artifact -maxdepth 1 -type f -print
+
+      - name: Upload workflow artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rayline-linux-pacman
+          path: artifact/*
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Upload assets to GitHub release (workflow_dispatch with tag)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.release_tag }}
+        run: |
+          files=()
+          while IFS= read -r -d '' file; do
+            files+=("$file")
+          done < <(find artifact -maxdepth 1 -type f -print0)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No binary files found in artifact/"
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "${files[@]}" --clobber

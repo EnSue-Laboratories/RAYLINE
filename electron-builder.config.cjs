@@ -85,7 +85,7 @@ module.exports = {
     category: "Development",
     icon: "public/icon.png",
     maintainer: "Ensue Laboratories <contact@ensue.dev>",
-    target: ["AppImage", "deb", "tar.gz"],
+    target: ["AppImage", "deb", "rpm", "pacman", "tar.gz"],
   },
   asarUnpack: [
     "electron/shell-init/**",
