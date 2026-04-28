@@ -2208,6 +2208,14 @@ export default function App() {
     }));
   }, []);
 
+  const handleEditProjectContext = useCallback((cwdRoot, context) => {
+    const projectRoot = getMainRepoRoot(cwdRoot);
+    setProjects((prev) => ({
+      ...prev,
+      [projectRoot]: { ...prev[projectRoot], context: context || "" },
+    }));
+  }, []);
+
   const resolveProjectContext = useCallback((cwdPath) => {
     if (!cwdPath) return undefined;
     const root = getMainRepoRoot(cwdPath);
@@ -3844,6 +3852,7 @@ export default function App() {
             draftsPath={draftsPath}
             onToggleProjectCollapse={handleToggleProjectCollapse}
             onHideProject={handleHideProject}
+            onEditProjectContext={handleEditProjectContext}
             onNewInProject={handleNewInProject}
             draftsCollapsed={draftsCollapsed}
             onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
