@@ -362,6 +362,63 @@ function normalizeStateImagesForPersist(state) {
   return { ...state, ...(convos ? { convos } : {}) };
 }
 
+const MESSAGE_IMAGE_FILENAME_RE = /^[0-9a-f]{64}\.[a-z0-9]+$/;
+let messageImageSweepScheduled = false;
+
+function collectReferencedMessageImagePaths(state) {
+  const refs = new Set();
+  if (!state || typeof state !== "object") return refs;
+  const seen = new WeakSet();
+  const visit = (node) => {
+    if (!node || typeof node !== "object") return;
+    if (seen.has(node)) return;
+    seen.add(node);
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item);
+      return;
+    }
+    if (typeof node.storagePath === "string" && node.storagePath) {
+      refs.add(path.basename(node.storagePath));
+    }
+    for (const key of Object.keys(node)) {
+      const value = node[key];
+      if (value && typeof value === "object") visit(value);
+    }
+  };
+  visit(state);
+  return refs;
+}
+
+function sweepOrphanedMessageImages() {
+  try {
+    const state = latestPersistedState;
+    if (!state) return;
+    const dir = getMessageImageStorageDir();
+    const referenced = collectReferencedMessageImagePaths(state);
+    const entries = fs.readdirSync(dir);
+    let removed = 0;
+    for (const name of entries) {
+      if (!MESSAGE_IMAGE_FILENAME_RE.test(name)) continue;
+      if (referenced.has(name)) continue;
+      try {
+        fs.unlinkSync(path.join(dir, name));
+        removed += 1;
+      } catch (err) {
+        console.warn(`Failed to unlink orphaned message image ${name}:`, err);
+      }
+    }
+    if (removed > 0) log(`Swept ${removed} orphaned message image(s)`);
+  } catch (err) {
+    console.warn("Failed to sweep orphaned message images:", err);
+  }
+}
+
+function scheduleMessageImageSweep() {
+  if (messageImageSweepScheduled) return;
+  messageImageSweepScheduled = true;
+  setTimeout(sweepOrphanedMessageImages, 5000).unref?.();
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: "RayLine",
@@ -905,6 +962,7 @@ ipcMain.handle("load-state", async () => {
       }
       rememberPersistedStateSnapshot(state);
       rememberTerminalSurfacePreference(state);
+      scheduleMessageImageSweep();
       return state;
     }
     // Try migrating from old app name
@@ -918,6 +976,7 @@ ipcMain.handle("load-state", async () => {
         fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
         rememberPersistedStateSnapshot(data);
         rememberTerminalSurfacePreference(data);
+        scheduleMessageImageSweep();
         return data;
       }
     }
@@ -2677,6 +2736,7 @@ ipcMain.handle("gh-load-pm-state", async () => {
     if (fs.existsSync(stateFilePath)) {
       const data = normalizeStateImagesForPersist(JSON.parse(fs.readFileSync(stateFilePath, "utf-8")));
       rememberPersistedStateSnapshot(data);
+      scheduleMessageImageSweep();
       return { repos: data.pmRepos || [], wallpaper: data.wallpaper || null };
     }
   } catch {}
