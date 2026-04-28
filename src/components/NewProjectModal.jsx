@@ -176,7 +176,7 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
               rows={5}
               value={contextValue}
               onChange={(e) => setContextValue(e.target.value)}
-              placeholder="Notes Claude should know about this project..."
+              placeholder="Notes Agent should know about this project..."
               style={{ ...inputStyle, resize: "vertical", minHeight: 88 }}
               spellCheck={false}
               disabled={busy}
