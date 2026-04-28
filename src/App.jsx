@@ -2217,7 +2217,7 @@ export default function App() {
         [projectRoot]: {
           ...existing,
           name: existing.name || projectRoot.split("/").pop(),
-          context: context || "",
+          context: typeof context === "string" ? context.trim() : "",
         },
       };
     });
