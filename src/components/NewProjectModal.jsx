@@ -15,12 +15,14 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
   const [parentDir, setParentDir] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [contextValue, setContextValue] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setUrl("");
     setError("");
     setBusy(false);
+    setContextValue("");
     (async () => {
       try {
         const info = await window.api?.getSystemInfo?.();
@@ -54,27 +56,27 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
         setError(result?.stderr || "Clone failed");
         return;
       }
-      onCloned?.(result.path);
+      onCloned?.(result.path, contextValue.trim() || undefined);
       onClose?.();
     } catch (e) {
       setError(e?.message || String(e));
     } finally {
       setBusy(false);
     }
-  }, [canClone, url, parentDir, onCloned, onClose]);
+  }, [canClone, url, parentDir, onCloned, onClose, contextValue]);
 
   const handlePickLocal = useCallback(async () => {
     if (busy) return;
     try {
       const folder = await window.api?.pickFolder?.();
       if (folder) {
-        onPickedLocalFolder?.(folder);
+        onPickedLocalFolder?.(folder, contextValue.trim() || undefined);
         onClose?.();
       }
     } catch (e) {
       setError(e?.message || String(e));
     }
-  }, [busy, onPickedLocalFolder, onClose]);
+  }, [busy, onPickedLocalFolder, onClose, contextValue]);
 
   if (!open) return null;
 
@@ -164,6 +166,24 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
               <FolderOpen size={12} strokeWidth={1.8} style={{ marginRight: 6 }} />
               Choose folder…
             </button>
+          </div>
+
+          <div style={sectionStyle}>
+            <div style={sectionHeaderStyle}>
+              <span>Project Context (optional)</span>
+            </div>
+            <textarea
+              rows={5}
+              value={contextValue}
+              onChange={(e) => setContextValue(e.target.value)}
+              placeholder="Notes Claude should know about this project..."
+              style={{ ...inputStyle, resize: "vertical", minHeight: 88 }}
+              spellCheck={false}
+              disabled={busy}
+            />
+            <div style={hintStyle}>
+              Appended to the system prompt for every chat in this project. Editable later from the project menu.
+            </div>
           </div>
 
           {error && <div style={errorStyle}>{error}</div>}

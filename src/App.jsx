@@ -2231,7 +2231,7 @@ export default function App() {
     return typeof ctx === "string" && ctx.trim() ? ctx : undefined;
   }, [projects]);
 
-  const registerManualProject = useCallback((projectPath) => {
+  const registerManualProject = useCallback((projectPath, context) => {
     if (!projectPath) return;
     const projectRoot = getMainRepoRoot(projectPath);
     setProjects((prev) => {
@@ -2243,13 +2243,16 @@ export default function App() {
           name: existing.name || projectRoot.split("/").pop(),
           manual: true,
           hidden: false,
+          ...(typeof context === "string" && context.trim()
+            ? { context: context.trim() }
+            : {}),
         },
       };
     });
   }, []);
 
-  const handleClonedRepo = useCallback((clonedPath) => {
-    if (clonedPath) registerManualProject(clonedPath);
+  const handleClonedRepo = useCallback((clonedPath, context) => {
+    if (clonedPath) registerManualProject(clonedPath, context);
   }, [registerManualProject]);
 
   const handleNewInProject = useCallback((cwdRoot) => {
