@@ -177,6 +177,7 @@ function groupConvosByProject(convos, projectsMeta, draftsPath) {
         name: meta.name || root.split("/").pop(),
         collapsed: meta.collapsed ?? false,
         hidden: meta.hidden ?? false,
+        context: meta.context || "",
         convos: [],
         latestTs: null,
       };
@@ -194,6 +195,7 @@ function groupConvosByProject(convos, projectsMeta, draftsPath) {
         name: root.split("/").pop(),
         collapsed: meta.collapsed ?? false,
         hidden: meta.hidden ?? false,
+        context: meta.context || "",
         convos: [],
         latestTs: null,
       };
@@ -228,7 +230,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, windowsChrome = false, hasUpdate = false, locale = "en-US" }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onEditProjectContext, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, windowsChrome = false, hasUpdate = false, locale = "en-US" }) {
   const s = useFontScale();
   const t = useMemo(() => createTranslator(locale), [locale]);
   const [search, setSearch]     = useState("");
@@ -676,6 +678,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             onNewInProject={onNewInProject}
             onToggleCollapse={handleProjectCollapse}
             onHideProject={onHideProject}
+            onEditContext={onEditProjectContext}
             searchActive={searchActive}
             multicaModels={multicaModels}
           />

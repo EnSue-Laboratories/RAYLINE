@@ -5,6 +5,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 import { getMOrMulticaFallback } from "../data/models";
 import { relativeTime } from "../utils/time";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
+import ProjectContextModal from "./ProjectContextModal";
 
 const PROJECT_CONVO_MAX_HEIGHT = 320;
 const PROJECT_CONVO_BASE_ROW_HEIGHT = 76;
@@ -19,6 +20,7 @@ function ProjectGroup({
   onNewInProject,
   onToggleCollapse,
   onHideProject,
+  onEditContext,
   searchActive,
   multicaModels = [],
 }) {
@@ -26,6 +28,7 @@ function ProjectGroup({
   const [headerHovered, setHeaderHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
+  const [contextModalOpen, setContextModalOpen] = useState(false);
   const moreRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -238,6 +241,14 @@ function ProjectGroup({
         >
           <MenuBtn
             s={s}
+            label="Edit context…"
+            onClick={() => {
+              setContextModalOpen(true);
+              closeMenu();
+            }}
+          />
+          <MenuBtn
+            s={s}
             label="Open in Finder"
             onClick={() => {
               window.api?.openPath?.(project.cwdRoot);
@@ -268,6 +279,14 @@ function ProjectGroup({
         </div>,
         document.body
       )}
+
+      <ProjectContextModal
+        open={contextModalOpen}
+        projectName={project.name}
+        initialValue={project.context || ""}
+        onClose={() => setContextModalOpen(false)}
+        onSave={(value) => onEditContext?.(project.cwdRoot, value)}
+      />
     </div>
   );
 }
@@ -626,6 +645,7 @@ function areProjectGroupsEqual(prev, next) {
     prev.onNewInProject !== next.onNewInProject ||
     prev.onToggleCollapse !== next.onToggleCollapse ||
     prev.onHideProject !== next.onHideProject ||
+    prev.onEditContext !== next.onEditContext ||
     prev.searchActive !== next.searchActive ||
     prev.multicaModels !== next.multicaModels
   ) {
@@ -639,6 +659,7 @@ function areProjectGroupsEqual(prev, next) {
     prevProject.name !== nextProject.name ||
     prevProject.collapsed !== nextProject.collapsed ||
     prevProject.hidden !== nextProject.hidden ||
+    prevProject.context !== nextProject.context ||
     prevProject.latestTs !== nextProject.latestTs ||
     !sameConversationList(prevProject.convos, nextProject.convos)
   ) {
