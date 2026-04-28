@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { GitCommitHorizontal, GitPullRequestArrow, CloudUpload, Check, X, Plus, Minus, Undo2, RefreshCwOff } from "lucide-react";
+import { GitCommitHorizontal, GitPullRequestArrow, CloudUpload, Check, X, Plus, Minus, Undo2, RefreshCwOff, Loader2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import useGitStatus from "../hooks/useGitStatus";
 import { createTranslator } from "../i18n";
@@ -48,6 +48,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [isCreatingPr, setIsCreatingPr] = useState(false);
   const [error, setError] = useState(null);
   const [prSuccess, setPrSuccess] = useState("");
   const [prInfo, setPrInfo] = useState({ loading: false, checked: false, unavailable: false, openPr: null });
@@ -119,6 +120,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
     setError(null);
     clearPrSuccess();
     setGenerating(false);
+    setIsCreatingPr(false);
     setPrInfo({ loading: false, checked: false, unavailable: false, openPr: null });
   }, [cwd, clearPrSuccess]);
 
@@ -185,7 +187,9 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   const isCheckingPr = !prInfo.unavailable && prInfo.loading && !prInfo.checked;
   const canPr = !detached && !!branch && branch !== prBase && !busy && !!upstream && !isCheckingPr && !hasOpenPr;
   const canPublish = !detached && !!branch && !upstream && !busy;
-  const prTitle = prSuccess || (isCheckingPr
+  const prTitle = prSuccess || (isCreatingPr
+    ? t("git.status.creatingPr")
+    : isCheckingPr
     ? t("git.status.checkingPrTitle")
     : canPr
       ? t("git.status.createPrTitle", { base: prBase })
@@ -268,7 +272,8 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
   };
 
   const handleCreatePr = async () => {
-    if (!canPr || !window.api?.gitCreatePr) return;
+    if (!canPr || isCreatingPr || !window.api?.gitCreatePr) return;
+    setIsCreatingPr(true);
     setBusy(true);
     setError(null);
     clearPrSuccess();
@@ -278,7 +283,10 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
       await refresh();
       await refreshPrInfo();
       flashPrSuccess(t("git.status.prCreated"));
+    } catch (err) {
+      setError(err?.message || t("git.status.createPrFailed"));
     } finally {
+      setIsCreatingPr(false);
       setBusy(false);
     }
   };
@@ -565,8 +573,9 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
         ) : (
           <button
             onClick={handleCreatePr}
-            disabled={!canPr}
+            disabled={!canPr || isCreatingPr}
             title={prTitle}
+            aria-busy={isCreatingPr}
             style={{
               height: 30,
               padding: "0 10px",
@@ -575,27 +584,35 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
               justifyContent: "center",
               background: prSuccess
                 ? "rgba(90,180,120,0.16)"
+                : isCreatingPr
+                ? "rgba(255,255,255,0.1)"
                 : canPr
                 ? (hasOpenPr ? "rgba(120,170,255,0.12)" : "rgba(255,255,255,0.06)")
                 : "rgba(255,255,255,0.03)",
               border: "1px solid " + (prSuccess
                 ? "rgba(90,180,120,0.28)"
+                : isCreatingPr
+                ? "rgba(255,255,255,0.18)"
                 : canPr
                 ? (hasOpenPr ? "rgba(120,170,255,0.2)" : "rgba(255,255,255,0.1)")
                 : "rgba(255,255,255,0.05)"),
               borderRadius: 6,
               color: prSuccess
                 ? "rgba(190,255,205,0.96)"
+                : isCreatingPr
+                ? "rgba(255,255,255,0.88)"
                 : canPr
                 ? (hasOpenPr ? "rgba(190,220,255,0.92)" : "rgba(255,255,255,0.8)")
                 : "rgba(255,255,255,0.3)",
               fontFamily: "system-ui,sans-serif",
-              cursor: canPr && !prSuccess ? "pointer" : "default",
+              cursor: canPr && !prSuccess && !isCreatingPr ? "pointer" : "default",
             }}
           >
             {prSuccess
               ? <Check size={14} strokeWidth={2} />
-              : <GitPullRequestArrow size={14} strokeWidth={1.6} />}
+              : isCreatingPr
+                ? <Loader2 size={13} strokeWidth={1.8} style={{ animation: "spin 1s linear infinite" }} />
+                : <GitPullRequestArrow size={14} strokeWidth={1.6} />}
           </button>
         )}
         <button
