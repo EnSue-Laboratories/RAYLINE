@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld("api", {
   storeMessageImage: (input) => ipcRenderer.invoke("store-message-image", input),
   listSessions: (cwd) => ipcRenderer.invoke("list-sessions", cwd),
   loadSession: (sessionId) => ipcRenderer.invoke("load-session", sessionId),
+  loadSessionSearchText: (sessionId) => ipcRenderer.invoke("load-session-search-text", sessionId),
   moveSession: (sessionId, newCwd) => ipcRenderer.invoke("move-session", sessionId, newCwd),
   rewindFiles: (opts) => ipcRenderer.invoke("rewind-files", opts),
   checkpointCreate: async (cwdPath) => {

@@ -438,7 +438,7 @@ const ConversationRow = memo(function ConversationRow({
               fontWeight: 300,
             }}
           >
-            {c.lastPreview || "Empty"}
+            {c._searchPreview || c.lastPreview || "Empty"}
           </div>
         </div>
       </div>
@@ -579,6 +579,7 @@ function sameConversationData(a, b) {
     a.id === b.id &&
     a.title === b.title &&
     a.lastPreview === b.lastPreview &&
+    a._searchPreview === b._searchPreview &&
     a.model === b.model &&
     a.isStreaming === b.isStreaming &&
     sameTags(a.tags || [], b.tags || [])
