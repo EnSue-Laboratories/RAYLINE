@@ -573,7 +573,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                 fontSize: s(8.5),
                 fontFamily: "'JetBrains Mono',monospace",
                 letterSpacing: ".08em",
-                color: showSearchLoadingState ? "rgba(160,235,210,0.58)" : "rgba(255,255,255,0.34)",
+                color: showSearchLoadingState ? "rgba(255,255,255,0.42)" : "rgba(255,255,255,0.34)",
               }}
             >
               {showSearchLoadingState ? (
@@ -632,50 +632,6 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               fontFamily: "system-ui,sans-serif",
             }}>
               {t("sidebar.noConversationsHint")}
-            </div>
-          </div>
-        )}
-        {showSearchLoadingState && (
-          <div style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: 180,
-            gap: 10,
-            padding: "40px 20px",
-            textAlign: "center",
-          }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              color: "rgba(160,235,210,0.52)",
-              fontSize: s(10),
-              fontFamily: "'JetBrains Mono',monospace",
-              letterSpacing: ".08em",
-            }}>
-              {[0, 1, 2].map((index) => (
-                <span
-                  key={index}
-                  className="sidebar-search-loader-dot"
-                  style={{
-                    width: 5,
-                    height: 5,
-                    borderRadius: "50%",
-                    background: "currentColor",
-                    animationDelay: `${index * 0.14}s`,
-                  }}
-                />
-              ))}
-              {t("sidebar.searchingChats")}
-            </div>
-            <div style={{
-              fontSize: s(10),
-              color: "rgba(255,255,255,0.16)",
-              fontFamily: "system-ui,sans-serif",
-            }}>
-              {t("sidebar.searchingChatsHint")}
             </div>
           </div>
         )}
@@ -991,7 +947,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           {searchActive
             ? (
               searchLoading
-                ? t("sidebar.searchingChats")
+                ? t("sidebar.chatsCount", { value: convos.length })
                 : t("sidebar.searchHits", { value: searchResultCount, suffix: searchResultCount === 1 ? "" : "S" })
             )
             : t("sidebar.chatsCount", { value: convos.length })}
