@@ -243,7 +243,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Install system dependencies
-        run: pacman -Sy --noconfirm git base-devel nodejs npm python github-cli
+        run: |
+          pacman -Sy --noconfirm git base-devel nodejs npm python github-cli
+          git config --global --add safe.directory '*'
 
       - name: Check out repository
         uses: actions/checkout@v4
