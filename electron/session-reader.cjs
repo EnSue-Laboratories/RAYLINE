@@ -160,6 +160,64 @@ function cleanCodexUserMessage(text) {
   return cleaned;
 }
 
+function limitMessages(messages, maxMessages = MAX_MESSAGES) {
+  if (!Array.isArray(messages)) return [];
+  if (!Number.isFinite(maxMessages) || maxMessages <= 0) return messages;
+  return messages.length > maxMessages ? messages.slice(-maxMessages) : messages;
+}
+
+function stringifySearchValue(value) {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function messageToSearchText(message) {
+  if (!message || typeof message !== "object") return "";
+  const chunks = [];
+
+  if (typeof message.text === "string" && message.text.trim()) {
+    chunks.push(message.text.trim());
+  }
+  if (typeof message.command === "string" && message.command.trim()) {
+    chunks.push(message.command.trim());
+  }
+  if (Array.isArray(message.parts)) {
+    for (const part of message.parts) {
+      if (!part || typeof part !== "object") continue;
+      if (typeof part.title === "string" && part.title.trim()) {
+        chunks.push(part.title.trim());
+      }
+      if (typeof part.text === "string" && part.text.trim()) {
+        chunks.push(part.text.trim());
+      }
+      if (part.result != null) {
+        const resultText = stringifySearchValue(part.result).trim();
+        if (resultText) chunks.push(resultText);
+      }
+      if (part.args != null) {
+        const argsText = stringifySearchValue(part.args).trim();
+        if (argsText) chunks.push(argsText);
+      }
+    }
+  }
+
+  return chunks.join("\n").trim();
+}
+
+function messagesToSearchText(messages) {
+  if (!Array.isArray(messages)) return "";
+  return messages
+    .map((message) => messageToSearchText(message))
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
 function appendCodexUserMessage(messages, text) {
   const cleaned = cleanCodexUserMessage(text);
   if (!cleaned) return;
@@ -222,7 +280,7 @@ function normalizeLegacyCodexTurnUsage(usage, contextWindow) {
   };
 }
 
-function loadCodexSessionMessages(filePath) {
+function loadCodexSessionMessages(filePath, { maxMessages = MAX_MESSAGES } = {}) {
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
   const messages = [];
@@ -308,7 +366,7 @@ function loadCodexSessionMessages(filePath) {
     }
   }
 
-  const result = messages.length > MAX_MESSAGES ? messages.slice(-MAX_MESSAGES) : messages;
+  const result = limitMessages(messages, maxMessages);
   if (usageSnapshot || rateLimitsSnapshot) {
     for (let i = result.length - 1; i >= 0; i -= 1) {
       if (result[i]?.role === "assistant") {
@@ -322,6 +380,102 @@ function loadCodexSessionMessages(filePath) {
     }
   }
   return { messages: result, cwd: sessionCwd, provider: "codex", usageSnapshot, rateLimitsSnapshot };
+}
+
+function loadClaudeSessionMessages(filePath, projectDir, { maxMessages = MAX_MESSAGES } = {}) {
+  const sessionCwd = extractSessionCwdFromFile(filePath) || cwdFromProjectDir(projectDir);
+  const content = fs.readFileSync(filePath, "utf-8");
+  const lines = content.split("\n");
+  const messages = [];
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let evt;
+    try { evt = JSON.parse(line); } catch { continue; }
+
+    if (evt.type === "user") {
+      let text = "";
+      const images = [];
+      if (evt.message?.content) {
+        if (typeof evt.message.content === "string") {
+          text = evt.message.content;
+        } else if (Array.isArray(evt.message.content)) {
+          for (const block of evt.message.content) {
+            if (block.type === "text") text += block.text;
+            if (block.type === "tool_result") continue;
+          }
+        }
+      }
+      if (text.startsWith("Base directory for this skill:")) text = "";
+      text = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
+
+      if (text && !evt.message?.content?.some?.((b) => b.type === "tool_result")) {
+        messages.push({
+          id: evt.uuid || "u" + Date.now() + Math.random(),
+          role: "user",
+          text,
+          images: images.length ? images : undefined,
+        });
+      }
+    } else if (evt.type === "assistant") {
+      const newParts = [];
+      if (evt.message?.content) {
+        for (const block of evt.message.content) {
+          if (block.type === "text" && block.text) {
+            newParts.push({ type: "text", text: block.text });
+          }
+          if (block.type === "tool_use") {
+            newParts.push({
+              type: "tool",
+              id: block.id || "tc" + Date.now() + Math.random(),
+              name: block.name || "unknown",
+              args: block.input || {},
+              result: null,
+              status: "done",
+            });
+          }
+        }
+      }
+      if (newParts.length > 0) {
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === "assistant") {
+          lastMsg.parts = [...(lastMsg.parts || []), ...newParts];
+        } else {
+          messages.push({
+            id: evt.uuid || "a" + Date.now() + Math.random(),
+            role: "assistant",
+            parts: newParts,
+            isStreaming: false,
+            isThinking: false,
+          });
+        }
+      }
+    }
+  }
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let evt;
+    try { evt = JSON.parse(line); } catch { continue; }
+
+    if (evt.type === "user" && evt.message?.content && Array.isArray(evt.message.content)) {
+      for (const block of evt.message.content) {
+        if (block.type === "tool_result" && block.tool_use_id) {
+          for (const msg of messages) {
+            if (msg.role === "assistant" && msg.parts) {
+              const tp = msg.parts.find((p) => p.type === "tool" && p.id === block.tool_use_id);
+              if (tp) {
+                tp.result = typeof block.content === "string" ? block.content : JSON.stringify(block.content);
+                tp.status = "done";
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { messages: limitMessages(messages, maxMessages), cwd: sessionCwd, provider: "claude" };
 }
 
 async function listSessions(cwd) {
@@ -415,120 +569,57 @@ async function listSessions(cwd) {
   return sessions;
 }
 
-async function loadSessionMessages(sessionId) {
+function resolveSessionSource(sessionId) {
   const found = findSessionFile(sessionId);
-  if (!found) {
-    // Fall back to Codex sessions
-    const codexFile = findCodexSessionFile(sessionId);
-    if (codexFile) {
-      return loadCodexSessionMessages(codexFile);
-    }
+  if (found) {
+    return {
+      provider: "claude",
+      filePath: found.filePath,
+      projectDir: found.projectDir,
+    };
+  }
+
+  const codexFile = findCodexSessionFile(sessionId);
+  if (codexFile) {
+    return {
+      provider: "codex",
+      filePath: codexFile,
+      projectDir: null,
+    };
+  }
+
+  return null;
+}
+
+async function loadSessionMessages(sessionId) {
+  const source = resolveSessionSource(sessionId);
+  if (!source) {
     return { messages: [], cwd: null, provider: null };
   }
 
-  const { filePath, projectDir } = found;
-  const sessionCwd = extractSessionCwdFromFile(filePath) || cwdFromProjectDir(projectDir);
-
-  const content = fs.readFileSync(filePath, "utf-8");
-  const lines = content.split("\n");
-  const messages = [];
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    let evt;
-    try { evt = JSON.parse(line); } catch { continue; }
-
-    if (evt.type === "user") {
-      // Extract user message text
-      let text = "";
-      let images = [];
-      if (evt.message?.content) {
-        if (typeof evt.message.content === "string") {
-          text = evt.message.content;
-        } else if (Array.isArray(evt.message.content)) {
-          for (const block of evt.message.content) {
-            if (block.type === "text") text += block.text;
-            if (block.type === "tool_result") continue; // skip tool results
-          }
-        }
-      }
-      // Strip system-injected content (skill prompts, system-reminders)
-      if (text.startsWith("Base directory for this skill:")) text = "";
-      text = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
-
-      // Only add actual user messages (not tool results or system-injected content)
-      if (text && !evt.message?.content?.some?.(b => b.type === "tool_result")) {
-        messages.push({
-          id: evt.uuid || "u" + Date.now() + Math.random(),
-          role: "user",
-          text,
-          images: images.length ? images : undefined,
-        });
-      }
-    } else if (evt.type === "assistant") {
-      // Extract parts in order — text and tool calls interleaved
-      const newParts = [];
-      if (evt.message?.content) {
-        for (const block of evt.message.content) {
-          if (block.type === "text" && block.text) {
-            newParts.push({ type: "text", text: block.text });
-          }
-          if (block.type === "tool_use") {
-            newParts.push({
-              type: "tool",
-              id: block.id || "tc" + Date.now() + Math.random(),
-              name: block.name || "unknown",
-              args: block.input || {},
-              result: null,
-              status: "done",
-            });
-          }
-        }
-      }
-      if (newParts.length > 0) {
-        // Merge into the last assistant message if consecutive
-        const lastMsg = messages[messages.length - 1];
-        if (lastMsg && lastMsg.role === "assistant") {
-          lastMsg.parts = [...(lastMsg.parts || []), ...newParts];
-        } else {
-          messages.push({
-            id: evt.uuid || "a" + Date.now() + Math.random(),
-            role: "assistant",
-            parts: newParts,
-            isStreaming: false,
-            isThinking: false,
-          });
-        }
-      }
-    }
+  if (source.provider === "codex") {
+    return loadCodexSessionMessages(source.filePath, { maxMessages: MAX_MESSAGES });
   }
 
-  // Fill in tool results from user messages that contain tool_result
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    let evt;
-    try { evt = JSON.parse(line); } catch { continue; }
+  return loadClaudeSessionMessages(source.filePath, source.projectDir, { maxMessages: MAX_MESSAGES });
+}
 
-    if (evt.type === "user" && evt.message?.content && Array.isArray(evt.message.content)) {
-      for (const block of evt.message.content) {
-        if (block.type === "tool_result" && block.tool_use_id) {
-          for (const msg of messages) {
-            if (msg.role === "assistant" && msg.parts) {
-              const tp = msg.parts.find(p => p.type === "tool" && p.id === block.tool_use_id);
-              if (tp) {
-                tp.result = typeof block.content === "string" ? block.content : JSON.stringify(block.content);
-                tp.status = "done";
-              }
-            }
-          }
-        }
-      }
-    }
+async function loadSessionSearchText(sessionId) {
+  const source = resolveSessionSource(sessionId);
+  if (!source) {
+    return { text: "", cwd: null, provider: null };
   }
 
-  // Keep only the last MAX_MESSAGES messages to avoid slowdowns
-  const result = messages.length > MAX_MESSAGES ? messages.slice(-MAX_MESSAGES) : messages;
-  return { messages: result, cwd: sessionCwd, provider: "claude" };
+  const session =
+    source.provider === "codex"
+      ? loadCodexSessionMessages(source.filePath, { maxMessages: Number.POSITIVE_INFINITY })
+      : loadClaudeSessionMessages(source.filePath, source.projectDir, { maxMessages: Number.POSITIVE_INFINITY });
+
+  return {
+    text: messagesToSearchText(session.messages),
+    cwd: session.cwd,
+    provider: session.provider,
+  };
 }
 
 function moveSession(sessionId, newCwd) {
@@ -553,4 +644,4 @@ function moveSession(sessionId, newCwd) {
   return true;
 }
 
-module.exports = { listSessions, loadSessionMessages, moveSession, findSessionCwd };
+module.exports = { listSessions, loadSessionMessages, loadSessionSearchText, moveSession, findSessionCwd };

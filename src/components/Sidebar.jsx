@@ -9,11 +9,148 @@ import { getMOrMulticaFallback } from "../data/models";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 
 const COLLAPSE_PERSIST_DELAY_MS = 1200;
+const SEARCH_DEBOUNCE_MS = 120;
+const SEARCH_CHUNK_SIZE = 4;
 
 function getMainRepoRoot(dir) {
   if (!dir) return dir;
   const wtIdx = dir.indexOf("/.worktrees/");
   return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
+}
+
+function waitForPaint() {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => resolve());
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getSearchTokens(query) {
+  return normalizeSearchText(query)
+    .split(" ")
+    .filter(Boolean);
+}
+
+function matchesSearch(text, tokens) {
+  if (!tokens.length) return true;
+  if (!text) return false;
+  return tokens.every((token) => text.includes(token));
+}
+
+function stringifySearchValue(value) {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function getMessageSearchText(message) {
+  if (!message || typeof message !== "object") return "";
+  const chunks = [];
+
+  if (typeof message.text === "string" && message.text.trim()) {
+    chunks.push(message.text.trim());
+  }
+  if (typeof message.command === "string" && message.command.trim()) {
+    chunks.push(message.command.trim());
+  }
+  if (Array.isArray(message.parts)) {
+    for (const part of message.parts) {
+      if (!part || typeof part !== "object") continue;
+      if (typeof part.title === "string" && part.title.trim()) {
+        chunks.push(part.title.trim());
+      }
+      if (typeof part.text === "string" && part.text.trim()) {
+        chunks.push(part.text.trim());
+      }
+      if (part.result != null) {
+        const resultText = stringifySearchValue(part.result).trim();
+        if (resultText) chunks.push(resultText);
+      }
+      if (part.args != null) {
+        const argsText = stringifySearchValue(part.args).trim();
+        if (argsText) chunks.push(argsText);
+      }
+    }
+  }
+
+  return chunks.join("\n").trim();
+}
+
+function getConversationSearchSessionIds(conversation) {
+  const ids = new Set();
+  if (conversation?.sessionId) ids.add(conversation.sessionId);
+  for (const session of conversation?.sessions || []) {
+    if (session?.nativeSessionId) ids.add(session.nativeSessionId);
+  }
+  return [...ids];
+}
+
+function getConversationLocalSearchBody(conversation) {
+  const chunks = [];
+  if (typeof conversation?.lastPreview === "string" && conversation.lastPreview.trim()) {
+    chunks.push(conversation.lastPreview.trim());
+  }
+  for (const message of conversation?.archivedMessages || []) {
+    const text = getMessageSearchText(message);
+    if (text) chunks.push(text);
+  }
+  return chunks.join("\n\n").trim();
+}
+
+function buildConversationSearchVersion(conversation) {
+  return [
+    conversation?.id || "",
+    conversation?.title || "",
+    conversation?.lastPreview || "",
+    conversation?.ts || 0,
+    conversation?.updatedAt || 0,
+    Array.isArray(conversation?.archivedMessages) ? conversation.archivedMessages.length : 0,
+    getConversationSearchSessionIds(conversation).join("|"),
+  ].join("::");
+}
+
+function buildSearchExcerpt(sourceText, query, tokens, limit = 96) {
+  const collapsed = String(sourceText || "").replace(/\s+/g, " ").trim();
+  if (!collapsed) return "";
+
+  const lower = collapsed.toLowerCase();
+  let matchIndex = query ? lower.indexOf(query) : -1;
+  let matchLength = matchIndex >= 0 ? query.length : 0;
+
+  if (matchIndex < 0) {
+    for (const token of tokens) {
+      const idx = lower.indexOf(token);
+      if (idx >= 0 && (matchIndex < 0 || idx < matchIndex)) {
+        matchIndex = idx;
+        matchLength = token.length;
+      }
+    }
+  }
+
+  if (matchIndex < 0) {
+    return collapsed.length > limit ? `${collapsed.slice(0, limit - 1).trim()}…` : collapsed;
+  }
+
+  const desiredStart = Math.max(0, matchIndex - Math.floor((limit - Math.max(matchLength, 12)) / 2));
+  const start = Math.min(desiredStart, Math.max(0, collapsed.length - limit));
+  const end = Math.min(collapsed.length, start + limit);
+  const prefix = start > 0 ? "…" : "";
+  const suffix = end < collapsed.length ? "…" : "";
+  return `${prefix}${collapsed.slice(start, end).trim()}${suffix}`;
 }
 
 function isDraftConversation(conversation, draftsPath) {
@@ -103,6 +240,10 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
   const pendingCollapsePersistRef = useRef({});
   const collapsePersistTimerRef = useRef(null);
   const [collapsedOverrides, setCollapsedOverrides] = useState({});
+  const [searchResults, setSearchResults] = useState(convos);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchCacheRef = useRef(new Map());
+  const searchRunRef = useRef(0);
 
   useEffect(() => {
     projectsRef.current = projects;
@@ -120,15 +261,127 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
     }
   ), []);
 
-  const searchQuery = search.toLowerCase();
-  const filtered = useMemo(
-    () => convos.filter((c) => c.title.toLowerCase().includes(searchQuery)),
-    [convos, searchQuery]
-  );
+  useEffect(() => {
+    const convoIds = new Set(convos.map((conversation) => conversation.id));
+    for (const convoId of searchCacheRef.current.keys()) {
+      if (!convoIds.has(convoId)) {
+        searchCacheRef.current.delete(convoId);
+      }
+    }
+  }, [convos]);
+
+  const searchQuery = useMemo(() => normalizeSearchText(search), [search]);
+  const searchActive = searchQuery.length > 0;
+
+  const loadConversationSearchRecord = useCallback(async (conversation) => {
+    const version = buildConversationSearchVersion(conversation);
+    const cached = searchCacheRef.current.get(conversation.id);
+    if (cached?.version === version) return cached;
+
+    const titleText = String(conversation?.title || "").trim();
+    const localBodyText = getConversationLocalSearchBody(conversation);
+    const sessionIds = getConversationSearchSessionIds(conversation);
+
+    let sessionBodyText = "";
+    if (sessionIds.length > 0 && window.api?.loadSessionSearchText) {
+      const sessionResults = await Promise.all(
+        sessionIds.map((sessionId) =>
+          window.api.loadSessionSearchText(sessionId).catch(() => null)
+        )
+      );
+      sessionBodyText = sessionResults
+        .map((result) => result?.text || "")
+        .filter(Boolean)
+        .join("\n\n")
+        .trim();
+    }
+
+    const bodyText = [localBodyText, sessionBodyText].filter(Boolean).join("\n\n").trim();
+    const record = {
+      version,
+      titleText,
+      titleSearchText: normalizeSearchText(titleText),
+      bodyText,
+      bodySearchText: normalizeSearchText(bodyText),
+    };
+    searchCacheRef.current.set(conversation.id, record);
+    return record;
+  }, []);
+
+  useEffect(() => {
+    const runId = searchRunRef.current + 1;
+    searchRunRef.current = runId;
+
+    if (!searchActive) {
+      setSearchLoading(false);
+      setSearchResults(convos);
+      return undefined;
+    }
+
+    setSearchLoading(true);
+    setSearchResults([]);
+
+    const tokens = getSearchTokens(searchQuery);
+    let cancelled = false;
+
+    const timeoutId = setTimeout(() => {
+      void (async () => {
+        await waitForPaint();
+
+        if (cancelled || searchRunRef.current !== runId) return;
+
+        const matches = [];
+        for (let index = 0; index < convos.length; index += SEARCH_CHUNK_SIZE) {
+          const chunk = convos.slice(index, index + SEARCH_CHUNK_SIZE);
+          const resolvedChunk = await Promise.all(
+            chunk.map(async (conversation) => {
+              const record = await loadConversationSearchRecord(conversation);
+              const titleMatch = matchesSearch(record.titleSearchText, tokens);
+              const bodyMatch = matchesSearch(record.bodySearchText, tokens);
+              if (!titleMatch && !bodyMatch) return null;
+
+              const preview = bodyMatch
+                ? buildSearchExcerpt(record.bodyText, searchQuery, tokens)
+                : "";
+
+              return {
+                ...conversation,
+                _searchPreview: preview || null,
+              };
+            })
+          );
+
+          if (cancelled || searchRunRef.current !== runId) return;
+
+          for (const match of resolvedChunk) {
+            if (match) matches.push(match);
+          }
+
+          await waitForPaint();
+        }
+
+        if (cancelled || searchRunRef.current !== runId) return;
+
+        setSearchResults(matches);
+        setSearchLoading(false);
+      })().catch(() => {
+        if (cancelled || searchRunRef.current !== runId) return;
+        setSearchResults([]);
+        setSearchLoading(false);
+      });
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [convos, loadConversationSearchRecord, searchActive, searchQuery]);
+
+  const visibleConvos = searchActive ? searchResults : convos;
 
   const { projectGroups, drafts } = useMemo(() => {
-    return groupConvosByProject(filtered, projects, draftsPath);
-  }, [draftsPath, filtered, projects]);
+    return groupConvosByProject(visibleConvos, projects, draftsPath);
+  }, [draftsPath, projects, visibleConvos]);
   const renderedProjectGroups = useMemo(
     () => projectGroups.map((proj) => {
       if (!Object.prototype.hasOwnProperty.call(collapsedOverrides, proj.cwdRoot)) return proj;
@@ -161,7 +414,10 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
       }
     }, COLLAPSE_PERSIST_DELAY_MS);
   }, [onToggleProjectCollapse]);
-  const searchActive = search.length > 0;
+
+  const searchResultCount = searchResults.length;
+  const showSearchNoResults = searchActive && !searchLoading && searchResultCount === 0 && convos.length > 0;
+  const showSearchLoadingState = searchActive && searchLoading;
 
   const cwdShort = cwd ? (() => {
     const parts = cwd.split(/[\\/]+/);
@@ -268,43 +524,84 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           <Search size={15} strokeWidth={1.5} />
           {t("sidebar.search")}
         </button>}
-        {searchOpen && <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            marginTop: 6,
-            padding: "6px 10px",
-            border: "1px solid " + (searchFocused ? "rgba(255,255,255,0.12)" : "var(--pane-border)"),
-            borderRadius: 8,
-            transition: "background .2s, color .2s, border-color .2s, box-shadow .2s, backdrop-filter .2s",
-            ...(searchFocused ? getPaneInteractionStyle("active") : {
-              background: "var(--pane-elevated)",
-              backdropFilter: "none",
-              boxShadow: "none",
-            }),
-          }}
-        >
-          <span style={{ color: "rgba(255,255,255,0.45)", flexShrink: 0, display: "flex" }}>
-            <Search size={13} strokeWidth={1.5} />
-          </span>
-          <input
-            type="text"
-            placeholder={t("sidebar.searchPlaceholder")}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onFocus={() => setSF(true)}
-            onBlur={() => { setSF(false); if (!search) { setSearchOpen(false); } }}
-            autoFocus
+        {searchOpen && <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
+          <div
             style={{
-              flex: 1,
-              background: "transparent",
-              border: "none",
-              color: "rgba(255,255,255,0.8)",
-              fontSize: s(11),
-              fontFamily: "'JetBrains Mono',monospace",
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "6px 10px",
+              border: "1px solid " + (searchFocused ? "rgba(255,255,255,0.12)" : "var(--pane-border)"),
+              borderRadius: 8,
+              transition: "background .2s, color .2s, border-color .2s, box-shadow .2s, backdrop-filter .2s",
+              ...(searchFocused ? getPaneInteractionStyle("active") : {
+                background: "var(--pane-elevated)",
+                backdropFilter: "none",
+                boxShadow: "none",
+              }),
             }}
-          />
+          >
+            <span style={{ color: "rgba(255,255,255,0.45)", flexShrink: 0, display: "flex" }}>
+              <Search size={13} strokeWidth={1.5} />
+            </span>
+            <input
+              type="text"
+              placeholder={t("sidebar.searchPlaceholder")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onFocus={() => setSF(true)}
+              onBlur={() => { setSF(false); if (!search.trim()) { setSearchOpen(false); } }}
+              autoFocus
+              style={{
+                flex: 1,
+                background: "transparent",
+                border: "none",
+                color: "rgba(255,255,255,0.8)",
+                fontSize: s(11),
+                fontFamily: "'JetBrains Mono',monospace",
+              }}
+            />
+          </div>
+          {searchActive && (
+            <div
+              style={{
+                minHeight: 16,
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "0 2px 0 10px",
+                fontSize: s(8.5),
+                fontFamily: "'JetBrains Mono',monospace",
+                letterSpacing: ".08em",
+                color: showSearchLoadingState ? "rgba(160,235,210,0.58)" : "rgba(255,255,255,0.34)",
+              }}
+            >
+              {showSearchLoadingState ? (
+                <>
+                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    {[0, 1, 2].map((index) => (
+                      <span
+                        key={index}
+                        className="sidebar-search-loader-dot"
+                        style={{
+                          width: 4,
+                          height: 4,
+                          borderRadius: "50%",
+                          background: "currentColor",
+                          animationDelay: `${index * 0.12}s`,
+                        }}
+                      />
+                    ))}
+                  </span>
+                  {t("sidebar.searchingChats")}
+                </>
+              ) : (
+                searchResultCount === 0
+                  ? t("sidebar.searchNoResults")
+                  : t("sidebar.searchHits", { value: searchResultCount, suffix: searchResultCount === 1 ? "" : "S" })
+              )}
+            </div>
+          )}
         </div>}
       </div>
 
@@ -335,6 +632,78 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               fontFamily: "system-ui,sans-serif",
             }}>
               {t("sidebar.noConversationsHint")}
+            </div>
+          </div>
+        )}
+        {showSearchLoadingState && (
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 180,
+            gap: 10,
+            padding: "40px 20px",
+            textAlign: "center",
+          }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              color: "rgba(160,235,210,0.52)",
+              fontSize: s(10),
+              fontFamily: "'JetBrains Mono',monospace",
+              letterSpacing: ".08em",
+            }}>
+              {[0, 1, 2].map((index) => (
+                <span
+                  key={index}
+                  className="sidebar-search-loader-dot"
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: "50%",
+                    background: "currentColor",
+                    animationDelay: `${index * 0.14}s`,
+                  }}
+                />
+              ))}
+              {t("sidebar.searchingChats")}
+            </div>
+            <div style={{
+              fontSize: s(10),
+              color: "rgba(255,255,255,0.16)",
+              fontFamily: "system-ui,sans-serif",
+            }}>
+              {t("sidebar.searchingChatsHint")}
+            </div>
+          </div>
+        )}
+        {showSearchNoResults && (
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 180,
+            gap: 8,
+            padding: "40px 20px",
+            textAlign: "center",
+          }}>
+            <div style={{
+              fontSize: s(11),
+              fontFamily: "'JetBrains Mono',monospace",
+              color: "rgba(255,255,255,0.16)",
+              letterSpacing: ".08em",
+            }}>
+              {t("sidebar.searchNoResults")}
+            </div>
+            <div style={{
+              fontSize: s(10),
+              color: "rgba(255,255,255,0.11)",
+              fontFamily: "system-ui,sans-serif",
+            }}>
+              {t("sidebar.searchNoResultsHint")}
             </div>
           </div>
         )}
@@ -516,7 +885,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                           fontWeight: 300,
                         }}
                       >
-                        {c.lastPreview || "Empty"}
+                        {c._searchPreview || c.lastPreview || "Empty"}
                       </div>
                     </div>
 
@@ -619,7 +988,13 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
           {cwdShort || t("sidebar.selectFolder")}
         </button>
         <span style={{ fontSize: s(8), fontFamily: "'JetBrains Mono',monospace", color: "rgba(255,255,255,0.38)", letterSpacing: ".06em" }}>
-          {t("sidebar.chatsCount", { value: convos.length })}
+          {searchActive
+            ? (
+              searchLoading
+                ? t("sidebar.searchingChats")
+                : t("sidebar.searchHits", { value: searchResultCount, suffix: searchResultCount === 1 ? "" : "S" })
+            )
+            : t("sidebar.chatsCount", { value: convos.length })}
         </span>
       </div>
     </div>

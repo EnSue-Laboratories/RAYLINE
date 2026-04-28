@@ -26,7 +26,7 @@ const {
   subscribeMulticaAgent,
 } = require("./multica-manager.cjs");
 const { buildSpawnPath, resolveCliBin, spawnCli, execFileCli } = require("./cli-bin-resolver.cjs");
-const { listSessions, loadSessionMessages, moveSession } = require("./session-reader.cjs");
+const { listSessions, loadSessionMessages, loadSessionSearchText, moveSession } = require("./session-reader.cjs");
 const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
 const ghManager = require("./github-manager.cjs");
@@ -748,6 +748,10 @@ ipcMain.handle("list-sessions", async (_event, cwd) => {
 
 ipcMain.handle("load-session", async (_event, sessionId) => {
   return loadSessionMessages(sessionId);
+});
+
+ipcMain.handle("load-session-search-text", async (_event, sessionId) => {
+  return loadSessionSearchText(sessionId);
 });
 
 ipcMain.handle("move-session", async (_event, sessionId, newCwd) => {

@@ -80,6 +80,10 @@ input:focus         { outline: none; }
   40% { opacity: 0.8; transform: scale(1.1); }
 }
 
+.sidebar-search-loader-dot {
+  animation: dotPulse 1.05s ease-in-out infinite;
+}
+
 @keyframes selToolbarIn {
   from { opacity: 0; transform: translate(-50%, -100%) scale(0.92); }
   to   { opacity: 1; transform: translate(-50%, -100%) scale(1); }
@@ -151,4 +155,10 @@ input[type="range"]::-webkit-slider-thumb {
   background: rgba(255, 255, 255, 0.9);
   cursor: pointer;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-search-loader-dot {
+    animation: none !important;
+  }
 }
