@@ -1582,8 +1582,12 @@ function runCodexDispatchPlanner({ prompt, plannerModel, cwd }) {
     const child = spawnCli(codexBin, args, {
       cwd: launchCwd,
       env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
-      stdio: ["ignore", "pipe", "pipe"],
+      // Codex stalls before the first network request when stdin is /dev/null.
+      // Give it a pipe and immediately close it so it observes EOF correctly.
+      stdio: ["pipe", "pipe", "pipe"],
     });
+    child.stdin?.on("error", () => {});
+    child.stdin?.end();
 
     let settled = false;
     let out = "";

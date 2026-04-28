@@ -238,7 +238,7 @@ function appendCodexMcpOverrides(args, mcpServers) {
   }
 }
 
-function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, files, sessionId, resumeSessionId, providerUpstreamConfig }, webContents) {
+async function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, files, sessionId, resumeSessionId, providerUpstreamConfig }, webContents) {
   cancelCodexAgent(conversationId);
 
   const args = ["exec"];
@@ -262,7 +262,15 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
   const mcpServers = readConfiguredMcpServers();
   appendCodexMcpOverrides(args, mcpServers);
   const upstreamSummary = summarizeProviderUpstream(providerUpstreamConfig, "codex");
-  appendCodexUpstreamArgs(args, providerUpstreamConfig);
+  let upstreamRuntime = null;
+  try {
+    upstreamRuntime = await appendCodexUpstreamArgs(args, providerUpstreamConfig);
+  } catch (error) {
+    log("Failed to prepare codex upstream:", error?.message || error);
+    webContents.send("agent-error", { conversationId, error: error?.message || "Failed to prepare Codex upstream" });
+    webContents.send("agent-done", { conversationId, exitCode: -1, provider: "codex" });
+    return null;
+  }
 
   // Working directory — only pass -C for new sessions (resume doesn't accept it)
   let launchCwd = process.cwd();
@@ -317,15 +325,23 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
       ...process.env,
       FORCE_COLOR: "0",
       PATH: buildSpawnPath(),
-      ...buildCodexUpstreamEnv(providerUpstreamConfig),
+      ...buildCodexUpstreamEnv(providerUpstreamConfig, upstreamRuntime),
       CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
       CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",
       CLAUDI_TERMINAL_MCP_CONFIG: global.mcpConfigPath || "",
     },
-    stdio: ["ignore", "pipe", "pipe"],
+    // Codex stalls before the first network request when stdin is /dev/null.
+    // Give it a pipe and immediately close it so it observes EOF correctly.
+    stdio: ["pipe", "pipe", "pipe"],
   });
+  child.stdin?.on("error", () => {});
+  child.stdin?.end();
 
   log("Spawned PID:", child.pid);
+  if (upstreamRuntime?.bridge) {
+    child.once("exit", () => upstreamRuntime.bridge.close());
+    child.once("error", () => upstreamRuntime.bridge.close());
+  }
 
   const state = {
     child,
