@@ -2208,6 +2208,14 @@ export default function App() {
     }));
   }, []);
 
+  const resolveProjectContext = useCallback((cwdPath) => {
+    if (!cwdPath) return undefined;
+    const root = getMainRepoRoot(cwdPath);
+    if (!root) return undefined;
+    const ctx = projects?.[root]?.context;
+    return typeof ctx === "string" && ctx.trim() ? ctx : undefined;
+  }, [projects]);
+
   const registerManualProject = useCallback((projectPath) => {
     if (!projectPath) return;
     const projectRoot = getMainRepoRoot(projectPath);
@@ -2840,6 +2848,7 @@ export default function App() {
           thinking: getModelThinkingValue(m),
           openCodeConfig: getOpenCodeRuntimeConfig(m),
           cwd: effectiveCwd,
+          projectContext: resolveProjectContext(effectiveCwd),
           images:
             currentProvider === "multica"
               ? (imageAttachments?.length ? imageAttachments : undefined)
@@ -2890,7 +2899,7 @@ export default function App() {
         sendInFlightConversationIdsRef.current.delete(conversationId);
       }
     },
-    [buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
+    [buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, resolveProjectContext, startPreparedMessage, healConversationCwdIfMissing]
   );
 
   const handleSend = useCallback(
@@ -3431,6 +3440,7 @@ export default function App() {
         thinking: getModelThinkingValue(m),
         openCodeConfig: getOpenCodeRuntimeConfig(m),
         cwd: convoCwd,
+        projectContext: resolveProjectContext(convoCwd),
         multicaContext,
         multicaToken,
       });
@@ -3463,7 +3473,7 @@ export default function App() {
         );
       }
     },
-    [activeConvo, active, buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, editAndResend, ensureMulticaContextForConversation, getConversation, resolveConversationLastProvider, resolveConversationProviderSession]
+    [activeConvo, active, buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, editAndResend, ensureMulticaContextForConversation, getConversation, resolveConversationLastProvider, resolveConversationProviderSession, resolveProjectContext]
   );
 
   const handleModelChange = (modelId) => {
