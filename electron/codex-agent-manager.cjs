@@ -4,6 +4,12 @@ const os = require("os");
 const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { loadSessionMessages } = require("./session-reader.cjs");
 const { createLogger } = require("./logger.cjs");
+const {
+  appendCodexUpstreamArgs,
+  buildCodexUpstreamEnv,
+  getCodexUpstreamModel,
+  summarizeProviderUpstream,
+} = require("./provider-upstreams.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
@@ -233,10 +239,12 @@ function appendCodexMcpOverrides(args, mcpServers) {
   }
 }
 
-function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, files, sessionId, resumeSessionId }, webContents) {
+function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, files, sessionId, resumeSessionId, providerUpstreamConfig }, webContents) {
   cancelCodexAgent(conversationId);
 
   const args = ["exec"];
+  const upstreamModel = getCodexUpstreamModel(providerUpstreamConfig);
+  const launchModel = upstreamModel || model;
 
   // Resume an existing thread if requested
   if (resumeSessionId) {
@@ -245,8 +253,8 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
 
   args.push("--json", ...getExecutionFlags());
 
-  if (model) {
-    args.push("-m", model);
+  if (launchModel) {
+    args.push("-m", launchModel);
   }
 
   if (effort) {
@@ -255,6 +263,8 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
 
   const mcpServers = readConfiguredMcpServers();
   appendCodexMcpOverrides(args, mcpServers);
+  const upstreamSummary = summarizeProviderUpstream(providerUpstreamConfig, "codex");
+  appendCodexUpstreamArgs(args, providerUpstreamConfig);
 
   // Working directory — only pass -C for new sessions (resume doesn't accept it)
   let launchCwd = process.cwd();
@@ -299,7 +309,7 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
     return null;
   }
 
-  log("Starting codex agent:", { conversationId, model, effort, cwd: launchCwd, resumeSessionId });
+  log("Starting codex agent:", { conversationId, model: launchModel, requestedModel: model, effort, cwd: launchCwd, resumeSessionId, upstream: upstreamSummary });
   log("Full args:", args.filter(a => a !== fullPrompt).join(" "));
   log("Prompt:", fullPrompt.slice(0, 100));
 
@@ -309,6 +319,7 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
       ...process.env,
       FORCE_COLOR: "0",
       PATH: buildSpawnPath(),
+      ...buildCodexUpstreamEnv(providerUpstreamConfig),
       CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
       CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",
       CLAUDI_TERMINAL_MCP_CONFIG: global.mcpConfigPath || "",
