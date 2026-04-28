@@ -32,6 +32,41 @@ function freezeElapsed(msg) {
   return { ...rest, _elapsedMs: Date.now() - rest._startedAt };
 }
 
+// Image content blocks travel in several wire shapes. Normalize whichever the
+// provider emits into a renderer-ready { src, alt, mime } record consumed by
+// AssistantImage in Message.jsx.
+function buildImagePartFromAnthropicBlock(block) {
+  if (!block || block.type !== "image" || !block.source) return null;
+  const src = block.source;
+  if (src.type === "base64" && src.data) {
+    const mime = src.media_type || src.mediaType || "image/png";
+    return {
+      type: "image",
+      id: block.id || "img" + uid(),
+      src: `data:${mime};base64,${src.data}`,
+      mime,
+      alt: block.alt || "",
+    };
+  }
+  if (src.type === "url" && src.url) {
+    return { type: "image", id: block.id || "img" + uid(), src: src.url, alt: block.alt || "" };
+  }
+  return null;
+}
+
+function buildImagePartFromOpenAIBlock(block) {
+  if (!block) return null;
+  if (block.type === "image_url") {
+    const url = typeof block.image_url === "string" ? block.image_url : block.image_url?.url;
+    if (url) return { type: "image", id: "img" + uid(), src: url, alt: block.alt || "" };
+  }
+  if (block.type === "output_image" && block.image_url) {
+    const url = typeof block.image_url === "string" ? block.image_url : block.image_url?.url;
+    if (url) return { type: "image", id: "img" + uid(), src: url, alt: block.alt || "" };
+  }
+  return null;
+}
+
 function mapMulticaTaskMessage(p) {
   // Target the `{type: "tool"}` part shape that Message.jsx renders via
   // ToolCallBlock. Multica carries no tool_use_id, so the task:message
@@ -171,6 +206,16 @@ function extractCodexResponseText(content) {
     .filter((item) => item?.type === "output_text" && typeof item.text === "string")
     .map((item) => item.text)
     .join("");
+}
+
+function extractCodexResponseImages(content) {
+  if (!Array.isArray(content)) return [];
+  const out = [];
+  for (const item of content) {
+    const part = buildImagePartFromOpenAIBlock(item);
+    if (part) out.push(part);
+  }
+  return out;
 }
 
 function normalizeCodexToolArgs(payload) {
@@ -655,6 +700,14 @@ export default function useAgent() {
             } else if (block?.type === "text") {
               parts.push({ type: "text", text: "", blockIndex, _streamKey: streamKey });
               updateAssistant({ parts, isStreaming: true, _streamState: streamState });
+            } else if (block?.type === "image") {
+              // Anthropic vision-output blocks arrive whole (no per-delta data
+              // for image bytes), so push the full image part on start.
+              const imagePart = buildImagePartFromAnthropicBlock(block);
+              if (imagePart) {
+                parts.push({ ...imagePart, blockIndex, _streamKey: streamKey });
+                updateAssistant({ parts, isStreaming: true, _streamState: streamState });
+              }
             }
           } else if (inner.type === "content_block_delta") {
             ensureAssistant();
@@ -730,6 +783,10 @@ export default function useAgent() {
                     status: "running",
                   });
                 }
+              }
+              if (block.type === "image") {
+                const imagePart = buildImagePartFromAnthropicBlock(block);
+                if (imagePart) parts.push(imagePart);
               }
             }
             msgs[msgs.length - 1] = { ...lastMsg, parts, isThinking: false };
@@ -1006,10 +1063,12 @@ export default function useAgent() {
           const payload = event.payload || {};
           if (payload.type === "message" && payload.role === "assistant") {
             const text = extractCodexResponseText(payload.content);
-            if (text) {
+            const images = extractCodexResponseImages(payload.content);
+            if (text || images.length > 0) {
               const am = ensureAssistant();
               const parts = cloneParts(am.parts);
-              parts.push({ type: "text", text });
+              if (text) parts.push({ type: "text", text });
+              for (const imagePart of images) parts.push(imagePart);
               msgs[msgs.length - 1] = { ...am, parts };
               lastMsg = msgs[msgs.length - 1];
             }

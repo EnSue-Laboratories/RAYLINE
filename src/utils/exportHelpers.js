@@ -44,6 +44,16 @@ export function serializeMessageParts(parts) {
     if (!part || typeof part !== "object") return part;
     if (part.type === "text") return { type: "text", text: part.text || "" };
     if (part.type === "thinking") return { type: "thinking", text: part.text || "" };
+    if (part.type === "image") {
+      return {
+        type: "image",
+        src: part.src || "",
+        alt: part.alt || "",
+        ...(part.mime ? { mime: part.mime } : {}),
+        ...(part.storagePath ? { storagePath: part.storagePath } : {}),
+        ...(part.originalPath ? { originalPath: part.originalPath } : {}),
+      };
+    }
     if (part.type === "status") {
       return {
         type: "status",
@@ -69,9 +79,22 @@ export function serializeMessageParts(parts) {
 
 export function extractAssistantMarkdown(message) {
   if (Array.isArray(message?.parts)) {
+    // Preserve assistant images by emitting them as markdown image syntax
+    // inline with surrounding text parts. This way exported conversations
+    // round-trip correctly when re-rendered as markdown.
     return message.parts
-      .filter((part) => part?.type === "text" && part.text)
-      .map((part) => part.text)
+      .map((part) => {
+        if (!part) return "";
+        if (part.type === "text") return part.text || "";
+        if (part.type === "image") {
+          const src = part.src || "";
+          if (!src) return "";
+          const alt = (part.alt || "").replace(/[[\]]/g, "");
+          return `![${alt}](${src})`;
+        }
+        return "";
+      })
+      .filter(Boolean)
       .join("\n");
   }
   return message?.text || "";

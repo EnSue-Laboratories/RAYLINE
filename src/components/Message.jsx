@@ -1,5 +1,6 @@
-import { memo, useEffect, useState, useMemo, useRef } from "react";
-import { Pencil, FileText, PauseCircle, Terminal } from "lucide-react";
+import { memo, useCallback, useEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
+import { Pencil, FileText, PauseCircle, Terminal, ImageOff } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -20,12 +21,19 @@ import ValueControlBlock from "./ValueControlBlock";
 import LoadingStatus from "./LoadingStatus";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-// Allow SVG tags in markdown (rehype-sanitize schema)
+// Allow SVG tags in markdown (rehype-sanitize schema). Also broaden the
+// `img.src` protocol allowlist to permit base64 `data:` URLs so model-emitted
+// inline images render via the markdown image override.
 const sanitizeSchema = {
   ...defaultSchema,
   tagNames: [...(defaultSchema.tagNames || []), "svg", "path", "circle", "rect", "line", "polyline", "polygon", "ellipse", "g", "defs", "use", "text", "tspan", "marker", "pattern", "clipPath", "mask", "linearGradient", "radialGradient", "stop", "animate", "animateTransform", "animateMotion", "set", "foreignObject"],
+  protocols: {
+    ...(defaultSchema.protocols || {}),
+    src: [...((defaultSchema.protocols && defaultSchema.protocols.src) || []), "data"],
+  },
   attributes: {
     ...defaultSchema.attributes,
+    img: [...((defaultSchema.attributes && defaultSchema.attributes.img) || []), "alt", "title", "loading", "decoding", "width", "height"],
     svg: ["viewBox", "width", "height", "xmlns", "fill", "stroke", "strokeWidth", "style", "class", "id", "preserveAspectRatio", "opacity"],
     path: ["d", "fill", "stroke", "strokeWidth", "strokeLinecap", "strokeLinejoin", "opacity", "transform", "style", "class", "id"],
     circle: ["cx", "cy", "r", "fill", "stroke", "strokeWidth", "opacity", "transform", "style", "class", "id"],
@@ -104,6 +112,10 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
     if (match && match[1] === "control") {
       return <ValueControlBlock json={codeString} isStreaming={isStreaming} onAnswer={onAnswer} onControlChange={onControlChange} canControlTarget={canControlTarget} />;
     }
+    if (match && match[1] === "image") {
+      const img = parseImageFenceBody(codeString);
+      return img ? <AssistantImage {...img} /> : null;
+    }
     if (match) {
       return (
         <SyntaxHighlighter
@@ -146,9 +158,17 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
       const text = codeNode?.children?.map(c => c.value || "").join("") || "";
       return <ValueControlBlock json={text.replace(/\n$/, "")} isStreaming={isStreaming} onAnswer={onAnswer} onControlChange={onControlChange} canControlTarget={canControlTarget} />;
     }
+    if (classes.includes("language-image")) {
+      const text = codeNode?.children?.map(c => c.value || "").join("") || "";
+      const img = parseImageFenceBody(text.replace(/\n$/, ""));
+      return img ? <AssistantImage {...img} /> : null;
+    }
     const rawText = codeNode?.children?.map(c => c.value || "").join("") || "";
     return <PreBlock rawText={rawText} s={s}>{children}</PreBlock>;
   },
+  img: ({ src, alt, title }) => (
+    <AssistantImage src={src} alt={alt || title || ""} />
+  ),
   ul: ({ children }) => <ul style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ol>,
   li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
@@ -248,6 +268,226 @@ function MessageImage({ image }) {
   }
 
   return <img src={loadedSrc} alt="" style={{ height: 40, borderRadius: 6, opacity: 0.8 }} />;
+}
+
+// ---------------- Assistant-emitted images ----------------
+// Normalize the various shapes a model may emit into a single
+// { src, alt, mime, storagePath } record consumed by AssistantImage.
+function normalizeAssistantImagePart(part) {
+  if (!part) return null;
+  if (typeof part === "string") return { src: part, alt: "" };
+
+  // Anthropic-style: { type: "image", source: { type: "base64"|"url", ... } }
+  if (part.source && typeof part.source === "object") {
+    const src = part.source;
+    if (src.type === "base64" && src.data) {
+      const mime = src.media_type || src.mediaType || "image/png";
+      return {
+        src: `data:${mime};base64,${src.data}`,
+        alt: part.alt || part.title || "",
+        mime,
+      };
+    }
+    if (src.type === "url" && src.url) {
+      return { src: src.url, alt: part.alt || part.title || "" };
+    }
+  }
+
+  // OpenAI-style: { type: "image_url", image_url: { url, detail } }
+  if (part.image_url) {
+    const url = typeof part.image_url === "string" ? part.image_url : part.image_url.url;
+    if (url) return { src: url, alt: part.alt || "" };
+  }
+
+  // Already-normalized image part (storagePath or src)
+  if (part.src || part.storagePath || part.dataUrl) {
+    return {
+      src: part.src || part.dataUrl || "",
+      alt: part.alt || part.title || part.name || "",
+      mime: part.mime,
+      storagePath: part.storagePath,
+      originalPath: part.originalPath,
+    };
+  }
+
+  return null;
+}
+
+// Lightbox modal — portal-mounted full-bleed overlay. Click backdrop or press
+// Escape to close. Image itself swallows clicks so users can interact (right-
+// click → save, etc.) without dismissing.
+function ImageLightbox({ src, alt, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={alt || "Image preview"}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        background: "rgba(0,0,0,0.82)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 32,
+        animation: "msgIn .2s ease-out",
+      }}
+    >
+      <img
+        src={src}
+        alt={alt || ""}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: "100%",
+          maxHeight: "100%",
+          objectFit: "contain",
+          borderRadius: 8,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        }}
+      />
+    </div>,
+    document.body
+  );
+}
+
+// Inline assistant image. Constrains to message-bubble width, matches existing
+// rounded-corner style, lazy-loads, shows a skeleton until paint, falls back
+// to a small error placeholder on failure, and opens a lightbox on click.
+function AssistantImage({ src, alt, mime, storagePath, originalPath }) {
+  // Initialize errored synchronously when there's no source at all, so we
+  // skip the loading state entirely instead of bouncing through an effect.
+  const [resolvedSrc, setResolvedSrc] = useState(src || "");
+  const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(() => !src && !storagePath);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  useEffect(() => {
+    if (resolvedSrc) return undefined;
+    if (!storagePath || !window.api?.readImage) return undefined;
+    let cancelled = false;
+    window.api.readImage(storagePath)
+      .then((dataUrl) => {
+        if (cancelled) return;
+        if (dataUrl) setResolvedSrc(dataUrl);
+        else setErrored(true);
+      })
+      .catch(() => { if (!cancelled) setErrored(true); });
+    return () => { cancelled = true; };
+  }, [resolvedSrc, storagePath]);
+
+  const altText = alt || "";
+  const handleOpen = useCallback(() => {
+    if (!errored && resolvedSrc) setLightboxOpen(true);
+  }, [errored, resolvedSrc]);
+  const handleClose = useCallback(() => setLightboxOpen(false), []);
+
+  if (errored) {
+    return (
+      <span
+        title={originalPath || "Image failed to load"}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "6px 10px",
+          margin: "8px 0",
+          borderRadius: 8,
+          border: "1px dashed rgba(255,255,255,0.12)",
+          background: "rgba(255,255,255,0.03)",
+          color: "rgba(255,255,255,0.45)",
+          fontSize: 12,
+          fontFamily: "'JetBrains Mono',monospace",
+        }}
+      >
+        <ImageOff size={14} strokeWidth={1.5} />
+        {altText || "Image unavailable"}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      style={{
+        display: "block",
+        position: "relative",
+        margin: "8px 0",
+        maxWidth: "100%",
+        borderRadius: 12,
+        overflow: "hidden",
+        border: "1px solid rgba(255,255,255,0.06)",
+        background: "rgba(255,255,255,0.03)",
+        lineHeight: 0,
+      }}
+    >
+      {!loaded && (
+        <span
+          aria-hidden="true"
+          style={{
+            display: "block",
+            width: "100%",
+            minHeight: 160,
+            background: "linear-gradient(110deg, rgba(255,255,255,0.04) 8%, rgba(255,255,255,0.08) 18%, rgba(255,255,255,0.04) 33%)",
+            backgroundSize: "200% 100%",
+            animation: "msgIn 1.2s ease-in-out infinite",
+          }}
+        />
+      )}
+      {resolvedSrc && (
+        <img
+          src={resolvedSrc}
+          alt={altText}
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setLoaded(true)}
+          onError={() => setErrored(true)}
+          onClick={handleOpen}
+          title={altText || originalPath || "Click to expand"}
+          style={{
+            display: loaded ? "block" : "none",
+            maxWidth: "100%",
+            height: "auto",
+            cursor: "zoom-in",
+            ...(mime ? { /* mime is informational only */ } : {}),
+          }}
+        />
+      )}
+      {lightboxOpen && resolvedSrc && (
+        <ImageLightbox src={resolvedSrc} alt={altText} onClose={handleClose} />
+      )}
+    </span>
+  );
+}
+
+// Parse the body of a fenced ```image block. Accepts a bare URL/data URL, or
+// a small JSON object { src|url, alt }.
+function parseImageFenceBody(body) {
+  const trimmed = String(body || "").trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("{")) {
+    try {
+      const obj = JSON.parse(trimmed);
+      const src = obj.src || obj.url || obj.dataUrl;
+      if (src) return { src, alt: obj.alt || obj.title || "", mime: obj.mime };
+    } catch {
+      // Fall through to URL handling.
+    }
+  }
+  return { src: trimmed, alt: "" };
 }
 
 function splitControlBlocks(text) {
@@ -662,6 +902,15 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                   onControlChange,
                   canControlTarget,
                 })}
+              </div>
+            );
+          }
+          if (part.type === "image") {
+            const normalized = normalizeAssistantImagePart(part);
+            if (!normalized) return null;
+            return (
+              <div key={part.id || `img-${i}`} style={{ margin: "4px 0 8px" }}>
+                <AssistantImage {...normalized} />
               </div>
             );
           }
