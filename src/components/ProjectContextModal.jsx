@@ -7,8 +7,9 @@ export default function ProjectContextModal({ open, projectName, initialValue, o
 
   useEffect(() => {
     if (!open) return;
-    setValue(initialValue || ""); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [open, initialValue]);
+    setValue(initialValue || "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleSave = useCallback(() => {
     onSave?.(value);
