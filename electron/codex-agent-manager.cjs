@@ -7,7 +7,6 @@ const { createLogger } = require("./logger.cjs");
 const {
   appendCodexUpstreamArgs,
   buildCodexUpstreamEnv,
-  getCodexUpstreamModel,
   summarizeProviderUpstream,
 } = require("./provider-upstreams.cjs");
 
@@ -243,8 +242,7 @@ function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, f
   cancelCodexAgent(conversationId);
 
   const args = ["exec"];
-  const upstreamModel = getCodexUpstreamModel(providerUpstreamConfig);
-  const launchModel = upstreamModel || model;
+  const launchModel = model;
 
   // Resume an existing thread if requested
   if (resumeSessionId) {

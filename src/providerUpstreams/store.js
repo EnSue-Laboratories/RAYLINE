@@ -1,84 +1,91 @@
 const STORAGE_KEY = "rayline.providerUpstreams.v1";
 
-const DEFAULT_STATE = {
-  profiles: [],
-  activeByProvider: {},
+const SUPPORTED_PROVIDERS = ["claude", "codex"];
+const DEFAULT_CONFIG = {
+  baseURL: "",
+  apiKey: "",
+  modelListText: "",
 };
 
-const SUPPORTED_PROVIDERS = new Set(["claude", "codex"]);
-const CLAUDE_AUTH_FIELDS = new Set(["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"]);
-const CODEX_WIRE_APIS = new Set(["responses", "chat"]);
+const DEFAULT_STATE = {
+  providers: {
+    claude: { ...DEFAULT_CONFIG },
+    codex: { ...DEFAULT_CONFIG },
+  },
+};
 
 function safeString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function makeProfileId(provider) {
-  return `${provider}:${Date.now()}:${Math.random().toString(36).slice(2, 9)}`;
-}
-
 function normalizeProvider(provider) {
   const value = safeString(provider).toLowerCase();
-  return SUPPORTED_PROVIDERS.has(value) ? value : "";
+  return SUPPORTED_PROVIDERS.includes(value) ? value : "";
 }
 
-function sanitizeProfile(entry) {
-  if (!entry || typeof entry !== "object") return null;
-  const provider = normalizeProvider(entry.provider);
-  if (!provider) return null;
+function parseModelList(value) {
+  return safeString(value)
+    .split(/[\n,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
 
-  const name = safeString(entry.name);
-  if (!name) return null;
-
-  const authField = CLAUDE_AUTH_FIELDS.has(entry.authField)
-    ? entry.authField
-    : "ANTHROPIC_AUTH_TOKEN";
-  const wireApi = CODEX_WIRE_APIS.has(entry.wireApi) ? entry.wireApi : "responses";
-  const now = Date.now();
+function normalizeProviderConfig(entry) {
+  if (!entry || typeof entry !== "object") return { ...DEFAULT_CONFIG };
+  const rawModelList = Array.isArray(entry.modelList)
+    ? entry.modelList
+    : Array.isArray(entry.models)
+      ? entry.models
+      : null;
+  const modelListText = rawModelList
+    ? rawModelList.map((model) => safeString(model)).filter(Boolean).join("\n")
+    : safeString(entry.modelListText || entry.modelsText || entry.models || entry.model);
 
   return {
-    id: safeString(entry.id) || makeProfileId(provider),
-    provider,
-    name,
-    baseURL: safeString(entry.baseURL),
+    baseURL: safeString(entry.baseURL || entry.baseUrl),
     apiKey: safeString(entry.apiKey),
-    model: safeString(entry.model),
-    enabled: typeof entry.enabled === "boolean" ? entry.enabled : true,
-    authField,
-    wireApi,
-    createdAt: Number.isFinite(entry.createdAt) ? entry.createdAt : now,
-    updatedAt: Number.isFinite(entry.updatedAt) ? entry.updatedAt : now,
+    modelListText,
   };
 }
 
-function sanitizeState(state) {
-  const profiles = [];
-  const seen = new Set();
-
-  for (const raw of Array.isArray(state?.profiles) ? state.profiles : []) {
-    const profile = sanitizeProfile(raw);
-    if (!profile || seen.has(profile.id)) continue;
-    seen.add(profile.id);
-    profiles.push(profile);
-  }
-
-  const activeByProvider = {};
-  const rawActive = state?.activeByProvider && typeof state.activeByProvider === "object"
+function migrateProfileState(state) {
+  const next = { ...DEFAULT_STATE.providers };
+  const profiles = Array.isArray(state?.profiles) ? state.profiles : [];
+  const activeByProvider = state?.activeByProvider && typeof state.activeByProvider === "object"
     ? state.activeByProvider
     : {};
 
   for (const provider of SUPPORTED_PROVIDERS) {
-    const activeId = safeString(rawActive[provider]);
-    if (activeId && profiles.some((profile) => profile.provider === provider && profile.id === activeId)) {
-      activeByProvider[provider] = activeId;
+    const activeId = safeString(activeByProvider[provider]);
+    const profile = profiles.find((entry) => (
+      entry?.provider === provider &&
+      entry?.id === activeId &&
+      entry?.enabled !== false
+    )) || profiles.find((entry) => entry?.provider === provider && entry?.enabled !== false);
+
+    if (profile) {
+      next[provider] = normalizeProviderConfig({
+        baseURL: profile.baseURL,
+        apiKey: profile.apiKey,
+        modelListText: profile.model,
+      });
     }
   }
 
-  return {
-    ...DEFAULT_STATE,
-    profiles,
-    activeByProvider,
-  };
+  return next;
+}
+
+function sanitizeState(state) {
+  const source = state?.providers && typeof state.providers === "object"
+    ? state.providers
+    : migrateProfileState(state);
+  const providers = {};
+
+  for (const provider of SUPPORTED_PROVIDERS) {
+    providers[provider] = normalizeProviderConfig(source[provider]);
+  }
+
+  return { providers };
 }
 
 export function loadProviderUpstreamsState() {
@@ -97,6 +104,10 @@ export function saveProviderUpstreamsState(patch) {
   const next = sanitizeState({
     ...current,
     ...(patch || {}),
+    providers: {
+      ...current.providers,
+      ...(patch?.providers || {}),
+    },
   });
 
   if (typeof window !== "undefined" && window.localStorage) {
@@ -106,86 +117,66 @@ export function saveProviderUpstreamsState(patch) {
   return next;
 }
 
-export function upsertProviderUpstreamProfile(entry) {
-  const current = loadProviderUpstreamsState();
-  const incoming = sanitizeProfile({
-    ...entry,
-    updatedAt: Date.now(),
-  });
-  if (!incoming) return current;
-
-  const existing = current.profiles.find((profile) => profile.id === incoming.id);
-  const nextProfile = {
-    ...existing,
-    ...incoming,
-    createdAt: existing?.createdAt || incoming.createdAt || Date.now(),
-    updatedAt: Date.now(),
-  };
-  const profiles = existing
-    ? current.profiles.map((profile) => (profile.id === incoming.id ? nextProfile : profile))
-    : [nextProfile, ...current.profiles];
-  const activeByProvider = {
-    ...current.activeByProvider,
-    [nextProfile.provider]: nextProfile.enabled === false ? "" : nextProfile.id,
-  };
-
-  return saveProviderUpstreamsState({ profiles, activeByProvider });
-}
-
-export function removeProviderUpstreamProfile(profileId) {
-  const current = loadProviderUpstreamsState();
-  const id = safeString(profileId);
-  const removed = current.profiles.find((profile) => profile.id === id);
-  const profiles = current.profiles.filter((profile) => profile.id !== id);
-  const activeByProvider = { ...current.activeByProvider };
-  if (removed && activeByProvider[removed.provider] === id) {
-    delete activeByProvider[removed.provider];
-  }
-  return saveProviderUpstreamsState({ profiles, activeByProvider });
-}
-
-export function setActiveProviderUpstream(provider, profileId) {
+export function saveProviderUpstreamConfig(provider, patch) {
   const normalizedProvider = normalizeProvider(provider);
   if (!normalizedProvider) return loadProviderUpstreamsState();
 
   const current = loadProviderUpstreamsState();
-  const id = safeString(profileId);
-  const activeByProvider = { ...current.activeByProvider };
-
-  if (!id) {
-    delete activeByProvider[normalizedProvider];
-  } else if (
-    current.profiles.some((profile) => (
-      profile.provider === normalizedProvider &&
-      profile.id === id &&
-      profile.enabled !== false
-    ))
-  ) {
-    activeByProvider[normalizedProvider] = id;
-  }
-
-  return saveProviderUpstreamsState({ activeByProvider });
+  return saveProviderUpstreamsState({
+    providers: {
+      [normalizedProvider]: {
+        ...current.providers[normalizedProvider],
+        ...(patch || {}),
+      },
+    },
+  });
 }
 
-export function getActiveProviderUpstreamConfig(provider, state = loadProviderUpstreamsState()) {
+export function clearProviderUpstreamConfig(provider) {
+  const normalizedProvider = normalizeProvider(provider);
+  if (!normalizedProvider) return loadProviderUpstreamsState();
+  return saveProviderUpstreamsState({
+    providers: {
+      [normalizedProvider]: { ...DEFAULT_CONFIG },
+    },
+  });
+}
+
+export function getProviderUpstreamConfig(provider, state = loadProviderUpstreamsState()) {
   const normalizedProvider = normalizeProvider(provider);
   if (!normalizedProvider) return null;
-  const activeId = safeString(state?.activeByProvider?.[normalizedProvider]);
-  if (!activeId) return null;
-  const profile = (state?.profiles || []).find((entry) => (
-    entry.id === activeId &&
-    entry.provider === normalizedProvider &&
-    entry.enabled !== false
-  ));
-  if (!profile) return null;
+  const config = normalizeProviderConfig(state?.providers?.[normalizedProvider]);
+  const modelList = parseModelList(config.modelListText);
+  if (!config.baseURL && !config.apiKey && modelList.length === 0) return null;
   return {
-    provider: profile.provider,
-    profileId: profile.id,
-    name: profile.name,
-    baseURL: profile.baseURL,
-    apiKey: profile.apiKey,
-    model: profile.model,
-    authField: profile.authField,
-    wireApi: profile.wireApi,
+    provider: normalizedProvider,
+    baseURL: config.baseURL,
+    apiKey: config.apiKey,
+    modelList,
   };
+}
+
+function modelTag(modelId) {
+  const compact = safeString(modelId).split("/").pop() || modelId;
+  return compact.replace(/[^a-z0-9._-]+/gi, " ").trim().toUpperCase() || "MODEL";
+}
+
+export function buildProviderUpstreamModels(state = loadProviderUpstreamsState()) {
+  const models = [];
+  for (const provider of SUPPORTED_PROVIDERS) {
+    const config = getProviderUpstreamConfig(provider, state);
+    if (!config?.modelList?.length) continue;
+    for (const modelId of config.modelList) {
+      models.push({
+        id: `provider-upstream:${provider}:${modelId}`,
+        name: modelId,
+        tag: modelTag(modelId),
+        cliFlag: modelId,
+        provider,
+        providerOverride: true,
+        contextWindow: provider === "codex" ? 1_050_000 : 200_000,
+      });
+    }
+  }
+  return models;
 }

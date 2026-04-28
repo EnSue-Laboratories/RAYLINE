@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  getActiveProviderUpstreamConfig,
+  buildProviderUpstreamModels,
+  clearProviderUpstreamConfig,
+  getProviderUpstreamConfig,
   loadProviderUpstreamsState,
-  removeProviderUpstreamProfile,
-  setActiveProviderUpstream,
-  upsertProviderUpstreamProfile,
+  saveProviderUpstreamConfig,
 } from "../providerUpstreams/store";
 
 export function useProviderUpstreams() {
@@ -20,47 +20,34 @@ export function useProviderUpstreams() {
     return () => window.removeEventListener("provider-upstreams-refresh", handleRefresh);
   }, [refresh]);
 
-  const saveProfile = useCallback((entry) => {
-    const next = upsertProviderUpstreamProfile(entry);
+  const saveConfig = useCallback((provider, patch) => {
+    const next = saveProviderUpstreamConfig(provider, patch);
     setState(next);
     window.dispatchEvent(new CustomEvent("provider-upstreams-refresh"));
     return next;
   }, []);
 
-  const removeProfile = useCallback((profileId) => {
-    const next = removeProviderUpstreamProfile(profileId);
+  const clearConfig = useCallback((provider) => {
+    const next = clearProviderUpstreamConfig(provider);
     setState(next);
     window.dispatchEvent(new CustomEvent("provider-upstreams-refresh"));
     return next;
   }, []);
 
-  const setActiveProfile = useCallback((provider, profileId) => {
-    const next = setActiveProviderUpstream(provider, profileId);
-    setState(next);
-    window.dispatchEvent(new CustomEvent("provider-upstreams-refresh"));
-    return next;
-  }, []);
-
-  const getActiveConfig = useCallback((provider) => (
-    getActiveProviderUpstreamConfig(provider, state)
+  const getConfig = useCallback((provider) => (
+    getProviderUpstreamConfig(provider, state)
   ), [state]);
 
-  const profilesByProvider = useMemo(() => {
-    const grouped = { claude: [], codex: [] };
-    for (const profile of state.profiles || []) {
-      if (grouped[profile.provider]) grouped[profile.provider].push(profile);
-    }
-    return grouped;
-  }, [state.profiles]);
+  const overrideModels = useMemo(() => (
+    buildProviderUpstreamModels(state)
+  ), [state]);
 
   return {
-    profiles: state.profiles || [],
-    profilesByProvider,
-    activeByProvider: state.activeByProvider || {},
-    getActiveConfig,
-    saveProfile,
-    removeProfile,
-    setActiveProfile,
+    configsByProvider: state.providers || {},
+    overrideModels,
+    getConfig,
+    saveConfig,
+    clearConfig,
     refresh,
   };
 }

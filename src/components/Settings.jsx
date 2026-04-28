@@ -10,6 +10,19 @@ import { useOpenCodeModels } from "../data/openCodeModels.jsx";
 import { useProviderUpstreams } from "../data/providerUpstreams.jsx";
 import WindowDragSpacer from "./WindowDragSpacer";
 
+const EMPTY_UPSTREAM_CONFIG = {
+  baseURL: "",
+  apiKey: "",
+  modelListText: "",
+};
+
+function normalizeUpstreamDrafts(configs = {}) {
+  return {
+    claude: { ...EMPTY_UPSTREAM_CONFIG, ...(configs.claude || {}) },
+    codex: { ...EMPTY_UPSTREAM_CONFIG, ...(configs.codex || {}) },
+  };
+}
+
 export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, windowControlsVisible = false, onClose }) {
   const s = useFontScale();
   const t = createTranslator(locale);
@@ -26,25 +39,11 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     removeModel: removeOpenCodeModel,
   } = useOpenCodeModels();
   const {
-    profilesByProvider: upstreamProfilesByProvider,
-    activeByProvider: activeUpstreamByProvider,
-    saveProfile: saveUpstreamProfile,
-    removeProfile: removeUpstreamProfile,
-    setActiveProfile: setActiveUpstreamProfile,
+    configsByProvider: upstreamConfigsByProvider,
+    saveConfig: saveUpstreamConfig,
+    clearConfig: clearUpstreamConfig,
   } = useProviderUpstreams();
-  const [upstreamDraft, setUpstreamDraft] = useState({
-    id: "",
-    provider: "claude",
-    name: "",
-    baseURL: "",
-    apiKey: "",
-    model: "",
-    authField: "ANTHROPIC_AUTH_TOKEN",
-    wireApi: "responses",
-    enabled: true,
-  });
-  const [upstreamEditingId, setUpstreamEditingId] = useState("");
-  const [upstreamAddingProvider, setUpstreamAddingProvider] = useState("");
+  const [upstreamDrafts, setUpstreamDrafts] = useState(() => normalizeUpstreamDrafts(upstreamConfigsByProvider));
   const [upstreamMessage, setUpstreamMessage] = useState("");
   const [openCodeDraft, setOpenCodeDraft] = useState({
     providerId: "openrouter",
@@ -198,79 +197,34 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     window.dispatchEvent(new CustomEvent("open-multica-setup"));
   }, [multicaServerDirty, normalizedMulticaServerDraft]);
 
-  const updateUpstreamDraft = useCallback((patch) => {
-    setUpstreamDraft((prev) => ({ ...prev, ...patch }));
+  useEffect(() => {
+    setUpstreamDrafts(normalizeUpstreamDrafts(upstreamConfigsByProvider));
+  }, [upstreamConfigsByProvider]);
+
+  const updateUpstreamDraft = useCallback((provider, patch) => {
+    setUpstreamDrafts((prev) => ({
+      ...prev,
+      [provider]: {
+        ...(prev[provider] || EMPTY_UPSTREAM_CONFIG),
+        ...patch,
+      },
+    }));
     setUpstreamMessage("");
   }, []);
 
-  const handleStartUpstreamAdd = useCallback((provider) => {
-    setUpstreamAddingProvider(provider);
-    setUpstreamEditingId("");
-    setUpstreamMessage("");
-    setUpstreamDraft({
-      id: "",
-      provider,
-      name: "",
-      baseURL: "",
-      apiKey: "",
-      model: "",
-      authField: "ANTHROPIC_AUTH_TOKEN",
-      wireApi: "responses",
-      enabled: true,
-    });
-  }, []);
-
-  const handleStartUpstreamEdit = useCallback((profile) => {
-    setUpstreamAddingProvider(profile.provider);
-    setUpstreamEditingId(profile.id);
-    setUpstreamMessage("");
-    setUpstreamDraft({
-      id: profile.id,
-      provider: profile.provider,
-      name: profile.name || "",
-      baseURL: profile.baseURL || "",
-      apiKey: "",
-      model: profile.model || "",
-      authField: profile.authField || "ANTHROPIC_AUTH_TOKEN",
-      wireApi: profile.wireApi || "responses",
-      enabled: profile.enabled !== false,
-    });
-  }, []);
-
-  const handleCancelUpstreamEdit = useCallback(() => {
-    setUpstreamAddingProvider("");
-    setUpstreamEditingId("");
-    setUpstreamMessage("");
-  }, []);
-
-  const handleSaveUpstreamProfile = useCallback(() => {
-    const provider = upstreamDraft.provider;
-    const name = upstreamDraft.name.trim();
-    if (!name) {
-      setUpstreamMessage(t("settings.upstreamMissingName"));
-      return;
-    }
-    const existing = upstreamEditingId
-      ? (upstreamProfilesByProvider[provider] || []).find((profile) => profile.id === upstreamEditingId)
-      : null;
-    const nextApiKey = upstreamDraft.apiKey || existing?.apiKey || "";
-    const profileId = upstreamEditingId || upstreamDraft.id || `${provider}:${Date.now()}:${Math.random().toString(36).slice(2, 9)}`;
-    saveUpstreamProfile({
-      ...upstreamDraft,
-      id: profileId,
-      name,
-      apiKey: nextApiKey,
-    });
-    setActiveUpstreamProfile(provider, profileId);
-    setUpstreamAddingProvider("");
-    setUpstreamEditingId("");
+  const handleSaveUpstreamConfig = useCallback((provider) => {
+    saveUpstreamConfig(provider, upstreamDrafts[provider] || EMPTY_UPSTREAM_CONFIG);
     setUpstreamMessage(t("settings.upstreamSaved"));
-  }, [saveUpstreamProfile, setActiveUpstreamProfile, t, upstreamDraft, upstreamEditingId, upstreamProfilesByProvider]);
+  }, [saveUpstreamConfig, t, upstreamDrafts]);
 
-  const handleRemoveUpstreamProfile = useCallback((profile) => {
-    removeUpstreamProfile(profile.id);
-    setUpstreamMessage("");
-  }, [removeUpstreamProfile]);
+  const handleClearUpstreamConfig = useCallback((provider) => {
+    clearUpstreamConfig(provider);
+    setUpstreamDrafts((prev) => ({
+      ...prev,
+      [provider]: { ...EMPTY_UPSTREAM_CONFIG },
+    }));
+    setUpstreamMessage(t("settings.upstreamCleared"));
+  }, [clearUpstreamConfig, t]);
 
   const updateOpenCodeDraft = useCallback((patch) => {
     setOpenCodeDraft((prev) => ({ ...prev, ...patch }));
@@ -473,9 +427,13 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     outline: "none",
   };
 
-  const selectStyle = {
+  const textareaStyle = {
     ...inputStyle,
-    fontFamily: "system-ui, sans-serif",
+    minHeight: 84,
+    height: "auto",
+    padding: "8px 10px",
+    resize: "vertical",
+    lineHeight: 1.45,
   };
 
   const compactButtonStyle = (active = true) => ({
@@ -958,10 +916,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {upstreamProviderDefs.map((def) => {
-                const profiles = upstreamProfilesByProvider[def.id] || [];
-                const activeId = activeUpstreamByProvider[def.id] || "";
-                const formOpen = upstreamAddingProvider === def.id;
-                const isClaude = def.id === "claude";
+                const draft = upstreamDrafts[def.id] || EMPTY_UPSTREAM_CONFIG;
+                const configured = Boolean(draft.baseURL.trim() || draft.apiKey.trim() || draft.modelListText.trim());
                 return (
                   <div
                     key={def.id}
@@ -981,368 +937,104 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         marginBottom: 8,
                       }}
                     >
-                      <div
-                        style={{
-                          fontSize: s(12),
-                          color: "rgba(255,255,255,0.76)",
-                          minWidth: 0,
-                        }}
-                      >
-                        {def.label}
-                      </div>
-                      {!formOpen && (
-                        <button
-                          type="button"
-                          onClick={() => handleStartUpstreamAdd(def.id)}
-                          style={compactButtonStyle(true)}
+                      <div style={{ minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: s(12),
+                            color: "rgba(255,255,255,0.76)",
+                          }}
                         >
-                          <Plus size={12} strokeWidth={1.8} />
-                          {t("settings.upstreamAdd")}
-                        </button>
+                          {def.label}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: s(10),
+                            color: "rgba(255,255,255,0.28)",
+                            marginTop: 2,
+                          }}
+                        >
+                          {configured ? t("settings.upstreamConfigured") : t("settings.upstreamUsingDefault")}
+                        </div>
+                      </div>
+                      {configured && (
+                        <span
+                          style={{
+                            flexShrink: 0,
+                            padding: "2px 5px",
+                            borderRadius: 5,
+                            border: "1px solid rgba(180,220,255,0.18)",
+                            background: "rgba(180,220,255,0.08)",
+                            color: "rgba(210,230,255,0.72)",
+                            fontSize: s(9),
+                            fontFamily: "'JetBrains Mono', monospace",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {t("settings.upstreamOverrideBadge")}
+                        </span>
                       )}
                     </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <input
+                        type="text"
+                        value={draft.baseURL}
+                        placeholder={t("settings.upstreamBaseUrlPlaceholder")}
+                        onChange={(e) => updateUpstreamDraft(def.id, { baseURL: e.target.value })}
+                        spellCheck={false}
+                        style={inputStyle}
+                      />
+                      <input
+                        type="password"
+                        value={draft.apiKey}
+                        placeholder={t("settings.upstreamApiKeyPlaceholder")}
+                        onChange={(e) => updateUpstreamDraft(def.id, { apiKey: e.target.value })}
+                        spellCheck={false}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <textarea
+                      value={draft.modelListText}
+                      placeholder={t("settings.upstreamModelListPlaceholder")}
+                      onChange={(e) => updateUpstreamDraft(def.id, { modelListText: e.target.value })}
+                      spellCheck={false}
+                      style={textareaStyle}
+                    />
+                    <div
+                      style={{
+                        fontSize: s(10),
+                        color: "rgba(255,255,255,0.28)",
+                        marginTop: 6,
+                        marginBottom: 10,
+                      }}
+                    >
+                      {t("settings.upstreamModelListHint")}
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <button
                         type="button"
-                        onClick={() => setActiveUpstreamProfile(def.id, "")}
-                        style={{
-                          width: "100%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 8,
-                          padding: "7px 8px",
-                          borderRadius: 7,
-                          border: "1px solid rgba(255,255,255,0.05)",
-                          background: !activeId ? "rgba(180,220,255,0.08)" : "rgba(255,255,255,0.018)",
-                          color: "rgba(255,255,255,0.72)",
-                          cursor: "pointer",
-                          textAlign: "left",
-                          fontFamily: "system-ui, sans-serif",
-                        }}
+                        onClick={() => handleClearUpstreamConfig(def.id)}
+                        disabled={!configured}
+                        style={compactButtonStyle(configured)}
                       >
-                        <span style={{ fontSize: s(12) }}>
-                          {t("settings.upstreamDefault")}
-                        </span>
-                        {!activeId && (
-                          <span
-                            style={{
-                              flexShrink: 0,
-                              padding: "2px 5px",
-                              borderRadius: 5,
-                              border: "1px solid rgba(180,220,255,0.18)",
-                              background: "rgba(180,220,255,0.08)",
-                              color: "rgba(210,230,255,0.72)",
-                              fontSize: s(9),
-                              fontFamily: "'JetBrains Mono', monospace",
-                              lineHeight: 1,
-                            }}
-                          >
-                            {t("settings.upstreamActiveBadge")}
-                          </span>
-                        )}
+                        {t("settings.upstreamClear")}
                       </button>
-
-                      {profiles.length === 0 ? (
-                        <div style={{ fontSize: s(11), color: "rgba(255,255,255,0.28)", padding: "2px 2px 0" }}>
-                          {t("settings.upstreamNoProfiles")}
-                        </div>
-                      ) : profiles.map((profile) => {
-                        const active = profile.id === activeId;
-                        return (
-                          <div
-                            key={profile.id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              opacity: profile.enabled === false ? 0.55 : 1,
-                            }}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => setActiveUpstreamProfile(def.id, profile.id)}
-                              title={t("settings.upstreamUseProfile")}
-                              style={{
-                                flex: 1,
-                                minWidth: 0,
-                                padding: "7px 8px",
-                                borderRadius: 7,
-                                border: "1px solid rgba(255,255,255,0.05)",
-                                background: active ? "rgba(180,220,255,0.08)" : "rgba(255,255,255,0.018)",
-                                color: "rgba(255,255,255,0.72)",
-                                cursor: "pointer",
-                                textAlign: "left",
-                                fontFamily: "system-ui, sans-serif",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 6,
-                                  minWidth: 0,
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: s(12),
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {profile.name}
-                                </span>
-                                {active && (
-                                  <span
-                                    style={{
-                                      flexShrink: 0,
-                                      padding: "2px 5px",
-                                      borderRadius: 5,
-                                      border: "1px solid rgba(180,220,255,0.18)",
-                                      background: "rgba(180,220,255,0.08)",
-                                      color: "rgba(210,230,255,0.72)",
-                                      fontSize: s(9),
-                                      fontFamily: "'JetBrains Mono', monospace",
-                                      lineHeight: 1,
-                                    }}
-                                  >
-                                    {t("settings.upstreamActiveBadge")}
-                                  </span>
-                                )}
-                                {profile.enabled === false && (
-                                  <span
-                                    style={{
-                                      flexShrink: 0,
-                                      padding: "2px 5px",
-                                      borderRadius: 5,
-                                      border: "1px solid rgba(255,255,255,0.10)",
-                                      background: "rgba(255,255,255,0.04)",
-                                      color: "rgba(255,255,255,0.42)",
-                                      fontSize: s(9),
-                                      fontFamily: "'JetBrains Mono', monospace",
-                                      lineHeight: 1,
-                                    }}
-                                  >
-                                    {t("settings.upstreamDisabledBadge")}
-                                  </span>
-                                )}
-                              </span>
-                              <span
-                                style={{
-                                  display: "block",
-                                  marginTop: 2,
-                                  fontFamily: "'JetBrains Mono', monospace",
-                                  fontSize: s(10),
-                                  color: "rgba(255,255,255,0.28)",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {profile.baseURL || t("settings.upstreamNoBaseUrl")}
-                                {profile.model ? ` / ${profile.model}` : ""}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStartUpstreamEdit(profile)}
-                              aria-label={t("settings.upstreamEdit")}
-                              title={t("settings.upstreamEdit")}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: 28,
-                                height: 28,
-                                borderRadius: 7,
-                                background: "rgba(255,255,255,0.03)",
-                                border: "1px solid rgba(255,255,255,0.06)",
-                                color: "rgba(255,255,255,0.45)",
-                                cursor: "pointer",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Pencil size={13} strokeWidth={1.7} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveUpstreamProfile(profile)}
-                              aria-label={t("settings.upstreamRemove")}
-                              title={t("settings.upstreamRemove")}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: 28,
-                                height: 28,
-                                borderRadius: 7,
-                                background: "rgba(255,255,255,0.03)",
-                                border: "1px solid rgba(255,255,255,0.06)",
-                                color: "rgba(255,255,255,0.45)",
-                                cursor: "pointer",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Trash2 size={13} strokeWidth={1.7} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {formOpen && (
-                      <div
-                        style={{
-                          marginTop: 10,
-                          paddingTop: 10,
-                          borderTop: "1px solid rgba(255,255,255,0.06)",
-                        }}
+                      <button
+                        type="button"
+                        onClick={() => handleSaveUpstreamConfig(def.id)}
+                        style={compactButtonStyle(true)}
                       >
-                        <div
-                          style={{
-                            fontSize: s(11),
-                            color: "rgba(255,255,255,0.55)",
-                            marginBottom: 8,
-                            fontFamily: "'JetBrains Mono', monospace",
-                            letterSpacing: ".02em",
-                          }}
-                        >
-                          {upstreamEditingId ? t("settings.upstreamEdit") : t("settings.upstreamAdd")}
-                        </div>
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                            gap: 8,
-                            marginBottom: 8,
-                          }}
-                        >
-                          <input
-                            type="text"
-                            value={upstreamDraft.name}
-                            placeholder={t("settings.upstreamNamePlaceholder")}
-                            onChange={(e) => updateUpstreamDraft({ name: e.target.value })}
-                            spellCheck={false}
-                            style={inputStyle}
-                          />
-                          <input
-                            type="text"
-                            value={upstreamDraft.baseURL}
-                            placeholder={t("settings.upstreamBaseUrlPlaceholder")}
-                            onChange={(e) => updateUpstreamDraft({ baseURL: e.target.value })}
-                            spellCheck={false}
-                            style={inputStyle}
-                          />
-                          <input
-                            type="password"
-                            value={upstreamDraft.apiKey}
-                            placeholder={upstreamEditingId ? t("settings.upstreamApiKeyEditPlaceholder") : t("settings.upstreamApiKeyPlaceholder")}
-                            onChange={(e) => updateUpstreamDraft({ apiKey: e.target.value })}
-                            spellCheck={false}
-                            style={inputStyle}
-                          />
-                          <input
-                            type="text"
-                            value={upstreamDraft.model}
-                            placeholder={t("settings.upstreamModelPlaceholder")}
-                            onChange={(e) => updateUpstreamDraft({ model: e.target.value })}
-                            spellCheck={false}
-                            style={inputStyle}
-                          />
-                          {isClaude ? (
-                            <select
-                              value={upstreamDraft.authField}
-                              onChange={(e) => updateUpstreamDraft({ authField: e.target.value })}
-                              style={selectStyle}
-                              title={t("settings.upstreamAuthField")}
-                            >
-                              <option value="ANTHROPIC_AUTH_TOKEN">ANTHROPIC_AUTH_TOKEN</option>
-                              <option value="ANTHROPIC_API_KEY">ANTHROPIC_API_KEY</option>
-                            </select>
-                          ) : (
-                            <select
-                              value={upstreamDraft.wireApi}
-                              onChange={(e) => updateUpstreamDraft({ wireApi: e.target.value })}
-                              style={selectStyle}
-                              title={t("settings.upstreamWireApi")}
-                            >
-                              <option value="responses">responses</option>
-                              <option value="chat">chat</option>
-                            </select>
-                          )}
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            padding: "8px 10px",
-                            marginBottom: 10,
-                            borderRadius: 7,
-                            border: "1px solid rgba(255,255,255,0.06)",
-                            background: "rgba(255,255,255,0.025)",
-                          }}
-                        >
-                          <div style={{ fontSize: s(12), color: "rgba(255,255,255,0.76)" }}>
-                            {t("settings.upstreamEnabled")}
-                          </div>
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={upstreamDraft.enabled}
-                            aria-label={t("settings.upstreamEnabled")}
-                            onClick={() => updateUpstreamDraft({ enabled: !upstreamDraft.enabled })}
-                            style={{
-                              flexShrink: 0,
-                              width: 38,
-                              height: 22,
-                              borderRadius: 999,
-                              border: "1px solid rgba(255,255,255,0.12)",
-                              background: upstreamDraft.enabled ? "rgba(180,220,255,0.35)" : "rgba(255,255,255,0.06)",
-                              position: "relative",
-                              cursor: "pointer",
-                              padding: 0,
-                              transition: "background 120ms ease",
-                            }}
-                          >
-                            <span
-                              style={{
-                                position: "absolute",
-                                top: 2,
-                                left: upstreamDraft.enabled ? 18 : 2,
-                                width: 16,
-                                height: 16,
-                                borderRadius: "50%",
-                                background: "rgba(255,255,255,0.9)",
-                                transition: "left 120ms ease",
-                              }}
-                            />
-                          </button>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button
-                            type="button"
-                            onClick={handleCancelUpstreamEdit}
-                            style={compactButtonStyle(true)}
-                          >
-                            {t("common.cancel")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleSaveUpstreamProfile}
-                            disabled={!upstreamDraft.name.trim()}
-                            style={compactButtonStyle(!!upstreamDraft.name.trim())}
-                          >
-                            <Check size={12} strokeWidth={1.8} />
-                            {upstreamEditingId ? t("settings.upstreamUpdate") : t("settings.upstreamSave")}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                        <Check size={12} strokeWidth={1.8} />
+                        {t("settings.upstreamSave")}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -1352,7 +1044,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               <div
                 style={{
                   fontSize: s(11),
-                  color: upstreamMessage === t("settings.upstreamSaved")
+                  color: upstreamMessage === t("settings.upstreamSaved") || upstreamMessage === t("settings.upstreamCleared")
                     ? "rgba(205,255,214,0.74)"
                     : "rgba(255,210,160,0.74)",
                   marginTop: 10,

@@ -20,10 +20,57 @@ export const MODELS = [
 
 export const normalizeModelId = (id) => LEGACY_MODEL_IDS[id] || id;
 
-export const getM = (id) =>
-  MODELS.find((m) => m.id === normalizeModelId(id)) ||
-  MODELS.find((m) => m.id === DEFAULT_MODEL_ID) ||
-  MODELS[0];
+function modelTag(modelId) {
+  const compact = String(modelId || "").split("/").pop() || modelId;
+  return String(compact || "model").replace(/[^a-z0-9._-]+/gi, " ").trim().toUpperCase() || "MODEL";
+}
+
+export function isProviderUpstreamModelId(id) {
+  return typeof id === "string" && id.startsWith("provider-upstream:");
+}
+
+export function parseProviderUpstreamModelId(id) {
+  if (!isProviderUpstreamModelId(id)) return null;
+  const value = id.slice("provider-upstream:".length);
+  const splitIndex = value.indexOf(":");
+  if (splitIndex <= 0 || splitIndex >= value.length - 1) return null;
+  const provider = value.slice(0, splitIndex);
+  const modelId = value.slice(splitIndex + 1);
+  if (provider !== "claude" && provider !== "codex") return null;
+  return { provider, modelId };
+}
+
+export function getAvailableModels(extraModels = []) {
+  const overrides = new Set(
+    (extraModels || [])
+      .filter((m) => m?.providerOverride && m.provider)
+      .map((m) => m.provider)
+  );
+  return [
+    ...MODELS.filter((m) => !overrides.has(m.provider)),
+    ...(extraModels || []),
+  ];
+}
+
+export const getM = (id) => {
+  const parsed = parseProviderUpstreamModelId(id);
+  if (parsed) {
+    return {
+      id,
+      name: parsed.modelId,
+      tag: modelTag(parsed.modelId),
+      cliFlag: parsed.modelId,
+      provider: parsed.provider,
+      providerOverride: true,
+      contextWindow: parsed.provider === "codex" ? 1_050_000 : 200_000,
+    };
+  }
+  return (
+    MODELS.find((m) => m.id === normalizeModelId(id)) ||
+    MODELS.find((m) => m.id === DEFAULT_MODEL_ID) ||
+    MODELS[0]
+  );
+};
 
 export function isMulticaModelId(id) {
   return typeof id === "string" && id.startsWith("multica:");
@@ -46,8 +93,13 @@ export function parseOpenCodeModelId(id) {
 }
 
 export function getMOrMulticaFallback(id, extraModels = []) {
-  const dynamicHit = extraModels?.find((m) => m.id === id);
-  if (dynamicHit) return dynamicHit;
+  const normalizedId = normalizeModelId(id);
+  const available = getAvailableModels(extraModels);
+  const availableHit = available.find((m) => (
+    m.id === id || m.id === normalizedId
+  ));
+  if (availableHit) return availableHit;
+  const baseHit = MODELS.find((m) => m.id === normalizedId);
 
   if (isMulticaModelId(id)) {
     return { id, name: "Multica agent", tag: "MULTICA", provider: "multica" };
@@ -66,5 +118,12 @@ export function getMOrMulticaFallback(id, extraModels = []) {
       };
     }
   }
-  return getM(id);
+  if (isProviderUpstreamModelId(id)) {
+    return getM(id);
+  }
+  return (
+    available.find((m) => m.provider === baseHit?.provider) ||
+    available[0] ||
+    getM(id)
+  );
 }

@@ -14,7 +14,7 @@ import { usePrefersReducedMotion } from "./hooks/useWindowActivity";
 import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
 import NewProjectModal from "./components/NewProjectModal";
-import { DEFAULT_MODEL_ID, getMOrMulticaFallback, isMulticaModelId, MODELS, normalizeModelId } from "./data/models";
+import { DEFAULT_MODEL_ID, getAvailableModels, getMOrMulticaFallback, isMulticaModelId, normalizeModelId } from "./data/models";
 import { useMulticaModels } from "./data/multicaModels.jsx";
 import { useOpenCodeModels } from "./data/openCodeModels.jsx";
 import { useProviderUpstreams } from "./data/providerUpstreams.jsx";
@@ -1200,7 +1200,10 @@ export default function App() {
   const prefersReducedMotion = usePrefersReducedMotion();
   const { models: multicaModels } = useMulticaModels();
   const { models: openCodeModels } = useOpenCodeModels();
-  const { getActiveConfig: getActiveProviderUpstreamConfig } = useProviderUpstreams();
+  const {
+    getConfig: getProviderUpstreamConfig,
+    overrideModels: providerOverrideModels,
+  } = useProviderUpstreams();
 
   // convos: array of { id, sessionId, title, model, ts }
   const [convoList, setConvoList] = useState([]);
@@ -1338,12 +1341,12 @@ export default function App() {
     [active, persistableConversations]
   );
   const dispatchAvailableModels = useMemo(
-    () => [...MODELS, ...openCodeModels, ...multicaModels],
-    [multicaModels, openCodeModels]
+    () => getAvailableModels([...providerOverrideModels, ...openCodeModels, ...multicaModels]),
+    [multicaModels, openCodeModels, providerOverrideModels]
   );
   const dynamicModels = useMemo(
-    () => [...openCodeModels, ...multicaModels],
-    [multicaModels, openCodeModels]
+    () => [...providerOverrideModels, ...openCodeModels, ...multicaModels],
+    [multicaModels, openCodeModels, providerOverrideModels]
   );
   const persistStatePayload = useMemo(() => ({
     convos: persistableConversations,
@@ -2846,7 +2849,7 @@ export default function App() {
           effort: m.effort,
           thinking: getModelThinkingValue(m),
           openCodeConfig: getOpenCodeRuntimeConfig(m),
-          providerUpstreamConfig: getProviderUpstreamRuntimeConfig(currentProvider, getActiveProviderUpstreamConfig),
+          providerUpstreamConfig: getProviderUpstreamRuntimeConfig(currentProvider, getProviderUpstreamConfig),
           cwd: effectiveCwd,
           images:
             currentProvider === "multica"
@@ -2898,7 +2901,7 @@ export default function App() {
         sendInFlightConversationIdsRef.current.delete(conversationId);
       }
     },
-    [buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, ensureMulticaContextForConversation, getActiveProviderUpstreamConfig, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
+    [buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, ensureMulticaContextForConversation, getProviderUpstreamConfig, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, startPreparedMessage, healConversationCwdIfMissing]
   );
 
   const handleSend = useCallback(
@@ -3438,7 +3441,7 @@ export default function App() {
         effort: m.effort,
         thinking: getModelThinkingValue(m),
         openCodeConfig: getOpenCodeRuntimeConfig(m),
-        providerUpstreamConfig: getProviderUpstreamRuntimeConfig(currentProvider, getActiveProviderUpstreamConfig),
+        providerUpstreamConfig: getProviderUpstreamRuntimeConfig(currentProvider, getProviderUpstreamConfig),
         cwd: convoCwd,
         multicaContext,
         multicaToken,
@@ -3472,7 +3475,7 @@ export default function App() {
         );
       }
     },
-    [activeConvo, active, buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, editAndResend, ensureMulticaContextForConversation, getActiveProviderUpstreamConfig, getConversation, resolveConversationLastProvider, resolveConversationProviderSession]
+    [activeConvo, active, buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, editAndResend, ensureMulticaContextForConversation, getProviderUpstreamConfig, getConversation, resolveConversationLastProvider, resolveConversationProviderSession]
   );
 
   const handleModelChange = (modelId) => {
@@ -3847,7 +3850,7 @@ export default function App() {
             draftsCollapsed={draftsCollapsed}
             onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
             developerMode={developerMode}
-            multicaModels={[...openCodeModels, ...multicaModels]}
+            multicaModels={dynamicModels}
             hasUpdate={hasUpdate}
           />
         </div>
