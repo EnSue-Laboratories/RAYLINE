@@ -578,12 +578,10 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
             aria-busy={isCreatingPr}
             style={{
               height: 30,
-              padding: isCreatingPr ? "0 12px" : "0 10px",
-              minWidth: isCreatingPr ? 124 : undefined,
+              padding: "0 10px",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 6,
               background: prSuccess
                 ? "rgba(90,180,120,0.16)"
                 : isCreatingPr
@@ -607,19 +605,13 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
                 ? (hasOpenPr ? "rgba(190,220,255,0.92)" : "rgba(255,255,255,0.8)")
                 : "rgba(255,255,255,0.3)",
               fontFamily: "system-ui,sans-serif",
-              fontSize: s(11),
               cursor: canPr && !prSuccess && !isCreatingPr ? "pointer" : "default",
             }}
           >
             {prSuccess
               ? <Check size={14} strokeWidth={2} />
               : isCreatingPr
-                ? (
-                  <>
-                    <Loader2 size={13} strokeWidth={1.8} style={{ animation: "spin 1s linear infinite" }} />
-                    <span>{t("git.status.creatingPr")}</span>
-                  </>
-                )
+                ? <Loader2 size={13} strokeWidth={1.8} style={{ animation: "spin 1s linear infinite" }} />
                 : <GitPullRequestArrow size={14} strokeWidth={1.6} />}
           </button>
         )}
