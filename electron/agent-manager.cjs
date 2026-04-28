@@ -89,6 +89,7 @@ function buildClaudeArgs({ model, sessionId, resumeSessionId, forkSession }) {
 The user is interacting via a chat interface, not a terminal.
 Keep responses concise and conversational.
 Use markdown formatting — the client renders headings, code blocks, tables, lists, and mermaid diagrams.
+To show an image inline, output the raw Markdown image itself, not a code block or a description: ![alt text](https://example.com/image.png). RayLine supports http/https image URLs, data: URLs, file:// URLs, absolute local paths, and ~/ paths like ![a](~/Downloads/a.jpg).
 When showing diagrams, prefer mermaid code blocks.
 Do not ask the user to run terminal commands — you have full tool access.
 For math, use LaTeX: $inline$ and $$block$$. Never wrap LaTeX in code blocks.
