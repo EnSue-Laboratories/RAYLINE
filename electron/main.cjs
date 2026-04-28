@@ -777,8 +777,12 @@ ipcMain.handle("delete-wallpaper", async (_event, filePath) => {
 // IPC: read image file as data URL (for wallpaper preview + background)
 ipcMain.handle("read-image", async (_event, filePath) => {
   try {
-    const data = fs.readFileSync(filePath);
-    const ext = path.extname(filePath).toLowerCase().replace(".", "");
+    let resolved = filePath;
+    if (typeof resolved === "string" && (resolved === "~" || resolved.startsWith("~/"))) {
+      resolved = path.join(os.homedir(), resolved.slice(1));
+    }
+    const data = fs.readFileSync(resolved);
+    const ext = path.extname(resolved).toLowerCase().replace(".", "");
     const mime = WALLPAPER_MIME_TYPES[ext] || "image/png";
     return `data:${mime};base64,${data.toString("base64")}`;
   } catch {

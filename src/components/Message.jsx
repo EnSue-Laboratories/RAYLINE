@@ -29,7 +29,7 @@ const sanitizeSchema = {
   tagNames: [...(defaultSchema.tagNames || []), "svg", "path", "circle", "rect", "line", "polyline", "polygon", "ellipse", "g", "defs", "use", "text", "tspan", "marker", "pattern", "clipPath", "mask", "linearGradient", "radialGradient", "stop", "animate", "animateTransform", "animateMotion", "set", "foreignObject"],
   protocols: {
     ...(defaultSchema.protocols || {}),
-    src: [...((defaultSchema.protocols && defaultSchema.protocols.src) || []), "data"],
+    src: [...((defaultSchema.protocols && defaultSchema.protocols.src) || []), "data", "file"],
   },
   attributes: {
     ...defaultSchema.attributes,
@@ -167,7 +167,7 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
     return <PreBlock rawText={rawText} s={s}>{children}</PreBlock>;
   },
   img: ({ src, alt, title }) => (
-    <AssistantImage src={src} alt={alt || title || ""} />
+    <AssistantImage {...resolveMarkdownImgSrc(src, alt || title || "")} />
   ),
   ul: ({ children }) => <ul style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ol>,
@@ -270,6 +270,24 @@ function MessageImage({ image }) {
   return <img src={loadedSrc} alt="" style={{ height: 40, borderRadius: 6, opacity: 0.8 }} />;
 }
 
+// Markdown `![alt](src)` may carry a remote URL, a `data:` URL, a `file://`
+// URL, or a bare local path. Renderable URLs pass straight through; anything
+// that's a local filesystem path gets routed through the existing readImage
+// IPC via `storagePath` so AssistantImage can load it.
+function resolveMarkdownImgSrc(src, alt) {
+  if (!src) return { src: "", alt };
+  if (/^(data:|https?:|blob:)/i.test(src)) return { src, alt };
+  if (/^file:\/\//i.test(src)) {
+    let p = src.replace(/^file:\/\//i, "");
+    try { p = decodeURI(p); } catch { /* keep as-is */ }
+    return { src: "", storagePath: p, originalPath: src, alt };
+  }
+  if (src.startsWith("/") || src.startsWith("~")) {
+    return { src: "", storagePath: src, originalPath: src, alt };
+  }
+  return { src, alt };
+}
+
 // ---------------- Assistant-emitted images ----------------
 // Normalize the various shapes a model may emit into a single
 // { src, alt, mime, storagePath } record consumed by AssistantImage.
@@ -368,7 +386,7 @@ function ImageLightbox({ src, alt, onClose }) {
 // Inline assistant image. Constrains to message-bubble width, matches existing
 // rounded-corner style, lazy-loads, shows a skeleton until paint, falls back
 // to a small error placeholder on failure, and opens a lightbox on click.
-function AssistantImage({ src, alt, mime, storagePath, originalPath }) {
+function AssistantImage({ src, alt, storagePath, originalPath }) {
   // Initialize errored synchronously when there's no source at all, so we
   // skip the loading state entirely instead of bouncing through an effect.
   const [resolvedSrc, setResolvedSrc] = useState(src || "");
@@ -438,6 +456,8 @@ function AssistantImage({ src, alt, mime, storagePath, originalPath }) {
         <span
           aria-hidden="true"
           style={{
+            position: resolvedSrc ? "absolute" : "static",
+            inset: 0,
             display: "block",
             width: "100%",
             minHeight: 160,
@@ -451,18 +471,18 @@ function AssistantImage({ src, alt, mime, storagePath, originalPath }) {
         <img
           src={resolvedSrc}
           alt={altText}
-          loading="lazy"
           decoding="async"
           onLoad={() => setLoaded(true)}
           onError={() => setErrored(true)}
           onClick={handleOpen}
           title={altText || originalPath || "Click to expand"}
           style={{
-            display: loaded ? "block" : "none",
+            display: "block",
             maxWidth: "100%",
             height: "auto",
             cursor: "zoom-in",
-            ...(mime ? { /* mime is informational only */ } : {}),
+            opacity: loaded ? 1 : 0,
+            transition: "opacity 0.18s ease-out",
           }}
         />
       )}
