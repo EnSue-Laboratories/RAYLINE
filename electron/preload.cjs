@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld("api", {
   selectWallpaper: (previousPath) => ipcRenderer.invoke("select-wallpaper", previousPath),
   deleteWallpaper: (filePath) => ipcRenderer.invoke("delete-wallpaper", filePath),
   readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
+  storeMessageImage: (input) => ipcRenderer.invoke("store-message-image", input),
   listSessions: (cwd) => ipcRenderer.invoke("list-sessions", cwd),
   loadSession: (sessionId) => ipcRenderer.invoke("load-session", sessionId),
   moveSession: (sessionId, newCwd) => ipcRenderer.invoke("move-session", sessionId, newCwd),

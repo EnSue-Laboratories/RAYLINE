@@ -26,12 +26,26 @@ async function fileToAttachment(file) {
   if (file.type?.startsWith("image/")) {
     const dataUrl = await readFileAsDataUrl(file);
     if (!dataUrl) return null;
+    let stored = null;
+    if (window.api?.storeMessageImage) {
+      try {
+        stored = await window.api.storeMessageImage({
+          dataUrl,
+          name: file.name || basename(filePath) || "",
+          path: filePath || "",
+        });
+      } catch {
+        stored = null;
+      }
+    }
 
     return {
       type: "image",
       dataUrl,
       name: file.name || basename(filePath) || `image-${Date.now()}.png`,
       ...(filePath ? { path: filePath } : {}),
+      ...(stored?.storagePath ? { storagePath: stored.storagePath } : {}),
+      ...(stored?.mime ? { mime: stored.mime } : {}),
     };
   }
 

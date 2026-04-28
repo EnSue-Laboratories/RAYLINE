@@ -1,4 +1,4 @@
-import { memo, useState, useMemo, useRef } from "react";
+import { memo, useEffect, useState, useMemo, useRef } from "react";
 import { Pencil, FileText, PauseCircle, Terminal } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -199,6 +199,56 @@ function sanitizeText(text) {
 }
 
 const CONTROL_BLOCK_RE = /```control\s*\n([\s\S]*?)```/g;
+const MESSAGE_ROOT_STYLE = {
+  contentVisibility: "auto",
+  containIntrinsicSize: "180px",
+};
+
+function getImmediateImageSrc(image) {
+  if (typeof image === "string") return image;
+  if (!image || typeof image !== "object") return "";
+  return image.dataUrl || "";
+}
+
+function getStoredImagePath(image) {
+  if (!image || typeof image !== "object") return "";
+  return image.storagePath || "";
+}
+
+function MessageImage({ image }) {
+  const immediateSrc = getImmediateImageSrc(image);
+  const storagePath = getStoredImagePath(image);
+  const [storedSrc, setStoredSrc] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    if (immediateSrc || !storagePath || !window.api?.readImage) return () => { cancelled = true; };
+
+    window.api.readImage(storagePath).then((dataUrl) => {
+      if (!cancelled && dataUrl) setStoredSrc(dataUrl);
+    }).catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [immediateSrc, storagePath]);
+
+  const loadedSrc = immediateSrc || storedSrc;
+
+  if (!loadedSrc) {
+    return (
+      <div
+        style={{
+          height: 40,
+          width: 58,
+          borderRadius: 6,
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.06)",
+        }}
+      />
+    );
+  }
+
+  return <img src={loadedSrc} alt="" style={{ height: 40, borderRadius: 6, opacity: 0.8 }} />;
+}
 
 function splitControlBlocks(text) {
   if (!text) return [{ type: "markdown", text: "" }];
@@ -338,6 +388,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
     return (
       <div
         style={{
+          ...MESSAGE_ROOT_STYLE,
           marginBottom: 32,
           animation: "msgIn .4s cubic-bezier(.16,1,.3,1)",
           paddingTop: 28,
@@ -413,7 +464,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
             {msg.images && msg.images.length > 0 && (
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", marginBottom: 8 }}>
                 {msg.images.map((img, i) => (
-                  <img key={i} src={img} alt="" style={{ height: 40, borderRadius: 6, opacity: 0.8 }} />
+                  <MessageImage key={i} image={img} />
                 ))}
               </div>
             )}
@@ -508,6 +559,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
     return (
       <div
         style={{
+          ...MESSAGE_ROOT_STYLE,
           marginBottom: 28,
           animation: "msgIn .4s cubic-bezier(.16,1,.3,1)",
           textAlign: "left",
@@ -563,6 +615,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
   return (
     <div
       style={{
+        ...MESSAGE_ROOT_STYLE,
         marginBottom: 44,
         animation: "msgIn .4s cubic-bezier(.16,1,.3,1)",
         textAlign: "left",

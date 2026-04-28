@@ -192,6 +192,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
   // Track whether the user is near the bottom to toggle the scroll-to-bottom
   // button, and maintain follow-mode based on user scroll direction.
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const showScrollToBottomRef = useRef(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -213,7 +214,11 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
         followingRef.current = true;
       }
       lastScrollTop = el.scrollTop;
-      setShowScrollToBottom(distanceFromBottom > 120);
+      const nextShowScrollToBottom = distanceFromBottom > 120;
+      if (showScrollToBottomRef.current !== nextShowScrollToBottom) {
+        showScrollToBottomRef.current = nextShowScrollToBottom;
+        setShowScrollToBottom(nextShowScrollToBottom);
+      }
     };
     handleScroll();
     el.addEventListener("scroll", handleScroll, { passive: true });

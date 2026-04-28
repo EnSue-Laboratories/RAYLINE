@@ -3,6 +3,7 @@ const { initAutoUpdater, handleCheckForUpdates, handleDownloadUpdate, handleInst
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const crypto = require("crypto");
 const { startAgent, cancelAgent, cancelAll, rewindFiles, respondPermission } = require("./agent-manager.cjs");
 const { startCodexAgent, cancelCodexAgent, cancelAllCodex } = require("./codex-agent-manager.cjs");
 const {
@@ -50,6 +51,10 @@ const WALLPAPER_MIME_TYPES = {
   bmp: "image/bmp",
   avif: "image/avif",
 };
+const MIME_IMAGE_EXTENSIONS = Object.fromEntries(
+  Object.entries(WALLPAPER_MIME_TYPES).map(([ext, mime]) => [mime, ext])
+);
+const STORED_MESSAGE_IMAGE_TYPE = "rayline-stored-image";
 const OPENCODE_SUPPORTED_PROVIDERS_TTL_MS = 10 * 60 * 1000;
 
 let opencodeSupportedProvidersCache = [];
@@ -73,6 +78,8 @@ let terminalWindow;
 let terminalWindowRevealTimer = null;
 let pendingPreferredTerminalSessionName = null;
 let sidebarTerminalEnabledPreference = false;
+let latestPersistedState = null;
+let preservedPmRepos;
 const log = createLogger("main");
 const logCheckpointMain = createLogger("checkpoint-main");
 
@@ -237,6 +244,12 @@ function getWallpaperStorageDir() {
   return dir;
 }
 
+function getMessageImageStorageDir() {
+  const dir = path.join(app.getPath("userData"), "message-images");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 function getDraftsStorageDir() {
   const dir = path.join(app.getPath("userData"), "drafts");
   fs.mkdirSync(dir, { recursive: true });
@@ -268,6 +281,142 @@ function importWallpaperToStorage(sourcePath, previousPath) {
     removeManagedWallpaper(previousPath);
   }
   return storedPath;
+}
+
+function getImageExtFromMime(mime) {
+  return MIME_IMAGE_EXTENSIONS[String(mime || "").toLowerCase()] || "png";
+}
+
+function storeMessageImageDataUrl(dataUrl, meta = {}) {
+  if (typeof dataUrl !== "string") return null;
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/);
+  if (!match) return null;
+
+  const mime = match[1].toLowerCase();
+  const base64 = match[2].replace(/\s+/g, "");
+  const hash = crypto.createHash("sha256").update(base64).digest("hex");
+  const ext = getImageExtFromMime(mime);
+  const storedPath = path.join(getMessageImageStorageDir(), `${hash}.${ext}`);
+  if (!fs.existsSync(storedPath)) {
+    fs.writeFileSync(storedPath, Buffer.from(base64, "base64"));
+  }
+
+  return {
+    type: STORED_MESSAGE_IMAGE_TYPE,
+    storagePath: storedPath,
+    mime,
+    ...(typeof meta.name === "string" && meta.name ? { name: meta.name } : {}),
+    ...(typeof meta.path === "string" && meta.path ? { originalPath: meta.path } : {}),
+  };
+}
+
+function normalizeMessageImageForPersist(image) {
+  if (typeof image === "string") {
+    return storeMessageImageDataUrl(image) || image;
+  }
+
+  if (!image || typeof image !== "object") return null;
+
+  const storagePath =
+    typeof image.storagePath === "string" ? image.storagePath :
+    typeof image.path === "string" && image.type === STORED_MESSAGE_IMAGE_TYPE ? image.path :
+    "";
+  if (storagePath) {
+    return {
+      type: STORED_MESSAGE_IMAGE_TYPE,
+      storagePath,
+      ...(typeof image.mime === "string" ? { mime: image.mime } : {}),
+      ...(typeof image.name === "string" ? { name: image.name } : {}),
+      ...(typeof image.originalPath === "string" ? { originalPath: image.originalPath } : {}),
+    };
+  }
+
+  if (typeof image.dataUrl === "string") {
+    return storeMessageImageDataUrl(image.dataUrl, image) || image;
+  }
+
+  return image;
+}
+
+function normalizeMessageImagesForPersist(images) {
+  if (!Array.isArray(images) || images.length === 0) return images;
+  const normalized = images.map(normalizeMessageImageForPersist).filter(Boolean);
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function normalizeStateImagesForPersist(state) {
+  if (!state || typeof state !== "object") return state;
+  const convos = Array.isArray(state.convos)
+    ? state.convos.map((convo) => {
+        if (!convo || typeof convo !== "object" || !Array.isArray(convo.archivedMessages)) return convo;
+        return {
+          ...convo,
+          archivedMessages: convo.archivedMessages.map((message) => {
+            if (!message || typeof message !== "object" || !Array.isArray(message.images)) return message;
+            const images = normalizeMessageImagesForPersist(message.images);
+            return images ? { ...message, images } : { ...message, images: undefined };
+          }),
+        };
+      })
+    : state.convos;
+  return { ...state, ...(convos ? { convos } : {}) };
+}
+
+const MESSAGE_IMAGE_FILENAME_RE = /^[0-9a-f]{64}\.[a-z0-9]+$/;
+let messageImageSweepScheduled = false;
+
+function collectReferencedMessageImagePaths(state) {
+  const refs = new Set();
+  if (!state || typeof state !== "object") return refs;
+  const seen = new WeakSet();
+  const visit = (node) => {
+    if (!node || typeof node !== "object") return;
+    if (seen.has(node)) return;
+    seen.add(node);
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item);
+      return;
+    }
+    if (typeof node.storagePath === "string" && node.storagePath) {
+      refs.add(path.basename(node.storagePath));
+    }
+    for (const key of Object.keys(node)) {
+      const value = node[key];
+      if (value && typeof value === "object") visit(value);
+    }
+  };
+  visit(state);
+  return refs;
+}
+
+function sweepOrphanedMessageImages() {
+  try {
+    const state = latestPersistedState;
+    if (!state) return;
+    const dir = getMessageImageStorageDir();
+    const referenced = collectReferencedMessageImagePaths(state);
+    const entries = fs.readdirSync(dir);
+    let removed = 0;
+    for (const name of entries) {
+      if (!MESSAGE_IMAGE_FILENAME_RE.test(name)) continue;
+      if (referenced.has(name)) continue;
+      try {
+        fs.unlinkSync(path.join(dir, name));
+        removed += 1;
+      } catch (err) {
+        console.warn(`Failed to unlink orphaned message image ${name}:`, err);
+      }
+    }
+    if (removed > 0) log(`Swept ${removed} orphaned message image(s)`);
+  } catch (err) {
+    console.warn("Failed to sweep orphaned message images:", err);
+  }
+}
+
+function scheduleMessageImageSweep() {
+  if (messageImageSweepScheduled) return;
+  messageImageSweepScheduled = true;
+  setTimeout(sweepOrphanedMessageImages, 5000).unref?.();
 }
 
 function createWindow() {
@@ -637,6 +786,15 @@ ipcMain.handle("read-image", async (_event, filePath) => {
   }
 });
 
+ipcMain.handle("store-message-image", async (_event, input = {}) => {
+  try {
+    return storeMessageImageDataUrl(input.dataUrl, input);
+  } catch (error) {
+    console.error("Failed to store message image:", error);
+    return null;
+  }
+});
+
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
   if (opts.provider === "multica") {
@@ -757,20 +915,21 @@ ipcMain.handle("move-session", async (_event, sessionId, newCwd) => {
 // IPC: file-based state persistence (survives app name changes)
 const stateFilePath = path.join(app.getPath("userData"), "claudi-state.json");
 
+function rememberPersistedStateSnapshot(state) {
+  latestPersistedState = state && typeof state === "object" ? state : null;
+  if (state?.pmRepos !== undefined) {
+    preservedPmRepos = state.pmRepos;
+  }
+}
+
 function persistStateToDisk(state) {
   try {
     rememberTerminalSurfacePreference(state);
-    // Preserve pmRepos from PM window (main app state doesn't include it)
-    let existing = {};
-    try {
-      if (fs.existsSync(stateFilePath)) {
-        existing = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
-      }
-    } catch {}
-    const merged = { ...state };
-    if (existing.pmRepos !== undefined && state.pmRepos === undefined) {
-      merged.pmRepos = existing.pmRepos;
+    const merged = normalizeStateImagesForPersist({ ...state });
+    if (state?.pmRepos === undefined && preservedPmRepos !== undefined) {
+      merged.pmRepos = preservedPmRepos;
     }
+    rememberPersistedStateSnapshot(merged);
     fs.writeFileSync(stateFilePath, JSON.stringify(merged, null, 2));
     return true;
   } catch (e) {
@@ -796,8 +955,14 @@ ipcMain.on("save-state-sync", (event, state) => {
 ipcMain.handle("load-state", async () => {
   try {
     if (fs.existsSync(stateFilePath)) {
-      const state = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+      const rawState = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+      const state = normalizeStateImagesForPersist(rawState);
+      if (state !== rawState) {
+        fs.writeFileSync(stateFilePath, JSON.stringify(state, null, 2));
+      }
+      rememberPersistedStateSnapshot(state);
       rememberTerminalSurfacePreference(state);
+      scheduleMessageImageSweep();
       return state;
     }
     // Try migrating from old app name
@@ -807,9 +972,11 @@ ipcMain.handle("load-state", async () => {
     ];
     for (const old of oldPaths) {
       if (fs.existsSync(old)) {
-        const data = JSON.parse(fs.readFileSync(old, "utf-8"));
+        const data = normalizeStateImagesForPersist(JSON.parse(fs.readFileSync(old, "utf-8")));
         fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
+        rememberPersistedStateSnapshot(data);
         rememberTerminalSurfacePreference(data);
+        scheduleMessageImageSweep();
         return data;
       }
     }
@@ -2560,8 +2727,16 @@ ipcMain.handle("gh-auth-cancel", () => { ghManager.cancelWebAuth(); return true;
 
 ipcMain.handle("gh-load-pm-state", async () => {
   try {
+    if (latestPersistedState) {
+      return {
+        repos: latestPersistedState.pmRepos || [],
+        wallpaper: latestPersistedState.wallpaper || null,
+      };
+    }
     if (fs.existsSync(stateFilePath)) {
-      const data = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+      const data = normalizeStateImagesForPersist(JSON.parse(fs.readFileSync(stateFilePath, "utf-8")));
+      rememberPersistedStateSnapshot(data);
+      scheduleMessageImageSweep();
       return { repos: data.pmRepos || [], wallpaper: data.wallpaper || null };
     }
   } catch {}
@@ -2570,11 +2745,12 @@ ipcMain.handle("gh-load-pm-state", async () => {
 
 ipcMain.handle("gh-save-pm-state", async (_e, pmState) => {
   try {
-    let data = {};
-    if (fs.existsSync(stateFilePath)) {
-      data = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
+    let data = latestPersistedState ? { ...latestPersistedState } : {};
+    if (!latestPersistedState && fs.existsSync(stateFilePath)) {
+      data = normalizeStateImagesForPersist(JSON.parse(fs.readFileSync(stateFilePath, "utf-8")));
     }
     data.pmRepos = pmState.repos || [];
+    rememberPersistedStateSnapshot(data);
     fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
     return true;
   } catch { return false; }
