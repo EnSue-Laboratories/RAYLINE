@@ -968,6 +968,15 @@ function serializeMessagesForState(messages) {
         ...(part.kind ? { kind: part.kind } : {}),
         ...(part.title ? { title: part.title } : {}),
         ...(Number.isFinite(part.durationMs) ? { durationMs: part.durationMs } : {}),
+        // Image-part fields. `src` may be an https URL or a `data:` URL; the
+        // latter is large but acceptable here since the user already accepted
+        // the image into the conversation. `storagePath` lets the renderer
+        // re-fetch via window.api.readImage on reload without re-embedding.
+        ...(part.type === "image" && typeof part.src === "string" ? { src: part.src } : {}),
+        ...(part.type === "image" && typeof part.alt === "string" ? { alt: part.alt } : {}),
+        ...(part.type === "image" && typeof part.mime === "string" ? { mime: part.mime } : {}),
+        ...(part.type === "image" && typeof part.storagePath === "string" ? { storagePath: part.storagePath } : {}),
+        ...(part.type === "image" && typeof part.originalPath === "string" ? { originalPath: part.originalPath } : {}),
       }));
     }
     if (Array.isArray(message.images) && message.images.length > 0) {
@@ -1237,6 +1246,65 @@ export default function App() {
     window.addEventListener("open-multica-setup", h);
     return () => window.removeEventListener("open-multica-setup", h);
   }, []);
+
+  // Dev-only fixture: inject an assistant message exercising every
+  // image-rendering codepath (markdown ![](url), fenced ```image block, and
+  // a structured image part). Open the devtools console and call
+  // `__raylineDevAddImageDemo()` to drop the demo into the active conversation.
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    if (!import.meta.env?.DEV) return undefined;
+
+    const PUBLIC_DEMO_URL = "https://raw.githubusercontent.com/anthropics/anthropic-cookbook/main/images/anthropic_logo_horizontal.png";
+    const TINY_TRANSPARENT_PNG_DATA_URL =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=";
+
+    window.__raylineDevAddImageDemo = (conversationId) => {
+      const targetId = conversationId || activeConversationIdRef.current;
+      if (!targetId) {
+        console.warn("[devImageDemo] No active conversation. Open one first.");
+        return;
+      }
+      const existing = getConversation(targetId);
+      const fixtureUserMsg = {
+        id: "dev-img-user-" + Date.now(),
+        role: "user",
+        text: "Show me an image rendering demo.",
+        localOnly: true,
+      };
+      const fixtureAssistantMsg = {
+        id: "dev-img-assistant-" + Date.now(),
+        role: "assistant",
+        parts: [
+          {
+            type: "text",
+            text:
+              "Here are three ways the assistant can emit images:\n\n" +
+              "**1. Markdown image:** ![Anthropic logo](" + PUBLIC_DEMO_URL + ")\n\n" +
+              "**2. Inline base64 (1×1 transparent png):** ![tiny pixel](" + TINY_TRANSPARENT_PNG_DATA_URL + ")\n\n" +
+              "**3. Structured image part follows below, then a fenced ```image block:**",
+          },
+          {
+            type: "image",
+            id: "dev-img-part-1",
+            src: PUBLIC_DEMO_URL,
+            alt: "Anthropic logo (structured image part)",
+          },
+          {
+            type: "text",
+            text: "```image\n" + JSON.stringify({ src: PUBLIC_DEMO_URL, alt: "Anthropic logo (fenced image block)" }) + "\n```\n\nClick any image to expand it.",
+          },
+        ],
+      };
+      const merged = [...(existing?.messages || []), fixtureUserMsg, fixtureAssistantMsg];
+      replaceMessages(targetId, merged);
+      console.info("[devImageDemo] Injected fixture into conversation", targetId);
+    };
+
+    return () => {
+      try { delete window.__raylineDevAddImageDemo; } catch { /* ignore */ }
+    };
+  }, [getConversation, replaceMessages]);
   const messageQueue = useRef([]);
   const queueInterruptRequestedRef = useRef(new Set());
   // Guards the async preflight gap before useAgent flips `isStreaming`.
