@@ -3696,10 +3696,15 @@ export default function App() {
 
   const handleRefocusTerminal = () => {
     if (sidebarTerminalEnabled) {
-      setSidebarTerminalOpen(true);
+      if (sidebarTerminalOpen) {
+        terminal.focusActiveSession();
+        terminal.refitActiveSession();
+      }
       return;
     }
-    terminal.openWindow();
+    if (terminal.windowOpen) {
+      terminal.openWindow();
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
