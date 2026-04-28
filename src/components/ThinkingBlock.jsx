@@ -42,15 +42,15 @@ export default function ThinkingBlock({ text, isThinking, durationMs }) {
       <div style={{
         margin: "6px 0 10px",
         borderRadius: 8,
-        border: "1px solid rgba(255,255,255,0.04)",
-        background: "rgba(255,255,255,0.015)",
+        border: "1px solid var(--control-border)",
+        background: "var(--control-bg-subtle)",
         padding: "8px 10px",
         display: "flex",
         alignItems: "center",
         gap: 6,
-        color: "rgba(255,255,255,0.25)",
+        color: "var(--text-muted)",
         fontSize: s(11),
-        fontFamily: "'JetBrains Mono',monospace",
+        fontFamily: "var(--font-mono)",
         letterSpacing: ".04em",
       }}>
         Thought for {duration}
@@ -66,8 +66,8 @@ export default function ThinkingBlock({ text, isThinking, durationMs }) {
     <div style={{
       margin: "6px 0 10px",
       borderRadius: 8,
-      border: "1px solid rgba(255,255,255,0.04)",
-      background: "rgba(255,255,255,0.015)",
+      border: "1px solid var(--control-border)",
+      background: "var(--control-bg-subtle)",
       overflow: "hidden",
     }}>
       <button
@@ -81,14 +81,14 @@ export default function ThinkingBlock({ text, isThinking, durationMs }) {
           background: "none",
           border: "none",
           cursor: "pointer",
-          color: "rgba(255,255,255,0.3)",
+          color: "var(--text-muted)",
           fontSize: s(11),
-          fontFamily: "'JetBrains Mono',monospace",
+          fontFamily: "var(--font-mono)",
           letterSpacing: ".04em",
           transition: "color .15s",
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-secondary)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
       >
         {isThinking ? (
           <Loader2 size={12} strokeWidth={1.5} style={{ animation: "spin 1s linear infinite" }} />
@@ -111,8 +111,8 @@ export default function ThinkingBlock({ text, isThinking, durationMs }) {
           padding: "0 12px 10px",
           fontSize: s(12),
           lineHeight: 1.6,
-          fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.25)",
+          fontFamily: "var(--font-mono)",
+          color: "var(--text-muted)",
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
           maxHeight: 300,

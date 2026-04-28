@@ -88,7 +88,7 @@ function ProjectGroup({
           style={{
             display: "flex",
             alignItems: "center",
-            color: "rgba(255,255,255,0.25)",
+            color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
             transform: `rotate(${expanded ? 90 : 0}deg)`,
             transition: "transform .15s",
             flexShrink: 0,
@@ -102,7 +102,7 @@ function ProjectGroup({
           style={{
             display: "flex",
             alignItems: "center",
-            color: "rgba(255,255,255,0.3)",
+            color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
             flexShrink: 0,
           }}
         >
@@ -115,8 +115,8 @@ function ProjectGroup({
             flex: 1,
             minWidth: 0,
             fontSize: s(11),
-            fontFamily: "'JetBrains Mono', monospace",
-            color: "rgba(255,255,255,0.4)",
+            fontFamily: "var(--font-mono)",
+            color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
             letterSpacing: ".04em",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -135,8 +135,8 @@ function ProjectGroup({
                 top: "50%",
                 transform: "translateY(-50%)",
                 fontSize: s(9),
-                fontFamily: "'JetBrains Mono', monospace",
-                color: "rgba(255,255,255,0.15)",
+                fontFamily: "var(--font-mono)",
+                color: "color-mix(in srgb, var(--text-primary) 16%, transparent)",
                 letterSpacing: ".04em",
                 opacity: headerHovered ? 0 : 1,
                 pointerEvents: "none",
@@ -171,14 +171,14 @@ function ProjectGroup({
                 justifyContent: "center",
                 background: "none",
                 border: "none",
-                color: "rgba(255,255,255,0.25)",
+                color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
                 cursor: "pointer",
                 padding: 3,
                 borderRadius: 4,
                 transition: "color .15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 71%, transparent)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 27%, transparent)"; }}
             >
               <Plus size={11} strokeWidth={1.5} />
             </button>
@@ -193,14 +193,14 @@ function ProjectGroup({
                 justifyContent: "center",
                 background: "none",
                 border: "none",
-                color: "rgba(255,255,255,0.25)",
+                color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
                 cursor: "pointer",
                 padding: 3,
                 borderRadius: 4,
                 transition: "color .15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 71%, transparent)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 27%, transparent)"; }}
             >
               <MoreHorizontal size={11} strokeWidth={1.5} />
             </button>
@@ -229,9 +229,9 @@ function ProjectGroup({
             left: menuPos.left,
             zIndex: 400,
             minWidth: 180,
-            background: "rgba(8,8,12,0.55)",
+            background: "var(--pane-elevated)",
             backdropFilter: "blur(48px) saturate(1.2)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            border: "1px solid var(--pane-border)",
             borderRadius: 10,
             padding: 3,
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
@@ -265,7 +265,7 @@ function ProjectGroup({
           />
 
           {/* Divider */}
-          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "3px 8px" }} />
+          <div style={{ height: 1, background: "var(--control-bg)", margin: "3px 8px" }} />
 
           <MenuBtn
             s={s}
@@ -436,11 +436,11 @@ const ConversationRow = memo(function ConversationRow({
           <div
             style={{
               fontSize: s(12.5),
-              color: isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)",
+              color: isActive ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 49%, transparent)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
-              fontFamily: "system-ui,sans-serif",
+              fontFamily: "var(--font-ui)",
               marginBottom: 4,
             }}
           >
@@ -449,7 +449,7 @@ const ConversationRow = memo(function ConversationRow({
           <div
             style={{
               fontSize: s(11),
-              color: "rgba(255,255,255,0.3)",
+              color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -480,14 +480,14 @@ const ConversationRow = memo(function ConversationRow({
           style={{
             background: "none",
             border: "none",
-            color: "rgba(255,255,255,0.25)",
+            color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
             cursor: "pointer",
             padding: 1,
             transition: "color .15s",
             display: "flex",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(200,80,80,0.5)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.25)"; }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--danger-soft-text)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 27%, transparent)"; }}
         >
           <Trash2 size={12} strokeWidth={1.5} />
         </button>
@@ -505,8 +505,8 @@ const ConversationRow = memo(function ConversationRow({
         <div
           style={{
             fontSize: s(9),
-            fontFamily: "'JetBrains Mono',monospace",
-            color: "rgba(255,255,255,0.35)",
+            fontFamily: "var(--font-mono)",
+            color: "color-mix(in srgb, var(--text-primary) 38%, transparent)",
             letterSpacing: ".08em",
             minWidth: 0,
           }}
@@ -523,8 +523,8 @@ const ConversationRow = memo(function ConversationRow({
               flexShrink: 0,
               transform: "translateX(-2px)",
               fontSize: s(8.5),
-              fontFamily: "'JetBrains Mono',monospace",
-              color: "rgba(165,255,210,0.5)",
+              fontFamily: "var(--font-mono)",
+              color: "var(--badge-open-text)",
               letterSpacing: ".08em",
             }}
           >
@@ -533,7 +533,7 @@ const ConversationRow = memo(function ConversationRow({
                 width: 6,
                 height: 6,
                 borderRadius: "50%",
-                background: "rgba(165,255,210,0.5)",
+                background: "var(--badge-open-text)",
                 animation: "dotPulse 1.2s ease-in-out infinite",
               }}
             />
@@ -556,20 +556,20 @@ function MenuBtn({ s, label, onClick, danger = false }) {
         background: "transparent",
         border: "none",
         borderRadius: 7,
-        color: danger ? "rgba(210,80,80,0.7)" : "rgba(255,255,255,0.55)",
+        color: danger ? "var(--danger-soft-text)" : "color-mix(in srgb, var(--text-primary) 60%, transparent)",
         fontSize: s(11),
-        fontFamily: "system-ui, sans-serif",
+        fontFamily: "var(--font-ui)",
         cursor: "pointer",
         textAlign: "left",
         transition: "all .12s",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-        e.currentTarget.style.color = danger ? "rgba(220,90,90,1)" : "rgba(255,255,255,0.85)";
+        e.currentTarget.style.background = "var(--control-bg)";
+        e.currentTarget.style.color = danger ? "var(--danger-soft-text)" : "color-mix(in srgb, var(--text-primary) 92%, transparent)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = danger ? "rgba(210,80,80,0.7)" : "rgba(255,255,255,0.55)";
+        e.currentTarget.style.color = danger ? "var(--danger-soft-text)" : "color-mix(in srgb, var(--text-primary) 60%, transparent)";
       }}
     >
       {label}

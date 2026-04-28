@@ -16,12 +16,14 @@ import MulticaSetupModal from "./components/MulticaSetupModal";
 import NewProjectModal from "./components/NewProjectModal";
 import { DEFAULT_MODEL_ID, getAvailableModels, getMOrMulticaFallback, isMulticaModelId, normalizeModelId } from "./data/models";
 import { useMulticaModels } from "./data/multicaModels.jsx";
+import { useTheme } from "./contexts/ThemeContext.jsx";
 import { useOpenCodeModels } from "./data/openCodeModels.jsx";
 import { useProviderUpstreams } from "./data/providerUpstreams.jsx";
 import { getRuntimeSetupShell } from "./data/runtimeSetup";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
+import { applyAppearanceToDocument, applyAppearanceWindowBackground, normalizeAppearance } from "./utils/appearance";
 import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 import { detectDefaultLocale, normalizeLocale } from "./i18n";
@@ -1218,6 +1220,7 @@ export default function App() {
   const { createSession: createTerminalSession, sendInput: sendTerminalInput } = terminal;
   const prefersReducedMotion = usePrefersReducedMotion();
   const { models: multicaModels } = useMulticaModels();
+  const { resolved: resolvedTheme } = useTheme();
   const { models: openCodeModels, status: openCodeStatus, refresh: refreshOpenCodeModels } = useOpenCodeModels();
   const {
     getConfig: getProviderUpstreamConfig,
@@ -1236,6 +1239,7 @@ export default function App() {
   const [cliChecking, setCliChecking] = useState(false);
   const [runtimeSetupPreview] = useState(() => shouldPreviewRuntimeSetup());
   const [wallpaper, setWallpaper] = useState(null);
+  const [appearance, setAppearance] = useState(() => normalizeAppearance());
   const [locale, setLocale] = useState(() => detectDefaultLocale());
   const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE);
   const [sidebarActiveOpacity, setSidebarActiveOpacity] = useState(DEFAULT_SIDEBAR_ACTIVE_OPACITY);
@@ -1487,6 +1491,7 @@ export default function App() {
     fontSize,
     sidebarActiveOpacity,
     wallpaper: getPersistedWallpaper(wallpaper),
+    appearance,
     projects,
     draftsCollapsed,
     defaultPrBranch,
@@ -1501,6 +1506,7 @@ export default function App() {
     notificationsMuted,
     queuedMessages,
   }), [
+    appearance,
     appBlur,
     appOpacity,
     coauthorEnabled,
@@ -1773,6 +1779,7 @@ export default function App() {
         if (state.cwd) setCwd(state.cwd);
         if (state.defaultModel) setDefaultModel(normalizeModelId(state.defaultModel));
         if (state.locale) setLocale(normalizeLocale(state.locale));
+        if (state.appearance) setAppearance(normalizeAppearance(state.appearance));
         if (state.fontSize) setFontSize(state.fontSize);
         if (state.sidebarActiveOpacity != null) {
           setSidebarActiveOpacity(clampNumber(state.sidebarActiveOpacity, 0, 20, DEFAULT_SIDEBAR_ACTIVE_OPACITY));
@@ -1813,6 +1820,11 @@ export default function App() {
     });
     window.api.getDraftsPath?.().then((p) => { if (p) setDraftsPath(p); });
   }, []);
+
+  useEffect(() => {
+    applyAppearanceToDocument(appearance, resolvedTheme);
+    applyAppearanceWindowBackground(appearance, resolvedTheme, window.api);
+  }, [appearance, resolvedTheme]);
 
   // Listen for auto-updater status to drive the Sidebar badge
   useEffect(() => {
@@ -4029,6 +4041,8 @@ export default function App() {
         <Settings
           wallpaper={wallpaper}
           onWallpaperChange={setWallpaper}
+          appearance={appearance}
+          onAppearanceChange={(next) => setAppearance(normalizeAppearance(next))}
           fontSize={fontSize}
           onFontSizeChange={setFontSize}
           defaultPrBranch={defaultPrBranch}

@@ -2,13 +2,13 @@ import { useState, useRef, useEffect } from "react";
 
 const inputStyle = {
   width: "100%",
-  background: "var(--pane-hover)",
-  border: "1px solid var(--pane-border)",
+  background: "var(--control-bg)",
+  border: "1px solid var(--control-border)",
   borderRadius: 6,
   padding: "8px 10px",
-  color: "rgba(255,255,255,0.8)",
+  color: "var(--text-primary)",
   fontSize: 13,
-  fontFamily: "system-ui, sans-serif",
+  fontFamily: "var(--font-ui)",
   boxSizing: "border-box",
 };
 
@@ -98,8 +98,8 @@ export default function SearchableSelect({ options, value, onChange, placeholder
             background: "var(--pane-elevated)",
             backdropFilter: "blur(48px) saturate(1.2)",
             WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-            border: "1px solid var(--pane-border)",
+            boxShadow: "var(--shadow-md)",
+            border: "1px solid var(--control-border)",
             borderRadius: 6,
             zIndex: 50,
           }}
@@ -112,8 +112,8 @@ export default function SearchableSelect({ options, value, onChange, placeholder
               style={{
                 padding: "6px 10px",
                 fontSize: 13,
-                fontFamily: "system-ui, sans-serif",
-                color: opt === value ? "rgba(180,220,255,0.9)" : "rgba(255,255,255,0.7)",
+                fontFamily: "var(--font-ui)",
+                color: opt === value ? "var(--accent-text)" : "var(--text-secondary)",
                 background: i === highlightIdx ? "var(--pane-hover)" : "transparent",
                 cursor: "pointer",
               }}

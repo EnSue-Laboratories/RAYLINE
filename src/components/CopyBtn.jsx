@@ -22,7 +22,7 @@ export default function CopyBtn({ text, title = "Copy" }) {
       style={{
         background: "none",
         border: "none",
-        color: ok ? "rgba(160,200,140,0.6)" : "rgba(255,255,255,0.3)",
+        color: ok ? "var(--accent)" : "var(--text-muted)",
         cursor: "pointer",
         padding: "2px 4px",
         borderRadius: 3,
@@ -31,10 +31,10 @@ export default function CopyBtn({ text, title = "Copy" }) {
         alignItems: "center",
         gap: 3,
         fontSize: s(10),
-        fontFamily: "'JetBrains Mono',monospace",
+        fontFamily: "var(--font-mono)",
       }}
-      onMouseEnter={(e) => { if (!ok) e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-      onMouseLeave={(e) => { if (!ok) e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+      onMouseEnter={(e) => { if (!ok) e.currentTarget.style.color = "var(--text-secondary)"; }}
+      onMouseLeave={(e) => { if (!ok) e.currentTarget.style.color = "var(--text-muted)"; }}
     >
       {ok ? <Check size={12} strokeWidth={1.5} /> : <Copy size={12} strokeWidth={1.5} />}
       {ok ? "copied" : ""}

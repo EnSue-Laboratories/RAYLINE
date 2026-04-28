@@ -6,10 +6,23 @@ const FOCUSED_FRAME_MS = 1000 / 60;
 const BACKGROUND_FRAME_MS = 1000 / 12;
 const REDUCED_MOTION_FRAME_MS = 1000 / 8;
 
+function readRootCssVar(name, fallback) {
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+function getAuroraStops() {
+  return {
+    bg: readRootCssVar("--aurora-bg", "#0D0D0F"),
+    glow: readRootCssVar("--aurora-glow", "rgba(255,255,255,0.018)"),
+  };
+}
+
 export default function AuroraCanvas() {
   const ref = useRef(null);
   const tRef = useRef(0);
   const lastFrameAtRef = useRef(0);
+  const stopsRef = useRef(getAuroraStops());
   const { isVisible, isFocused, prefersReducedMotion } = useWindowActivity();
   const frameBudgetRef = useRef(FOCUSED_FRAME_MS);
 
@@ -41,7 +54,8 @@ export default function AuroraCanvas() {
     resize();
 
     const renderFrame = () => {
-      ctx.fillStyle = "#0D0D0F";
+      const stops = stopsRef.current;
+      ctx.fillStyle = stops.bg;
       ctx.fillRect(0, 0, w, h);
 
       // Compute orb positions
@@ -60,7 +74,7 @@ export default function AuroraCanvas() {
       for (var gi = 0; gi < orbPositions.length; gi++) {
         var gp = orbPositions[gi];
         var grad = ctx.createRadialGradient(gp.x, gp.y, 0, gp.x, gp.y, gp.r * 0.7);
-        grad.addColorStop(0, "rgba(255,255,255,0.018)");
+        grad.addColorStop(0, stops.glow);
         grad.addColorStop(1, "transparent");
         ctx.fillStyle = grad;
         ctx.beginPath();
@@ -90,10 +104,18 @@ export default function AuroraCanvas() {
     if (isVisible) {
       raf = requestAnimationFrame(draw);
     }
+    const handleThemeChange = () => {
+      stopsRef.current = getAuroraStops();
+      renderFrame();
+    };
     window.addEventListener("resize", resize);
+    window.addEventListener("rayline:theme-change", handleThemeChange);
+    window.addEventListener("rayline:appearance-change", handleThemeChange);
     return () => {
       if (raf != null) cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      window.removeEventListener("rayline:theme-change", handleThemeChange);
+      window.removeEventListener("rayline:appearance-change", handleThemeChange);
     };
   }, [isVisible]);
 

@@ -82,8 +82,8 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
       style={{
         margin: "12px 0",
         borderRadius: 10,
-        border: "1px solid rgba(255,255,255,0.08)",
-        background: "rgba(255,255,255,0.025)",
+        border: "1px solid var(--control-border)",
+        background: "var(--control-bg)",
         overflow: "hidden",
       }}
     >
@@ -94,14 +94,14 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
           alignItems: "center",
           gap: 8,
           padding: "9px 14px",
-          borderBottom: "1px solid rgba(255,255,255,0.05)",
+          borderBottom: "1px solid var(--control-bg-strong)",
         }}
       >
         <span
           style={{
             fontSize: s(10),
-            fontFamily: "'JetBrains Mono',monospace",
-            color: "rgba(255,255,255,0.3)",
+            fontFamily: "var(--font-mono)",
+            color: "var(--text-muted)",
             letterSpacing: ".1em",
           }}
         >
@@ -121,9 +121,9 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                   style={{
                     display: "inline-block",
                     fontSize: s(9),
-                    fontFamily: "'JetBrains Mono',monospace",
-                    color: "rgba(255,255,255,0.35)",
-                    background: "rgba(255,255,255,0.05)",
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--text-muted)",
+                    background: "var(--control-bg-strong)",
                     padding: "2px 7px",
                     borderRadius: 4,
                     letterSpacing: ".08em",
@@ -138,8 +138,8 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
               <div
                 style={{
                   fontSize: s(14),
-                  color: "rgba(255,255,255,0.82)",
-                  fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
+                  color: "var(--text-primary)",
+                  fontFamily: "var(--font-content)",
                   lineHeight: 1.6,
                   marginBottom: 10,
                 }}
@@ -163,11 +163,11 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                         width: "100%",
                         padding: "9px 11px",
                         background: selected
-                          ? "rgba(255,255,255,0.07)"
-                          : "rgba(255,255,255,0.015)",
+                          ? "var(--control-bg-strong)"
+                          : "var(--control-bg-subtle)",
                         border: selected
-                          ? "1px solid rgba(255,255,255,0.18)"
-                          : "1px solid rgba(255,255,255,0.05)",
+                          ? "1px solid var(--control-border-active)"
+                          : "1px solid var(--control-bg-strong)",
                         borderRadius: 8,
                         cursor: submitted ? "default" : "pointer",
                         textAlign: "left",
@@ -176,14 +176,14 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                       }}
                       onMouseEnter={(e) => {
                         if (!selected && !submitted) {
-                          e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-                          e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
+                          e.currentTarget.style.background = "var(--control-bg)";
+                          e.currentTarget.style.borderColor = "var(--control-bg-active)";
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!selected && !submitted) {
-                          e.currentTarget.style.background = "rgba(255,255,255,0.015)";
-                          e.currentTarget.style.borderColor = "rgba(255,255,255,0.05)";
+                          e.currentTarget.style.background = "var(--control-bg-subtle)";
+                          e.currentTarget.style.borderColor = "var(--control-bg-strong)";
                         }
                       }}
                     >
@@ -194,10 +194,10 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                           height: 16,
                           borderRadius: q.multiSelect ? 3 : 8,
                           border: selected
-                            ? "1.5px solid rgba(255,255,255,0.5)"
-                            : "1.5px solid rgba(255,255,255,0.15)",
+                            ? "1.5px solid var(--text-secondary)"
+                            : "1.5px solid var(--control-border-strong)",
                           background: selected
-                            ? "rgba(255,255,255,0.12)"
+                            ? "var(--control-bg-active)"
                             : "transparent",
                           display: "flex",
                           alignItems: "center",
@@ -207,15 +207,15 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                           transition: "all .15s ease",
                         }}
                       >
-                        {selected && <Check size={10} strokeWidth={2.5} style={{ color: "rgba(255,255,255,0.8)" }} />}
+                        {selected && <Check size={10} strokeWidth={2.5} style={{ color: "var(--text-primary)" }} />}
                       </div>
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
                             fontSize: s(13),
-                            fontFamily: "system-ui,-apple-system,sans-serif",
-                            color: selected ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.6)",
+                            fontFamily: "var(--font-ui)",
+                            color: selected ? "var(--text-primary)" : "var(--text-secondary)",
                             fontWeight: 500,
                             lineHeight: 1.4,
                           }}
@@ -226,8 +226,8 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                           <div
                             style={{
                               fontSize: s(11),
-                              color: "rgba(255,255,255,0.3)",
-                              fontFamily: "system-ui,-apple-system,sans-serif",
+                              color: "var(--text-muted)",
+                              fontFamily: "var(--font-ui)",
                               lineHeight: 1.5,
                               marginTop: 2,
                             }}
@@ -241,7 +241,7 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                         size={13}
                         strokeWidth={1.5}
                         style={{
-                          color: selected ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.08)",
+                          color: selected ? "var(--text-muted)" : "var(--control-border)",
                           flexShrink: 0,
                           marginTop: 2,
                           transition: "color .15s ease",
@@ -261,12 +261,12 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                     style={{
                       width: "100%",
                       marginTop: 4,
-                      background: "rgba(255,255,255,0.015)",
-                      border: "1px solid rgba(255,255,255,0.05)",
+                      background: "var(--control-bg-subtle)",
+                      border: "1px solid var(--control-bg-strong)",
                       borderRadius: 8,
-                      color: "rgba(255,255,255,0.6)",
+                      color: "var(--text-secondary)",
                       fontSize: s(13),
-                      fontFamily: "system-ui,-apple-system,sans-serif",
+                      fontFamily: "var(--font-ui)",
                       fontWeight: 400,
                       lineHeight: 1.4,
                       padding: "9px 11px",
@@ -289,11 +289,11 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
                 borderRadius: 6,
                 border: "none",
                 fontSize: s(12),
-                fontFamily: "system-ui,-apple-system,sans-serif",
+                fontFamily: "var(--font-ui)",
                 fontWeight: 500,
                 cursor: hasAnswer ? "pointer" : "default",
-                background: hasAnswer ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.06)",
-                color: hasAnswer ? "#000" : "rgba(255,255,255,0.2)",
+                background: hasAnswer ? "var(--text-primary)" : "var(--control-bg-strong)",
+                color: hasAnswer ? "var(--text-inverse)" : "var(--text-disabled)",
                 transition: "all .2s ease",
               }}
             >
@@ -306,8 +306,8 @@ export default function AskUserQuestionBlock({ tool, onAnswer }) {
           <div style={{
             marginTop: 10,
             fontSize: s(10),
-            fontFamily: "'JetBrains Mono',monospace",
-            color: "rgba(255,255,255,0.25)",
+            fontFamily: "var(--font-mono)",
+            color: "var(--text-faint)",
             letterSpacing: ".06em",
           }}>
             ANSWERED

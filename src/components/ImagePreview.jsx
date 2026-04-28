@@ -33,7 +33,7 @@ export default function ImagePreview({ items, onRemove }) {
               alignItems: "center",
               gap: 6,
               fontSize: s(11),
-              fontFamily: "'JetBrains Mono',monospace",
+              fontFamily: "var(--font-mono)",
               color: "rgba(255,255,255,0.5)",
             }}>
               <FileText size={13} strokeWidth={1.5} />

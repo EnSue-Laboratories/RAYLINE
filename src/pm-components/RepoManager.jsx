@@ -55,13 +55,13 @@ export default function RepoManager({ repos, onAdd, onClose, locale }) {
           background: "var(--pane-elevated)",
           backdropFilter: "blur(48px) saturate(1.2)",
           WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          boxShadow: "var(--shadow-md)",
           borderRadius: 12,
           border: "1px solid var(--pane-border)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          fontFamily: "system-ui, sans-serif",
+          fontFamily: "var(--font-ui)",
         }}
       >
         {/* Header */}
@@ -71,7 +71,7 @@ export default function RepoManager({ repos, onAdd, onClose, locale }) {
             alignItems: "center",
             justifyContent: "space-between",
             padding: "16px 20px",
-            borderBottom: "1px solid rgba(255,255,255,0.04)",
+            borderBottom: "1px solid var(--control-border-soft)",
             flexShrink: 0,
           }}
         >
@@ -79,7 +79,7 @@ export default function RepoManager({ repos, onAdd, onClose, locale }) {
             style={{
               fontSize: 14,
               fontWeight: 500,
-              color: "rgba(255,255,255,0.85)",
+              color: "var(--text-primary)",
             }}
           >
             {t("pm.addRepositoryTitle")}
@@ -92,7 +92,7 @@ export default function RepoManager({ repos, onAdd, onClose, locale }) {
               borderRadius: 7,
               border: "1px solid var(--pane-border)",
               background: "var(--pane-hover)",
-              color: "rgba(255,255,255,0.5)",
+              color: "var(--text-muted)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -116,11 +116,11 @@ export default function RepoManager({ repos, onAdd, onClose, locale }) {
               width: "100%",
               padding: "8px 12px",
               borderRadius: 7,
-              border: "1px solid var(--pane-border)",
-              background: "var(--pane-hover)",
-              color: "rgba(255,255,255,0.85)",
+              border: "1px solid var(--control-border)",
+              background: "var(--control-bg)",
+              color: "var(--text-primary)",
               fontSize: 13,
-              fontFamily: "system-ui, sans-serif",
+              fontFamily: "var(--font-ui)",
               outline: "none",
               boxSizing: "border-box",
             }}
@@ -136,7 +136,7 @@ export default function RepoManager({ repos, onAdd, onClose, locale }) {
                 alignItems: "center",
                 justifyContent: "center",
                 padding: 40,
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-muted)",
               }}
             >
               <Loader2
@@ -163,10 +163,10 @@ export default function RepoManager({ repos, onAdd, onClose, locale }) {
               <button
                 onClick={fetchRepos}
                 style={{
-                  background: "var(--pane-hover)",
-                  border: "1px solid var(--pane-border)",
+                  background: "var(--control-bg)",
+                  border: "1px solid var(--control-border)",
                   borderRadius: 6,
-                  color: "rgba(255,255,255,0.6)",
+                  color: "var(--text-secondary)",
                   fontSize: 12,
                   padding: "6px 14px",
                   cursor: "pointer",
@@ -180,7 +180,7 @@ export default function RepoManager({ repos, onAdd, onClose, locale }) {
               style={{
                 padding: 40,
                 textAlign: "center",
-                color: "rgba(255,255,255,0.3)",
+                color: "var(--text-muted)",
                 fontSize: 13,
               }}
             >
@@ -238,11 +238,11 @@ function RepoRow({ repo, added, onClick, addedLabel }) {
         <div
           style={{
             fontSize: 13,
-            color: "rgba(255,255,255,0.85)",
+            color: "var(--text-primary)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            fontFamily: "system-ui, sans-serif",
+            fontFamily: "var(--font-ui)",
           }}
         >
           {repo.nameWithOwner}
@@ -251,12 +251,12 @@ function RepoRow({ repo, added, onClick, addedLabel }) {
           <div
             style={{
               fontSize: 11,
-              color: "rgba(255,255,255,0.3)",
+              color: "var(--text-muted)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
               marginTop: 2,
-              fontFamily: "system-ui, sans-serif",
+              fontFamily: "var(--font-ui)",
             }}
           >
             {repo.description}
@@ -267,8 +267,8 @@ function RepoRow({ repo, added, onClick, addedLabel }) {
         <span
           style={{
             fontSize: 10,
-            fontFamily: "'JetBrains Mono', monospace",
-            color: "rgba(255,255,255,0.3)",
+            fontFamily: "var(--font-mono)",
+            color: "var(--text-muted)",
             letterSpacing: ".06em",
             marginLeft: 8,
             flexShrink: 0,

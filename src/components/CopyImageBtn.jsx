@@ -165,7 +165,7 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
         alignItems: "center",
         gap: 3,
         fontSize: s(10),
-        fontFamily: "'JetBrains Mono',monospace",
+        fontFamily: "var(--font-mono)",
       }}
       onMouseEnter={(e) => {
         if (status === "idle") {
