@@ -11,6 +11,7 @@ import { useProviderUpstreams } from "../data/providerUpstreams.jsx";
 import WindowDragSpacer from "./WindowDragSpacer";
 
 const EMPTY_UPSTREAM_CONFIG = {
+  enabled: false,
   baseURL: "",
   apiKey: "",
   modelListText: "",
@@ -44,7 +45,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     clearConfig: clearUpstreamConfig,
   } = useProviderUpstreams();
   const [upstreamDrafts, setUpstreamDrafts] = useState(() => normalizeUpstreamDrafts(upstreamConfigsByProvider));
-  const [upstreamMessage, setUpstreamMessage] = useState("");
+  const [upstreamDirtyProviders, setUpstreamDirtyProviders] = useState({});
+  const [upstreamMessages, setUpstreamMessages] = useState({});
   const [openCodeDraft, setOpenCodeDraft] = useState({
     providerId: "openrouter",
     modelId: "",
@@ -198,8 +200,12 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   }, [multicaServerDirty, normalizedMulticaServerDraft]);
 
   useEffect(() => {
-    setUpstreamDrafts(normalizeUpstreamDrafts(upstreamConfigsByProvider));
-  }, [upstreamConfigsByProvider]);
+    const normalized = normalizeUpstreamDrafts(upstreamConfigsByProvider);
+    setUpstreamDrafts((prev) => ({
+      claude: upstreamDirtyProviders.claude ? (prev.claude || normalized.claude) : normalized.claude,
+      codex: upstreamDirtyProviders.codex ? (prev.codex || normalized.codex) : normalized.codex,
+    }));
+  }, [upstreamConfigsByProvider, upstreamDirtyProviders]);
 
   const updateUpstreamDraft = useCallback((provider, patch) => {
     setUpstreamDrafts((prev) => ({
@@ -209,12 +215,31 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
         ...patch,
       },
     }));
-    setUpstreamMessage("");
+    setUpstreamDirtyProviders((prev) => ({ ...prev, [provider]: true }));
+    setUpstreamMessages((prev) => ({ ...prev, [provider]: "" }));
   }, []);
 
   const handleSaveUpstreamConfig = useCallback((provider) => {
     saveUpstreamConfig(provider, upstreamDrafts[provider] || EMPTY_UPSTREAM_CONFIG);
-    setUpstreamMessage(t("settings.upstreamSaved"));
+    setUpstreamDirtyProviders((prev) => ({ ...prev, [provider]: false }));
+    setUpstreamMessages((prev) => ({ ...prev, [provider]: t("settings.upstreamSaved") }));
+  }, [saveUpstreamConfig, t, upstreamDrafts]);
+
+  const handleToggleUpstreamConfig = useCallback((provider, enabled) => {
+    const nextDraft = {
+      ...(upstreamDrafts[provider] || EMPTY_UPSTREAM_CONFIG),
+      enabled,
+    };
+    setUpstreamDrafts((prev) => ({
+      ...prev,
+      [provider]: nextDraft,
+    }));
+    saveUpstreamConfig(provider, nextDraft);
+    setUpstreamDirtyProviders((prev) => ({ ...prev, [provider]: false }));
+    setUpstreamMessages((prev) => ({
+      ...prev,
+      [provider]: enabled ? t("settings.upstreamEnabledSaved") : t("settings.upstreamDisabledSaved"),
+    }));
   }, [saveUpstreamConfig, t, upstreamDrafts]);
 
   const handleClearUpstreamConfig = useCallback((provider) => {
@@ -223,7 +248,8 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
       ...prev,
       [provider]: { ...EMPTY_UPSTREAM_CONFIG },
     }));
-    setUpstreamMessage(t("settings.upstreamCleared"));
+    setUpstreamDirtyProviders((prev) => ({ ...prev, [provider]: false }));
+    setUpstreamMessages((prev) => ({ ...prev, [provider]: t("settings.upstreamCleared") }));
   }, [clearUpstreamConfig, t]);
 
   const updateOpenCodeDraft = useCallback((patch) => {
@@ -449,6 +475,33 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     cursor: active ? "pointer" : "not-allowed",
     transition: "all .2s",
     fontFamily: "system-ui, sans-serif",
+  });
+
+  const switchStyle = (enabled) => ({
+    position: "relative",
+    flexShrink: 0,
+    width: 42,
+    height: 23,
+    padding: 2,
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 999,
+    WebkitAppearance: "none",
+    appearance: "none",
+    background: enabled ? "rgba(210,230,255,0.24)" : "rgba(255,255,255,0.045)",
+    boxShadow: enabled ? "inset 0 0 0 1px rgba(210,230,255,0.12)" : "none",
+    cursor: "pointer",
+    transition: "all .2s",
+  });
+
+  const switchKnobStyle = (enabled) => ({
+    display: "block",
+    width: 17,
+    height: 17,
+    borderRadius: "50%",
+    background: enabled ? "rgba(245,248,255,0.95)" : "rgba(255,255,255,0.38)",
+    transform: enabled ? "translateX(17px)" : "translateX(0)",
+    transition: "all .2s",
+    boxShadow: enabled ? "0 2px 10px rgba(190,220,255,0.24)" : "0 2px 8px rgba(0,0,0,0.18)",
   });
 
   const openCodeProviderOptions = useMemo(() => [
@@ -918,14 +971,24 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
               {upstreamProviderDefs.map((def) => {
                 const draft = upstreamDrafts[def.id] || EMPTY_UPSTREAM_CONFIG;
                 const configured = Boolean(draft.baseURL.trim() || draft.apiKey.trim() || draft.modelListText.trim());
+                const enabled = Boolean(draft.enabled);
+                const activeOverride = enabled && configured;
+                const statusText = activeOverride
+                  ? t("settings.upstreamConfigured")
+                  : enabled
+                    ? t("settings.upstreamEnabledNoConfig")
+                    : configured
+                      ? t("settings.upstreamSavedDisabled")
+                      : t("settings.upstreamUsingDefault");
+                const providerMessage = upstreamMessages[def.id] || "";
                 return (
                   <div
                     key={def.id}
                     style={{
-                      padding: 10,
+                      padding: 12,
                       border: "1px solid rgba(255,255,255,0.06)",
                       borderRadius: 8,
-                      background: "rgba(255,255,255,0.025)",
+                      background: enabled ? "rgba(255,255,255,0.035)" : "rgba(255,255,255,0.02)",
                     }}
                   >
                     <div
@@ -934,7 +997,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                         alignItems: "center",
                         justifyContent: "space-between",
                         gap: 10,
-                        marginBottom: 8,
+                        marginBottom: enabled ? 10 : 0,
                       }}
                     >
                       <div style={{ minWidth: 0 }}>
@@ -944,7 +1007,7 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                             color: "rgba(255,255,255,0.76)",
                           }}
                         >
-                          {def.label}
+                          {t("settings.upstreamOverrideTitle", { provider: def.label })}
                         </div>
                         <div
                           style={{
@@ -953,106 +1016,127 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                             marginTop: 2,
                           }}
                         >
-                          {configured ? t("settings.upstreamConfigured") : t("settings.upstreamUsingDefault")}
+                          {statusText}
                         </div>
                       </div>
-                      {configured && (
-                        <span
-                          style={{
-                            flexShrink: 0,
-                            padding: "2px 5px",
-                            borderRadius: 5,
-                            border: "1px solid rgba(180,220,255,0.18)",
-                            background: "rgba(180,220,255,0.08)",
-                            color: "rgba(210,230,255,0.72)",
-                            fontSize: s(9),
-                            fontFamily: "'JetBrains Mono', monospace",
-                            lineHeight: 1,
-                          }}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "flex-end",
+                          gap: 8,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {configured && (
+                          <span
+                            style={{
+                              flexShrink: 0,
+                              padding: "2px 5px",
+                              borderRadius: 5,
+                              border: activeOverride ? "1px solid rgba(180,220,255,0.18)" : "1px solid rgba(255,255,255,0.08)",
+                              background: activeOverride ? "rgba(180,220,255,0.08)" : "rgba(255,255,255,0.035)",
+                              color: activeOverride ? "rgba(210,230,255,0.72)" : "rgba(255,255,255,0.38)",
+                              fontSize: s(9),
+                              fontFamily: "'JetBrains Mono', monospace",
+                              lineHeight: 1,
+                            }}
+                          >
+                            {activeOverride ? t("settings.upstreamOverrideBadge") : t("settings.upstreamDisabledBadge")}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={enabled}
+                          aria-label={t("settings.upstreamEnableLabel", { provider: def.label })}
+                          onClick={() => handleToggleUpstreamConfig(def.id, !enabled)}
+                          style={switchStyle(enabled)}
                         >
-                          {t("settings.upstreamOverrideBadge")}
-                        </span>
-                      )}
+                          <span style={switchKnobStyle(enabled)} />
+                        </button>
+                      </div>
                     </div>
 
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                        gap: 8,
-                        marginBottom: 8,
-                      }}
-                    >
-                      <input
-                        type="text"
-                        value={draft.baseURL}
-                        placeholder={t("settings.upstreamBaseUrlPlaceholder")}
-                        onChange={(e) => updateUpstreamDraft(def.id, { baseURL: e.target.value })}
-                        spellCheck={false}
-                        style={inputStyle}
-                      />
-                      <input
-                        type="password"
-                        value={draft.apiKey}
-                        placeholder={t("settings.upstreamApiKeyPlaceholder")}
-                        onChange={(e) => updateUpstreamDraft(def.id, { apiKey: e.target.value })}
-                        spellCheck={false}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <textarea
-                      value={draft.modelListText}
-                      placeholder={t("settings.upstreamModelListPlaceholder")}
-                      onChange={(e) => updateUpstreamDraft(def.id, { modelListText: e.target.value })}
-                      spellCheck={false}
-                      style={textareaStyle}
-                    />
-                    <div
-                      style={{
-                        fontSize: s(10),
-                        color: "rgba(255,255,255,0.28)",
-                        marginTop: 6,
-                        marginBottom: 10,
-                      }}
-                    >
-                      {t("settings.upstreamModelListHint")}
-                    </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button
-                        type="button"
-                        onClick={() => handleClearUpstreamConfig(def.id)}
-                        disabled={!configured}
-                        style={compactButtonStyle(configured)}
+                    {enabled && (
+                      <>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                            gap: 8,
+                            marginBottom: 8,
+                          }}
+                        >
+                          <input
+                            type="text"
+                            value={draft.baseURL}
+                            placeholder={t("settings.upstreamBaseUrlPlaceholder")}
+                            onChange={(e) => updateUpstreamDraft(def.id, { baseURL: e.target.value })}
+                            spellCheck={false}
+                            style={inputStyle}
+                          />
+                          <input
+                            type="password"
+                            value={draft.apiKey}
+                            placeholder={t("settings.upstreamApiKeyPlaceholder")}
+                            onChange={(e) => updateUpstreamDraft(def.id, { apiKey: e.target.value })}
+                            spellCheck={false}
+                            style={inputStyle}
+                          />
+                        </div>
+                        <textarea
+                          value={draft.modelListText}
+                          placeholder={t("settings.upstreamModelListPlaceholder")}
+                          onChange={(e) => updateUpstreamDraft(def.id, { modelListText: e.target.value })}
+                          spellCheck={false}
+                          style={textareaStyle}
+                        />
+                        <div
+                          style={{
+                            fontSize: s(10),
+                            color: "rgba(255,255,255,0.28)",
+                            marginTop: 6,
+                            marginBottom: 10,
+                          }}
+                        >
+                          {t("settings.upstreamModelListHint")}
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            onClick={() => handleClearUpstreamConfig(def.id)}
+                            disabled={!configured}
+                            style={compactButtonStyle(configured)}
+                          >
+                            {t("settings.upstreamClear")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveUpstreamConfig(def.id)}
+                            style={compactButtonStyle(true)}
+                          >
+                            <Check size={12} strokeWidth={1.8} />
+                            {t("settings.upstreamSave")}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    {providerMessage && (
+                      <div
+                        style={{
+                          fontSize: s(11),
+                          color: "rgba(205,255,214,0.74)",
+                          marginTop: enabled ? 10 : 8,
+                        }}
                       >
-                        {t("settings.upstreamClear")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSaveUpstreamConfig(def.id)}
-                        style={compactButtonStyle(true)}
-                      >
-                        <Check size={12} strokeWidth={1.8} />
-                        {t("settings.upstreamSave")}
-                      </button>
-                    </div>
+                        {providerMessage}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
-
-            {upstreamMessage && (
-              <div
-                style={{
-                  fontSize: s(11),
-                  color: upstreamMessage === t("settings.upstreamSaved") || upstreamMessage === t("settings.upstreamCleared")
-                    ? "rgba(205,255,214,0.74)"
-                    : "rgba(255,210,160,0.74)",
-                  marginTop: 10,
-                }}
-              >
-                {upstreamMessage}
-              </div>
-            )}
           </div>
 
           <div style={{ marginBottom: 28 }}>

@@ -2,6 +2,7 @@ const STORAGE_KEY = "rayline.providerUpstreams.v1";
 
 const SUPPORTED_PROVIDERS = ["claude", "codex"];
 const DEFAULT_CONFIG = {
+  enabled: false,
   baseURL: "",
   apiKey: "",
   modelListText: "",
@@ -40,10 +41,15 @@ function normalizeProviderConfig(entry) {
   const modelListText = rawModelList
     ? rawModelList.map((model) => safeString(model)).filter(Boolean).join("\n")
     : safeString(entry.modelListText || entry.modelsText || entry.models || entry.model);
+  const baseURL = safeString(entry.baseURL || entry.baseUrl);
+  const apiKey = safeString(entry.apiKey);
+  const hasConfig = Boolean(baseURL || apiKey || modelListText);
+  const enabled = typeof entry.enabled === "boolean" ? entry.enabled : hasConfig;
 
   return {
-    baseURL: safeString(entry.baseURL || entry.baseUrl),
-    apiKey: safeString(entry.apiKey),
+    enabled,
+    baseURL,
+    apiKey,
     modelListText,
   };
 }
@@ -65,6 +71,7 @@ function migrateProfileState(state) {
 
     if (profile) {
       next[provider] = normalizeProviderConfig({
+        enabled: profile.enabled !== false,
         baseURL: profile.baseURL,
         apiKey: profile.apiKey,
         modelListText: profile.model,
@@ -147,6 +154,7 @@ export function getProviderUpstreamConfig(provider, state = loadProviderUpstream
   if (!normalizedProvider) return null;
   const config = normalizeProviderConfig(state?.providers?.[normalizedProvider]);
   const modelList = parseModelList(config.modelListText);
+  if (!config.enabled) return null;
   if (!config.baseURL && !config.apiKey && modelList.length === 0) return null;
   return {
     provider: normalizedProvider,
