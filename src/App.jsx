@@ -2210,10 +2210,17 @@ export default function App() {
 
   const handleEditProjectContext = useCallback((cwdRoot, context) => {
     const projectRoot = getMainRepoRoot(cwdRoot);
-    setProjects((prev) => ({
-      ...prev,
-      [projectRoot]: { ...prev[projectRoot], context: context || "" },
-    }));
+    setProjects((prev) => {
+      const existing = prev[projectRoot] || {};
+      return {
+        ...prev,
+        [projectRoot]: {
+          ...existing,
+          name: existing.name || projectRoot.split("/").pop(),
+          context: context || "",
+        },
+      };
+    });
   }, []);
 
   const resolveProjectContext = useCallback((cwdPath) => {
