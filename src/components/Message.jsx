@@ -383,15 +383,22 @@ function ImageLightbox({ src, alt, onClose }) {
   );
 }
 
+// Module-level cache of resolved file → data URL so streaming re-renders that
+// remount AssistantImage with the same storagePath skip the IPC roundtrip and
+// avoid skeleton flashes.
+const ASSISTANT_IMAGE_CACHE = new Map();
+
 // Inline assistant image. Constrains to message-bubble width, matches existing
 // rounded-corner style, lazy-loads, shows a skeleton until paint, falls back
 // to a small error placeholder on failure, and opens a lightbox on click.
 function AssistantImage({ src, alt, storagePath, originalPath }) {
-  // Initialize errored synchronously when there's no source at all, so we
-  // skip the loading state entirely instead of bouncing through an effect.
-  const [resolvedSrc, setResolvedSrc] = useState(src || "");
-  const [loaded, setLoaded] = useState(false);
-  const [errored, setErrored] = useState(() => !src && !storagePath);
+  const cachedFromStorage = storagePath ? ASSISTANT_IMAGE_CACHE.get(storagePath) : "";
+  const initialSrc = src || cachedFromStorage || "";
+  const [resolvedSrc, setResolvedSrc] = useState(initialSrc);
+  // If we already have a source on first paint, treat as loaded so the skeleton
+  // never flashes during streaming re-renders.
+  const [loaded, setLoaded] = useState(Boolean(initialSrc));
+  const [errored, setErrored] = useState(() => !initialSrc && !storagePath);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   useEffect(() => {
@@ -401,8 +408,10 @@ function AssistantImage({ src, alt, storagePath, originalPath }) {
     window.api.readImage(storagePath)
       .then((dataUrl) => {
         if (cancelled) return;
-        if (dataUrl) setResolvedSrc(dataUrl);
-        else setErrored(true);
+        if (dataUrl) {
+          ASSISTANT_IMAGE_CACHE.set(storagePath, dataUrl);
+          setResolvedSrc(dataUrl);
+        } else setErrored(true);
       })
       .catch(() => { if (!cancelled) setErrored(true); });
     return () => { cancelled = true; };
