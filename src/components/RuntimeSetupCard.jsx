@@ -20,7 +20,7 @@ const MUTED = "rgba(255,255,255,0.28)";
 const BORDER = "rgba(255,255,255,0.065)";
 const FILL = "rgba(255,255,255,0.025)";
 const ACTIVE = "rgba(255,255,255,0.08)";
-const ACCENT = "#ff5a36";
+const UI_FONT = "system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
 
 function providerStatusLabel(provider, state) {
   const installed = state?.installed?.[provider.id] === true;
@@ -39,7 +39,7 @@ function primaryActionLabel(action, provider) {
   if (action === "configure") return "Configure";
   if (action === "signin") return "Sign in";
   if (provider.id === "opencode") return "Install";
-  return "Install & sign in";
+  return "Install and sign in";
 }
 
 function ProviderRow({ provider, state, copiedProvider, onCopy, onConfirmInstall, onRunSignIn, onOpenDocs, onConfigure }) {
@@ -66,10 +66,9 @@ function ProviderRow({ provider, state, copiedProvider, onCopy, onConfirmInstall
           <span
             style={{
               fontSize: s(8),
-              fontFamily: "'JetBrains Mono', monospace",
-              letterSpacing: ".12em",
+              fontFamily: UI_FONT,
+              letterSpacing: "0",
               color: installed ? "rgba(180,255,210,0.58)" : MUTED,
-              textTransform: "uppercase",
             }}
           >
             {provider.eyebrow}
@@ -89,9 +88,9 @@ function ProviderRow({ provider, state, copiedProvider, onCopy, onConfirmInstall
             flexWrap: "wrap",
             marginTop: 8,
             color: MUTED,
-            fontSize: s(9),
-            fontFamily: "'JetBrains Mono', monospace",
-            letterSpacing: ".04em",
+            fontSize: s(11),
+            fontFamily: UI_FONT,
+            letterSpacing: "0",
           }}
         >
           <span>{providerStatusLabel(provider, state)}</span>
@@ -114,9 +113,9 @@ function ProviderRow({ provider, state, copiedProvider, onCopy, onConfirmInstall
             background: action === "configure" ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.84)",
             color: action === "configure" ? "rgba(255,255,255,0.78)" : "#08080a",
             cursor: "pointer",
-            fontSize: s(10),
-            fontFamily: "'JetBrains Mono', monospace",
-            letterSpacing: ".05em",
+            fontSize: s(12),
+            fontFamily: UI_FONT,
+            letterSpacing: "0",
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
@@ -155,9 +154,9 @@ function iconButtonStyle(s) {
     background: "transparent",
     color: SECONDARY,
     cursor: "pointer",
-    fontSize: s(10),
-    fontFamily: "'JetBrains Mono', monospace",
-    letterSpacing: ".04em",
+    fontSize: s(12),
+    fontFamily: UI_FONT,
+    letterSpacing: "0",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -222,6 +221,7 @@ export default function RuntimeSetupCard({
         justifyContent: "center",
         padding: "20px 0",
         userSelect: "none",
+        fontFamily: UI_FONT,
       }}
     >
       <div style={{ width: "min(720px, 100%)" }}>
@@ -237,11 +237,10 @@ export default function RuntimeSetupCard({
             <div>
               <div
                 style={{
-                  color: ACCENT,
-                  fontSize: s(9),
-                  fontFamily: "'JetBrains Mono', monospace",
-                  letterSpacing: ".14em",
-                  textTransform: "uppercase",
+                  color: SECONDARY,
+                  fontSize: s(12),
+                  fontFamily: UI_FONT,
+                  letterSpacing: "0",
                   marginBottom: 7,
                 }}
               >
@@ -255,6 +254,7 @@ export default function RuntimeSetupCard({
                   fontWeight: 650,
                   margin: 0,
                   letterSpacing: "0",
+                  fontFamily: UI_FONT,
                 }}
               >
                 Choose an agent runtime
@@ -298,10 +298,9 @@ export default function RuntimeSetupCard({
             <div
               style={{
                 color: MUTED,
-                fontSize: s(9),
-                fontFamily: "'JetBrains Mono', monospace",
-                letterSpacing: ".12em",
-                textTransform: "uppercase",
+                fontSize: s(12),
+                fontFamily: UI_FONT,
+                letterSpacing: "0",
                 margin: "0 0 7px 2px",
               }}
             >
@@ -395,9 +394,9 @@ export default function RuntimeSetupCard({
                     background: "transparent",
                     color: SECONDARY,
                     cursor: "pointer",
-                    fontSize: s(10),
-                    fontFamily: "'JetBrains Mono', monospace",
-                    letterSpacing: ".05em",
+                    fontSize: s(12),
+                    fontFamily: UI_FONT,
+                    letterSpacing: "0",
                   }}
                 >
                   Cancel
@@ -412,9 +411,9 @@ export default function RuntimeSetupCard({
                     background: ACTIVE,
                     color: PRIMARY,
                     cursor: "pointer",
-                    fontSize: s(10),
-                    fontFamily: "'JetBrains Mono', monospace",
-                    letterSpacing: ".05em",
+                    fontSize: s(12),
+                    fontFamily: UI_FONT,
+                    letterSpacing: "0",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 7,

@@ -24,7 +24,7 @@ export const RUNTIME_SETUP_PROVIDERS = [
   {
     id: "opencode",
     name: "OpenCode",
-    eyebrow: "Advanced",
+    eyebrow: "Optional",
     description: "Bring your own provider or API key.",
     primary: false,
     installNote: "Provider setup is still required after install.",
