@@ -15,6 +15,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         pm: resolve(__dirname, 'src/project-manager.html'),
         terminal: resolve(__dirname, 'src/terminal-window.html'),
+        quickq: resolve(__dirname, 'src/quick-q.html'),
       },
     },
   },

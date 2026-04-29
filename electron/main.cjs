@@ -32,6 +32,7 @@ const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
 const ghManager = require("./github-manager.cjs");
 const { createLogger, isTruthyFlag, isVerboseLoggingEnabled } = require("./logger.cjs");
+const { DEFAULT_SHORTCUT: DEFAULT_QUICK_Q_SHORTCUT, createQuickQManager } = require("./quick-q-manager.cjs");
 
 const isDev = !app.isPackaged;
 const isMac = process.platform === "darwin";
@@ -75,6 +76,7 @@ if (isDev && isMac) {
 let mainWindow;
 let pmWindow;
 let terminalWindow;
+let quickQManager;
 let terminalWindowRevealTimer = null;
 let pendingPreferredTerminalSessionName = null;
 let sidebarTerminalEnabledPreference = false;
@@ -574,6 +576,7 @@ app.whenReady().then(() => {
     if (!icon.isEmpty()) app.dock.setIcon(icon);
   }
   createWindow();
+  quickQManager?.registerShortcut();
 
   // Start terminal session WebSocket server + write MCP config
   terminalManager.startServer().then((port) => {
@@ -621,6 +624,10 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   if (!isMac) app.quit();
+});
+
+app.on("will-quit", () => {
+  quickQManager?.unregisterShortcut();
 });
 
 app.on("activate", () => {
@@ -930,6 +937,28 @@ function rememberPersistedStateSnapshot(state) {
   }
 }
 
+function readPersistedStateSnapshot() {
+  if (latestPersistedState) return latestPersistedState;
+  try {
+    if (fs.existsSync(stateFilePath)) {
+      const state = normalizeStateImagesForPersist(JSON.parse(fs.readFileSync(stateFilePath, "utf-8")));
+      rememberPersistedStateSnapshot(state);
+      return state;
+    }
+  } catch (error) {
+    console.warn("Failed to read persisted state snapshot:", error?.message || error);
+  }
+  return { quickQShortcut: DEFAULT_QUICK_Q_SHORTCUT };
+}
+
+quickQManager = createQuickQManager({
+  isDev,
+  getVitePort: () => process.env.VITE_PORT || "5173",
+  getMainWindow: () => mainWindow,
+  getPersistedState: readPersistedStateSnapshot,
+});
+quickQManager.registerIpc();
+
 function persistStateToDisk(state) {
   try {
     rememberTerminalSurfacePreference(state);
@@ -938,6 +967,7 @@ function persistStateToDisk(state) {
       merged.pmRepos = preservedPmRepos;
     }
     rememberPersistedStateSnapshot(merged);
+    quickQManager?.syncShortcutFromState(merged);
     fs.writeFileSync(stateFilePath, JSON.stringify(merged, null, 2));
     return true;
   } catch (e) {

@@ -79,6 +79,20 @@ contextBridge.exposeInMainWorld("api", {
   opencodeSaveConfig: (input) => ipcRenderer.invoke("opencode-save-config", input),
   opencodeGetProviderConfig: (providerId) => ipcRenderer.invoke("opencode-get-provider-config", providerId),
   shellRun: ({ command, cwd }) => ipcRenderer.invoke("shell-run", { command, cwd }),
+  quickQSetShortcut: (shortcut) => ipcRenderer.invoke("quick-q-set-shortcut", shortcut),
+  quickQShortcutStatus: () => ipcRenderer.invoke("quick-q-shortcut-status"),
+  quickQScreenPermissionStatus: () => ipcRenderer.invoke("quick-q-screen-permission-status"),
+  quickQOpenScreenSettings: () => ipcRenderer.invoke("quick-q-open-screen-settings"),
+  onQuickQNotice: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("quick-q-notice", handler);
+    return () => ipcRenderer.removeListener("quick-q-notice", handler);
+  },
+  onQuickQShortcutStatus: (cb) => {
+    const handler = (_e, data) => cb(data);
+    ipcRenderer.on("quick-q-shortcut-status", handler);
+    return () => ipcRenderer.removeListener("quick-q-shortcut-status", handler);
+  },
 
   // Git operations
   gitBranches: (cwd) => ipcRenderer.invoke("git-branches", cwd),

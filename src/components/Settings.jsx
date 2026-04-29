@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { ArrowLeft, Check, ChevronDown, Copy, Image, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, Image, Keyboard, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { createTranslator } from "../i18n";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
@@ -9,7 +9,53 @@ import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from ".
 import { useOpenCodeModels } from "../data/openCodeModels.jsx";
 import WindowDragSpacer from "./WindowDragSpacer";
 
-export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, windowControlsVisible = false, onClose }) {
+function displayShortcut(shortcut, platform) {
+  const parts = String(shortcut || "CommandOrControl+Shift+Space").split("+").filter(Boolean);
+  return parts.map((part) => {
+    if (part === "CommandOrControl") return platform === "darwin" ? "Cmd" : "Ctrl";
+    if (part === "Command") return "Cmd";
+    if (part === "Control") return "Ctrl";
+    if (part === "Alt") return platform === "darwin" ? "Option" : "Alt";
+    return part;
+  }).join(" + ");
+}
+
+function normalizeShortcutKey(event) {
+  const key = event.key;
+  if (key === " ") return "Space";
+  if (key === "Escape") return "Escape";
+  if (key === "ArrowUp" || key === "ArrowDown" || key === "ArrowLeft" || key === "ArrowRight") return key;
+  if (key === "Backspace" || key === "Delete" || key === "Tab" || key === "Enter") return key;
+  if (/^F\d{1,2}$/.test(key)) return key;
+  if (typeof key === "string" && key.length === 1) return key.toUpperCase();
+  const code = String(event.code || "");
+  if (code.startsWith("Key")) return code.slice(3).toUpperCase();
+  if (code.startsWith("Digit")) return code.slice(5);
+  return "";
+}
+
+function eventToShortcut(event, platform) {
+  const parts = [];
+  const primaryPressed = platform === "darwin" ? event.metaKey : event.ctrlKey;
+  if (primaryPressed) {
+    parts.push("CommandOrControl");
+  } else {
+    if (event.metaKey) parts.push("Command");
+    if (event.ctrlKey) parts.push("Control");
+  }
+  if (event.altKey) parts.push("Alt");
+  if (event.shiftKey) parts.push("Shift");
+
+  const key = normalizeShortcutKey(event);
+  if (!key || ["Shift", "Control", "Alt", "Meta", "Command"].includes(key)) return "";
+  if (key === "Escape") return "";
+  parts.push(key);
+
+  const hasModifier = parts.length > 1;
+  return hasModifier ? [...new Set(parts)].join("+") : "";
+}
+
+export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, quickQShortcut = "CommandOrControl+Shift+Space", quickQShortcutStatus = null, onQuickQShortcutChange, platform = null, locale = "en-US", onLocaleChange, windowControlsVisible = false, onClose }) {
   const s = useFontScale();
   const t = createTranslator(locale);
   const showUpdaterSettings = platform === "win32";
@@ -430,6 +476,42 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const [backHover, setBackHover] = useState(false);
   const [chooseHover, setChooseHover] = useState(false);
   const [removeHover, setRemoveHover] = useState(false);
+  const [shortcutRecording, setShortcutRecording] = useState(false);
+  const [screenPermissionStatus, setScreenPermissionStatus] = useState("");
+
+  const handleShortcutKeyDown = useCallback((event) => {
+    if (!shortcutRecording) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === "Escape") {
+      setShortcutRecording(false);
+      return;
+    }
+    const nextShortcut = eventToShortcut(event, platform);
+    if (!nextShortcut) return;
+    setShortcutRecording(false);
+    onQuickQShortcutChange?.(nextShortcut);
+  }, [onQuickQShortcutChange, platform, shortcutRecording]);
+
+  useEffect(() => {
+    if (platform !== "darwin" || !window.api?.quickQScreenPermissionStatus) return undefined;
+    let cancelled = false;
+    const refreshPermission = () => {
+      window.api.quickQScreenPermissionStatus()
+        .then((status) => {
+          if (!cancelled) setScreenPermissionStatus(status || "unknown");
+        })
+        .catch(() => {
+          if (!cancelled) setScreenPermissionStatus("unknown");
+        });
+    };
+    refreshPermission();
+    window.addEventListener("focus", refreshPermission);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", refreshPermission);
+    };
+  }, [platform]);
 
   // ── Auto-updater state ──────────────────────────────────────────────────
   const [appVersion, setAppVersion] = useState(null);
@@ -1610,6 +1692,118 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 </div>
               ))}
             </div>
+          </div>
+
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: 2,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: s(13),
+                    color: "rgba(255,255,255,0.8)",
+                    marginBottom: 2,
+                  }}
+                >
+                  {t("settings.quickQ")}
+                </div>
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: "rgba(255,255,255,0.3)",
+                    lineHeight: 1.35,
+                  }}
+                >
+                  {t("settings.quickQDescription")}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShortcutRecording(true)}
+                onKeyDown={handleShortcutKeyDown}
+                onBlur={() => setShortcutRecording(false)}
+                style={{
+                  minWidth: 176,
+                  height: 34,
+                  padding: "0 10px",
+                  borderRadius: 7,
+                  border: shortcutRecording
+                    ? "1px solid rgba(205,235,255,0.36)"
+                    : "1px solid rgba(255,255,255,0.08)",
+                  background: shortcutRecording
+                    ? "rgba(205,235,255,0.10)"
+                    : "rgba(255,255,255,0.04)",
+                  color: shortcutRecording ? "rgba(235,248,255,0.9)" : "rgba(255,255,255,0.76)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: s(11),
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                <Keyboard size={13} strokeWidth={1.7} />
+                {shortcutRecording
+                  ? t("settings.quickQPressShortcut")
+                  : displayShortcut(quickQShortcut, platform)}
+              </button>
+            </div>
+            <div
+              style={{
+                fontSize: s(10),
+                color: quickQShortcutStatus?.registered === false
+                  ? "rgba(255,190,150,0.72)"
+                  : "rgba(255,255,255,0.26)",
+                marginTop: 8,
+                minHeight: 14,
+              }}
+            >
+              {quickQShortcutStatus?.registered === false
+                ? (quickQShortcutStatus.error || t("settings.quickQShortcutFailed"))
+                : t("settings.quickQShortcutRegistered")}
+            </div>
+            {platform === "darwin" && (
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: s(11),
+                    color: screenPermissionStatus === "granted"
+                      ? "rgba(205,255,214,0.70)"
+                      : "rgba(255,210,160,0.72)",
+                  }}
+                >
+                  {t("settings.quickQScreenRecording", {
+                    value: screenPermissionStatus || t("settings.unknown"),
+                  })}
+                </div>
+                {screenPermissionStatus !== "granted" && (
+                  <button
+                    type="button"
+                    onClick={() => window.api?.quickQOpenScreenSettings?.()}
+                    style={compactButtonStyle(true)}
+                  >
+                    {t("settings.openSystemSettings")}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ADVANCED section label */}

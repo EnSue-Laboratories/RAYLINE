@@ -79,6 +79,7 @@ const LAB_CONTROL_COMMIT_DELAY_MS = 1000;
 const SIDEBAR_WIDTH = 264;
 const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
 const DEFAULT_FONT_SIZE = 17;
+const DEFAULT_QUICK_Q_SHORTCUT = "CommandOrControl+Shift+Space";
 const EMPTY_CONVERSATION_DATA = { messages: [], isStreaming: false, error: null };
 
 const logSessionState = createLogger("session-state");
@@ -1242,6 +1243,9 @@ export default function App() {
   const [chromeControlsOnHover, setChromeControlsOnHover] = useState(false);
   const [notificationSound, setNotificationSound] = useState("glass");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
+  const [quickQShortcut, setQuickQShortcut] = useState(DEFAULT_QUICK_Q_SHORTCUT);
+  const [quickQShortcutStatus, setQuickQShortcutStatus] = useState(null);
+  const [quickQNotice, setQuickQNotice] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [hasUpdate, setHasUpdate] = useState(false);
   const [projects, setProjects] = useState({});
@@ -1489,6 +1493,7 @@ export default function App() {
     chromeControlsOnHover,
     notificationSound,
     notificationsMuted,
+    quickQShortcut,
     queuedMessages,
   }), [
     appBlur,
@@ -1508,6 +1513,7 @@ export default function App() {
     persistedActive,
     persistableConversations,
     projects,
+    quickQShortcut,
     queuedMessages,
     sidebarActiveOpacity,
     sidebarTerminalEnabled,
@@ -1783,6 +1789,9 @@ export default function App() {
         if (typeof state.chromeControlsOnHover === "boolean") setChromeControlsOnHover(state.chromeControlsOnHover);
         if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
         if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
+        if (typeof state.quickQShortcut === "string" && state.quickQShortcut.trim()) {
+          setQuickQShortcut(state.quickQShortcut.trim());
+        }
         // Migrate legacy "zh"/"en" language key to locale
         if (state.language === "zh") setLocale("zh-CN");
         else if (state.language === "en") setLocale("en-US");
@@ -1810,6 +1819,48 @@ export default function App() {
     });
     return () => unsub?.();
   }, []);
+
+  useEffect(() => {
+    window.api?.quickQShortcutStatus?.()
+      .then((status) => {
+        if (status) setQuickQShortcutStatus(status);
+      })
+      .catch(() => {});
+    const offStatus = window.api?.onQuickQShortcutStatus?.((status) => {
+      setQuickQShortcutStatus(status);
+    });
+    const offNotice = window.api?.onQuickQNotice?.((notice) => {
+      setQuickQNotice({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        message: notice?.message || "Quick Q is unavailable.",
+      });
+    });
+    return () => {
+      offStatus?.();
+      offNotice?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!quickQNotice) return undefined;
+    const timer = window.setTimeout(() => setQuickQNotice(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [quickQNotice]);
+
+  useEffect(() => {
+    if (!stateLoaded || !window.api?.quickQSetShortcut) return;
+    window.api.quickQSetShortcut(quickQShortcut)
+      .then((status) => {
+        if (status) setQuickQShortcutStatus(status);
+      })
+      .catch((error) => {
+        setQuickQShortcutStatus({
+          shortcut: quickQShortcut,
+          registered: false,
+          error: error?.message || "Shortcut registration failed.",
+        });
+      });
+  }, [quickQShortcut, stateLoaded]);
 
   // Persist state to file on changes (skip until initial load is done)
   const saveTimer = useRef(null);
@@ -3920,6 +3971,32 @@ export default function App() {
 
       <WindowControls visible={showWindowControls} />
 
+      {quickQNotice && (
+        <div
+          role="status"
+          style={{
+            position: "fixed",
+            top: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 80,
+            maxWidth: "min(520px, calc(100vw - 32px))",
+            padding: "10px 14px",
+            borderRadius: 9,
+            border: "1px solid rgba(255,210,160,0.18)",
+            background: "rgba(22, 17, 12, 0.86)",
+            color: "rgba(255,235,210,0.92)",
+            boxShadow: "0 18px 52px rgba(0,0,0,0.34)",
+            backdropFilter: "blur(24px) saturate(1.1)",
+            fontSize: 13,
+            lineHeight: 1.35,
+            pointerEvents: "none",
+          }}
+        >
+          {quickQNotice.message}
+        </div>
+      )}
+
       {useWindowsSidebarChrome ? (
         <SidebarWindowsHeader
           sidebarOpen={sidebarOpen}
@@ -4038,6 +4115,9 @@ export default function App() {
           onNotificationSoundChange={setNotificationSound}
           notificationsMuted={notificationsMuted}
           onNotificationsMutedChange={setNotificationsMuted}
+          quickQShortcut={quickQShortcut}
+          quickQShortcutStatus={quickQShortcutStatus}
+          onQuickQShortcutChange={setQuickQShortcut}
           platform={platform}
           locale={locale}
           onLocaleChange={setLocale}
