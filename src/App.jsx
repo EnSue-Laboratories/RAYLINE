@@ -17,6 +17,7 @@ import NewProjectModal from "./components/NewProjectModal";
 import { DEFAULT_MODEL_ID, getMOrMulticaFallback, isMulticaModelId, MODELS, normalizeModelId } from "./data/models";
 import { useMulticaModels } from "./data/multicaModels.jsx";
 import { useOpenCodeModels } from "./data/openCodeModels.jsx";
+import { getRuntimeSetupShell } from "./data/runtimeSetup";
 import { buildConversationPrime, buildCrossProviderPrime, decoratePromptWithPrime } from "./utils/crossProviderPrime";
 import { resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder, getMainRepoRoot as getMainRepoRootUtil } from "./utils/cwdRecovery";
 import { FontSizeContext } from "./contexts/FontSizeContext";
@@ -39,6 +40,23 @@ import { playChime } from "./utils/chime";
 
 const logCheckpoint = createLogger("checkpoint-ui");
 const logSendFlow = createLogger("send-flow");
+
+function shouldPreviewRuntimeSetup() {
+  if (typeof window === "undefined") return false;
+  try {
+    const envPreview = String(import.meta.env?.VITE_RAYLINE_RUNTIME_SETUP_PREVIEW || "").trim();
+    if (/^(1|true|yes|on|preview)$/i.test(envPreview)) return true;
+
+    const params = new URLSearchParams(window.location.search || "");
+    return (
+      params.get("runtimeSetup") === "preview" ||
+      params.get("runtime-setup") === "preview" ||
+      window.localStorage?.getItem("rayline.runtimeSetupPreview") === "1"
+    );
+  } catch {
+    return false;
+  }
+}
 
 function getModelThinkingValue(model) {
   return typeof model?.thinking === "boolean" ? model.thinking : undefined;
@@ -1191,9 +1209,10 @@ export default function App() {
   } = useAgent();
   const terminal = useTerminal();
   const { closeWindow: closeTerminalWindow, openWindow: openTerminalWindow } = terminal;
+  const { createSession: createTerminalSession, sendInput: sendTerminalInput } = terminal;
   const prefersReducedMotion = usePrefersReducedMotion();
   const { models: multicaModels } = useMulticaModels();
-  const { models: openCodeModels } = useOpenCodeModels();
+  const { models: openCodeModels, status: openCodeStatus, refresh: refreshOpenCodeModels } = useOpenCodeModels();
 
   // convos: array of { id, sessionId, title, model, ts }
   const [convoList, setConvoList] = useState([]);
@@ -1203,6 +1222,9 @@ export default function App() {
   const [cwd, setCwd] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [platform, setPlatform] = useState(null);
+  const [cliInstalled, setCliInstalled] = useState(null);
+  const [cliChecking, setCliChecking] = useState(false);
+  const [runtimeSetupPreview] = useState(() => shouldPreviewRuntimeSetup());
   const [wallpaper, setWallpaper] = useState(null);
   const [locale, setLocale] = useState(() => detectDefaultLocale());
   const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE);
@@ -1338,6 +1360,114 @@ export default function App() {
     () => [...openCodeModels, ...multicaModels],
     [multicaModels, openCodeModels]
   );
+  const effectivePlatform = useMemo(() => {
+    if (platform) return platform;
+    if (typeof navigator !== "undefined" && /windows/i.test(navigator.userAgent || "")) return "win32";
+    return "";
+  }, [platform]);
+
+  const refreshCliInstalled = useCallback(async (options = {}) => {
+    if (!window.api?.checkCliInstalled) {
+      setCliInstalled({ claude: true, codex: true, opencode: false });
+      return { claude: true, codex: true, opencode: false };
+    }
+    setCliChecking(true);
+    try {
+      const result = await window.api.checkCliInstalled({ force: Boolean(options.force) });
+      const next = {
+        claude: Boolean(result?.claude),
+        codex: Boolean(result?.codex),
+        opencode: Boolean(result?.opencode),
+      };
+      setCliInstalled(next);
+      return next;
+    } catch {
+      const fallback = { claude: true, codex: true, opencode: false };
+      setCliInstalled(fallback);
+      return fallback;
+    } finally {
+      setCliChecking(false);
+    }
+  }, []);
+
+  const runtimeAvailability = useMemo(() => {
+    const claude = cliInstalled?.claude === true;
+    const codex = cliInstalled?.codex === true;
+    const opencodeInstalled = cliInstalled?.opencode === true || openCodeStatus?.installed === true;
+    const opencode = opencodeInstalled && openCodeModels.length > 0;
+    const multica = multicaModels.length > 0;
+    return {
+      claude,
+      codex,
+      opencode,
+      multica,
+      opencodeInstalled,
+      any: claude || codex || opencode || multica,
+    };
+  }, [cliInstalled, multicaModels.length, openCodeModels.length, openCodeStatus?.installed]);
+
+  const isRuntimeProviderAvailable = useCallback((provider) => {
+    if (!cliInstalled) return true;
+    if (provider === "claude") return runtimeAvailability.claude;
+    if (provider === "codex") return runtimeAvailability.codex;
+    if (provider === "opencode") return runtimeAvailability.opencode;
+    if (provider === "multica") return runtimeAvailability.multica;
+    return true;
+  }, [cliInstalled, runtimeAvailability]);
+
+  const runRuntimeSetupCommand = useCallback(async ({ providerId, command }) => {
+    if (!command) return;
+    const sessionName = `setup-${providerId}-${Date.now().toString(36)}`;
+    await createTerminalSession({
+      name: sessionName,
+      command: getRuntimeSetupShell(effectivePlatform),
+      reveal: true,
+    });
+    sendTerminalInput(sessionName, `${command}\n`);
+    window.setTimeout(() => {
+      void refreshCliInstalled({ force: true });
+      void refreshOpenCodeModels?.();
+    }, 5000);
+    window.setTimeout(() => {
+      void refreshCliInstalled({ force: true });
+      void refreshOpenCodeModels?.();
+    }, 15000);
+  }, [createTerminalSession, effectivePlatform, refreshCliInstalled, refreshOpenCodeModels, sendTerminalInput]);
+
+  const refreshRuntimeSetup = useCallback(() => {
+    void refreshCliInstalled({ force: true });
+    void refreshOpenCodeModels?.();
+  }, [refreshCliInstalled, refreshOpenCodeModels]);
+
+  const configureOpenCodeRuntime = useCallback(() => {
+    setShowSettings(true);
+    window.dispatchEvent(new CustomEvent("opencode-refresh"));
+  }, []);
+
+  const runtimeSetup = useMemo(() => ({
+    required: runtimeSetupPreview || (Boolean(cliInstalled) && !runtimeAvailability.any),
+    checking: !runtimeSetupPreview && cliChecking,
+    installed: {
+      claude: runtimeSetupPreview ? false : runtimeAvailability.claude,
+      codex: runtimeSetupPreview ? false : runtimeAvailability.codex,
+      opencode: runtimeSetupPreview ? false : runtimeAvailability.opencodeInstalled,
+    },
+    opencodeConfigured: runtimeSetupPreview ? false : openCodeModels.length > 0,
+    platform: effectivePlatform,
+    onRunCommand: runRuntimeSetupCommand,
+    onRefresh: refreshRuntimeSetup,
+    onConfigureOpenCode: configureOpenCodeRuntime,
+  }), [
+    cliChecking,
+    cliInstalled,
+    configureOpenCodeRuntime,
+    openCodeModels.length,
+    effectivePlatform,
+    refreshRuntimeSetup,
+    runRuntimeSetupCommand,
+    runtimeSetupPreview,
+    runtimeAvailability,
+  ]);
   const persistStatePayload = useMemo(() => ({
     convos: persistableConversations,
     active: persistedActive,
@@ -1396,6 +1526,10 @@ export default function App() {
       if (info?.platform) setPlatform(info.platform);
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    void refreshCliInstalled();
+  }, [refreshCliInstalled]);
 
   const activePermissionRequests = useMemo(
     () => permissionRequests.filter((item) => item?.conversationId === active),
@@ -2642,6 +2776,10 @@ export default function App() {
         const files = attachments?.filter((a) => a.type === "file");
         const m = getMOrMulticaFallback(normalizedConversation.model, dynamicModels);
         const currentProvider = m.provider || "claude";
+        if (!isRuntimeProviderAvailable(currentProvider)) {
+          refreshRuntimeSetup();
+          return false;
+        }
         // Multica context must be resolved BEFORE prepareMessage so a missing
         // context doesn't leave an orphan streaming assistant bubble.
         const multicaSessionPolluted =
@@ -2917,7 +3055,7 @@ export default function App() {
         sendInFlightConversationIdsRef.current.delete(conversationId);
       }
     },
-    [buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, resolveProjectContext, startPreparedMessage, healConversationCwdIfMissing]
+    [buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, ensureMulticaContextForConversation, getConversation, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, resolveProjectContext, startPreparedMessage, healConversationCwdIfMissing, isRuntimeProviderAvailable, refreshRuntimeSetup]
   );
 
   const handleSend = useCallback(
@@ -3955,6 +4093,7 @@ export default function App() {
           developerMode={developerMode}
           windowControlsVisible={showWindowControls}
           locale={locale}
+          runtimeSetup={runtimeSetup}
         />
       )}
 
