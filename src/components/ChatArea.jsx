@@ -5,6 +5,7 @@ import { ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-
 import Message from "./Message";
 import EmptyState from "./EmptyState";
 import NewChatCard from "./NewChatCard";
+import RuntimeSetupCard from "./RuntimeSetupCard";
 import { ModelPickerWithMultica } from "../data/multicaModels.jsx";
 import BranchSelector from "./BranchSelector";
 import GitStatusPill from "./GitStatusPill";
@@ -61,8 +62,21 @@ const ChatTranscript = memo(function ChatTranscript({
   wallpaper,
   messageBodyRef,
   endRef,
+  runtimeSetup,
 }) {
   const messages = convo?.msgs || EMPTY_MESSAGES;
+
+  if (runtimeSetup?.required) {
+    return (
+      <RuntimeSetupCard
+        state={runtimeSetup}
+        platform={runtimeSetup.platform}
+        onRunCommand={runtimeSetup.onRunCommand}
+        onRefresh={runtimeSetup.onRefresh}
+        onConfigureOpenCode={runtimeSetup.onConfigureOpenCode}
+      />
+    );
+  }
 
   if (showNewChatCard) {
     return (
@@ -105,7 +119,7 @@ const ChatTranscript = memo(function ChatTranscript({
   );
 });
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, windowControlsVisible = false, locale }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, windowControlsVisible = false, locale, runtimeSetup = null }) {
   const s = useFontScale();
   const t = createTranslator(locale);
   const isDraftContext = showNewChatCard ? newChatDefaultCwd == null : isDraftConversation(convo, draftsPath);
@@ -256,7 +270,8 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
   const trimmedInput = input.trim();
   const shellMode = trimmedInput.startsWith("!");
   const canRunShell = shellMode && trimmedInput.length > 1;
-  const canSend = shellMode ? canRunShell : Boolean(trimmedInput) || attachments.length > 0;
+  const setupRequired = Boolean(runtimeSetup?.required);
+  const canSend = shellMode ? canRunShell : !setupRequired && (Boolean(trimmedInput) || attachments.length > 0);
   const shellLocation = cwd ? (() => {
     const parts = cwd.split("/");
     const wtIdx = parts.indexOf(".worktrees");
@@ -707,6 +722,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
           wallpaper={wallpaper}
           messageBodyRef={setMessageBodyNode}
           endRef={endRef}
+          runtimeSetup={runtimeSetup}
         />
       </div>
 
@@ -1128,7 +1144,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                 composingRef.current = false;
                 setInputFocused(false);
               }}
-              placeholder={shellMode ? t("chatArea.placeholderShell") : t("chatArea.placeholderAsk")}
+              placeholder={setupRequired && !shellMode ? "Install a runtime to start chatting" : (shellMode ? t("chatArea.placeholderShell") : t("chatArea.placeholderAsk"))}
               rows={1}
               style={{
                 flex: 1,
