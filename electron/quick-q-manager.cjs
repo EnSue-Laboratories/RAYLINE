@@ -3,12 +3,10 @@
 const {
   app,
   BrowserWindow,
-  desktopCapturer,
   globalShortcut,
   ipcMain,
   screen,
   shell,
-  systemPreferences,
 } = require("electron");
 const crypto = require("crypto");
 const fs = require("fs");
@@ -21,10 +19,10 @@ const { resolveOpenCodeBin } = require("./opencode-agent-manager.cjs");
 const { createLogger } = require("./logger.cjs");
 
 const DEFAULT_SHORTCUT = "CommandOrControl+Shift+Space";
-const WINDOW_WIDTH = 560;
-const WINDOW_HEIGHT = 420;
-const MIN_WIDTH = 420;
-const MIN_HEIGHT = 320;
+const WINDOW_WIDTH = 444;
+const WINDOW_HEIGHT = 86;
+const MIN_WIDTH = 320;
+const MIN_HEIGHT = 76;
 
 const BUILTIN_MODELS = {
   opus: { id: "opus", label: "Claude Opus", provider: "claude", cliFlag: "opus" },
@@ -41,6 +39,22 @@ const BUILTIN_MODELS = {
 function normalizeShortcut(shortcut) {
   const value = String(shortcut || "").trim();
   return value || DEFAULT_SHORTCUT;
+}
+
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
+}
+
+function buildAppearance(state) {
+  const appOpacity = clampNumber(state?.appOpacity, 30, 100, 100);
+  const appBlur = clampNumber(state?.appBlur, 0, 20, 0);
+  return {
+    appOpacity,
+    appBlur,
+    windowOpacity: Math.max(0.3, Math.min(1, appOpacity / 100)),
+  };
 }
 
 function providerRuntimeName(provider) {
@@ -119,26 +133,13 @@ function buildRuntime(state) {
   };
 }
 
-function isMacScreenPermissionDenied(status) {
-  return status === "denied" || status === "restricted";
-}
-
-function getScreenPermissionStatus() {
-  if (process.platform !== "darwin") return "granted";
-  try {
-    return systemPreferences.getMediaAccessStatus("screen");
-  } catch {
-    return "unknown";
-  }
-}
-
-function displayBoundsForWindow(display) {
+function displayBoundsForWindow(display, height = WINDOW_HEIGHT) {
   const area = display?.workArea || display?.bounds || { x: 0, y: 0, width: WINDOW_WIDTH, height: WINDOW_HEIGHT };
   return {
     width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
+    height,
     x: Math.round(area.x + Math.max(0, (area.width - WINDOW_WIDTH) / 2)),
-    y: Math.round(area.y + Math.max(0, (area.height - WINDOW_HEIGHT) / 2)),
+    y: Math.round(area.y + Math.max(0, (area.height - height) / 2)),
   };
 }
 
@@ -151,13 +152,11 @@ function serializeState(state) {
   return {
     invocationId: state.invocationId,
     conversationId: state.conversationId,
-    screenshotDataUrl: state.screenshotDataUrl || null,
-    captureError: state.captureError || "",
-    permissionStatus: state.permissionStatus || "unknown",
     runtime: state.runtime,
     cwd: state.cwd,
     shortcut: state.shortcut,
     shortcutStatus: state.shortcutStatus,
+    appearance: state.appearance || buildAppearance(),
   };
 }
 
@@ -170,6 +169,8 @@ function createQuickQManager({
   const log = createLogger("quick-q");
   let quickWindow = null;
   let currentState = null;
+  let currentDisplay = null;
+  let workspaceVisibilityApplied = false;
   let configuredShortcut = DEFAULT_SHORTCUT;
   let registeredShortcut = "";
   let shortcutStatus = {
@@ -274,69 +275,56 @@ function createQuickQManager({
     unregisterCurrentShortcut();
   }
 
-  async function captureDisplay(display) {
-    const permissionStatus = getScreenPermissionStatus();
-    if (isMacScreenPermissionDenied(permissionStatus)) {
-      return {
-        dataUrl: null,
-        permissionStatus,
-        error: "screen-permission-denied",
-      };
-    }
-
-    const scaleFactor = Number(display?.scaleFactor) || 1;
-    const sourceSize = display?.size || display?.bounds || { width: 1440, height: 900 };
-    const thumbnailSize = {
-      width: Math.max(1, Math.round(sourceSize.width * scaleFactor)),
-      height: Math.max(1, Math.round(sourceSize.height * scaleFactor)),
-    };
-
-    try {
-      const sources = await desktopCapturer.getSources({
-        types: ["screen"],
-        thumbnailSize,
-        fetchWindowIcons: false,
-      });
-      const source = sources.find((item) => String(item.display_id) === String(display?.id))
-        || sources.find((item) => item.thumbnail && !item.thumbnail.isEmpty())
-        || sources[0];
-      const thumbnail = source?.thumbnail;
-      if (!thumbnail || thumbnail.isEmpty()) {
-        return {
-          dataUrl: null,
-          permissionStatus,
-          error: "capture-empty",
-        };
-      }
-      return {
-        dataUrl: thumbnail.toDataURL(),
-        permissionStatus,
-        error: "",
-      };
-    } catch (error) {
-      log("Capture failed:", error?.message || error);
-      return {
-        dataUrl: null,
-        permissionStatus,
-        error: error?.message || "capture-failed",
-      };
-    }
-  }
-
-  async function buildInvocationState(display) {
-    const runtime = buildRuntime(getPersistedState?.());
-    const capture = await captureDisplay(display);
+  function buildInvocationState() {
+    const persistedState = getPersistedState?.();
+    const runtime = buildRuntime(persistedState);
     return {
       invocationId: crypto.randomUUID(),
       conversationId: makeConversationId(),
-      screenshotDataUrl: capture.dataUrl,
-      captureError: capture.error,
-      permissionStatus: capture.permissionStatus,
       runtime,
       cwd: getScratchDir(),
       shortcut: configuredShortcut,
       shortcutStatus,
+      appearance: buildAppearance(persistedState),
     };
+  }
+
+  function applyWindowLevel(win) {
+    if (!win || win.isDestroyed()) return;
+    try {
+      win.setAlwaysOnTop(true, process.platform === "darwin" ? "screen-saver" : "floating", 1);
+    } catch {
+      win.setAlwaysOnTop(true);
+    }
+    if (process.platform !== "darwin") return;
+    try {
+      win.setFullScreenable(false);
+      if (!workspaceVisibilityApplied) {
+        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        workspaceVisibilityApplied = true;
+      }
+    } catch (error) {
+      log("Failed to apply Quick Q macOS workspace behavior:", error?.message || error);
+    }
+  }
+
+  function applyAppearance(win, appearance = buildAppearance(getPersistedState?.())) {
+    if (!win || win.isDestroyed()) return;
+    try {
+      win.setOpacity(appearance.windowOpacity);
+    } catch (error) {
+      log("Failed to apply Quick Q opacity:", error?.message || error);
+    }
+  }
+
+  function syncAppearanceFromState(state) {
+    const appearance = buildAppearance(state);
+    if (currentState) {
+      currentState = { ...currentState, appearance };
+      sendToQuickWindow("quick-q-appearance", appearance);
+    }
+    applyAppearance(quickWindow, appearance);
+    return appearance;
   }
 
   function createWindow(display) {
@@ -353,10 +341,15 @@ function createQuickQManager({
       show: false,
       frame: false,
       transparent: true,
-      resizable: true,
+      resizable: false,
       roundedCorners: true,
       hasShadow: true,
-      alwaysOnTop: false,
+      focusable: true,
+      acceptFirstMouse: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      fullscreenable: false,
+      type: process.platform === "darwin" ? "panel" : undefined,
       backgroundColor: "#00000000",
       icon: path.join(__dirname, "../public/icon.png"),
       webPreferences: {
@@ -365,6 +358,8 @@ function createQuickQManager({
         nodeIntegration: false,
       },
     });
+    applyWindowLevel(quickWindow);
+    applyAppearance(quickWindow, currentState?.appearance);
 
     quickWindow.webContents.setWindowOpenHandler(({ url }) => {
       shell.openExternal(url);
@@ -386,6 +381,8 @@ function createQuickQManager({
       cancelCurrentAgent();
       quickWindow = null;
       currentState = null;
+      currentDisplay = null;
+      workspaceVisibilityApplied = false;
     });
 
     if (isDev) {
@@ -401,8 +398,16 @@ function createQuickQManager({
   function revealWindow(win, display) {
     const bounds = displayBoundsForWindow(display);
     win.setBounds(bounds);
+    applyWindowLevel(win);
+    applyAppearance(win, currentState?.appearance);
     if (win.isMinimized()) win.restore();
+    if (process.platform === "darwin" && !getMainWindow?.()?.isFocused?.()) {
+      win.showInactive();
+      win.moveTop();
+      return;
+    }
     if (!win.isVisible()) win.show();
+    win.moveTop();
     win.focus();
   }
 
@@ -433,30 +438,13 @@ function createQuickQManager({
     }
 
     cancelCurrentAgent();
-    currentState = await buildInvocationState(display);
+    currentDisplay = display;
+    currentState = buildInvocationState();
 
     const win = createWindow(display);
     revealWindow(win, display);
     sendResetWhenReady(win);
     return { ok: true };
-  }
-
-  async function retakeScreenshot() {
-    if (!currentState) return null;
-    const cursor = screen.getCursorScreenPoint();
-    const display = screen.getDisplayNearestPoint(cursor);
-    const capture = await captureDisplay(display);
-    currentState = {
-      ...currentState,
-      screenshotDataUrl: capture.dataUrl,
-      captureError: capture.error,
-      permissionStatus: capture.permissionStatus,
-    };
-    return {
-      screenshotDataUrl: capture.dataUrl,
-      captureError: capture.error,
-      permissionStatus: capture.permissionStatus,
-    };
   }
 
   function cancelCurrentAgent() {
@@ -502,15 +490,6 @@ function createQuickQManager({
 
   function registerIpc() {
     ipcMain.handle("quick-q-state", () => serializeState(currentState));
-    ipcMain.handle("quick-q-retake-screenshot", () => retakeScreenshot());
-    ipcMain.handle("quick-q-screen-permission-status", () => getScreenPermissionStatus());
-    ipcMain.handle("quick-q-open-screen-settings", () => {
-      if (process.platform === "darwin") {
-        shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
-        return true;
-      }
-      return false;
-    });
     ipcMain.handle("quick-q-close", (event) => {
       const win = BrowserWindow.fromWebContents(event.sender);
       if (!win || win.isDestroyed()) return false;
@@ -537,6 +516,7 @@ function createQuickQManager({
     registerIpc,
     registerShortcut,
     syncShortcutFromState,
+    syncAppearanceFromState,
     unregisterShortcut,
     getShortcutStatus: () => ({ ...shortcutStatus }),
   };

@@ -81,8 +81,6 @@ contextBridge.exposeInMainWorld("api", {
   shellRun: ({ command, cwd }) => ipcRenderer.invoke("shell-run", { command, cwd }),
   quickQSetShortcut: (shortcut) => ipcRenderer.invoke("quick-q-set-shortcut", shortcut),
   quickQShortcutStatus: () => ipcRenderer.invoke("quick-q-shortcut-status"),
-  quickQScreenPermissionStatus: () => ipcRenderer.invoke("quick-q-screen-permission-status"),
-  quickQOpenScreenSettings: () => ipcRenderer.invoke("quick-q-open-screen-settings"),
   onQuickQNotice: (cb) => {
     const handler = (_e, data) => cb(data);
     ipcRenderer.on("quick-q-notice", handler);

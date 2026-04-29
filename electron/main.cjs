@@ -968,6 +968,7 @@ function persistStateToDisk(state) {
     }
     rememberPersistedStateSnapshot(merged);
     quickQManager?.syncShortcutFromState(merged);
+    quickQManager?.syncAppearanceFromState(merged);
     fs.writeFileSync(stateFilePath, JSON.stringify(merged, null, 2));
     return true;
   } catch (e) {

@@ -2,8 +2,6 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
   quickQState: () => ipcRenderer.invoke("quick-q-state"),
-  quickQRetakeScreenshot: () => ipcRenderer.invoke("quick-q-retake-screenshot"),
-  quickQOpenScreenSettings: () => ipcRenderer.invoke("quick-q-open-screen-settings"),
   quickQClose: () => ipcRenderer.invoke("quick-q-close"),
 
   agentStart: (opts) => ipcRenderer.send("quick-q-agent-start", opts),
@@ -33,6 +31,11 @@ contextBridge.exposeInMainWorld("api", {
     const handler = (_event, data) => cb(data);
     ipcRenderer.on("quick-q-shortcut-status", handler);
     return () => ipcRenderer.removeListener("quick-q-shortcut-status", handler);
+  },
+  onQuickQAppearance: (cb) => {
+    const handler = (_event, data) => cb(data);
+    ipcRenderer.on("quick-q-appearance", handler);
+    return () => ipcRenderer.removeListener("quick-q-appearance", handler);
   },
 
   loadSession: (sessionId) => ipcRenderer.invoke("load-session", sessionId),

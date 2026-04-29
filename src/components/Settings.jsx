@@ -477,7 +477,6 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
   const [chooseHover, setChooseHover] = useState(false);
   const [removeHover, setRemoveHover] = useState(false);
   const [shortcutRecording, setShortcutRecording] = useState(false);
-  const [screenPermissionStatus, setScreenPermissionStatus] = useState("");
 
   const handleShortcutKeyDown = useCallback((event) => {
     if (!shortcutRecording) return;
@@ -492,26 +491,6 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
     setShortcutRecording(false);
     onQuickQShortcutChange?.(nextShortcut);
   }, [onQuickQShortcutChange, platform, shortcutRecording]);
-
-  useEffect(() => {
-    if (platform !== "darwin" || !window.api?.quickQScreenPermissionStatus) return undefined;
-    let cancelled = false;
-    const refreshPermission = () => {
-      window.api.quickQScreenPermissionStatus()
-        .then((status) => {
-          if (!cancelled) setScreenPermissionStatus(status || "unknown");
-        })
-        .catch(() => {
-          if (!cancelled) setScreenPermissionStatus("unknown");
-        });
-    };
-    refreshPermission();
-    window.addEventListener("focus", refreshPermission);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", refreshPermission);
-    };
-  }, [platform]);
 
   // ── Auto-updater state ──────────────────────────────────────────────────
   const [appVersion, setAppVersion] = useState(null);
@@ -1771,39 +1750,6 @@ export default function Settings({ wallpaper, onWallpaperChange, fontSize, onFon
                 ? (quickQShortcutStatus.error || t("settings.quickQShortcutFailed"))
                 : t("settings.quickQShortcutRegistered")}
             </div>
-            {platform === "darwin" && (
-              <div
-                style={{
-                  marginTop: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: s(11),
-                    color: screenPermissionStatus === "granted"
-                      ? "rgba(205,255,214,0.70)"
-                      : "rgba(255,210,160,0.72)",
-                  }}
-                >
-                  {t("settings.quickQScreenRecording", {
-                    value: screenPermissionStatus || t("settings.unknown"),
-                  })}
-                </div>
-                {screenPermissionStatus !== "granted" && (
-                  <button
-                    type="button"
-                    onClick={() => window.api?.quickQOpenScreenSettings?.()}
-                    style={compactButtonStyle(true)}
-                  >
-                    {t("settings.openSystemSettings")}
-                  </button>
-                )}
-              </div>
-            )}
           </div>
 
           {/* ADVANCED section label */}
