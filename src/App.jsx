@@ -41,6 +41,23 @@ import { playChime } from "./utils/chime";
 const logCheckpoint = createLogger("checkpoint-ui");
 const logSendFlow = createLogger("send-flow");
 
+function shouldPreviewRuntimeSetup() {
+  if (typeof window === "undefined") return false;
+  try {
+    const envPreview = String(import.meta.env?.VITE_RAYLINE_RUNTIME_SETUP_PREVIEW || "").trim();
+    if (/^(1|true|yes|on|preview)$/i.test(envPreview)) return true;
+
+    const params = new URLSearchParams(window.location.search || "");
+    return (
+      params.get("runtimeSetup") === "preview" ||
+      params.get("runtime-setup") === "preview" ||
+      window.localStorage?.getItem("rayline.runtimeSetupPreview") === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
 function getModelThinkingValue(model) {
   return typeof model?.thinking === "boolean" ? model.thinking : undefined;
 }
@@ -1207,6 +1224,7 @@ export default function App() {
   const [platform, setPlatform] = useState(null);
   const [cliInstalled, setCliInstalled] = useState(null);
   const [cliChecking, setCliChecking] = useState(false);
+  const [runtimeSetupPreview] = useState(() => shouldPreviewRuntimeSetup());
   const [wallpaper, setWallpaper] = useState(null);
   const [locale, setLocale] = useState(() => detectDefaultLocale());
   const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE);
@@ -1427,14 +1445,14 @@ export default function App() {
   }, []);
 
   const runtimeSetup = useMemo(() => ({
-    required: Boolean(cliInstalled) && !runtimeAvailability.any,
-    checking: cliChecking,
+    required: runtimeSetupPreview || (Boolean(cliInstalled) && !runtimeAvailability.any),
+    checking: !runtimeSetupPreview && cliChecking,
     installed: {
-      claude: runtimeAvailability.claude,
-      codex: runtimeAvailability.codex,
-      opencode: runtimeAvailability.opencodeInstalled,
+      claude: runtimeSetupPreview ? false : runtimeAvailability.claude,
+      codex: runtimeSetupPreview ? false : runtimeAvailability.codex,
+      opencode: runtimeSetupPreview ? false : runtimeAvailability.opencodeInstalled,
     },
-    opencodeConfigured: openCodeModels.length > 0,
+    opencodeConfigured: runtimeSetupPreview ? false : openCodeModels.length > 0,
     platform: effectivePlatform,
     onRunCommand: runRuntimeSetupCommand,
     onRefresh: refreshRuntimeSetup,
@@ -1447,6 +1465,7 @@ export default function App() {
     effectivePlatform,
     refreshRuntimeSetup,
     runRuntimeSetupCommand,
+    runtimeSetupPreview,
     runtimeAvailability,
   ]);
   const persistStatePayload = useMemo(() => ({
