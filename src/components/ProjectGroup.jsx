@@ -88,7 +88,7 @@ function ProjectGroup({
           style={{
             display: "flex",
             alignItems: "center",
-            color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
+            color: "var(--sb-text-icon)",
             transform: `rotate(${expanded ? 90 : 0}deg)`,
             transition: "transform .15s",
             flexShrink: 0,
@@ -102,7 +102,7 @@ function ProjectGroup({
           style={{
             display: "flex",
             alignItems: "center",
-            color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
+            color: "var(--sb-text-dim)",
             flexShrink: 0,
           }}
         >
@@ -116,7 +116,7 @@ function ProjectGroup({
             minWidth: 0,
             fontSize: s(11),
             fontFamily: "var(--font-mono)",
-            color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
+            color: "var(--sb-text-label)",
             letterSpacing: ".04em",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -136,7 +136,7 @@ function ProjectGroup({
                 transform: "translateY(-50%)",
                 fontSize: s(9),
                 fontFamily: "var(--font-mono)",
-                color: "color-mix(in srgb, var(--text-primary) 16%, transparent)",
+                color: "var(--sb-text-ghost)",
                 letterSpacing: ".04em",
                 opacity: headerHovered ? 0 : 1,
                 pointerEvents: "none",
@@ -171,14 +171,14 @@ function ProjectGroup({
                 justifyContent: "center",
                 background: "none",
                 border: "none",
-                color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
+                color: "var(--sb-text-icon)",
                 cursor: "pointer",
                 padding: 3,
                 borderRadius: 4,
                 transition: "color .15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 71%, transparent)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 27%, transparent)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--sb-text-icon-hover)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--sb-text-icon)"; }}
             >
               <Plus size={11} strokeWidth={1.5} />
             </button>
@@ -193,14 +193,14 @@ function ProjectGroup({
                 justifyContent: "center",
                 background: "none",
                 border: "none",
-                color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
+                color: "var(--sb-text-icon)",
                 cursor: "pointer",
                 padding: 3,
                 borderRadius: 4,
                 transition: "color .15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 71%, transparent)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 27%, transparent)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--sb-text-icon-hover)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--sb-text-icon)"; }}
             >
               <MoreHorizontal size={11} strokeWidth={1.5} />
             </button>
@@ -436,7 +436,7 @@ const ConversationRow = memo(function ConversationRow({
           <div
             style={{
               fontSize: s(12.5),
-              color: isActive ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 49%, transparent)",
+              color: isActive ? "var(--text-primary)" : "var(--sb-text-mid)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -449,7 +449,7 @@ const ConversationRow = memo(function ConversationRow({
           <div
             style={{
               fontSize: s(11),
-              color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
+              color: "var(--sb-text-dim)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -480,14 +480,14 @@ const ConversationRow = memo(function ConversationRow({
           style={{
             background: "none",
             border: "none",
-            color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
+            color: "var(--sb-text-icon)",
             cursor: "pointer",
             padding: 1,
             transition: "color .15s",
             display: "flex",
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = "var(--danger-soft-text)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 27%, transparent)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--sb-text-icon)"; }}
         >
           <Trash2 size={12} strokeWidth={1.5} />
         </button>
@@ -506,7 +506,7 @@ const ConversationRow = memo(function ConversationRow({
           style={{
             fontSize: s(9),
             fontFamily: "var(--font-mono)",
-            color: "color-mix(in srgb, var(--text-primary) 38%, transparent)",
+            color: "var(--sb-text-meta)",
             letterSpacing: ".08em",
             minWidth: 0,
           }}
@@ -556,7 +556,7 @@ function MenuBtn({ s, label, onClick, danger = false }) {
         background: "transparent",
         border: "none",
         borderRadius: 7,
-        color: danger ? "var(--danger-soft-text)" : "color-mix(in srgb, var(--text-primary) 60%, transparent)",
+        color: danger ? "var(--danger-soft-text)" : "var(--sb-text)",
         fontSize: s(11),
         fontFamily: "var(--font-ui)",
         cursor: "pointer",
@@ -565,11 +565,11 @@ function MenuBtn({ s, label, onClick, danger = false }) {
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = "var(--control-bg)";
-        e.currentTarget.style.color = danger ? "var(--danger-soft-text)" : "color-mix(in srgb, var(--text-primary) 92%, transparent)";
+        e.currentTarget.style.color = danger ? "var(--danger-soft-text)" : "var(--sb-text-92)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = danger ? "var(--danger-soft-text)" : "color-mix(in srgb, var(--text-primary) 60%, transparent)";
+        e.currentTarget.style.color = danger ? "var(--danger-soft-text)" : "var(--sb-text)";
       }}
     >
       {label}

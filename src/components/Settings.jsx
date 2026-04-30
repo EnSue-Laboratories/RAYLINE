@@ -986,7 +986,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                   height: 22,
                   borderRadius: 999,
                   border: "1px solid var(--control-border)",
-                  background: chromeControlsOnHover ? "color-mix(in srgb, var(--accent) 35%, transparent)" : "var(--control-bg)",
+                  background: chromeControlsOnHover ? "var(--toggle-on)" : "var(--control-bg)",
                   position: "relative",
                   cursor: "pointer",
                   padding: 0,
@@ -1001,7 +1001,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                     width: 16,
                     height: 16,
                     borderRadius: "50%",
-                    background: "var(--text-primary)",
+                    background: "var(--toggle-knob)",
                     transition: "left 120ms ease",
                   }}
                 />
@@ -1508,7 +1508,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
               <div
                 style={{
                   fontSize: s(12),
-                  color: multicaConnected ? "rgba(205,255,214,0.88)" : "color-mix(in srgb, var(--text-primary) 78%, transparent)",
+                  color: multicaConnected ? "var(--success-text)" : "color-mix(in srgb, var(--text-primary) 78%, transparent)",
                   marginBottom: 4,
                 }}
               >
@@ -1689,7 +1689,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                   style={{
                     fontSize: s(12),
                     color: openCodeStatus.installed && openCodeReady
-                      ? "rgba(205,255,214,0.88)"
+                      ? "var(--success-text)"
                       : "color-mix(in srgb, var(--text-primary) 72%, transparent)",
                     marginBottom: 4,
                   }}
@@ -2002,7 +2002,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                       height: 22,
                       borderRadius: 999,
                       border: "1px solid color-mix(in srgb, var(--text-primary) 12%, transparent)",
-                      background: openCodeDraft.thinking ? "color-mix(in srgb, var(--accent) 35%, transparent)" : "color-mix(in srgb, var(--text-primary) 6%, transparent)",
+                      background: openCodeDraft.thinking ? "var(--toggle-on)" : "color-mix(in srgb, var(--text-primary) 6%, transparent)",
                       position: "relative",
                       cursor: "pointer",
                       padding: 0,
@@ -2017,7 +2017,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                         width: 16,
                         height: 16,
                         borderRadius: "50%",
-                        background: "color-mix(in srgb, var(--text-primary) 90%, transparent)",
+                        background: "var(--toggle-knob)",
                         transition: "left 120ms ease",
                       }}
                     />
@@ -2176,7 +2176,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                         height: 20,
                         borderRadius: 999,
                         border: "1px solid color-mix(in srgb, var(--text-primary) 12%, transparent)",
-                        background: model.enabled !== false ? "color-mix(in srgb, var(--accent) 35%, transparent)" : "color-mix(in srgb, var(--text-primary) 6%, transparent)",
+                        background: model.enabled !== false ? "var(--toggle-on)" : "color-mix(in srgb, var(--text-primary) 6%, transparent)",
                         position: "relative",
                         cursor: "pointer",
                         padding: 0,
@@ -2194,7 +2194,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                           width: 14,
                           height: 14,
                           borderRadius: "50%",
-                          background: "color-mix(in srgb, var(--text-primary) 90%, transparent)",
+                          background: "var(--toggle-knob)",
                           transition: "left 120ms ease",
                         }}
                       />
@@ -2321,7 +2321,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                   height: 22,
                   borderRadius: 999,
                   border: "1px solid var(--control-border)",
-                  background: developerMode ? "color-mix(in srgb, var(--accent) 35%, transparent)" : "var(--control-bg)",
+                  background: developerMode ? "var(--toggle-on)" : "var(--control-bg)",
                   position: "relative",
                   cursor: "pointer",
                   padding: 0,
@@ -2336,7 +2336,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                     width: 16,
                     height: 16,
                     borderRadius: "50%",
-                    background: "var(--text-primary)",
+                    background: "var(--toggle-knob)",
                     transition: "left 120ms ease",
                   }}
                 />
@@ -2401,7 +2401,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                       height: 22,
                       borderRadius: 999,
                       border: "1px solid color-mix(in srgb, var(--text-primary) 12%, transparent)",
-                      background: sidebarTerminalEnabled ? "color-mix(in srgb, var(--accent) 35%, transparent)" : "color-mix(in srgb, var(--text-primary) 6%, transparent)",
+                      background: sidebarTerminalEnabled ? "var(--toggle-on)" : "color-mix(in srgb, var(--text-primary) 6%, transparent)",
                       position: "relative",
                       cursor: "pointer",
                       padding: 0,
@@ -2416,7 +2416,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                         width: 16,
                         height: 16,
                         borderRadius: "50%",
-                        background: "color-mix(in srgb, var(--text-primary) 90%, transparent)",
+                        background: "var(--toggle-knob)",
                         transition: "left 120ms ease",
                       }}
                     />
@@ -2665,7 +2665,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                       height: 22,
                       borderRadius: 999,
                       border: "1px solid var(--control-border)",
-                      background: coauthorEnabled ? "color-mix(in srgb, var(--accent) 35%, transparent)" : "var(--control-bg)",
+                      background: coauthorEnabled ? "var(--toggle-on)" : "var(--control-bg)",
                       position: "relative",
                       cursor: "pointer",
                       padding: 0,
@@ -2777,7 +2777,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                     height: 22,
                     borderRadius: 999,
                     border: "1px solid color-mix(in srgb, var(--text-primary) 12%, transparent)",
-                    background: chromeControlsOnHover ? "color-mix(in srgb, var(--accent) 35%, transparent)" : "color-mix(in srgb, var(--text-primary) 6%, transparent)",
+                    background: chromeControlsOnHover ? "var(--toggle-on)" : "color-mix(in srgb, var(--text-primary) 6%, transparent)",
                     position: "relative",
                     cursor: "pointer",
                     padding: 0,
@@ -2792,7 +2792,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                       width: 16,
                       height: 16,
                       borderRadius: "50%",
-                      background: "color-mix(in srgb, var(--text-primary) 90%, transparent)",
+                      background: "var(--toggle-knob)",
                       transition: "left 120ms ease",
                     }}
                   />
@@ -2828,7 +2828,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
 
             {/* Status text */}
             {updaterPhase === "available" && updateVersion && (
-              <div style={{ fontSize: s(12), color: "rgba(165,255,210,0.82)", marginBottom: 10 }}>
+              <div style={{ fontSize: s(12), color: "var(--success-text)", marginBottom: 10 }}>
                 {t("settings.updateAvailable", { version: updateVersion })}
               </div>
             )}
@@ -2838,7 +2838,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
               </div>
             )}
             {updaterPhase === "ready" && (
-              <div style={{ fontSize: s(12), color: "rgba(165,255,210,0.82)", marginBottom: 10 }}>
+              <div style={{ fontSize: s(12), color: "var(--success-text)", marginBottom: 10 }}>
                 {t("settings.readyToInstall")}
               </div>
             )}
@@ -2897,8 +2897,8 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                   onClick={() => window.api?.downloadUpdate?.()}
                   style={{
                     padding: "6px 14px", borderRadius: 7,
-                    background: "rgba(165,255,210,0.12)", border: "1px solid rgba(165,255,210,0.2)",
-                    color: "rgba(165,255,210,0.9)", fontSize: s(12), cursor: "pointer",
+                    background: "var(--success-bg)", border: "1px solid var(--success-border)",
+                    color: "var(--success-text)", fontSize: s(12), cursor: "pointer",
                     transition: "all .2s", fontFamily: "var(--font-ui)",
                   }}
                 >
@@ -2911,8 +2911,8 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                   onClick={() => window.api?.installUpdate?.()}
                   style={{
                     padding: "6px 14px", borderRadius: 7,
-                    background: "rgba(165,255,210,0.18)", border: "1px solid rgba(165,255,210,0.28)",
-                    color: "rgba(165,255,210,0.95)", fontSize: s(12), cursor: "pointer",
+                    background: "var(--success-bg)", border: "1px solid var(--success-border)",
+                    color: "var(--success-text-strong)", fontSize: s(12), cursor: "pointer",
                     transition: "all .2s", fontFamily: "var(--font-ui)", fontWeight: 600,
                   }}
                 >

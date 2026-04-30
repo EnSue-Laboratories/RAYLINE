@@ -1,4 +1,4 @@
-export const APPEARANCE_VERSION = 2;
+export const APPEARANCE_VERSION = 3;
 export const LOGO_RED = "#FF4422";
 
 const FONT_UI = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
@@ -33,7 +33,7 @@ export const DEFAULT_APPEARANCE = Object.freeze({
         surface: "#161618",
         surfaceStrong: "#202025",
         border: "#FFFFFF",
-        accent: LOGO_RED,
+        accent: "#FFFFFF",
         success: "#6EE7A8",
         danger: "#F87171",
         warning: "#F0B450",
@@ -52,7 +52,7 @@ export const DEFAULT_APPEARANCE = Object.freeze({
         surface: "#FFFFFF",
         surfaceStrong: "#E8DED3",
         border: "#1F2937",
-        accent: LOGO_RED,
+        accent: "#1A1C1F",
         success: "#15803D",
         danger: "#DC2626",
         warning: "#B45309",
@@ -83,8 +83,8 @@ const PALETTE_KEYS = [
 ];
 const TYPOGRAPHY_KEYS = ["uiFont", "contentFont", "monoFont"];
 const LEGACY_DEFAULT_ACCENTS = {
-  dark: "#339CFF",
-  light: "#2563EB",
+  dark: ["#339CFF", "#FF4422"],
+  light: ["#2563EB", "#FF4422"],
 };
 
 function expandHex(value) {
@@ -119,9 +119,10 @@ function normalizeProfile(profile, fallback, options = {}) {
 
   for (const key of PALETTE_KEYS) {
     const normalizedColor = normalizeColor(paletteSource[key], fallback.palette[key]);
+    const legacyAccents = LEGACY_DEFAULT_ACCENTS[options.theme] || [];
     palette[key] = key === "accent" &&
       options.migrateLegacyAccent &&
-      normalizedColor === LEGACY_DEFAULT_ACCENTS[options.theme]
+      legacyAccents.includes(normalizedColor)
       ? fallback.palette[key]
       : normalizedColor;
   }
@@ -296,6 +297,8 @@ export function buildAppearanceCssVariables(profile, resolvedTheme = "dark") {
     "--link-text": p.accent,
     "--link-text-hover": mix(p.accent, isLight ? "#000000" : "#FFFFFF", 0.2),
     "--loading-dot-bg": rgba(p.text, isLight ? 0.42 : 0.34),
+    "--mono-dimmed": rgba(p.text, isLight ? 0.62 : 0.43),
+    "--mono-faint": rgba(p.text, isLight ? 0.52 : 0.38),
 
     "--code-bg": rgba(p.text, isLight ? 0.045 : 0.035),
     "--code-border": rgba(p.border, isLight ? 0.1 : 0.06),
