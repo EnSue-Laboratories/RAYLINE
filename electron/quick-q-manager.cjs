@@ -19,10 +19,11 @@ const { resolveOpenCodeBin } = require("./opencode-agent-manager.cjs");
 const { createLogger } = require("./logger.cjs");
 
 const DEFAULT_SHORTCUT = "CommandOrControl+Shift+Space";
-const WINDOW_WIDTH = 444;
+const WINDOW_WIDTH = 560;
 const WINDOW_HEIGHT = 86;
-const MIN_WIDTH = 320;
+const MIN_WIDTH = 360;
 const MIN_HEIGHT = 76;
+const MAX_HEIGHT = 620;
 
 const BUILTIN_MODELS = {
   opus: { id: "opus", label: "Claude Opus", provider: "claude", cliFlag: "opus" },
@@ -133,13 +134,22 @@ function buildRuntime(state) {
   };
 }
 
+function clampHeight(value) {
+  const number = Math.round(Number(value) || 0);
+  if (!Number.isFinite(number)) return WINDOW_HEIGHT;
+  return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, number));
+}
+
 function displayBoundsForWindow(display, height = WINDOW_HEIGHT) {
   const area = display?.workArea || display?.bounds || { x: 0, y: 0, width: WINDOW_WIDTH, height: WINDOW_HEIGHT };
+  // Anchor the window vertically near the upper third of the display so it
+  // doesn't jump as the panel grows downward when an answer streams in.
+  const verticalOffset = Math.max(0, Math.round(area.height * 0.22));
   return {
     width: WINDOW_WIDTH,
     height,
     x: Math.round(area.x + Math.max(0, (area.width - WINDOW_WIDTH) / 2)),
-    y: Math.round(area.y + Math.max(0, (area.height - height) / 2)),
+    y: Math.round(area.y + verticalOffset),
   };
 }
 
@@ -336,6 +346,7 @@ function createQuickQManager({
       height: WINDOW_HEIGHT,
       minWidth: MIN_WIDTH,
       minHeight: MIN_HEIGHT,
+      maxHeight: MAX_HEIGHT,
       x: displayBoundsForWindow(display).x,
       y: displayBoundsForWindow(display).y,
       show: false,
@@ -495,6 +506,21 @@ function createQuickQManager({
       if (!win || win.isDestroyed()) return false;
       win.close();
       return true;
+    });
+    ipcMain.on("quick-q-resize", (event, { height } = {}) => {
+      if (!quickWindow || quickWindow.isDestroyed()) return;
+      if (event.sender !== quickWindow.webContents) return;
+      const nextHeight = clampHeight(height);
+      const bounds = quickWindow.getBounds();
+      if (bounds.height === nextHeight) return;
+      // Keep the window anchored to its current top-left so the panel grows
+      // downward instead of recentering on every height tick.
+      quickWindow.setBounds({
+        x: bounds.x,
+        y: bounds.y,
+        width: WINDOW_WIDTH,
+        height: nextHeight,
+      });
     });
     ipcMain.handle("quick-q-set-shortcut", (_event, shortcut) => registerShortcut(shortcut));
     ipcMain.handle("quick-q-shortcut-status", () => ({ ...shortcutStatus }));

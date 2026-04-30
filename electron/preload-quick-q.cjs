@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("api", {
   quickQState: () => ipcRenderer.invoke("quick-q-state"),
   quickQClose: () => ipcRenderer.invoke("quick-q-close"),
+  quickQResize: (height) => ipcRenderer.send("quick-q-resize", { height }),
 
   agentStart: (opts) => ipcRenderer.send("quick-q-agent-start", opts),
   agentCancel: (payload) => ipcRenderer.send("quick-q-agent-cancel", payload),
