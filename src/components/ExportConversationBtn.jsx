@@ -95,14 +95,14 @@ export default function ExportConversationBtn({ convo, title = "Export conversat
   };
 
   const color = status === "success"
-    ? "rgba(160,200,140,0.85)"
+    ? "var(--accent)"
     : status === "error"
-      ? "rgba(255,160,160,0.9)"
-      : "rgba(255,255,255,0.5)";
-  const bgIdle = "rgba(255,255,255,0.04)";
-  const bgHover = "rgba(255,255,255,0.1)";
-  const borderIdle = "rgba(255,255,255,0.06)";
-  const borderHover = "rgba(255,255,255,0.12)";
+      ? "var(--accent)"
+      : "var(--text-secondary)";
+  const bgIdle = "var(--bg-tertiary)";
+  const bgHover = "var(--hover-overlay)";
+  const borderIdle = "var(--border)";
+  const borderHover = "var(--border-strong)";
 
   return (
     <div
@@ -163,10 +163,10 @@ export default function ExportConversationBtn({ convo, title = "Export conversat
             minWidth: 160,
             padding: 4,
             borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "rgba(19,20,26,0.96)",
+            border: "1px solid var(--border)",
+            background: "var(--surface-glass)",
             backdropFilter: "blur(20px)",
-            boxShadow: "0 18px 40px rgba(0,0,0,0.32)",
+            boxShadow: "var(--shadow-md)",
             zIndex: 30,
           }}
         >
@@ -201,13 +201,13 @@ function MenuButton({ label, onClick, disabled = false }) {
         border: "none",
         background: disabled
           ? "transparent"
-          : hovered ? "rgba(255,255,255,0.08)" : "transparent",
+          : hovered ? "var(--hover-overlay)" : "transparent",
         color: disabled
-          ? "rgba(255,255,255,0.25)"
-          : hovered ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.62)",
+          ? "var(--text-muted)"
+          : hovered ? "var(--text-primary)" : "var(--text-secondary)",
         cursor: disabled ? "default" : "pointer",
         fontSize: s(11),
-        fontFamily: "'JetBrains Mono',monospace",
+        fontFamily: "var(--font-mono)",
         textAlign: "left",
         transition: "background .15s, color .15s",
       }}

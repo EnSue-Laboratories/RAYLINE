@@ -13,9 +13,9 @@ function IconActionButton({
   onClick,
   disabled = false,
   visible = true,
-  hoverColor = "rgba(255,255,255,0.72)",
-  baseColor = "rgba(255,255,255,0.45)",
-  disabledColor = "rgba(255,255,255,0.12)",
+  hoverColor = "color-mix(in srgb, var(--text-primary) 78%, transparent)",
+  baseColor = "var(--text-secondary)",
+  disabledColor = "color-mix(in srgb, var(--text-primary) 13%, transparent)",
   ariaLabel,
 }) {
   const btnRef = useRef(null);
@@ -73,12 +73,12 @@ function IconActionButton({
             top: tipPos.top - 6,
             transform: "translate(-50%, -100%)",
             padding: "3px 7px",
-            background: "rgba(14,14,18,0.95)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--app-background)",
+            border: "1px solid var(--control-border)",
             borderRadius: 4,
-            color: "rgba(255,255,255,0.8)",
+            color: "color-mix(in srgb, var(--text-primary) 87%, transparent)",
             fontSize: 9,
-            fontFamily: "'JetBrains Mono',monospace",
+            fontFamily: "var(--font-mono)",
             letterSpacing: ".04em",
             whiteSpace: "nowrap",
             pointerEvents: "none",
@@ -361,19 +361,19 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
           alignItems: "center",
           gap: 5,
           padding: "4px 10px",
-          background: "rgba(255,255,255,0.02)",
-          border: "1px solid rgba(255,255,255,0.04)",
+          background: "color-mix(in srgb, var(--control-bg) 50%, transparent)",
+          border: "1px solid var(--control-bg)",
           borderRadius: 7,
-          color: "rgba(255,255,255,0.4)",
+          color: "var(--text-secondary)",
           fontSize: s(10),
-          fontFamily: "'JetBrains Mono',monospace",
+          fontFamily: "var(--font-mono)",
           cursor: "pointer",
           transition: "all .2s",
           letterSpacing: ".04em",
           maxWidth: 220,
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--text-primary) 11%, transparent)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--control-bg)"; }}
       >
         <span style={{
           overflow: "hidden",
@@ -394,9 +394,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
             left: menuStyle.left,
             zIndex: 400,
             width: menuStyle.width,
-            background: "rgba(8,8,12,0.55)",
+            background: "var(--pane-elevated)",
             backdropFilter: "blur(48px) saturate(1.2)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            border: "1px solid var(--pane-border)",
             borderRadius: 10,
             padding: 3,
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
@@ -418,12 +418,12 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                 style={{
                   flex: 1,
                   padding: "5px 0",
-                  background: mode === tab ? "rgba(255,255,255,0.04)" : "transparent",
+                  background: mode === tab ? "var(--control-bg)" : "transparent",
                   border: "none",
                   borderRadius: 6,
-                  color: mode === tab ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
+                  color: mode === tab ? "color-mix(in srgb, var(--text-primary) 76%, transparent)" : "color-mix(in srgb, var(--text-primary) 27%, transparent)",
                   fontSize: s(9),
-                  fontFamily: "'JetBrains Mono',monospace",
+                  fontFamily: "var(--font-mono)",
                   letterSpacing: ".08em",
                   cursor: "pointer",
                   transition: "all .15s",
@@ -460,12 +460,12 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
               style={{
                 width: "100%",
                 padding: "6px 8px",
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: "color-mix(in srgb, var(--control-bg) 75%, transparent)",
+                border: "1px solid var(--control-border)",
                 borderRadius: 6,
-                color: "rgba(255,255,255,0.8)",
+                color: "color-mix(in srgb, var(--text-primary) 87%, transparent)",
                 fontSize: s(10),
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: "var(--font-mono)",
                 outline: "none",
                 boxSizing: "border-box",
               }}
@@ -487,14 +487,14 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                       justifyContent: "space-between",
                       width: "100%",
                       padding: "8px 12px",
-                      background: "rgba(255,180,180,0.06)",
+                      background: "var(--danger-soft-bg)",
                       borderRadius: 7,
                       gap: 8,
                     }}>
                       <span style={{
                         fontSize: s(10),
-                        fontFamily: "'JetBrains Mono',monospace",
-                        color: "rgba(255,180,180,0.7)",
+                        fontFamily: "var(--font-mono)",
+                        color: "var(--danger-soft-text)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -505,8 +505,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                           style={{
                             display: "flex", alignItems: "center", justifyContent: "center",
                             width: 24, height: 24, borderRadius: 6,
-                            background: "rgba(255,180,180,0.12)", border: "none",
-                            color: "rgba(255,180,180,0.7)", cursor: "pointer",
+                            background: "var(--danger-soft-bg)", border: "none",
+                            color: "var(--danger-soft-text)", cursor: "pointer",
                           }}
                         ><Check size={12} strokeWidth={2} /></button>
                         <button
@@ -514,8 +514,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                           style={{
                             display: "flex", alignItems: "center", justifyContent: "center",
                             width: 24, height: 24, borderRadius: 6,
-                            background: "rgba(255,255,255,0.02)", border: "none",
-                            color: "rgba(255,255,255,0.3)", cursor: "pointer",
+                            background: "color-mix(in srgb, var(--control-bg) 50%, transparent)", border: "none",
+                            color: "color-mix(in srgb, var(--text-primary) 33%, transparent)", cursor: "pointer",
                           }}
                         ><X size={12} strokeWidth={2} /></button>
                       </span>
@@ -532,7 +532,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                       justifyContent: "space-between",
                       width: "100%",
                       padding: "8px 12px",
-                      background: b === current ? "rgba(255,255,255,0.04)" : hoveredRow === `branch-${b}` ? "rgba(255,255,255,0.025)" : "transparent",
+                      background: b === current ? "var(--control-bg)" : hoveredRow === `branch-${b}` ? "color-mix(in srgb, var(--control-bg) 63%, transparent)" : "transparent",
                       borderRadius: 7,
                       transition: "all .12s",
                     }}
@@ -548,9 +548,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                         minWidth: 0,
                         background: "none",
                         border: "none",
-                        color: b === current ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+                        color: b === current ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
                         fontSize: s(11),
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: "var(--font-mono)",
                         cursor: "pointer",
                         textAlign: "left",
                         padding: 0,
@@ -578,8 +578,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                 <div style={{
                   padding: "10px 12px",
                   fontSize: s(9),
-                  fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.25)",
+                  fontFamily: "var(--font-mono)",
+                  color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
                 }}>
                   {t("git.branch.noBranchesMatch")}
                 </div>
@@ -594,8 +594,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                 <div style={{
                   padding: "6px 12px",
                   fontSize: s(9),
-                  fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.25)",
+                  fontFamily: "var(--font-mono)",
+                  color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
                   letterSpacing: ".04em",
                 }}>
                   {t("git.branch.startNewChatToSwitch")}
@@ -616,17 +616,17 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     justifyContent: "space-between",
                     width: "100%",
                     padding: "8px 12px",
-                    background: !isInWorktree ? "rgba(255,255,255,0.04)" : "transparent",
+                    background: !isInWorktree ? "var(--control-bg)" : "transparent",
                     border: "none",
                     borderRadius: 7,
-                    color: !isInWorktree ? "rgba(255,255,255,0.9)" : worktreeLocked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
+                    color: !isInWorktree ? "var(--text-primary)" : worktreeLocked ? "color-mix(in srgb, var(--text-primary) 16%, transparent)" : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
                     fontSize: s(11),
-                    fontFamily: "'JetBrains Mono',monospace",
+                    fontFamily: "var(--font-mono)",
                     cursor: worktreeLocked && isInWorktree ? "default" : "pointer",
                     textAlign: "left",
                     transition: "all .12s",
                   }}
-                  onMouseEnter={(e) => { if (!worktreeLocked && isInWorktree) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                  onMouseEnter={(e) => { if (!worktreeLocked && isInWorktree) e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
                   onMouseLeave={(e) => { if (isInWorktree) e.currentTarget.style.background = "transparent"; }}
                 >
                   <span>{t("git.branch.none")}</span>
@@ -642,7 +642,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   return (
                     <div key={wt.path} style={{
                       padding: "8px 12px",
-                      background: "rgba(180,220,255,0.06)",
+                      background: "var(--badge-open-bg)",
                       borderRadius: 7,
                     }}>
                       <div style={{
@@ -653,8 +653,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                       }}>
                         <span style={{
                           fontSize: s(10),
-                          fontFamily: "'JetBrains Mono',monospace",
-                          color: "rgba(180,220,255,0.7)",
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--badge-open-text)",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -666,8 +666,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                             style={{
                               display: "flex", alignItems: "center", justifyContent: "center",
                               width: 24, height: 24, borderRadius: 6,
-                              background: "rgba(180,220,255,0.12)", border: "none",
-                              color: "rgba(180,220,255,0.7)",
+                              background: "var(--badge-open-bg)", border: "none",
+                              color: "var(--badge-open-text)",
                               cursor: promoting ? "default" : "pointer",
                               opacity: promoting ? 0.5 : 1,
                             }}
@@ -678,8 +678,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                             style={{
                               display: "flex", alignItems: "center", justifyContent: "center",
                               width: 24, height: 24, borderRadius: 6,
-                              background: "rgba(255,255,255,0.02)", border: "none",
-                              color: "rgba(255,255,255,0.3)",
+                              background: "color-mix(in srgb, var(--control-bg) 50%, transparent)", border: "none",
+                              color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
                               cursor: promoting ? "default" : "pointer",
                             }}
                           ><X size={12} strokeWidth={2} /></button>
@@ -688,8 +688,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                       <div style={{
                         marginTop: 6,
                         fontSize: s(9),
-                        fontFamily: "'JetBrains Mono',monospace",
-                        color: promoteError ? "rgba(255,180,180,0.7)" : "rgba(255,255,255,0.35)",
+                        fontFamily: "var(--font-mono)",
+                        color: promoteError ? "var(--danger-soft-text)" : "color-mix(in srgb, var(--text-primary) 38%, transparent)",
                         lineHeight: 1.4,
                       }}>
                         {promoteError
@@ -704,7 +704,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   return (
                     <div key={wt.path} style={{
                       padding: "8px 12px",
-                      background: "rgba(255,180,180,0.06)",
+                      background: "var(--danger-soft-bg)",
                       borderRadius: 7,
                     }}>
                       <div style={{
@@ -715,8 +715,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                       }}>
                         <span style={{
                           fontSize: s(10),
-                          fontFamily: "'JetBrains Mono',monospace",
-                          color: "rgba(255,180,180,0.7)",
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--danger-soft-text)",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -727,8 +727,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                             style={{
                               display: "flex", alignItems: "center", justifyContent: "center",
                               width: 24, height: 24, borderRadius: 6,
-                              background: "rgba(255,180,180,0.12)", border: "none",
-                              color: "rgba(255,180,180,0.7)", cursor: "pointer",
+                              background: "var(--danger-soft-bg)", border: "none",
+                              color: "var(--danger-soft-text)", cursor: "pointer",
                             }}
                           ><Check size={12} strokeWidth={2} /></button>
                           <button
@@ -736,8 +736,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                             style={{
                               display: "flex", alignItems: "center", justifyContent: "center",
                               width: 24, height: 24, borderRadius: 6,
-                              background: "rgba(255,255,255,0.02)", border: "none",
-                              color: "rgba(255,255,255,0.3)", cursor: "pointer",
+                              background: "color-mix(in srgb, var(--control-bg) 50%, transparent)", border: "none",
+                              color: "color-mix(in srgb, var(--text-primary) 33%, transparent)", cursor: "pointer",
                             }}
                           ><X size={12} strokeWidth={2} /></button>
                         </span>
@@ -751,8 +751,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                             gap: 6,
                             marginTop: 6,
                             fontSize: s(9),
-                            fontFamily: "'JetBrains Mono',monospace",
-                            color: "rgba(255,255,255,0.3)",
+                            fontFamily: "var(--font-mono)",
+                            color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
                             cursor: "pointer",
                           }}
                         >
@@ -763,11 +763,11 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                             width: 14,
                             height: 14,
                             borderRadius: 3,
-                            border: "1.5px solid rgba(255,255,255,0.2)",
-                            background: deleteBranchToo ? "rgba(255,180,180,0.5)" : "transparent",
+                            border: "1.5px solid color-mix(in srgb, var(--text-primary) 22%, transparent)",
+                            background: deleteBranchToo ? "var(--danger-soft-border)" : "transparent",
                             flexShrink: 0,
                           }}>
-                            {deleteBranchToo && <Check size={10} strokeWidth={2.5} style={{ color: "#fff" }} />}
+                            {deleteBranchToo && <Check size={10} strokeWidth={2.5} style={{ color: "var(--text-primary)" }} />}
                           </span>
                           {t("git.branch.alsoDeleteBranch")}
                         </div>
@@ -784,7 +784,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                       alignItems: "center",
                       width: "100%",
                       padding: "8px 12px",
-                      background: isActive ? "rgba(255,255,255,0.04)" : hoveredRow === `wt-${wt.path}` ? "rgba(255,255,255,0.025)" : "transparent",
+                      background: isActive ? "var(--control-bg)" : hoveredRow === `wt-${wt.path}` ? "color-mix(in srgb, var(--control-bg) 63%, transparent)" : "transparent",
                       borderRadius: 7,
                       transition: "all .12s",
                     }}
@@ -801,9 +801,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                         minWidth: 0,
                         background: "none",
                         border: "none",
-                        color: isActive ? "rgba(255,255,255,0.9)" : worktreeLocked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
+                        color: isActive ? "var(--text-primary)" : worktreeLocked ? "color-mix(in srgb, var(--text-primary) 16%, transparent)" : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
                         fontSize: s(11),
-                        fontFamily: "'JetBrains Mono',monospace",
+                        fontFamily: "var(--font-mono)",
                         cursor: worktreeLocked && !isActive ? "default" : "pointer",
                         textAlign: "left",
                         padding: 0,
@@ -816,7 +816,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                       </span>
                       <span style={{
                         fontSize: s(8),
-                        color: "rgba(255,255,255,0.2)",
+                        color: "color-mix(in srgb, var(--text-primary) 22%, transparent)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -853,8 +853,8 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                 <div style={{
                   padding: "10px 12px",
                   fontSize: s(9),
-                  fontFamily: "'JetBrains Mono',monospace",
-                  color: "rgba(255,255,255,0.25)",
+                  fontFamily: "var(--font-mono)",
+                  color: "color-mix(in srgb, var(--text-primary) 27%, transparent)",
                 }}>
                   {t("git.branch.noWorktreesMatch")}
                 </div>
@@ -865,16 +865,16 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
           {error && !creating && (
             <div style={{
               fontSize: s(9),
-              color: "rgba(255,180,180,0.7)",
+              color: "var(--danger-soft-text)",
               padding: "4px 12px",
-              fontFamily: "'JetBrains Mono',monospace",
+              fontFamily: "var(--font-mono)",
             }}>
               {error}
             </div>
           )}
 
           {/* Divider + create */}
-          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "3px 6px" }} />
+          <div style={{ height: 1, background: "var(--control-bg)", margin: "3px 6px" }} />
 
           {creating ? (
             <div style={{ padding: "6px 8px" }}>
@@ -884,12 +884,12 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   onClick={() => handleModeChange(mode === "worktree" ? "branch" : "worktree")}
                   style={{
                     padding: "3px 7px",
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.06)",
+                    background: "var(--control-bg)",
+                    border: "1px solid var(--pane-border)",
                     borderRadius: 5,
-                    color: "rgba(255,255,255,0.4)",
+                    color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
                     fontSize: s(8),
-                    fontFamily: "'JetBrains Mono',monospace",
+                    fontFamily: "var(--font-mono)",
                     letterSpacing: ".06em",
                     cursor: "pointer",
                     flexShrink: 0,
@@ -909,12 +909,12 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                   style={{
                     flex: 1,
                     padding: "5px 8px",
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.08)",
+                    background: "color-mix(in srgb, var(--control-bg) 75%, transparent)",
+                    border: "1px solid var(--control-border)",
                     borderRadius: 6,
-                    color: "rgba(255,255,255,0.8)",
+                    color: "color-mix(in srgb, var(--text-primary) 87%, transparent)",
                     fontSize: s(10),
-                    fontFamily: "'JetBrains Mono',monospace",
+                    fontFamily: "var(--font-mono)",
                     outline: "none",
                     minWidth: 0,
                   }}
@@ -928,9 +928,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     width: 24,
                     height: 24,
                     borderRadius: 6,
-                    background: newName.trim() ? "rgba(180,255,200,0.12)" : "rgba(255,255,255,0.02)",
+                    background: newName.trim() ? "var(--badge-open-bg)" : "color-mix(in srgb, var(--control-bg) 50%, transparent)",
                     border: "none",
-                    color: newName.trim() ? "rgba(180,255,200,0.7)" : "rgba(255,255,255,0.15)",
+                    color: newName.trim() ? "var(--badge-open-text)" : "color-mix(in srgb, var(--text-primary) 16%, transparent)",
                     cursor: newName.trim() ? "pointer" : "default",
                     flexShrink: 0,
                   }}
@@ -946,9 +946,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                     width: 24,
                     height: 24,
                     borderRadius: 6,
-                    background: "rgba(255,255,255,0.02)",
+                    background: "color-mix(in srgb, var(--control-bg) 50%, transparent)",
                     border: "none",
-                    color: "rgba(255,255,255,0.3)",
+                    color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
                     cursor: "pointer",
                     flexShrink: 0,
                   }}
@@ -959,9 +959,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
               {error && (
                 <div style={{
                   fontSize: s(9),
-                  color: "rgba(255,180,180,0.7)",
+                  color: "var(--danger-soft-text)",
                   padding: "2px 4px",
-                  fontFamily: "'JetBrains Mono',monospace",
+                  fontFamily: "var(--font-mono)",
                 }}>
                   {error}
                 </div>
@@ -979,14 +979,14 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                 background: "transparent",
                 border: "none",
                 borderRadius: 7,
-                color: "rgba(255,255,255,0.3)",
+                color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
                 fontSize: s(10),
-                fontFamily: "'JetBrains Mono',monospace",
+                fontFamily: "var(--font-mono)",
                 cursor: "pointer",
                 transition: "all .12s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 54%, transparent)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 33%, transparent)"; }}
             >
               <Plus size={12} strokeWidth={2} />
               {mode === "worktree" ? t("git.branch.newWorktree") : t("git.branch.newBranch")}

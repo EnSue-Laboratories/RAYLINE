@@ -172,26 +172,26 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
           display: "flex",
           alignItems: "center",
           gap: 1,
-          background: "rgba(30,30,30,0.95)",
-          border: "1px solid rgba(255,255,255,0.1)",
+          background: "var(--surface-glass)",
+          border: "1px solid var(--border)",
           borderRadius: explanation
             ? (showBelow ? "10px 10px 0 0" : "0 0 10px 10px")
             : 10,
           padding: "3px 4px",
           backdropFilter: "blur(20px)",
-          boxShadow: explanation ? "none" : "0 8px 32px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.06)",
+          boxShadow: explanation ? "none" : "var(--shadow-md)",
         }}>
           <ToolbarBtn
             label={explaining ? "Thinking..." : "Explain"}
             onClick={handleExplain}
             active={!!explanation}
           />
-          <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.08)" }} />
+          <div style={{ width: 1, height: 14, background: "var(--border)" }} />
           <ToolbarBtn
             label="Quote"
             onClick={handleQuote}
           />
-          <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.08)" }} />
+          <div style={{ width: 1, height: 14, background: "var(--border)" }} />
           <ToolbarBtn
             label="Copy"
             onClick={handleCopy}
@@ -207,7 +207,7 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
             height: 0,
             borderLeft: "5px solid transparent",
             borderRight: "5px solid transparent",
-            borderTop: "5px solid rgba(30,30,30,0.95)",
+            borderTop: "5px solid var(--surface-glass)",
             marginTop: -1,
           }} />
         )}
@@ -233,11 +233,11 @@ function ToolbarBtn({ label, onClick, active }) {
         padding: "4px 10px",
         borderRadius: 7,
         border: "none",
-        background: active ? "rgba(255,255,255,0.1)" : hovered ? "rgba(255,255,255,0.06)" : "transparent",
-        color: active ? "rgba(255,255,255,0.9)" : hovered ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.55)",
+        background: active ? "var(--bg-tertiary)" : hovered ? "var(--hover-overlay)" : "transparent",
+        color: active ? "var(--text-primary)" : hovered ? "var(--text-primary)" : "var(--text-secondary)",
         cursor: "pointer",
         fontSize: s(11),
-        fontFamily: "system-ui,sans-serif",
+        fontFamily: "var(--font-ui)",
         fontWeight: 500,
         transition: "all .15s",
         letterSpacing: ".01em",
@@ -255,12 +255,12 @@ function ExplainPane({ explanation, position }) {
       width: 340,
       maxHeight: 260,
       overflowY: "auto",
-      background: "rgba(24,24,24,0.97)",
-      border: "1px solid rgba(255,255,255,0.1)",
+      background: "var(--surface-glass)",
+      border: "1px solid var(--border)",
       borderRadius: position === "above" ? "10px 10px 0 0" : "0 0 10px 10px",
       padding: "10px 14px",
       backdropFilter: "blur(20px)",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+      boxShadow: "var(--shadow-md)",
       marginBottom: position === "above" ? -1 : 0,
       marginTop: position === "below" ? -1 : 0,
     }}>
@@ -269,19 +269,19 @@ function ExplainPane({ explanation, position }) {
           display: "flex",
           alignItems: "center",
           gap: 6,
-          color: "rgba(255,255,255,0.4)",
+          color: "var(--text-muted)",
           fontSize: s(12),
-          fontFamily: "system-ui,sans-serif",
+          fontFamily: "var(--font-ui)",
         }}>
           <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
           Thinking...
         </div>
       ) : (
         <div style={{
-          color: "rgba(255,255,255,0.7)",
+          color: "var(--text-secondary)",
           fontSize: s(13),
           lineHeight: 1.6,
-          fontFamily: "'Newsreader','Iowan Old Style',Georgia,serif",
+          fontFamily: "var(--font-content)",
           letterSpacing: "0.005em",
         }}>
           <Markdown remarkPlugins={[remarkGfm]}>

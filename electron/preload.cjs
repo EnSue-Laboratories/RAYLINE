@@ -159,6 +159,7 @@ contextBridge.exposeInMainWorld("api", {
 
   // Window appearance
   setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
+  setWindowBackgroundColor: (color) => ipcRenderer.invoke("set-window-background-color", color),
   windowMinimize: () => ipcRenderer.invoke("window-minimize"),
   windowToggleMaximize: () => ipcRenderer.invoke("window-toggle-maximize"),
   windowClose: () => ipcRenderer.invoke("window-close"),

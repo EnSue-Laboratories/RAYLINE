@@ -98,18 +98,18 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
           alignItems: "center",
           gap: 6,
           padding: "4px 10px",
-          background: "rgba(255,255,255,0.02)",
-          border: "1px solid rgba(255,255,255,0.04)",
+          background: "color-mix(in srgb, var(--control-bg) 50%, transparent)",
+          border: "1px solid var(--control-bg)",
           borderRadius: 7,
-          color: "rgba(255,255,255,0.4)",
+          color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
           fontSize: s(10),
-          fontFamily: "'JetBrains Mono',monospace",
+          fontFamily: "var(--font-mono)",
           cursor: "pointer",
           transition: "all .2s",
           letterSpacing: ".04em",
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--text-primary) 11%, transparent)"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--control-bg)"; }}
       >
         <span
           style={{
@@ -117,7 +117,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
             width: 6,
             height: 6,
             borderRadius: "50%",
-            background: "rgba(180,220,255,0.7)",
+            background: "var(--badge-open-text)",
             flexShrink: 0,
           }}
         />
@@ -135,9 +135,9 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
             zIndex: 400,
             width: menuStyle.width,
             maxHeight: menuStyle.maxHeight,
-            background: "rgba(8,8,12,0.55)",
+            background: "var(--pane-elevated)",
             backdropFilter: "blur(48px) saturate(1.2)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            border: "1px solid var(--pane-border)",
             borderRadius: 10,
             padding: 3,
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
@@ -156,17 +156,17 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
               justifyContent: "space-between",
               width: "100%",
               padding: "8px 12px",
-              background: value === null ? "rgba(255,255,255,0.04)" : "transparent",
+              background: value === null ? "var(--control-bg)" : "transparent",
               border: "none",
               borderRadius: 7,
-              color: value === null ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+              color: value === null ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
               fontSize: s(11),
-              fontFamily: "'JetBrains Mono',monospace",
+              fontFamily: "var(--font-mono)",
               cursor: "pointer",
               textAlign: "left",
               transition: "all .12s",
             }}
-            onMouseEnter={(e) => { if (value !== null) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+            onMouseEnter={(e) => { if (value !== null) e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
             onMouseLeave={(e) => { if (value !== null) e.currentTarget.style.background = "transparent"; }}
           >
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -177,7 +177,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
           </button>
 
           {/* Divider */}
-          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "3px 6px" }} />
+          <div style={{ height: 1, background: "var(--control-bg)", margin: "3px 6px" }} />
 
           {/* Project list */}
           <div style={{ minHeight: 0, overflowY: "auto" }}>
@@ -194,17 +194,17 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
                     justifyContent: "space-between",
                     width: "100%",
                     padding: "8px 12px",
-                    background: isSelected ? "rgba(255,255,255,0.04)" : "transparent",
+                    background: isSelected ? "var(--control-bg)" : "transparent",
                     border: "none",
                     borderRadius: 7,
-                    color: isSelected ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+                    color: isSelected ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
                     fontSize: s(11),
-                    fontFamily: "'JetBrains Mono',monospace",
+                    fontFamily: "var(--font-mono)",
                     cursor: "pointer",
                     textAlign: "left",
                     transition: "all .12s",
                   }}
-                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
                   onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
                 >
                   <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
@@ -217,7 +217,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
                     <span
                       style={{
                         fontSize: s(9),
-                        color: "rgba(255,255,255,0.2)",
+                        color: "color-mix(in srgb, var(--text-primary) 22%, transparent)",
                         paddingLeft: 20,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -234,7 +234,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
           </div>
 
           {/* Divider */}
-          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "3px 6px" }} />
+          <div style={{ height: 1, background: "var(--control-bg)", margin: "3px 6px" }} />
 
           {/* Browse option */}
           <button
@@ -248,14 +248,14 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
               background: "transparent",
               border: "none",
               borderRadius: 7,
-              color: "rgba(255,255,255,0.4)",
+              color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
               fontSize: s(11),
-              fontFamily: "'JetBrains Mono',monospace",
+              fontFamily: "var(--font-mono)",
               cursor: "pointer",
               textAlign: "left",
               transition: "all .12s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.025)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>

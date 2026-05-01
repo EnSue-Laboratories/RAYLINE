@@ -6,6 +6,21 @@
     <title>RayLine</title>
     <meta name="description" content="RayLine — a Claude Code desktop client" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      (() => {
+        const key = "rayline.themeMode";
+        const mode = (() => { try { return localStorage.getItem(key) || "auto"; } catch { return "auto"; } })();
+        const dark = matchMedia?.("(prefers-color-scheme: dark)")?.matches;
+        const resolved = mode === "light" || mode === "dark" ? mode : dark ? "dark" : "light";
+        document.documentElement.dataset.theme = resolved;
+        document.documentElement.style.background = resolved === "light" ? "#F7F4EE" : "#0D0D10";
+        document.documentElement.style.colorScheme = resolved;
+      })();
+    </script>
+    <style>
+      html, body, #root { margin: 0; min-height: 100%; background: #0D0D10; }
+      html[data-theme="light"], html[data-theme="light"] body, html[data-theme="light"] #root { background: #F7F4EE; }
+    </style>
   </head>
   <body>
     <div id="root"></div>

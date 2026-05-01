@@ -444,8 +444,8 @@ export default function NewChatCard({
     background: "transparent",
     border: "none",
     outline: "none",
-    color: "rgba(255,255,255,0.85)",
-    fontFamily: "system-ui, sans-serif",
+    color: "var(--text-primary)",
+    fontFamily: "var(--font-ui)",
   };
 
   const toolBtnStyle = (active) => ({
@@ -455,16 +455,16 @@ export default function NewChatCard({
     padding: "5px 11px",
     background: active ? SHEET_ACTIVE : SHEET_HOVER,
     backdropFilter: active ? "var(--pane-interaction-active-filter, none)" : "var(--pane-interaction-hover-filter, none)",
-    border: `1px solid ${active ? "rgba(255,255,255,0.12)" : SHEET_BORDER}`,
+    border: `1px solid ${active ? "var(--control-bg-active)" : SHEET_BORDER}`,
     borderRadius: 999,
-    color: active ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.5)",
+    color: active ? "var(--text-primary)" : "var(--text-secondary)",
     fontSize: s(10.5),
-    fontFamily: "system-ui, sans-serif",
+    fontFamily: "var(--font-ui)",
     fontWeight: 600,
     cursor: "pointer",
     transition: "all .2s",
     letterSpacing: ".01em",
-    boxShadow: active ? "var(--pane-interaction-active-shadow, inset 0 0 0 1px rgba(255,255,255,0.08))" : "var(--pane-interaction-hover-shadow, none)",
+    boxShadow: active ? "var(--pane-interaction-active-shadow, inset 0 0 0 1px var(--control-border))" : "var(--pane-interaction-hover-shadow, none)",
   });
 
   const chipIconStyle = {
@@ -498,9 +498,9 @@ export default function NewChatCard({
       <div style={{
         maxWidth: 600,
         width: "100%",
-        background: dragOver ? "rgba(180,220,255,0.05)" : SHEET_BG,
+        background: dragOver ? "var(--accent-bg)" : SHEET_BG,
         backdropFilter: "blur(48px) saturate(1.2)",
-        border: `1px solid ${dragOver ? "rgba(180,220,255,0.12)" : SHEET_BORDER}`,
+        border: `1px solid ${dragOver ? "var(--accent-border)" : SHEET_BORDER}`,
         borderRadius: 14,
         padding: "20px 20px 10px",
         display: "flex",
@@ -541,15 +541,15 @@ export default function NewChatCard({
               <span style={{
                 display: "inline-flex", alignItems: "center", gap: 4,
                 padding: "3px 8px",
-                background: "rgba(140,180,255,0.1)",
-                border: "1px solid rgba(140,180,255,0.15)",
+                background: "var(--accent-bg-strong)",
+                border: "1px solid var(--accent-border)",
                 borderRadius: 6, fontSize: s(10),
-                fontFamily: "'JetBrains Mono', monospace",
-                color: "rgba(180,210,255,0.8)",
+                fontFamily: "var(--font-mono)",
+                color: "var(--accent-text)",
               }}>
                 {issueContext.split("\n")[0]}
                 <button onClick={() => setIssueContext(null)} style={{
-                  background: "none", border: "none", color: "rgba(255,255,255,0.3)",
+                  background: "none", border: "none", color: "var(--text-muted)",
                   cursor: "pointer", padding: 0, display: "flex",
                 }}>
                   <X size={10} />
@@ -560,18 +560,18 @@ export default function NewChatCard({
               <span key={i} style={{
                 display: "inline-flex", alignItems: "center", gap: 4,
                 padding: "3px 8px",
-                background: f.type === "image" ? "rgba(180,255,200,0.06)" : "rgba(255,255,255,0.04)",
-                border: `1px solid ${f.type === "image" ? "rgba(180,255,200,0.1)" : "rgba(255,255,255,0.06)"}`,
+                background: f.type === "image" ? "var(--success-bg)" : "var(--control-bg)",
+                border: `1px solid ${f.type === "image" ? "var(--success-border)" : "var(--control-bg-strong)"}`,
                 borderRadius: 6, fontSize: s(10),
-                fontFamily: "'JetBrains Mono', monospace",
-                color: "rgba(255,255,255,0.5)",
+                fontFamily: "var(--font-mono)",
+                color: "var(--text-secondary)",
               }}>
                 {f.type === "image" && f.dataUrl && (
                   <img src={f.dataUrl} alt="" style={{ width: 14, height: 14, borderRadius: 2, objectFit: "cover" }} />
                 )}
                 {f.name}
                 <button onClick={() => removeAttachment(i)} style={{
-                  background: "none", border: "none", color: "rgba(255,255,255,0.3)",
+                  background: "none", border: "none", color: "var(--text-muted)",
                   cursor: "pointer", padding: 0, display: "flex",
                 }}>
                   <X size={10} />
@@ -587,8 +587,8 @@ export default function NewChatCard({
 
           {/* Attach */}
           <button onClick={handleAttach} style={toolBtnStyle(false)}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--control-bg-active)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--control-bg)"; }}
           >
             <Paperclip style={chipIconStyle} />
             File
@@ -687,8 +687,8 @@ export default function NewChatCard({
             onBrowse={handleBrowseProject}
           />
           <span style={{
-            fontSize: s(10), color: "rgba(255,255,255,0.2)",
-            fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
+            fontSize: s(10), color: "var(--text-disabled)",
+            fontFamily: "var(--font-mono)", letterSpacing: ".04em",
           }}>
             {creatingChat ? "Creating..." : "Enter to create"}
           </span>
@@ -697,8 +697,8 @@ export default function NewChatCard({
         {error && (
           <div style={{
             fontSize: s(10),
-            color: "rgba(255,180,180,0.7)",
-            fontFamily: "'JetBrains Mono', monospace",
+            color: "var(--danger-text)",
+            fontFamily: "var(--font-mono)",
           }}>
             {error}
           </div>
@@ -789,20 +789,20 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
           outline: "none",
           padding: "8px 10px",
           fontSize: s(11),
-          fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.8)",
+          fontFamily: "var(--font-mono)",
+          color: "var(--text-primary)",
           borderBottom: "1px solid var(--pane-border)",
           borderRadius: "7px 7px 0 0",
         }}
       />
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {loading && (
-          <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+          <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
             Loading...
           </div>
         )}
         {!loading && issues.length === 0 && (
-          <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+          <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
             No issues found
           </div>
         )}
@@ -819,9 +819,9 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
               background: "transparent",
               border: "none",
               borderRadius: 7,
-              color: "rgba(255,255,255,0.55)",
+              color: "var(--text-secondary)",
               fontSize: s(11),
-              fontFamily: "system-ui, sans-serif",
+              fontFamily: "var(--font-ui)",
               cursor: "pointer",
               textAlign: "left",
               transition: "all .12s",
@@ -830,8 +830,8 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
             <span style={{
-              fontSize: s(9), fontFamily: "'JetBrains Mono',monospace",
-              color: "rgba(255,255,255,0.3)", flexShrink: 0,
+              fontSize: s(9), fontFamily: "var(--font-mono)",
+              color: "var(--text-muted)", flexShrink: 0,
             }}>
               #{issue.number}
             </span>
@@ -917,8 +917,8 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
           outline: "none",
           padding: "8px 10px",
           fontSize: s(11),
-          fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.8)",
+          fontFamily: "var(--font-mono)",
+          color: "var(--text-primary)",
           borderBottom: "1px solid var(--pane-border)",
           borderRadius: "7px 7px 0 0",
         }}
@@ -935,9 +935,9 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
               background: "transparent",
               border: "none",
               borderRadius: 7,
-              color: "rgba(180,220,255,0.82)",
+              color: "var(--accent-text)",
               fontSize: s(11),
-              fontFamily: "'JetBrains Mono',monospace",
+              fontFamily: "var(--font-mono)",
               cursor: "pointer",
               textAlign: "left",
             }}
@@ -949,12 +949,12 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
         )}
 
         {loading && (
-          <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+          <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
             Loading...
           </div>
         )}
         {!loading && branches.length === 0 && (
-          <div style={{ padding: "12px 10px", fontSize: s(10), color: "rgba(255,255,255,0.3)", fontFamily: "'JetBrains Mono',monospace" }}>
+          <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
             No branches found
           </div>
         )}
@@ -973,9 +973,9 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
               background: "transparent",
               border: "none",
               borderRadius: 7,
-              color: branchName === currentBranch ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.55)",
+              color: branchName === currentBranch ? "var(--text-primary)" : "var(--text-secondary)",
               fontSize: s(11),
-              fontFamily: "'JetBrains Mono',monospace",
+              fontFamily: "var(--font-mono)",
               cursor: "pointer",
               textAlign: "left",
               transition: "all .12s",
@@ -985,7 +985,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
           >
             <span>{branchName}</span>
             {branchName === currentBranch && (
-              <span style={{ fontSize: s(8.5), color: "rgba(255,255,255,0.25)", letterSpacing: ".04em" }}>
+              <span style={{ fontSize: s(8.5), color: "var(--text-faint)", letterSpacing: ".04em" }}>
                 CURRENT
               </span>
             )}
@@ -1004,9 +1004,9 @@ function getNeutralDropdownItemStyle(s) {
     background: "transparent",
     border: "none",
     borderRadius: 7,
-    color: "rgba(255,255,255,0.55)",
+    color: "var(--text-secondary)",
     fontSize: s(11),
-    fontFamily: "'JetBrains Mono',monospace",
+    fontFamily: "var(--font-mono)",
     cursor: "pointer",
     textAlign: "left",
     transition: "all .12s",
@@ -1083,8 +1083,8 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
           outline: "none",
           padding: "8px 10px",
           fontSize: s(11),
-          fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.8)",
+          fontFamily: "var(--font-mono)",
+          color: "var(--text-primary)",
           borderBottom: "1px solid var(--pane-border)",
           borderRadius: "7px 7px 0 0",
         }}
@@ -1094,8 +1094,8 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
         <div style={{
           padding: "6px 10px 2px",
           fontSize: s(9),
-          fontFamily: "'JetBrains Mono',monospace",
-          color: "rgba(255,255,255,0.3)",
+          fontFamily: "var(--font-mono)",
+          color: "var(--text-muted)",
           letterSpacing: ".04em",
         }}>
           FROM {baseBranch}

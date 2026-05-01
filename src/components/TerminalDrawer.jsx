@@ -7,7 +7,8 @@ import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../windowChrom
 
 // ── Shared style helpers ──────────────────────────────────────────────────────
 
-const FONT_FAMILY = "'JetBrains Mono','Fira Code',monospace";
+const DEFAULT_FONT_FAMILY = "'JetBrains Mono','Fira Code',monospace";
+const FONT_FAMILY = "var(--font-mono)";
 const XTERM_TRANSPARENT = "rgba(0,0,0,0)";
 const TERMINAL_OPAQUE_BG = "#0D0D10";
 const ESC = "\x1b";
@@ -31,31 +32,82 @@ function getTerminalWallpaperOverlayAlpha(wallpaper) {
   return 0.52 + getWallpaperOpacityValue(wallpaper) * 0.18;
 }
 
-function getTerminalTheme(opaqueBackground) {
+function getResolvedThemeMode(detail) {
+  const candidate = detail?.resolved || detail?.mode || detail?.theme;
+  if (candidate === "light" || candidate === "dark") return candidate;
+
+  if (typeof document !== "undefined") {
+    const root = document.documentElement;
+    if (root.dataset.theme === "light" || root.dataset.theme === "dark") {
+      return root.dataset.theme;
+    }
+    if (root.classList.contains("light")) return "light";
+  }
+
+  return "dark";
+}
+
+function readRootCssVar(name, fallback) {
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+function getTerminalTheme(opaqueBackground, mode = "dark") {
+  const background = mode === "light" ? "#f8fafc" : TERMINAL_OPAQUE_BG;
+  const foreground = mode === "light" ? "rgba(15,23,42,0.88)" : "rgba(244,247,250,0.88)";
+  const cursor = mode === "light" ? "rgba(15,23,42,0.96)" : "rgba(245,247,251,0.98)";
+  const selectionBackground = mode === "light" ? "rgba(37,99,235,0.18)" : "rgba(120,182,255,0.18)";
+  const selectionInactiveBackground = mode === "light" ? "rgba(37,99,235,0.1)" : "rgba(120,182,255,0.1)";
+
   return {
-    background: opaqueBackground ? TERMINAL_OPAQUE_BG : XTERM_TRANSPARENT,
-    foreground: "rgba(244,247,250,0.88)",
-    cursor: "rgba(245,247,251,0.98)",
-    cursorAccent: opaqueBackground ? TERMINAL_OPAQUE_BG : XTERM_TRANSPARENT,
-    selectionBackground: "rgba(120,182,255,0.18)",
-    selectionInactiveBackground: "rgba(120,182,255,0.1)",
-    black: "#0f1116",
-    red: "#f38ba8",
-    green: "#7ed7b9",
-    yellow: "#f5c97a",
-    blue: "#89b4fa",
-    magenta: "#cba6f7",
-    cyan: "#74c7ec",
-    white: "#bac2de",
-    brightBlack: "#585b70",
-    brightRed: "#f7a6bc",
-    brightGreen: "#9ce8cf",
-    brightYellow: "#f8d99c",
-    brightBlue: "#a6c9ff",
-    brightMagenta: "#d9b8fb",
-    brightCyan: "#98dbf3",
-    brightWhite: "#f5f7fb",
+    background: opaqueBackground ? readRootCssVar("--term-background", background) : XTERM_TRANSPARENT,
+    foreground: readRootCssVar("--term-foreground", foreground),
+    cursor: readRootCssVar("--term-cursor", cursor),
+    cursorAccent: opaqueBackground ? readRootCssVar("--term-background", background) : XTERM_TRANSPARENT,
+    selectionBackground: readRootCssVar("--term-selection-background", selectionBackground),
+    selectionInactiveBackground: readRootCssVar("--term-selection-inactive-background", selectionInactiveBackground),
+    black: readRootCssVar("--term-black", "#0f1116"),
+    red: readRootCssVar("--term-red", "#f38ba8"),
+    green: readRootCssVar("--term-green", "#7ed7b9"),
+    yellow: readRootCssVar("--term-yellow", "#f5c97a"),
+    blue: readRootCssVar("--term-blue", "#89b4fa"),
+    magenta: readRootCssVar("--term-magenta", "#cba6f7"),
+    cyan: readRootCssVar("--term-cyan", "#74c7ec"),
+    white: readRootCssVar("--term-white", "#bac2de"),
+    brightBlack: readRootCssVar("--term-bright-black", "#585b70"),
+    brightRed: readRootCssVar("--term-bright-red", "#f7a6bc"),
+    brightGreen: readRootCssVar("--term-bright-green", "#9ce8cf"),
+    brightYellow: readRootCssVar("--term-bright-yellow", "#f8d99c"),
+    brightBlue: readRootCssVar("--term-bright-blue", "#a6c9ff"),
+    brightMagenta: readRootCssVar("--term-bright-magenta", "#d9b8fb"),
+    brightCyan: readRootCssVar("--term-bright-cyan", "#98dbf3"),
+    brightWhite: readRootCssVar("--term-bright-white", "#f5f7fb"),
   };
+}
+
+function getTerminalHostBackground(opaqueBackground) {
+  return opaqueBackground ? "var(--term-background)" : "transparent";
+}
+
+function applyTerminalVisualState(term, hostEl, containerEl, opaqueBackground, mode) {
+  const hostBackground = getTerminalHostBackground(opaqueBackground);
+  if (hostEl) {
+    hostEl.classList.toggle("rayline-terminal-host--opaque", opaqueBackground);
+    hostEl.style.background = hostBackground;
+  }
+  if (containerEl) {
+    containerEl.style.background = hostBackground;
+  }
+  if (!term) return;
+
+  try {
+    term.options.theme = getTerminalTheme(opaqueBackground, mode);
+    term.options.fontFamily = readRootCssVar("--font-mono", DEFAULT_FONT_FAMILY);
+    term.options.allowTransparency = true;
+    term.refresh?.(0, Math.max(0, term.rows - 1));
+  } catch {
+    // xterm option updates can fail during teardown; the next mount will apply them.
+  }
 }
 
 function emitTerminalDebug(event, details = {}) {
@@ -339,9 +391,9 @@ const iconBtnStyle = {
   width: 24,
   height: 24,
   borderRadius: 6,
-  background: "transparent",
-  border: "none",
-  color: "rgba(255,255,255,0.4)",
+  background: "var(--bg-tertiary)",
+  border: "1px solid var(--border)",
+  color: "var(--text-muted)",
   cursor: "pointer",
   flexShrink: 0,
   WebkitAppRegion: "no-drag",
@@ -391,8 +443,8 @@ function useHover(baseStyle, hoverStyle) {
 
 function IconButton({ onClick, title, children }) {
   const hover = useHover(iconBtnStyle, {
-    background: "rgba(255,255,255,0.07)",
-    color: "rgba(255,255,255,0.8)",
+    background: "var(--hover-overlay)",
+    color: "var(--text-primary)",
   });
 
   return (
@@ -425,6 +477,7 @@ function SessionTerminal({
   const fitTimersRef = useRef([]);
   const lastSyncedPtySizeRef = useRef("");
   const mouseGestureRef = useRef(null);
+  const themeModeRef = useRef(getResolvedThemeMode());
 
   // Stable refs so the async IIFE captures up-to-date callbacks without
   // restarting the effect every time parent re-renders.
@@ -433,11 +486,46 @@ function SessionTerminal({
   const registerRef = useRef(registerTerminal);
   const unregRef = useRef(unregisterTerminal);
   const activeRef = useRef(isActive);
+  const opaqueBackgroundRef = useRef(opaqueBackground);
   useEffect(() => { sendRef.current = onSendInput; }, [onSendInput]);
   useEffect(() => { resizeRef.current = onResizeSession; }, [onResizeSession]);
   useEffect(() => { registerRef.current = registerTerminal; }, [registerTerminal]);
   useEffect(() => { unregRef.current = unregisterTerminal; }, [unregisterTerminal]);
   useEffect(() => { activeRef.current = isActive; }, [isActive]);
+
+  useEffect(() => {
+    const handleThemeChange = (event) => {
+      themeModeRef.current = getResolvedThemeMode(event.detail);
+      applyTerminalVisualState(
+        termRef.current,
+        xtermElRef.current,
+        containerRef.current,
+        opaqueBackground,
+        themeModeRef.current
+      );
+      window.requestAnimationFrame(() => {
+        try { termRef.current?.__raylineFit?.(); } catch { /* ignore theme-fit races */ }
+      });
+    };
+
+    window.addEventListener("rayline:theme-change", handleThemeChange);
+    window.addEventListener("rayline:appearance-change", handleThemeChange);
+    return () => {
+      window.removeEventListener("rayline:theme-change", handleThemeChange);
+      window.removeEventListener("rayline:appearance-change", handleThemeChange);
+    };
+  }, [opaqueBackground]);
+
+  useEffect(() => {
+    opaqueBackgroundRef.current = opaqueBackground;
+    applyTerminalVisualState(
+      termRef.current,
+      xtermElRef.current,
+      containerRef.current,
+      opaqueBackground,
+      themeModeRef.current
+    );
+  }, [opaqueBackground]);
 
   const teardown = useCallback(() => {
     fitTimersRef.current.forEach((timer) => window.clearTimeout(timer));
@@ -473,15 +561,16 @@ function SessionTerminal({
       if (cancelled) return;
       if (!containerRef.current) return;
 
+      const initialOpaqueBackground = opaqueBackgroundRef.current;
       const el = document.createElement("div");
-      el.className = `rayline-terminal-host${opaqueBackground ? " rayline-terminal-host--opaque" : ""}`;
-      el.style.cssText = `width:100%;height:100%;background:${opaqueBackground ? TERMINAL_OPAQUE_BG : "transparent"};`;
+      el.className = `rayline-terminal-host${initialOpaqueBackground ? " rayline-terminal-host--opaque" : ""}`;
+      el.style.cssText = `width:100%;height:100%;background:${getTerminalHostBackground(initialOpaqueBackground)};`;
       xtermElRef.current = el;
       containerRef.current.appendChild(el);
 
       const term = new Terminal({
-        theme: getTerminalTheme(opaqueBackground),
-        fontFamily: FONT_FAMILY,
+        theme: getTerminalTheme(initialOpaqueBackground, themeModeRef.current),
+        fontFamily: readRootCssVar("--font-mono", DEFAULT_FONT_FAMILY),
         fontSize: 13,
         fontWeight: "400",
         fontWeightBold: "600",
@@ -496,7 +585,7 @@ function SessionTerminal({
         rescaleOverlappingGlyphs: true,
         scrollback: 5000,
         smoothScrollDuration: 90,
-        allowTransparency: !opaqueBackground,
+        allowTransparency: true,
         allowProposedApi: true,
         rightClickSelectsWord: true,
       });
@@ -763,7 +852,9 @@ function SessionTerminal({
         try {
           const result = await window.api.terminalRead({ name: sessionName, lines: 500 });
           if (!cancelled && result?.ok && result.lines?.length) {
-            term.write(result.lines.join("\n"));
+            term.write(result.lines.join("\r\n"), () => {
+              try { term.scrollToBottom?.(); } catch { /* ignore scroll restore races */ }
+            });
           }
         } catch { /* ignore scrollback preload failures */ }
       }
@@ -813,7 +904,7 @@ function SessionTerminal({
       emitTerminalDebug("session:teardown", { sessionName });
       teardown();
     };
-  }, [opaqueBackground, plainClickMovesCursor, promptSelectionEditing, promptUndoShortcut, sessionName, teardown]);
+  }, [plainClickMovesCursor, promptSelectionEditing, promptUndoShortcut, sessionName, teardown]);
 
   useEffect(() => {
     const logActiveState = (phase) => {
@@ -870,7 +961,7 @@ function SessionTerminal({
           width: "100%",
           height: "100%",
           overflow: "hidden",
-          background: opaqueBackground ? TERMINAL_OPAQUE_BG : "transparent",
+          background: getTerminalHostBackground(opaqueBackground),
           padding: "10px 6px 8px",
           boxSizing: "border-box",
           minHeight: 0,
@@ -937,9 +1028,9 @@ function EmptyState({ onCreate, blank = false }) {
       marginTop: 12,
       padding: "6px 14px",
       borderRadius: 7,
-      background: "rgba(255,255,255,0.06)",
-      border: "1px solid rgba(255,255,255,0.1)",
-      color: "rgba(255,255,255,0.45)",
+      background: "var(--bg-tertiary)",
+      border: "1px solid var(--border)",
+      color: "var(--text-muted)",
       cursor: "pointer",
       fontSize: s(11),
       fontFamily: FONT_FAMILY,
@@ -947,8 +1038,8 @@ function EmptyState({ onCreate, blank = false }) {
       transition: "background .15s, color .15s",
     },
     {
-      background: "rgba(255,255,255,0.11)",
-      color: "rgba(255,255,255,0.75)",
+      background: "var(--hover-overlay)",
+      color: "var(--text-primary)",
     }
   );
   if (blank) {
@@ -967,13 +1058,13 @@ function EmptyState({ onCreate, blank = false }) {
         userSelect: "none",
       }}
     >
-      <TerminalIcon size={32} strokeWidth={1} color="rgba(255,255,255,0.08)" />
+      <TerminalIcon size={32} strokeWidth={1} color="var(--text-muted)" />
       <div
         style={{
           marginTop: 8,
           fontSize: s(11),
           fontFamily: FONT_FAMILY,
-          color: "rgba(255,255,255,0.2)",
+          color: "var(--text-muted)",
           letterSpacing: ".06em",
         }}
       >
@@ -1004,7 +1095,7 @@ function TabBar({
         gap: 7,
         overflowX: "auto",
         background,
-        borderBottom: "1px solid rgba(255,255,255,0.04)",
+        borderBottom: "1px solid var(--border)",
         flexShrink: 0,
         scrollbarWidth: "none",
         padding: "5px 8px 4px",
@@ -1024,13 +1115,13 @@ function TabBar({
               cursor: "pointer",
               flexShrink: 0,
               background: isActive
-                ? "rgba(255,255,255,0.08)"
-                : "rgba(255,255,255,0.018)",
+                ? "var(--bg-tertiary)"
+                : "transparent",
               borderRadius: 7,
               transition: "background .15s, color .15s",
             }}
             onMouseEnter={(e) => {
-              if (!isActive) e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+              if (!isActive) e.currentTarget.style.background = "var(--hover-overlay)";
             }}
             onMouseLeave={(e) => {
               if (!isActive) e.currentTarget.style.background = "transparent";
@@ -1041,7 +1132,7 @@ function TabBar({
               style={{
                 fontSize: s(11),
                 fontFamily: FONT_FAMILY,
-                color: isActive ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)",
+                color: isActive ? "var(--text-secondary)" : "var(--text-muted)",
                 maxWidth: 120,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -1066,14 +1157,14 @@ function TabBar({
                 borderRadius: 3,
                 background: "transparent",
                 border: "none",
-                color: "rgba(255,255,255,0.2)",
+                color: "var(--text-muted)",
                 cursor: "pointer",
                 padding: 0,
                 flexShrink: 0,
                 transition: "color .15s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(220,80,80,0.7)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--accent)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
             >
               <X size={10} strokeWidth={2} />
             </button>
@@ -1156,10 +1247,10 @@ export default function TerminalDrawer({
         flexDirection: "column",
         height: "100%",
         ...(windowMode
-          ? { background: TERMINAL_OPAQUE_BG }
+          ? { background: "var(--bg-primary)" }
           : getPaneSurfaceStyle(hasWallpaper)),
         backdropFilter: windowMode ? "none" : (hasWallpaper ? "saturate(1.1)" : "blur(56px) saturate(1.1)"),
-        borderLeft: windowMode ? "none" : "1px solid rgba(255,255,255,0.025)",
+        borderLeft: windowMode ? "none" : "1px solid var(--border)",
         position: "relative",
         zIndex: 10,
         overflow: "hidden",
@@ -1189,7 +1280,7 @@ export default function TerminalDrawer({
               inset: 0,
               zIndex: 1,
               pointerEvents: "none",
-              background: `linear-gradient(180deg, rgba(13,13,16,${overlayAlpha.toFixed(2)}), rgba(9,9,11,${Math.min(overlayAlpha + 0.12, 0.84).toFixed(2)}))`,
+              background: `linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) ${(overlayAlpha * 100).toFixed(0)}%, transparent), color-mix(in srgb, var(--bg-primary) ${(Math.min(overlayAlpha + 0.12, 0.84) * 100).toFixed(0)}%, transparent))`,
             }}
           />
         </>
@@ -1240,42 +1331,53 @@ export default function TerminalDrawer({
               WebkitAppRegion: "drag",
             }}
           >
-            {/* Left: TERMINALS label (drawer) or + button (window) */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, WebkitAppRegion: "no-drag" }}>
-              {windowMode ? (
-                <IconButton onClick={handleCreate} title="New terminal">
-                  <Plus size={13} strokeWidth={1.5} />
-                </IconButton>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 7, WebkitAppRegion: "drag" }}>
-                  <TerminalIcon size={13} strokeWidth={1.5} color="rgba(255,255,255,0.35)" />
-                  <span style={{
-                    fontSize: s(10),
-                    fontFamily: FONT_FAMILY,
-                    color: "rgba(255,255,255,0.35)",
-                    letterSpacing: ".08em",
-                    userSelect: "none",
-                  }}>
-                    TERMINALS
-                  </span>
-                </div>
-              )}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                minWidth: 0,
+                WebkitAppRegion: "drag",
+              }}
+            >
+              <TerminalIcon
+                size={13}
+                strokeWidth={1.5}
+                color="var(--text-muted)"
+              />
+              <span
+                style={{
+                  fontSize: s(10),
+                  fontFamily: FONT_FAMILY,
+                  color: "var(--text-muted)",
+                  letterSpacing: ".08em",
+                  userSelect: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                TERMINALS
+              </span>
             </div>
 
-            {/* Right: action buttons (drawer only; window mode uses OS controls) */}
-            {!windowMode ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, WebkitAppRegion: "no-drag" }}>
-                <IconButton onClick={handleCreate} title="New terminal">
-                  <Plus size={13} strokeWidth={1.5} />
-                </IconButton>
-                <IconButton onClick={onToggleDrawer} title="Close drawer">
-                  <X size={13} strokeWidth={1.5} />
-                </IconButton>
-              </div>
-            ) : windowControlsVisible && (
-              /* no-drag spacer covering the WindowControls (3 × 30px + gaps ≈ 108px, +12px right offset) */
-              <div style={{ width: 120, flexShrink: 0, WebkitAppRegion: "no-drag" }} />
-            )}
+            {/* Right: action buttons */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                WebkitAppRegion: "no-drag",
+              }}
+            >
+              <IconButton onClick={handleCreate} title="New terminal">
+                <Plus size={13} strokeWidth={1.5} />
+              </IconButton>
+              <IconButton onClick={windowMode ? onRequestClose : onToggleDrawer} title={windowMode ? "Close window" : "Close drawer"}>
+                <X size={13} strokeWidth={1.5} />
+              </IconButton>
+              {windowMode && windowControlsVisible && (
+                <div style={{ width: 120, flexShrink: 0 }} />
+              )}
+            </div>
           </div>
 
           {/* Tab bar — only when there are multiple sessions */}

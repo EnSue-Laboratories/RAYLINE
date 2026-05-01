@@ -18,6 +18,8 @@ import IssueList from "./pm-components/IssueList";
 import PRList from "./pm-components/PRList";
 import ItemDetail from "./pm-components/ItemDetail";
 import HoverIconButton from "./components/HoverIconButton";
+import { useTheme } from "./contexts/ThemeContext.jsx";
+import { applyAppearanceToDocument, applyAppearanceWindowBackground, normalizeAppearance } from "./utils/appearance";
 import WindowControls from "./components/WindowControls";
 import { getPaneInteractionStyle, getPaneSurfaceStyle } from "./utils/paneSurface";
 import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
@@ -31,7 +33,7 @@ const iconBtnStyle = {
   background: "var(--pane-interaction-hover-fill, var(--pane-hover))",
   backdropFilter: "var(--pane-interaction-hover-filter, none)",
   boxShadow: "var(--pane-interaction-hover-shadow, none)",
-  color: "rgba(255,255,255,0.5)",
+  color: "var(--text-muted)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -57,10 +59,10 @@ function RepoFilterItem({ label, active, onClick, removeMode, isAll = false }) {
         border: "none",
         cursor: "pointer",
         fontSize: 12,
-        fontFamily: "system-ui, sans-serif",
+        fontFamily: "var(--font-ui)",
         color: active
-          ? "rgba(255,255,255,0.9)"
-          : "rgba(255,255,255,0.45)",
+          ? "var(--text-primary)"
+          : "var(--text-subtle)",
         transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
         textAlign: "left",
         marginBottom: 1,
@@ -75,7 +77,7 @@ function RepoFilterItem({ label, active, onClick, removeMode, isAll = false }) {
         {label}
       </span>
       {removeMode && !isAll && hovered && (
-        <X size={12} style={{ color: "rgba(200,80,80,0.7)", flexShrink: 0, marginLeft: 4 }} />
+        <X size={12} style={{ color: "var(--danger-text)", flexShrink: 0, marginLeft: 4 }} />
       )}
     </button>
   );
@@ -91,14 +93,14 @@ function TabButton({ label, active, onClick }) {
       style={{
         background: "none",
         border: "none",
-        borderBottom: active ? "2px solid rgba(255,255,255,0.8)" : "2px solid transparent",
-        color: active ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+        borderBottom: active ? "2px solid var(--text-secondary)" : "2px solid transparent",
+        color: active ? "var(--text-primary)" : "var(--text-subtle)",
         fontSize: 13,
-        fontFamily: "system-ui, sans-serif",
+        fontFamily: "var(--font-ui)",
         padding: "10px 16px",
         cursor: "pointer",
         transition: "color .15s, border-color .15s",
-        ...(hovered && !active ? { color: "rgba(255,255,255,0.6)" } : {}),
+        ...(hovered && !active ? { color: "var(--text-muted)" } : {}),
       }}
     >
       {label}
@@ -113,11 +115,11 @@ function StateToggle({ value, onChange, openLabel = "OPEN", closedLabel = "CLOSE
       <button
         onClick={() => onChange(val)}
         style={{
-          border: "1px solid " + (active ? "rgba(255,255,255,0.1)" : "var(--pane-border)"),
+          border: "1px solid " + (active ? "var(--control-bg-active)" : "var(--pane-border)"),
           borderRadius: 6,
-          color: active ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.35)",
+          color: active ? "var(--text-secondary)" : "var(--text-disabled)",
           fontSize: 11,
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "var(--font-mono)",
           letterSpacing: ".04em",
           padding: "4px 10px",
           cursor: "pointer",
@@ -138,6 +140,7 @@ function StateToggle({ value, onChange, openLabel = "OPEN", closedLabel = "CLOSE
 }
 
 export default function ProjectManager() {
+  const { resolved: resolvedTheme } = useTheme();
   const [locale, setLocale] = useState(() => detectDefaultLocale());
   const [repos, setRepos] = useState([]);
   const [activeTab, setActiveTab] = useState("issues");
@@ -151,6 +154,7 @@ export default function ProjectManager() {
   const [showAccountManager, setShowAccountManager] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
   const [wallpaper, setWallpaper] = useState(null);
+  const [appearance, setAppearance] = useState(() => normalizeAppearance());
   const [platform, setPlatform] = useState(null);
   const [stateLoaded, setStateLoaded] = useState(false);
   const [showCreate, setShowCreate] = useState(null); // null | "issue" | "pr"
@@ -180,6 +184,7 @@ export default function ProjectManager() {
       const { repos, wallpaper: wp } = pmState || {};
       setRepos(Array.isArray(repos) ? repos : []);
       if (appState?.locale) setLocale(normalizeLocale(appState.locale));
+      if (appState?.appearance) setAppearance(normalizeAppearance(appState.appearance));
       if (wp?.path) {
         setWallpaper(normalizeWallpaper(wp));
         window.ghApi.readImage(wp.path).then((dataUrl) => {
@@ -188,6 +193,23 @@ export default function ProjectManager() {
       }
       setStateLoaded(true);
     });
+  }, []);
+
+  useEffect(() => {
+    applyAppearanceToDocument(appearance, resolvedTheme);
+    applyAppearanceWindowBackground(appearance, resolvedTheme, window.ghApi);
+  }, [appearance, resolvedTheme]);
+
+  useEffect(() => {
+    const reloadAppearance = () => {
+      if (!window.ghApi?.loadAppState) return;
+      window.ghApi.loadAppState().then((appState) => {
+        if (appState?.locale) setLocale(normalizeLocale(appState.locale));
+        if (appState?.appearance) setAppearance(normalizeAppearance(appState.appearance));
+      }).catch(() => {});
+    };
+    window.addEventListener("focus", reloadAppearance);
+    return () => window.removeEventListener("focus", reloadAppearance);
   }, []);
 
   const handleAuthSuccess = async () => {
@@ -243,8 +265,8 @@ export default function ProjectManager() {
           justifyContent: "center",
           height: "100vh",
           background: "var(--pane-background)",
-          color: "rgba(255,255,255,0.3)",
-          fontFamily: "system-ui, sans-serif",
+          color: "var(--text-faint)",
+          fontFamily: "var(--font-ui)",
           fontSize: 14,
         }}
       >
@@ -277,7 +299,7 @@ export default function ProjectManager() {
           height: "100vh",
           gap: 16,
           background: "var(--pane-background)",
-          fontFamily: "system-ui, sans-serif",
+          fontFamily: "var(--font-ui)",
         }}
       >
         <WindowControls visible={showWindowControls} />
@@ -293,10 +315,10 @@ export default function ProjectManager() {
           }}
         />
         <GitHubIcon size={48} />
-        <div style={{ fontSize: 16, color: "rgba(255,255,255,0.6)" }}>
+        <div style={{ fontSize: 16, color: "var(--text-muted)" }}>
           {t("pm.authMissingTitle")}
         </div>
-        <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", maxWidth: 360, textAlign: "center" }}>
+        <div style={{ fontSize: 13, color: "var(--text-disabled)", maxWidth: 360, textAlign: "center" }}>
           {t("pm.authMissingBody")}
         </div>
         <button
@@ -309,10 +331,10 @@ export default function ProjectManager() {
             padding: "9px 18px",
             borderRadius: 8,
             border: "1px solid var(--pane-border)",
-            background: "rgba(255,255,255,0.1)",
-            color: "rgba(255,255,255,0.9)",
+            background: "var(--control-bg-active)",
+            color: "var(--text-primary)",
             fontSize: 13,
-            fontFamily: "system-ui, sans-serif",
+            fontFamily: "var(--font-ui)",
             cursor: "pointer",
           }}
         >
@@ -339,8 +361,8 @@ export default function ProjectManager() {
         width: "100vw",
         overflow: "hidden",
         background: "var(--pane-background)",
-        color: "rgba(255,255,255,0.85)",
-        fontFamily: "system-ui, sans-serif",
+        color: "var(--text-secondary)",
+        fontFamily: "var(--font-ui)",
         position: "relative",
       }}
     >
@@ -385,7 +407,7 @@ export default function ProjectManager() {
           minWidth: 200,
           display: "flex",
           flexDirection: "column",
-          borderRight: "1px solid rgba(255,255,255,0.025)",
+          borderRight: "1px solid var(--control-bg-soft)",
           position: "relative",
           zIndex: 10,
           ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
@@ -407,8 +429,8 @@ export default function ProjectManager() {
           <span
             style={{
               fontSize: 12,
-              fontFamily: "'JetBrains Mono', monospace",
-              color: "rgba(255,255,255,0.5)",
+              fontFamily: "var(--font-mono)",
+              color: "var(--text-muted)",
               letterSpacing: ".08em",
             }}
           >
@@ -418,15 +440,15 @@ export default function ProjectManager() {
             <HoverIconButton
               onClick={() => setRemoveMode(!removeMode)}
               ariaLabel={removeMode ? t("pm.doneEditingRepos") : t("pm.editRepos")}
-              baseColor={removeMode ? "rgba(120,230,150,0.9)" : "rgba(255,255,255,0.5)"}
-              hoverColor={removeMode ? "rgba(150,245,170,1)" : "rgba(255,255,255,0.9)"}
+              baseColor={removeMode ? "var(--success-text)" : "var(--text-muted)"}
+              hoverColor={removeMode ? "var(--success-text-strong)" : "var(--text-primary)"}
               style={{
                 ...iconBtnStyle,
                 ...(removeMode
                   ? {
-                    border: "1px solid rgba(120,230,150,0.22)",
-                    background: "rgba(120,230,150,0.12)",
-                    boxShadow: "0 0 0 1px rgba(120,230,150,0.06) inset",
+                    border: "1px solid var(--success-border)",
+                    background: "var(--success-bg)",
+                    boxShadow: "0 0 0 1px var(--success-ring) inset",
                   }
                   : {}),
               }}
@@ -441,8 +463,8 @@ export default function ProjectManager() {
                 setShowAddRepo(true);
               }}
               ariaLabel={t("pm.addRepo")}
-              baseColor="rgba(255,255,255,0.5)"
-              hoverColor="rgba(255,255,255,0.9)"
+              baseColor="var(--text-muted)"
+              hoverColor="var(--text-primary)"
               style={{ ...iconBtnStyle, color: undefined }}
             >
               <Plus size={12} strokeWidth={1.5} />
@@ -484,8 +506,8 @@ export default function ProjectManager() {
               border: "none",
               cursor: "pointer",
               fontSize: 10,
-              fontFamily: "'JetBrains Mono', monospace",
-              color: "rgba(255,255,255,0.3)",
+              fontFamily: "var(--font-mono)",
+              color: "var(--text-faint)",
               letterSpacing: ".08em",
               padding: 0,
               textAlign: "left",
@@ -520,7 +542,7 @@ export default function ProjectManager() {
               display: "flex",
               alignItems: "center",
               padding: "0 20px",
-              borderBottom: "1px solid rgba(255,255,255,0.04)",
+              borderBottom: "1px solid var(--control-bg)",
               marginBottom: 12,
               flexShrink: 0,
             }}
@@ -551,8 +573,8 @@ export default function ProjectManager() {
               backdropFilter: "var(--pane-interaction-hover-filter, none)",
               boxShadow: "var(--pane-interaction-hover-shadow, none)",
               borderRadius: 6, padding: "4px 10px", cursor: "pointer",
-              color: "rgba(255,255,255,0.5)", fontSize: 11,
-              fontFamily: "'JetBrains Mono', monospace", letterSpacing: ".04em",
+              color: "var(--text-muted)", fontSize: 11,
+              fontFamily: "var(--font-mono)", letterSpacing: ".04em",
                   marginRight: 8, transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
                 }}
               >

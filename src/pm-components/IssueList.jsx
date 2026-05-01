@@ -111,7 +111,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
 
   if (initialLoad && issues.length === 0) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui", fontSize: 13 }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "var(--text-muted)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
         {t("pm.loadingIssues")}
       </div>
     );
@@ -120,10 +120,10 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
   if (error && issues.length === 0) {
     return (
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: 40, gap: 12 }}>
-        <span style={{ color: "rgba(255,100,100,0.7)", fontFamily: "system-ui", fontSize: 13 }}>{error}</span>
+        <span style={{ color: "var(--danger-text)", fontFamily: "var(--font-ui)", fontSize: 13 }}>{error}</span>
         <button
           onClick={() => fetchIssues()}
-          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "rgba(255,255,255,0.5)", padding: "6px 16px", cursor: "pointer", fontFamily: "system-ui", fontSize: 12 }}
+          style={{ background: "var(--control-bg)", border: "1px solid var(--control-border)", borderRadius: 6, color: "var(--text-secondary)", padding: "6px 16px", cursor: "pointer", fontFamily: "var(--font-ui)", fontSize: 12 }}
         >
           {t("pm.retry")}
         </button>
@@ -133,7 +133,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
 
   if (issues.length === 0) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "rgba(255,255,255,0.3)", fontFamily: "system-ui", fontSize: 13 }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "var(--text-disabled)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
         {t("pm.noIssuesFound")}
       </div>
     );
@@ -153,7 +153,7 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
               flexDirection: "column",
               padding: "10px 16px",
               cursor: "pointer",
-              borderBottom: "1px solid rgba(255,255,255,0.03)",
+              borderBottom: "1px solid var(--control-border-soft)",
               transition: "background .15s, box-shadow .15s, backdrop-filter .15s",
               ...getPaneInteractionStyle("idle"),
             }}
@@ -162,14 +162,14 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {isOpen ? (
-                <Circle size={12} color="rgba(63,185,80,0.7)" />
+                <Circle size={12} color="var(--success-text)" />
               ) : (
-                <CheckCircle2 size={12} color="rgba(130,80,223,0.7)" />
+                <CheckCircle2 size={12} color="var(--accent-text)" />
               )}
-              <span style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+              <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
                 #{item.number}
               </span>
-              <span style={{ color: "rgba(255,255,255,0.8)", fontFamily: "system-ui", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ color: "var(--text-primary)", fontFamily: "var(--font-ui)", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.title}
               </span>
               <HoverIconButton
@@ -183,24 +183,24 @@ export default function IssueList({ repos, stateFilter, repoFilter, onSelectItem
                   setCopiedId(id);
                   setTimeout(() => setCopiedId((v) => v === id ? null : v), 1500);
                 }}
-                baseColor={copiedId === `${item._repo}-${item.number}` ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.35)"}
-                hoverColor={copiedId === `${item._repo}-${item.number}` ? "rgba(150,245,170,1)" : "rgba(255,255,255,0.9)"}
+                baseColor={copiedId === `${item._repo}-${item.number}` ? "var(--success-text)" : "var(--text-muted)"}
+                hoverColor={copiedId === `${item._repo}-${item.number}` ? "var(--success-text-strong)" : "var(--text-primary)"}
                 style={{ opacity: copiedId === `${item._repo}-${item.number}` ? 1 : 0 }}
               >
                 {copiedId === `${item._repo}-${item.number}` ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
               </HoverIconButton>
               <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                <span style={{ width: 25, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.35)" }} title={linkedPRs[`${item._repo}/${item.number}`] ? t(linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "pm.linkedPrsTooltip" : "pm.linkedPrTooltip", { count: linkedPRs[`${item._repo}/${item.number}`].length }) : undefined}>
+                <span style={{ width: 25, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)" }} title={linkedPRs[`${item._repo}/${item.number}`] ? t(linkedPRs[`${item._repo}/${item.number}`].length > 1 ? "pm.linkedPrsTooltip" : "pm.linkedPrTooltip", { count: linkedPRs[`${item._repo}/${item.number}`].length }) : undefined}>
                   {linkedPRs[`${item._repo}/${item.number}`] && (
                     <GitPullRequest size={12} strokeWidth={1.5} />
                   )}
                 </span>
-                <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11 }}>
+                <span style={{ color: "var(--text-disabled)", fontFamily: "var(--font-ui)", fontSize: 11 }}>
                   {repoShort}
                 </span>
               </div>
             </div>
-            <div style={{ marginLeft: 26, color: "rgba(255,255,255,0.3)", fontFamily: "system-ui", fontSize: 12, marginTop: 2 }}>
+            <div style={{ marginLeft: 26, color: "var(--text-disabled)", fontFamily: "var(--font-ui)", fontSize: 12, marginTop: 2 }}>
               {t("pm.byUpdated", { user: item.user?.login || t("pm.unknownUser"), time: timeAgo(item.updated_at, t) })}
             </div>
           </div>

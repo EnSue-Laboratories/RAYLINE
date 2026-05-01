@@ -85,7 +85,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
 
   if (initialLoad && prs.length === 0) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "rgba(255,255,255,0.4)", fontFamily: "system-ui", fontSize: 13 }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "var(--text-muted)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
         {t("pm.loadingPullRequests")}
       </div>
     );
@@ -94,10 +94,10 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
   if (error && prs.length === 0) {
     return (
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: 40, gap: 12 }}>
-        <span style={{ color: "rgba(255,100,100,0.7)", fontFamily: "system-ui", fontSize: 13 }}>{error}</span>
+        <span style={{ color: "var(--danger-text)", fontFamily: "var(--font-ui)", fontSize: 13 }}>{error}</span>
         <button
           onClick={() => fetchPRs()}
-          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "rgba(255,255,255,0.5)", padding: "6px 16px", cursor: "pointer", fontFamily: "system-ui", fontSize: 12 }}
+          style={{ background: "var(--control-bg)", border: "1px solid var(--control-border)", borderRadius: 6, color: "var(--text-secondary)", padding: "6px 16px", cursor: "pointer", fontFamily: "var(--font-ui)", fontSize: 12 }}
         >
           {t("pm.retry")}
         </button>
@@ -107,7 +107,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
 
   if (prs.length === 0) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "rgba(255,255,255,0.3)", fontFamily: "system-ui", fontSize: 13 }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: 40, color: "var(--text-disabled)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
         {t("pm.noPullRequestsFound")}
       </div>
     );
@@ -115,12 +115,12 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
 
   function getIcon(item) {
     if (isGitHubOpen(item.state, stateFilter)) {
-      return <GitPullRequest size={12} color="rgba(63,185,80,0.7)" />;
+      return <GitPullRequest size={12} color="var(--success-text)" />;
     }
     if (item.merged_at) {
-      return <GitMerge size={12} color="rgba(130,80,223,0.7)" />;
+      return <GitMerge size={12} color="var(--accent-text)" />;
     }
-    return <GitPullRequestClosed size={12} color="rgba(248,81,73,0.7)" />;
+    return <GitPullRequestClosed size={12} color="var(--danger-text)" />;
   }
 
   return (
@@ -139,7 +139,7 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
               flexDirection: "column",
               padding: "10px 16px",
               cursor: "pointer",
-              borderBottom: "1px solid rgba(255,255,255,0.03)",
+              borderBottom: "1px solid var(--control-border-soft)",
               transition: "background .15s, box-shadow .15s, backdrop-filter .15s",
               ...getPaneInteractionStyle("idle"),
             }}
@@ -158,21 +158,21 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {getIcon(item)}
-              <span style={{ color: "rgba(255,255,255,0.35)", fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+              <span style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)", fontSize: 12 }}>
                 #{item.number}
               </span>
-              <span style={{ color: "rgba(255,255,255,0.8)", fontFamily: "system-ui", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ color: "var(--text-primary)", fontFamily: "var(--font-ui)", fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.title}
               </span>
               {item.draft && (
                 <span style={{
-                  color: "rgba(255,255,255,0.35)",
-                  fontFamily: "system-ui",
+                  color: "var(--text-muted)",
+                  fontFamily: "var(--font-ui)",
                   fontSize: 10,
                   padding: "2px 6px",
                   borderRadius: 4,
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  background: "var(--control-bg)",
+                  border: "1px solid var(--control-border)",
                   flexShrink: 0,
                 }}>
                   {t("pm.draft")}
@@ -189,8 +189,8 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
                   setCopiedAction(actionId);
                   setTimeout(() => setCopiedAction((v) => v === actionId ? null : v), 1500);
                 }}
-                baseColor={copiedSummary ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.35)"}
-                hoverColor={copiedSummary ? "rgba(150,245,170,1)" : "rgba(255,255,255,0.9)"}
+                baseColor={copiedSummary ? "var(--success-text)" : "var(--text-muted)"}
+                hoverColor={copiedSummary ? "var(--success-text-strong)" : "var(--text-primary)"}
                 style={{ opacity: copiedSummary ? 1 : 0 }}
               >
                 {copiedSummary ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={1.5} />}
@@ -206,17 +206,17 @@ export default function PRList({ repos, stateFilter, repoFilter, onSelectItem, r
                   setCopiedAction(actionId);
                   setTimeout(() => setCopiedAction((v) => v === actionId ? null : v), 1500);
                 }}
-                baseColor={copiedCheckout ? "rgba(120,230,150,0.8)" : "rgba(255,255,255,0.35)"}
-                hoverColor={copiedCheckout ? "rgba(150,245,170,1)" : "rgba(255,255,255,0.9)"}
+                baseColor={copiedCheckout ? "var(--success-text)" : "var(--text-muted)"}
+                hoverColor={copiedCheckout ? "var(--success-text-strong)" : "var(--text-primary)"}
                 style={{ opacity: copiedCheckout ? 1 : 0 }}
               >
                 {copiedCheckout ? <Check size={12} strokeWidth={2} /> : <GitBranch size={12} strokeWidth={1.5} />}
               </HoverIconButton>
-              <span style={{ color: "rgba(255,255,255,0.25)", fontFamily: "system-ui", fontSize: 11, flexShrink: 0 }}>
+              <span style={{ color: "var(--text-disabled)", fontFamily: "var(--font-ui)", fontSize: 11, flexShrink: 0 }}>
                 {repoShort}
               </span>
             </div>
-            <div style={{ marginLeft: 26, color: "rgba(255,255,255,0.3)", fontFamily: "system-ui", fontSize: 12, marginTop: 2 }}>
+            <div style={{ marginLeft: 26, color: "var(--text-disabled)", fontFamily: "var(--font-ui)", fontSize: 12, marginTop: 2 }}>
               {t("pm.byUpdated", { user: item.user?.login || t("pm.unknownUser"), time: timeAgo(item.updated_at, t) })}
             </div>
           </div>

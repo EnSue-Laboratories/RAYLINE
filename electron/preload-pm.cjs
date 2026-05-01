@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld("ghApi", {
   loadAppState: () => ipcRenderer.invoke("load-state"),
   readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
   getSystemInfo: () => ipcRenderer.invoke("system-info"),
+  setWindowBackgroundColor: (color) => ipcRenderer.invoke("set-window-background-color", color),
   windowMinimize: () => ipcRenderer.invoke("window-minimize"),
   windowToggleMaximize: () => ipcRenderer.invoke("window-toggle-maximize"),
   windowClose: () => ipcRenderer.invoke("window-close"),

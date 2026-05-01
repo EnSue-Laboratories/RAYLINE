@@ -19,6 +19,7 @@
     "build:electron:mac": "vite build && electron-builder --config electron-builder.config.cjs --mac",
     "build:electron:win": "vite build && electron-builder --config electron-builder.config.cjs --win --config.npmRebuild=false",
     "lint": "eslint .",
+    "verify:theme-tokens": "node scripts/verify-theme-tokens.mjs",
     "preview": "vite preview",
     "rebuild": "electron-rebuild -f -w node-pty"
   },

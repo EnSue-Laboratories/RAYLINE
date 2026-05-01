@@ -88,8 +88,8 @@ export default function SidebarWindowsHeader({
           fontWeight: 600, fontSize: 18, letterSpacing: "0.12em",
           color: "rgba(218,218,222,0.95)", userSelect: "none", lineHeight: 1,
         }}>
-          R<span style={{ color: "#FF4422", letterSpacing: 0 }}>/</span>YLINE
-          <span style={{ color: "#FF4422", letterSpacing: 0 }}>.</span>
+          R<span style={{ color: "var(--brand-logo-red, #FF4422)", letterSpacing: 0 }}>/</span>YLINE
+          <span style={{ color: "var(--brand-logo-red, #FF4422)", letterSpacing: 0 }}>.</span>
         </span>
       </button>
 

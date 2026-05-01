@@ -18,11 +18,11 @@ function letterFor(code) {
 }
 
 const STATUS_COLORS = {
-  U: "rgba(130,210,140,0.85)",
-  A: "rgba(130,210,140,0.85)",
-  M: "rgba(240,180,90,0.85)",
-  D: "rgba(230,120,120,0.9)",
-  R: "rgba(150,190,255,0.85)",
+  U: "var(--badge-open-text)",
+  A: "var(--badge-open-text)",
+  M: "var(--state-warning-text)",
+  D: "var(--danger-soft-text)",
+  R: "var(--badge-open-text)",
 };
 
 const rowIconBtnStyle = {
@@ -35,7 +35,7 @@ const rowIconBtnStyle = {
   background: "transparent",
   border: "none",
   borderRadius: 4,
-  color: "rgba(255,255,255,0.5)",
+  color: "var(--text-secondary)",
   cursor: "pointer",
   transition: "color .15s",
 };
@@ -363,14 +363,14 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
         top: menuStyle.top,
         left: menuStyle.left,
         width: menuStyle.width,
-        background: "rgba(10,10,12,0.55)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "var(--pane-elevated)",
+        border: "1px solid var(--control-border)",
         borderRadius: 10,
         boxShadow: "0 12px 36px rgba(0,0,0,0.5)",
         backdropFilter: "blur(56px) saturate(1.1)",
         WebkitBackdropFilter: "blur(56px) saturate(1.1)",
-        color: "rgba(255,255,255,0.85)",
-        fontFamily: "system-ui, sans-serif",
+        color: "color-mix(in srgb, var(--text-primary) 92%, transparent)",
+        fontFamily: "var(--font-ui)",
         fontSize: s(12),
         zIndex: 9999,
         overflow: "hidden",
@@ -379,22 +379,22 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
       {/* header */}
       <div style={{
         padding: "10px 12px",
-        borderBottom: "1px solid rgba(255,255,255,0.05)",
-        fontFamily: "'JetBrains Mono',monospace",
+        borderBottom: "1px solid color-mix(in srgb, var(--control-border) 63%, transparent)",
+        fontFamily: "var(--font-mono)",
         fontSize: s(11),
         display: "flex",
         flexDirection: "column",
         gap: 4,
       }}>
-        <span style={{ color: "rgba(255,255,255,0.7)" }}>
+        <span style={{ color: "color-mix(in srgb, var(--text-primary) 76%, transparent)" }}>
           {branch || (detached ? t("git.status.detachedLabel") : "?")}
-          {upstream && <span style={{ color: "rgba(255,255,255,0.3)" }}> → {upstream}</span>}
+          {upstream && <span style={{ color: "color-mix(in srgb, var(--text-primary) 33%, transparent)" }}> → {upstream}</span>}
         </span>
         <span style={{ display: "flex", gap: 10 }}>
-          <span style={{ color: ahead > 0 ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)" }}>
+          <span style={{ color: ahead > 0 ? "color-mix(in srgb, var(--text-primary) 76%, transparent)" : "color-mix(in srgb, var(--text-primary) 33%, transparent)" }}>
             ↑{ahead}
           </span>
-          <span style={{ color: behind > 0 ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)" }}>
+          <span style={{ color: behind > 0 ? "color-mix(in srgb, var(--text-primary) 76%, transparent)" : "color-mix(in srgb, var(--text-primary) 33%, transparent)" }}>
             ↓{behind}
           </span>
         </span>
@@ -403,7 +403,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
       {/* file list */}
       <div style={{ padding: "8px 12px", maxHeight: 260, overflowY: "auto" }}>
         {clean && (
-          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: s(10), fontFamily: "'JetBrains Mono',monospace", letterSpacing: ".08em" }}>
+          <div style={{ color: "color-mix(in srgb, var(--text-primary) 43%, transparent)", fontSize: s(10), fontFamily: "var(--font-mono)", letterSpacing: ".08em" }}>
             {t("git.status.noChanges")}
           </div>
         )}
@@ -441,7 +441,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
 
       {/* commit message */}
       {!detached && (
-        <div style={{ padding: "8px 12px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+        <div style={{ padding: "8px 12px", borderTop: "1px solid color-mix(in srgb, var(--control-border) 63%, transparent)" }}>
           <textarea
             placeholder={generating ? t("git.status.generating") : t("git.status.commitPlaceholder")}
             value={message}
@@ -459,11 +459,11 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
               width: "100%",
               boxSizing: "border-box",
               resize: "none",
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              background: "var(--control-bg)",
+              border: "1px solid var(--control-border)",
               borderRadius: 6,
-              color: "rgba(255,255,255,0.9)",
-              fontFamily: "system-ui,sans-serif",
+              color: "var(--text-primary)",
+              fontFamily: "var(--font-ui)",
               fontSize: s(12),
               lineHeight: 1.4,
               padding: "6px 8px",
@@ -481,8 +481,8 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
           alignItems: "center",
           justifyContent: "space-between",
           gap: 10,
-          color: openPr ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.42)",
-          fontFamily: "'JetBrains Mono',monospace",
+          color: openPr ? "color-mix(in srgb, var(--text-primary) 78%, transparent)" : "color-mix(in srgb, var(--text-primary) 46%, transparent)",
+          fontFamily: "var(--font-mono)",
           fontSize: s(11),
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
@@ -499,25 +499,25 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
               disabled={busy}
               onMouseEnter={(e) => {
                 if (busy) return;
-                e.currentTarget.style.color = "rgba(255,255,255,0.96)";
-                e.currentTarget.style.textDecorationColor = "rgba(255,255,255,0.96)";
+                e.currentTarget.style.color = "var(--text-primary)";
+                e.currentTarget.style.textDecorationColor = "var(--text-primary)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = "rgba(255,255,255,0.78)";
-                e.currentTarget.style.textDecorationColor = "rgba(255,255,255,0.52)";
+                e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 85%, transparent)";
+                e.currentTarget.style.textDecorationColor = "color-mix(in srgb, var(--text-primary) 57%, transparent)";
               }}
               style={{
                 padding: 0,
                 background: "none",
                 border: "none",
-                color: "rgba(255,255,255,0.78)",
+                color: "color-mix(in srgb, var(--text-primary) 85%, transparent)",
                 fontSize: s(10),
-                fontFamily: "system-ui,sans-serif",
+                fontFamily: "var(--font-ui)",
                 cursor: busy ? "default" : "pointer",
                 flexShrink: 0,
                 textDecorationLine: "underline",
                 textDecorationStyle: "dashed",
-                textDecorationColor: "rgba(255,255,255,0.52)",
+                textDecorationColor: "color-mix(in srgb, var(--text-primary) 57%, transparent)",
                 textUnderlineOffset: "0.22em",
                 textDecorationThickness: "1px",
                 transition: "color .15s ease, text-decoration-color .15s ease",
@@ -537,12 +537,12 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
           style={{
             flex: 1,
             height: 30,
-            background: canCommit ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
-            border: "1px solid " + (canCommit ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.05)"),
+            background: canCommit ? "var(--control-bg-strong)" : "color-mix(in srgb, var(--control-bg) 75%, transparent)",
+            border: "1px solid " + (canCommit ? "color-mix(in srgb, var(--text-primary) 13%, transparent)" : "color-mix(in srgb, var(--control-border) 63%, transparent)"),
             borderRadius: 6,
-            color: canCommit ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.3)",
+            color: canCommit ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 33%, transparent)",
             fontSize: s(12),
-            fontFamily: "system-ui,sans-serif",
+            fontFamily: "var(--font-ui)",
             cursor: canCommit ? "pointer" : "default",
             transition: "all .15s",
           }}
@@ -560,11 +560,11 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              background: canPublish ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
-              border: "1px solid " + (canPublish ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)"),
+              background: canPublish ? "var(--pane-border)" : "color-mix(in srgb, var(--control-bg) 75%, transparent)",
+              border: "1px solid " + (canPublish ? "color-mix(in srgb, var(--text-primary) 11%, transparent)" : "color-mix(in srgb, var(--control-border) 63%, transparent)"),
               borderRadius: 6,
-              color: canPublish ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
-              fontFamily: "system-ui,sans-serif",
+              color: canPublish ? "color-mix(in srgb, var(--text-primary) 87%, transparent)" : "color-mix(in srgb, var(--text-primary) 33%, transparent)",
+              fontFamily: "var(--font-ui)",
               cursor: canPublish ? "pointer" : "default",
             }}
           >
@@ -583,28 +583,28 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
               alignItems: "center",
               justifyContent: "center",
               background: prSuccess
-                ? "rgba(90,180,120,0.16)"
+                ? "var(--badge-open-bg)"
                 : isCreatingPr
-                ? "rgba(255,255,255,0.1)"
+                ? "var(--control-bg-active)"
                 : canPr
-                ? (hasOpenPr ? "rgba(120,170,255,0.12)" : "rgba(255,255,255,0.06)")
-                : "rgba(255,255,255,0.03)",
+                ? (hasOpenPr ? "var(--badge-open-bg)" : "var(--pane-border)")
+                : "color-mix(in srgb, var(--control-bg) 75%, transparent)",
               border: "1px solid " + (prSuccess
-                ? "rgba(90,180,120,0.28)"
+                ? "var(--badge-open-border)"
                 : isCreatingPr
-                ? "rgba(255,255,255,0.18)"
+                ? "var(--control-border-hover)"
                 : canPr
-                ? (hasOpenPr ? "rgba(120,170,255,0.2)" : "rgba(255,255,255,0.1)")
-                : "rgba(255,255,255,0.05)"),
+                ? (hasOpenPr ? "var(--badge-open-border)" : "color-mix(in srgb, var(--text-primary) 11%, transparent)")
+                : "color-mix(in srgb, var(--control-border) 63%, transparent)"),
               borderRadius: 6,
               color: prSuccess
-                ? "rgba(190,255,205,0.96)"
+                ? "var(--badge-open-text)"
                 : isCreatingPr
-                ? "rgba(255,255,255,0.88)"
+                ? "color-mix(in srgb, var(--text-primary) 88%, transparent)"
                 : canPr
-                ? (hasOpenPr ? "rgba(190,220,255,0.92)" : "rgba(255,255,255,0.8)")
-                : "rgba(255,255,255,0.3)",
-              fontFamily: "system-ui,sans-serif",
+                ? (hasOpenPr ? "var(--badge-open-text)" : "color-mix(in srgb, var(--text-primary) 87%, transparent)")
+                : "color-mix(in srgb, var(--text-primary) 33%, transparent)",
+              fontFamily: "var(--font-ui)",
               cursor: canPr && !prSuccess && !isCreatingPr ? "pointer" : "default",
             }}
           >
@@ -621,12 +621,12 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
           style={{
             height: 30,
             padding: "0 14px",
-            background: canPull ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
-            border: "1px solid " + (canPull ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)"),
+            background: canPull ? "var(--pane-border)" : "color-mix(in srgb, var(--control-bg) 75%, transparent)",
+            border: "1px solid " + (canPull ? "color-mix(in srgb, var(--text-primary) 11%, transparent)" : "color-mix(in srgb, var(--control-border) 63%, transparent)"),
             borderRadius: 6,
-            color: canPull ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)",
+            color: canPull ? "color-mix(in srgb, var(--text-primary) 87%, transparent)" : "color-mix(in srgb, var(--text-primary) 33%, transparent)",
             fontSize: s(12),
-            fontFamily: "system-ui,sans-serif",
+            fontFamily: "var(--font-ui)",
             cursor: canPull && !busy ? "pointer" : "default",
           }}
         >
@@ -637,17 +637,17 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
       {error && (
         <div style={{
           padding: "8px 12px",
-          background: "rgba(200,80,80,0.08)",
-          borderTop: "1px solid rgba(200,80,80,0.2)",
-          color: "rgba(255,180,180,0.9)",
-          fontFamily: "'JetBrains Mono',monospace",
+          background: "var(--danger-soft-bg)",
+          borderTop: "1px solid var(--danger-soft-border)",
+          color: "var(--danger-soft-text)",
+          fontFamily: "var(--font-mono)",
           fontSize: s(11),
           display: "flex",
           alignItems: "flex-start",
           gap: 8,
         }}>
           <span style={{ flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{error}</span>
-          <button onClick={() => setError(null)} style={{ background: "none", border: "none", color: "rgba(255,180,180,0.9)", cursor: "pointer", padding: 0 }}>
+          <button onClick={() => setError(null)} style={{ background: "none", border: "none", color: "var(--danger-soft-text)", cursor: "pointer", padding: 0 }}>
             <X size={12} />
           </button>
         </div>
@@ -673,27 +673,27 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
           gap: 6,
           padding: "4px 10px",
           borderRadius: 7,
-          background: open ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
-          border: "1px solid " + (open ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.04)"),
-          color: "rgba(255,255,255,0.4)",
+          background: open ? "var(--pane-border)" : "color-mix(in srgb, var(--control-bg) 50%, transparent)",
+          border: "1px solid " + (open ? "color-mix(in srgb, var(--text-primary) 11%, transparent)" : "var(--control-bg)"),
+          color: "var(--text-secondary)",
           fontSize: s(10),
-          fontFamily: "'JetBrains Mono',monospace",
+          fontFamily: "var(--font-mono)",
           letterSpacing: ".04em",
           cursor: "pointer",
           transition: "all .2s",
         }}
-        onMouseEnter={(e) => { if (!open) e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}
-        onMouseLeave={(e) => { if (!open) e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)"; }}
+        onMouseEnter={(e) => { if (!open) e.currentTarget.style.borderColor = "color-mix(in srgb, var(--text-primary) 11%, transparent)"; }}
+        onMouseLeave={(e) => { if (!open) e.currentTarget.style.borderColor = "var(--control-bg)"; }}
       >
         {detached ? (
           <>
             <GitCommitHorizontal size={13} strokeWidth={1.6} />
-            <span style={{ color: "rgba(200,160,100,0.8)" }}>{t("git.status.detached")}</span>
+            <span style={{ color: "var(--state-warning-text)" }}>{t("git.status.detached")}</span>
           </>
         ) : !upstream ? (
           <>
             <GitCommitHorizontal size={13} strokeWidth={1.6} />
-            <span style={{ color: "rgba(255,255,255,0.4)" }}>{t("git.status.local")}</span>
+            <span>{t("git.status.local")}</span>
           </>
         ) : clean ? (
           <GitCommitHorizontal size={13} strokeWidth={1.6} />
@@ -737,9 +737,9 @@ function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, on
     return () => document.removeEventListener("keydown", onKey, true);
   }, [onCancel, onConfirm]);
 
-  const accent = destructive ? "rgba(230,120,120,0.95)" : "rgba(150,190,255,0.95)";
-  const accentBg = destructive ? "rgba(230,120,120,0.14)" : "rgba(150,190,255,0.14)";
-  const accentBorder = destructive ? "rgba(230,120,120,0.35)" : "rgba(150,190,255,0.35)";
+  const accent = destructive ? "var(--danger-soft-text)" : "var(--badge-open-text)";
+  const accentBg = destructive ? "var(--danger-soft-bg)" : "var(--badge-open-bg)";
+  const accentBorder = destructive ? "var(--danger-soft-border)" : "var(--badge-open-border)";
 
   return createPortal(
     <div
@@ -751,7 +751,7 @@ function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, on
         WebkitBackdropFilter: "blur(4px)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 24,
-        fontFamily: "system-ui, sans-serif",
+        fontFamily: "var(--font-ui)",
       }}
     >
       <div
@@ -760,20 +760,20 @@ function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, on
         aria-modal="true"
         style={{
           width: "min(420px, 100%)",
-          background: "rgba(14,14,16,0.55)",
-          border: "1px solid rgba(255,255,255,0.1)",
+          background: "var(--pane-elevated)",
+          border: "1px solid color-mix(in srgb, var(--text-primary) 11%, transparent)",
           borderRadius: 14,
           boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
           backdropFilter: "blur(72px) saturate(1.15)",
           WebkitBackdropFilter: "blur(72px) saturate(1.15)",
-          color: "rgba(255,255,255,0.9)",
+          color: "var(--text-primary)",
           overflow: "hidden",
         }}
       >
         <div style={{ padding: "16px 18px 4px", fontSize: s(14), fontWeight: 600, letterSpacing: "-0.005em" }}>
           {title}
         </div>
-        <div style={{ padding: "4px 18px 16px", fontSize: s(12), lineHeight: 1.5, color: "rgba(255,255,255,0.65)" }}>
+        <div style={{ padding: "4px 18px 16px", fontSize: s(12), lineHeight: 1.5, color: "color-mix(in srgb, var(--text-primary) 71%, transparent)" }}>
           {body}
         </div>
         <div style={{
@@ -784,12 +784,12 @@ function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, on
             onClick={onCancel}
             style={{
               height: 30, padding: "0 14px",
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              background: "color-mix(in srgb, var(--control-border) 63%, transparent)",
+              border: "1px solid var(--control-border)",
               borderRadius: 7,
-              color: "rgba(255,255,255,0.8)",
+              color: "color-mix(in srgb, var(--text-primary) 87%, transparent)",
               fontSize: s(12),
-              fontFamily: "system-ui,sans-serif",
+              fontFamily: "var(--font-ui)",
               cursor: "pointer",
             }}
           >
@@ -805,7 +805,7 @@ function ConfirmDialog({ s, title, body, confirmLabel, destructive, onCancel, on
               borderRadius: 7,
               color: accent,
               fontSize: s(12),
-              fontFamily: "system-ui,sans-serif",
+              fontFamily: "var(--font-ui)",
               fontWeight: 500,
               cursor: "pointer",
             }}
@@ -826,9 +826,9 @@ function FileSection({ title, files, s, pickCode, action, onAction, onRevert, on
       <div style={{
         display: "flex",
         alignItems: "center",
-        color: "rgba(255,255,255,0.4)",
+        color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
         fontSize: s(10),
-        fontFamily: "'JetBrains Mono',monospace",
+        fontFamily: "var(--font-mono)",
         letterSpacing: ".08em",
         marginBottom: 6,
       }}>
@@ -862,8 +862,8 @@ function RowIconBtn({ onClick, title, children }) {
       onClick={onClick}
       title={title}
       style={rowIconBtnStyle}
-      onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.95)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = "color-mix(in srgb, var(--text-primary) 54%, transparent)"; }}
     >
       {children}
     </button>
@@ -887,11 +887,11 @@ function FileRow({ file, s, letter, action, onAction, onRevert, onIgnore, t }) {
       onMouseLeave={() => setHover(false)}
       style={{
         display: "flex", gap: 6, alignItems: "center",
-        fontFamily: "'JetBrains Mono',monospace", fontSize: s(11),
-        padding: "2px 0", color: "rgba(255,255,255,0.7)",
+        fontFamily: "var(--font-mono)", fontSize: s(11),
+        padding: "2px 0", color: "color-mix(in srgb, var(--text-primary) 76%, transparent)",
       }}
     >
-      <span style={{ width: 14, color: STATUS_COLORS[letter] || "rgba(255,255,255,0.6)" }}>{letter}</span>
+      <span style={{ width: 14, color: STATUS_COLORS[letter] || "color-mix(in srgb, var(--text-primary) 65%, transparent)" }}>{letter}</span>
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{file.path}</span>
       <div style={{ display: "flex", gap: 2, visibility: hover ? "visible" : "hidden" }}>
         {onRevert && (

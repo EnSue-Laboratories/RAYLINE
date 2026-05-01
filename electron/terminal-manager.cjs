@@ -24,10 +24,26 @@ const { app } = require("electron");
 const { WebSocketServer } = require("ws");
 const { createLogger } = require("./logger.cjs");
 
+function ensureNodePtySpawnHelperExecutable() {
+  if (process.platform !== "darwin") return;
+  try {
+    const nodePtyRoot = path.dirname(require.resolve("node-pty/package.json"));
+    const helper = path.join(nodePtyRoot, "prebuilds", `${process.platform}-${process.arch}`, "spawn-helper");
+    if (!fs.existsSync(helper)) return;
+    const mode = fs.statSync(helper).mode;
+    if ((mode & 0o111) === 0) {
+      fs.chmodSync(helper, mode | 0o755);
+    }
+  } catch {
+    // If this preflight cannot run, node-pty will surface the real spawn error.
+  }
+}
+
 // node-pty is a native module — require lazily so syntax-check passes even
 // when binaries are not yet compiled for the current Electron version.
 let pty;
 try {
+  ensureNodePtySpawnHelperExecutable();
   pty = require("node-pty");
 } catch (e) {
   console.error("[terminal-manager] node-pty failed to load:", e.message);

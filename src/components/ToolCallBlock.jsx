@@ -33,7 +33,7 @@ function getPreview(tool) {
   if (tool.name === "Bash") {
     let cmd = args.command?.replace(/\n/g, " ") || "";
     // Replace absolute/home paths with just the binary name
-    cmd = cmd.replace(/(?:^|\s)[~\/][\w.~\/-]+\/([\w.-]+)/g, (_, bin) => " " + bin);
+    cmd = cmd.replace(/(?:^|\s)[~/][\w.~/:-]+\/([\w.-]+)/g, (_, bin) => " " + bin);
     return truncate(cmd.trim(), 30);
   }
   if (args.command) {
@@ -72,7 +72,7 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
   return (
     <div style={{ marginBottom: label === "ARGS" ? 8 : 0 }}>
       <div style={{
-        color: "rgba(255,255,255,0.3)",
+        color: "var(--text-muted)",
         marginBottom: 4,
         display: "flex",
         alignItems: "center",
@@ -86,10 +86,10 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
             style={{
               border: "none",
               background: "none",
-              color: "rgba(255,255,255,0.35)",
+              color: "var(--text-subtle)",
               cursor: "pointer",
               fontSize: fontScale(10),
-              fontFamily: "'JetBrains Mono',monospace",
+              fontFamily: "var(--font-mono)",
               padding: 0,
             }}
           >
@@ -98,12 +98,12 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
         )}
       </div>
       <pre style={{
-        color: "rgba(255,255,255,0.5)",
+        color: "var(--text-secondary)",
         whiteSpace: "pre-wrap",
         wordBreak: "break-all",
         margin: 0,
         padding: 8,
-        background: "rgba(0,0,0,0.3)",
+        background: "var(--control-bg-contrast)",
         borderRadius: 6,
         fontSize: fontScale(10),
         maxHeight,
@@ -128,8 +128,8 @@ export default function ToolCallBlock({ tool }) {
       style={{
         margin: "8px 0",
         borderRadius: 8,
-        border: "1px solid rgba(255,255,255,0.06)",
-        background: "rgba(255,255,255,0.02)",
+        border: "1px solid var(--pane-border)",
+        background: "var(--control-bg-subtle)",
         overflow: "hidden",
       }}
     >
@@ -143,16 +143,16 @@ export default function ToolCallBlock({ tool }) {
           padding: "8px 12px",
           background: "none",
           border: "none",
-          color: "rgba(255,255,255,0.5)",
+          color: "var(--text-secondary)",
           cursor: "pointer",
           fontSize: s(11),
-          fontFamily: "'JetBrains Mono',monospace",
+          fontFamily: "var(--font-mono)",
           textAlign: "left",
         }}
       >
         <Icon size={13} strokeWidth={1.5} />
         <span style={{
-          color: "rgba(255,255,255,0.7)",
+          color: "var(--text-primary)",
           flexShrink: 1,
           minWidth: 0,
           overflow: "hidden",
@@ -161,7 +161,7 @@ export default function ToolCallBlock({ tool }) {
         }}>{toolLabel}</span>
         {preview && !expanded && (
           <span style={{
-            color: "rgba(255,255,255,0.25)",
+            color: "var(--text-muted)",
             fontSize: s(10),
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -175,17 +175,17 @@ export default function ToolCallBlock({ tool }) {
         {!preview && <span style={{ flex: 1 }} />}
         <span style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
           {isRunning && (
-            <Loader2 size={10} strokeWidth={2} style={{ color: "rgba(255,255,255,0.3)", animation: "spin 1s linear infinite" }} />
+            <Loader2 size={10} strokeWidth={2} style={{ color: "var(--text-muted)", animation: "spin 1s linear infinite" }} />
           )}
           {tool.status === "done" && (
-            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: s(10) }}>done</span>
+            <span style={{ color: "var(--text-disabled)", fontSize: s(10) }}>done</span>
           )}
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
       </button>
 
       {expanded && (
-        <div style={{ padding: "0 12px 10px", fontSize: s(11), fontFamily: "'JetBrains Mono',monospace" }}>
+        <div style={{ padding: "0 12px 10px", fontSize: s(11), fontFamily: "var(--font-mono)" }}>
           {tool.args && Object.keys(tool.args).length > 0 && <ToolBody label="ARGS" value={tool.args} maxHeight={200} fontScale={s} />}
           {tool.result != null && <ToolBody label="RESULT" value={tool.result} maxHeight={300} fontScale={s} />}
         </div>

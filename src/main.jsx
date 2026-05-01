@@ -1,7 +1,11 @@
+import applyBootstrapTheme from "./utils/themeBootstrap.js";
+applyBootstrapTheme();
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.jsx";
+import { ThemeProvider } from "./contexts/ThemeContext.jsx";
 
 const container = document.getElementById("root");
 
@@ -14,6 +18,8 @@ container.__raylineRoot = root;
 
 root.render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </StrictMode>
 );
