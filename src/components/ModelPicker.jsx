@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
-import { MODELS, getMOrMulticaFallback } from "../data/models";
+import { getAvailableModels, getMOrMulticaFallback } from "../data/models";
+import { useProviderUpstreams } from "../data/providerUpstreams.jsx";
 import { useFontScale } from "../contexts/FontSizeContext";
 
 const MENU_GAP = 6;
@@ -34,7 +35,12 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
   const [cliInstalled, setCliInstalled] = useState(null);
   const cliCheckedAtRef = useRef(0);
   const cliProbePromiseRef = useRef(null);
-  const m = getMOrMulticaFallback(value, extraModels);
+  const { overrideModels } = useProviderUpstreams();
+  const mergedExtraModels = useMemo(() => (
+    [...overrideModels, ...extraModels]
+  ), [extraModels, overrideModels]);
+  const allModels = useMemo(() => getAvailableModels(mergedExtraModels), [mergedExtraModels]);
+  const m = getMOrMulticaFallback(value, mergedExtraModels);
 
   const probeCliInstalled = useCallback(async ({ force = false } = {}) => {
     if (cliProbePromiseRef.current) return cliProbePromiseRef.current;
@@ -100,12 +106,22 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
   }, [cliInstalled, open, probeCliInstalled]);
 
   useEffect(() => {
+    if (!onChange) return;
+    if (!allModels.some((candidate) => candidate.id === value)) {
+      const replacement = allModels.find((candidate) => candidate.provider === m.provider) || allModels[0];
+      if (replacement && replacement.id !== value) {
+        onChange(replacement.id);
+      }
+    }
+  }, [allModels, m.provider, onChange, value]);
+
+  useEffect(() => {
     if (!cliInstalled || !onChange) return;
 
     const currentProvider = m.provider;
     if (!PROVIDER_INSTALL_GUIDES[currentProvider] || cliInstalled[currentProvider] !== false) return;
 
-    const fallback = [...MODELS, ...extraModels].find((candidate) => {
+    const fallback = allModels.find((candidate) => {
       if (candidate.id === value) return false;
       const guide = PROVIDER_INSTALL_GUIDES[candidate.provider];
       return !guide || cliInstalled[candidate.provider] !== false;
@@ -114,7 +130,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
     if (fallback && fallback.id !== value) {
       onChange(fallback.id);
     }
-  }, [cliInstalled, extraModels, m.provider, onChange, value]);
+  }, [allModels, cliInstalled, m.provider, onChange, value]);
 
   const updateMenuPosition = useCallback(() => {
     if (!ref.current) return;
@@ -215,9 +231,8 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
           }}
         >
           {(() => {
-            const all = [...MODELS, ...extraModels];
             return ["claude", "codex", "opencode", "multica"].map((provider, gi) => {
-              const entries = all.filter((mm) => mm.provider === provider);
+              const entries = allModels.filter((mm) => mm.provider === provider);
               const isMulticaEmpty = provider === "multica" && entries.length === 0;
               const isOpenCodeEmpty = provider === "opencode" && entries.length === 0;
               const guide = PROVIDER_INSTALL_GUIDES[provider];

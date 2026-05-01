@@ -5,6 +5,7 @@ const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli
 const { findSessionCwd, moveSession } = require("./session-reader.cjs");
 const { fetchClaudeUsage } = require("./claude-usage-fetcher.cjs");
 const { createLogger } = require("./logger.cjs");
+const { buildClaudeUpstreamEnv, summarizeProviderUpstream, appendClaudeUpstreamArgs } = require("./provider-upstreams.cjs");
 
 const activeAgents = new Map();
 const log = createLogger("agent-manager");
@@ -242,7 +243,7 @@ function buildPromptWithAttachments(prompt, images, files) {
   return fullPrompt;
 }
 
-function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession, projectContext }, webContents) {
+function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession, providerUpstreamConfig, projectContext }, webContents) {
   cancelAgent(conversationId);
 
   const agentSessionId = resumeSessionId || sessionId;
@@ -295,7 +296,10 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     stdinClosed: false,
   };
 
-  log("Starting agent:", { conversationId, model, cwd: launchCwd, sessionId, resumeSessionId, forkSession });
+  const upstreamEnv = buildClaudeUpstreamEnv(providerUpstreamConfig);
+  const upstreamSummary = summarizeProviderUpstream(providerUpstreamConfig, "claude");
+
+  log("Starting agent:", { conversationId, model, cwd: launchCwd, sessionId, resumeSessionId, forkSession, upstream: upstreamSummary });
   const spawnRun = ({ runPrompt, runSessionId, runResumeSessionId, runForkSession }) => {
     state.runCount += 1;
     state.waitingForQuestion = false;
@@ -310,6 +314,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
       forkSession: runForkSession,
       projectContext,
     });
+    appendClaudeUpstreamArgs(args, providerUpstreamConfig, model);
 
     if (runResumeSessionId && launchCwd) {
       try {
@@ -346,7 +351,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
 
     const child = spawnCli(claudeBin, args, {
       cwd: launchCwd,
-      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath(), ...upstreamEnv },
       stdio: ["pipe", "pipe", "pipe"],
     });
 

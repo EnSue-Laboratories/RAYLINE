@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(git add *)",
+      "Bash(git reset *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'feat\\(Windows\\): macOS-style fixed chrome header for sidebar' --body ' *)",
+      "PowerShell(winget install *)",
+      "Bash(git checkout *)",
+      "Bash(gh release *)",
+      "Bash(gh pr *)",
+      "Bash(python3 -c \"import sys,json; prs=json.load\\(sys.stdin\\); [print\\(f'#{p[\\\\\"number\\\\\"]} {p[\\\\\"title\\\\\"]} by @{p[\\\\\"author\\\\\"][\\\\\"login\\\\\"]}'\\) for p in prs]\")",
+      "Bash(python3 -c \" import sys,json prs=json.load\\(sys.stdin\\) for p in prs: print\\(f'#{p[\\\\\"number\\\\\"]} [{p[\\\\\"headRefName\\\\\"]}] {p[\\\\\"title\\\\\"]} by @{p[\\\\\"author\\\\\"][\\\\\"login\\\\\"]}'\\) \")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('version','?'\\)\\)\")",
+      "Bash(git remote *)"
+    ]
+  }
+}
