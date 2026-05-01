@@ -75,7 +75,7 @@ function resolveLaunchCwd({ cwd, sessionId }) {
   throw new Error(`Invalid working directory: ${cwd}`);
 }
 
-function buildClaudeArgs({ model, sessionId, resumeSessionId, forkSession }) {
+function buildClaudeArgs({ model, sessionId, resumeSessionId, forkSession, projectContext }) {
   const args = [
     "--print",
     "--input-format=stream-json",
@@ -86,7 +86,7 @@ function buildClaudeArgs({ model, sessionId, resumeSessionId, forkSession }) {
     "--permission-prompt-tool", "stdio",
   ];
 
-  args.push("--append-system-prompt", `You are running inside RayLine, a desktop GUI client for Claude Code.
+  let appendPrompt = `You are running inside RayLine, a desktop GUI client for Claude Code.
 The user is interacting via a chat interface, not a terminal.
 Keep responses concise and conversational.
 Use markdown formatting — the client renders headings, code blocks, tables, lists, and mermaid diagrams.
@@ -169,7 +169,14 @@ RayLine has a built-in terminal window. You have MCP tools to control it:
 - kill_session(name) — terminate a session
 - list_sessions() — see all active sessions
 Use these INSTEAD of the Bash tool when you need: long-running processes (dev servers, watchers), interactive prompts needing stdin, or persistent shells across turns.
-The user can see and type into these terminals in real time.`);
+The user can see and type into these terminals in real time.`;
+
+  const trimmedProjectContext = typeof projectContext === "string" ? projectContext.trim() : "";
+  if (trimmedProjectContext) {
+    appendPrompt += `\n\nPROJECT CONTEXT (set in RayLine for this project):\n${trimmedProjectContext}`;
+  }
+
+  args.push("--append-system-prompt", appendPrompt);
 
   if (global.mcpConfigPath && fs.existsSync(global.mcpConfigPath)) {
     args.push("--mcp-config", global.mcpConfigPath);
@@ -236,7 +243,7 @@ function buildPromptWithAttachments(prompt, images, files) {
   return fullPrompt;
 }
 
-function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession, providerUpstreamConfig }, webContents) {
+function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession, providerUpstreamConfig, projectContext }, webContents) {
   cancelAgent(conversationId);
 
   const agentSessionId = resumeSessionId || sessionId;
@@ -305,6 +312,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
       sessionId: runSessionId,
       resumeSessionId: runResumeSessionId,
       forkSession: runForkSession,
+      projectContext,
     });
     appendClaudeUpstreamArgs(args, providerUpstreamConfig, model);
 
