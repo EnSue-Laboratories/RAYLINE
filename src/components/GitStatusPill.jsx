@@ -35,7 +35,7 @@ const rowIconBtnStyle = {
   background: "transparent",
   border: "none",
   borderRadius: 4,
-  color: "color-mix(in srgb, var(--text-primary) 54%, transparent)",
+  color: "var(--text-secondary)",
   cursor: "pointer",
   transition: "color .15s",
 };
@@ -675,7 +675,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
           borderRadius: 7,
           background: open ? "var(--pane-border)" : "color-mix(in srgb, var(--control-bg) 50%, transparent)",
           border: "1px solid " + (open ? "color-mix(in srgb, var(--text-primary) 11%, transparent)" : "var(--control-bg)"),
-          color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
+          color: "var(--text-secondary)",
           fontSize: s(10),
           fontFamily: "var(--font-mono)",
           letterSpacing: ".04em",
@@ -693,7 +693,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
         ) : !upstream ? (
           <>
             <GitCommitHorizontal size={13} strokeWidth={1.6} />
-            <span style={{ color: "color-mix(in srgb, var(--text-primary) 43%, transparent)" }}>{t("git.status.local")}</span>
+            <span>{t("git.status.local")}</span>
           </>
         ) : clean ? (
           <GitCommitHorizontal size={13} strokeWidth={1.6} />

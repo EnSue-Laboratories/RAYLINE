@@ -196,7 +196,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
           background: "color-mix(in srgb, var(--control-bg) 50%, transparent)",
           border: "1px solid var(--control-bg)",
           borderRadius: 7,
-          color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
+          color: "var(--text-secondary)",
           fontSize: s(10),
           fontFamily: "var(--font-mono)",
           cursor: "pointer",

@@ -669,12 +669,12 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
                 borderRadius: 7,
                 background: terminalOpen ? "var(--control-bg-active)" : "var(--control-bg)",
                 border: "1px solid " + (terminalOpen ? "var(--control-border-strong)" : "var(--pane-border)"),
-                color: terminalOpen ? "var(--text-secondary)" : "var(--text-muted)",
+                color: terminalOpen ? "var(--text-secondary)" : "var(--text-secondary)",
                 cursor: "pointer",
                 transition: "all .2s",
               }}
               onMouseEnter={(e) => { e.currentTarget.style.background = "var(--control-bg-active)"; e.currentTarget.style.color = "var(--text-secondary)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = terminalOpen ? "var(--control-bg-active)" : "var(--control-bg)"; e.currentTarget.style.color = terminalOpen ? "var(--text-secondary)" : "var(--text-muted)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = terminalOpen ? "var(--control-bg-active)" : "var(--control-bg)"; e.currentTarget.style.color = "var(--text-secondary)"; }}
             >
               <TerminalIcon size={14} strokeWidth={1.5} />
               {terminalCount > 0 && (

@@ -2680,7 +2680,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                         width: 16,
                         height: 16,
                         borderRadius: "50%",
-                        background: "var(--text-primary)",
+                        background: "var(--toggle-knob)",
                         transition: "left 120ms ease",
                       }}
                     />

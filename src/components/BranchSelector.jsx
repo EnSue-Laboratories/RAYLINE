@@ -14,7 +14,7 @@ function IconActionButton({
   disabled = false,
   visible = true,
   hoverColor = "color-mix(in srgb, var(--text-primary) 78%, transparent)",
-  baseColor = "color-mix(in srgb, var(--text-primary) 49%, transparent)",
+  baseColor = "var(--text-secondary)",
   disabledColor = "color-mix(in srgb, var(--text-primary) 13%, transparent)",
   ariaLabel,
 }) {
@@ -364,7 +364,7 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
           background: "color-mix(in srgb, var(--control-bg) 50%, transparent)",
           border: "1px solid var(--control-bg)",
           borderRadius: 7,
-          color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
+          color: "var(--text-secondary)",
           fontSize: s(10),
           fontFamily: "var(--font-mono)",
           cursor: "pointer",
