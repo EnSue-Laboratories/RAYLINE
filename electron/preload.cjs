@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld("api", {
   opencodeStatus: () => ipcRenderer.invoke("opencode-status"),
   opencodeSaveConfig: (input) => ipcRenderer.invoke("opencode-save-config", input),
   opencodeGetProviderConfig: (providerId) => ipcRenderer.invoke("opencode-get-provider-config", providerId),
+  syncProviderUpstreams: (provider, config) => ipcRenderer.invoke("sync-provider-upstreams", { provider, config }),
   shellRun: ({ command, cwd }) => ipcRenderer.invoke("shell-run", { command, cwd }),
 
   // Git operations
@@ -162,6 +163,8 @@ contextBridge.exposeInMainWorld("api", {
   windowToggleMaximize: () => ipcRenderer.invoke("window-toggle-maximize"),
   windowClose: () => ipcRenderer.invoke("window-close"),
   writeClipboardImage: (dataUrl) => ipcRenderer.invoke("clipboard-write-image", dataUrl),
+  writeClipboardText: (text) => ipcRenderer.invoke("clipboard-write-text", text),
+  readClipboardText: () => ipcRenderer.invoke("clipboard-read-text"),
 
   // Auto-updater
   getAppVersion:    () => ipcRenderer.invoke("get-app-version"),

@@ -32,6 +32,7 @@ const { createCheckpoint, restoreCheckpoint } = require("./checkpoint.cjs");
 const terminalManager = require("./terminal-manager.cjs");
 const ghManager = require("./github-manager.cjs");
 const { createLogger, isTruthyFlag, isVerboseLoggingEnabled } = require("./logger.cjs");
+const { patchClaudeSettingsWin32, patchClaudeConfigWin32, cleanCodexProviderKey, normalizeProviderUpstreamConfig } = require("./provider-upstreams.cjs");
 
 const isDev = !app.isPackaged;
 const isMac = process.platform === "darwin";
@@ -735,6 +736,15 @@ ipcMain.handle("clipboard-write-image", (_event, dataUrl) => {
   }
 });
 
+ipcMain.handle("clipboard-write-text", (_event, text) => {
+  clipboard.writeText(text);
+  return true;
+});
+
+ipcMain.handle("clipboard-read-text", () => {
+  return clipboard.readText();
+});
+
 // IPC: open path in Finder / file manager
 ipcMain.handle("open-path", async (_event, dirPath) => {
   const { shell } = require("electron");
@@ -1302,6 +1312,19 @@ ipcMain.handle("opencode-status", async () => {
 
 ipcMain.handle("opencode-save-config", (_event, input) => {
   return saveOpenCodeConfig(input);
+});
+
+ipcMain.handle("sync-provider-upstreams", (_event, { provider, config }) => {
+  if (provider === "claude" && isWindows) {
+    const normalized = normalizeProviderUpstreamConfig(config, "claude");
+    if (normalized && normalized.baseURL) {
+      const models = normalized.modelList || [];
+      const model = models[0] || ""; // Use the first model in the list as the primary one for settings.json
+      patchClaudeSettingsWin32({ baseURL: normalized.baseURL, apiKey: normalized.apiKey }, model);
+      patchClaudeConfigWin32();
+    }
+  }
+  return true;
 });
 
 ipcMain.handle("opencode-get-provider-config", (_event, providerId) => {

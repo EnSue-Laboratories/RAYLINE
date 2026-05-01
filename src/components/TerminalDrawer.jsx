@@ -498,6 +498,7 @@ function SessionTerminal({
         smoothScrollDuration: 90,
         allowTransparency: !opaqueBackground,
         allowProposedApi: true,
+        rightClickSelectsWord: true,
       });
 
       const fitAddon = new FitAddon();
@@ -537,6 +538,28 @@ function SessionTerminal({
           return true;
         }
 
+        // Copy/Paste shortcuts
+        const isCopy = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.code === "KeyC";
+        const isPaste = event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && event.code === "KeyV";
+
+        if (isCopy) {
+          if (term.hasSelection()) {
+            const text = term.getSelection();
+            window.api?.writeClipboardText?.(text);
+            term.clearSelection();
+            return false;
+          }
+        }
+
+        if (isPaste) {
+          event.preventDefault();
+          event.stopPropagation();
+          window.api?.readClipboardText?.().then((text) => {
+            if (text) term.input(text, true);
+          });
+          return false;
+        }
+
         if (!promptSelectionEditing) {
           return true;
         }
@@ -567,6 +590,22 @@ function SessionTerminal({
         });
         return false;
       });
+
+      const handleContextMenu = (event) => {
+        event.preventDefault();
+        if (term.hasSelection()) {
+          const text = term.getSelection();
+          window.api?.writeClipboardText?.(text);
+          term.clearSelection();
+        } else {
+          window.api?.readClipboardText?.().then((text) => {
+            if (text) {
+              // term.input is a custom method used in this file for sending pty input
+              term.input(text, true);
+            }
+          });
+        }
+      };
 
       const syncSessionSize = (reason, cols = term.cols, rows = term.rows) => {
         if (!cols || !rows) return;
@@ -716,6 +755,7 @@ function SessionTerminal({
       term.element?.addEventListener("mousedown", handleMouseDown);
       term.element?.addEventListener("mousemove", handleMouseMove);
       term.element?.addEventListener("mouseup", handleMouseUp);
+      term.element?.addEventListener("contextmenu", handleContextMenu);
 
       registerRef.current(sessionName, term);
 
