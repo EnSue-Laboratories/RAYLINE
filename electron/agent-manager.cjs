@@ -5,7 +5,7 @@ const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli
 const { findSessionCwd, moveSession } = require("./session-reader.cjs");
 const { fetchClaudeUsage } = require("./claude-usage-fetcher.cjs");
 const { createLogger } = require("./logger.cjs");
-const { buildClaudeUpstreamEnv, summarizeProviderUpstream } = require("./provider-upstreams.cjs");
+const { buildClaudeUpstreamEnv, summarizeProviderUpstream, appendClaudeUpstreamArgs } = require("./provider-upstreams.cjs");
 
 const activeAgents = new Map();
 const log = createLogger("agent-manager");
@@ -306,6 +306,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
       resumeSessionId: runResumeSessionId,
       forkSession: runForkSession,
     });
+    appendClaudeUpstreamArgs(args, providerUpstreamConfig, model);
 
     if (runResumeSessionId && launchCwd) {
       try {

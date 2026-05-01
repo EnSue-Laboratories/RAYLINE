@@ -24,6 +24,12 @@ export function useProviderUpstreams() {
     const next = saveProviderUpstreamConfig(provider, patch);
     setState(next);
     window.dispatchEvent(new CustomEvent("provider-upstreams-refresh"));
+    if (window.api?.syncProviderUpstreams) {
+      const config = getProviderUpstreamConfig(provider, next);
+      if (config) {
+        window.api.syncProviderUpstreams(provider, config);
+      }
+    }
     return next;
   }, []);
 
@@ -31,6 +37,9 @@ export function useProviderUpstreams() {
     const next = clearProviderUpstreamConfig(provider);
     setState(next);
     window.dispatchEvent(new CustomEvent("provider-upstreams-refresh"));
+    if (window.api?.syncProviderUpstreams) {
+      window.api.syncProviderUpstreams(provider, null);
+    }
     return next;
   }, []);
 

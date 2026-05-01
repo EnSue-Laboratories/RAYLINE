@@ -1,9 +1,73 @@
 const crypto = require("crypto");
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+
+const IS_WINDOWS = process.platform === "win32";
 
 function safeString(value) {
   return typeof value === "string" ? value.trim() : "";
 }
+
+function patchClaudeSettingsWin32(config, model) {
+  if (!IS_WINDOWS) return;
+  try {
+    const claudeDir = path.join(os.homedir(), ".claude");
+    if (!fs.existsSync(claudeDir)) {
+      fs.mkdirSync(claudeDir, { recursive: true });
+    }
+    const settingsPath = path.join(claudeDir, "settings.json");
+    
+    let settings = { env: {} };
+    if (fs.existsSync(settingsPath)) {
+      try {
+        const content = fs.readFileSync(settingsPath, "utf8");
+        const cleaned = content.replace(/\/\/.*$/gm, ""); // strip line comments
+        if (cleaned.trim()) {
+           settings = JSON.parse(cleaned);
+        }
+      } catch (e) {}
+    }
+    
+    settings.env = settings.env || {};
+    
+    if (config.baseURL) settings.env.ANTHROPIC_BASE_URL = config.baseURL;
+    if (config.apiKey) {
+      settings.env.ANTHROPIC_AUTH_TOKEN = config.apiKey;
+    }
+    
+    if (model) {
+      settings.env.ANTHROPIC_MODEL = model;
+      settings.env.ANTHROPIC_DEFAULT_SONNET_MODEL = model;
+      settings.env.ANTHROPIC_DEFAULT_OPUS_MODEL = model;
+      settings.env.ANTHROPIC_DEFAULT_HAIKU_MODEL = model;
+    }
+    
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
+  } catch (err) {
+    console.warn("Failed to patch ~/.claude/settings.json:", err);
+  }
+}
+
+function patchClaudeConfigWin32() {
+  if (!IS_WINDOWS) return;
+  try {
+    const configPath = path.join(os.homedir(), ".claude.json");
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      } catch (e) {}
+    }
+    config.hasCompletedOnboarding = true;
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf8");
+  } catch (err) {
+    console.warn("Failed to patch .claude.json:", err);
+  }
+}
+
+
 
 function normalizeOpenAIBaseURL(value) {
   const raw = safeString(value).replace(/\/+$/, "");
@@ -588,19 +652,60 @@ function startCodexResponsesBridge(input) {
   });
 }
 
-async function appendCodexUpstreamArgs(args, input, options = {}) {
+async function appendCodexUpstreamArgs(args, input, model, options = {}) {
   const config = normalizeProviderUpstreamConfig(input, "codex");
   if (!config || !config.baseURL) return null;
 
   const bridge = options.bridge === false ? null : await startCodexResponsesBridge(config);
   const baseURL = bridge?.baseURL || normalizeOpenAIBaseURL(config.baseURL);
   const key = cleanCodexProviderKey(baseURL);
-  args.push("-c", `model_provider=${JSON.stringify(key)}`);
-  args.push("-c", `model_providers.${key}.name=${JSON.stringify(key)}`);
-  args.push("-c", `model_providers.${key}.base_url=${JSON.stringify(baseURL)}`);
-  args.push("-c", `model_providers.${key}.wire_api=${JSON.stringify("responses")}`);
-  args.push("-c", `model_providers.${key}.env_key=${JSON.stringify("OPENAI_API_KEY")}`);
+  
+  const models = Array.from(new Set([...config.modelList, model].filter(Boolean)));
+
+  if (IS_WINDOWS) {
+    // Revert to non-windows logic for Codex, because Codex uses proxy and model_providers
+    args.push("-c", `model_provider=${JSON.stringify(key)}`);
+    args.push("-c", `model_providers.${key}.name=${JSON.stringify(key)}`);
+    args.push("-c", `model_providers.${key}.base_url=${JSON.stringify(baseURL)}`);
+    args.push("-c", `model_providers.${key}.wire_api=${JSON.stringify("responses")}`);
+    args.push("-c", `model_providers.${key}.env_key=${JSON.stringify("OPENAI_API_KEY")}`);
+    if (models.length > 0) {
+      args.push("-c", `model_providers.${key}.models=${JSON.stringify(models)}`);
+    }
+  } else {
+    args.push("-c", `model_provider=${JSON.stringify(key)}`);
+    args.push("-c", `model_providers.${key}.name=${JSON.stringify(key)}`);
+    args.push("-c", `model_providers.${key}.base_url=${JSON.stringify(baseURL)}`);
+    args.push("-c", `model_providers.${key}.wire_api=${JSON.stringify("responses")}`);
+    args.push("-c", `model_providers.${key}.env_key=${JSON.stringify("OPENAI_API_KEY")}`);
+    if (models.length > 0) {
+      args.push("-c", `model_providers.${key}.models=${JSON.stringify(models)}`);
+    }
+  }
+  
   return { ...config, baseURL, targetBaseURL: bridge?.targetBaseURL || normalizeOpenAIBaseURL(config.baseURL), providerKey: key, bridge };
+}
+
+function appendClaudeUpstreamArgs(args, input, model) {
+  const config = normalizeProviderUpstreamConfig(input, "claude");
+  if (!config || !config.baseURL) return null;
+
+  const baseURL = config.baseURL;
+  const key = cleanCodexProviderKey(baseURL); // reuse the same sanitization logic
+  
+  const models = Array.from(new Set([...config.modelList, model].filter(Boolean)));
+
+  if (IS_WINDOWS) {
+    // 1. Write environment variables to ~/.claude/settings.json
+    patchClaudeSettingsWin32({ baseURL, apiKey: config.apiKey }, model);
+    
+    // 2. Mark onboarding as completed
+    patchClaudeConfigWin32();
+  }
+  // On Mac/Linux, we don't modify args because buildClaudeUpstreamEnv sets ANTHROPIC_BASE_URL.
+  // Actually, we could do `-c` here for Mac too, but it's working fine currently.
+
+  return { ...config, baseURL, providerKey: key };
 }
 
 function buildCodexUpstreamEnv(input, runtime = null) {
@@ -624,8 +729,12 @@ function summarizeProviderUpstream(input, provider) {
 module.exports = {
   buildClaudeUpstreamEnv,
   appendCodexUpstreamArgs,
+  appendClaudeUpstreamArgs,
   buildCodexUpstreamEnv,
   normalizeOpenAIBaseURL,
   normalizeProviderUpstreamConfig,
   summarizeProviderUpstream,
+  patchClaudeSettingsWin32,
+  patchClaudeConfigWin32,
+  cleanCodexProviderKey,
 };
