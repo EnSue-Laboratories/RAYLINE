@@ -86,56 +86,56 @@ export default function ProjectContextModal({ open, projectName, initialValue, o
 }
 
 const backdropStyle = {
-  position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+  position: "fixed", inset: 0, background: "color-mix(in srgb, var(--bg-primary) 45%, transparent)",
   display: "flex", alignItems: "center", justifyContent: "center",
   zIndex: 1000, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
 };
 const cardStyle = {
   width: 560, maxWidth: "90vw", maxHeight: "85vh",
-  background: "var(--pane-elevated)",
+  background: "var(--surface-glass)",
   backdropFilter: "blur(48px) saturate(1.2)",
   WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-  border: "1px solid var(--pane-border)",
+  border: "1px solid var(--border)",
   borderRadius: 12, display: "flex", flexDirection: "column",
-  color: "white", fontFamily: "system-ui, sans-serif", fontSize: 13,
-  boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+  color: "var(--text-primary)", fontFamily: "var(--font-ui)", fontSize: 13,
+  boxShadow: "var(--shadow-md)",
 };
 const headerStyle = {
   display: "flex", justifyContent: "space-between", alignItems: "center",
-  padding: "14px 18px", borderBottom: "1px solid var(--pane-border)",
+  padding: "14px 18px", borderBottom: "1px solid var(--border)",
 };
-const titleRowStyle = { display: "flex", alignItems: "center", gap: 8, color: "rgba(255,255,255,0.85)" };
+const titleRowStyle = { display: "flex", alignItems: "center", gap: 8, color: "var(--text-primary)" };
 const titleStyle = { fontSize: 13, fontWeight: 500 };
 const closeBtnStyle = {
-  background: "none", border: "none", color: "rgba(255,255,255,0.55)",
+  background: "none", border: "none", color: "var(--text-secondary)",
   cursor: "pointer", padding: 4, display: "flex",
 };
 const bodyStyle = { padding: 18, display: "flex", flexDirection: "column", gap: 8 };
 const footerStyle = {
   display: "flex", justifyContent: "flex-end", gap: 8,
-  padding: "12px 18px", borderTop: "1px solid var(--pane-border)",
+  padding: "12px 18px", borderTop: "1px solid var(--border)",
 };
 const primaryBtnStyle = (enabled) => ({
   padding: "8px 14px", borderRadius: 6, border: "none",
-  background: enabled ? "white" : "rgba(255,255,255,0.1)",
-  color: enabled ? "black" : "rgba(255,255,255,0.4)",
+  background: enabled ? "var(--text-primary)" : "var(--bg-tertiary)",
+  color: enabled ? "var(--bg-primary)" : "var(--text-muted)",
   cursor: enabled ? "pointer" : "not-allowed",
   fontSize: 12, fontWeight: 500,
 });
 const secondaryBtnStyle = {
   padding: "8px 12px", borderRadius: 6,
   background: "transparent",
-  border: "1px solid var(--pane-border)",
-  color: "rgba(255,255,255,0.7)",
+  border: "1px solid var(--border)",
+  color: "var(--text-secondary)",
   cursor: "pointer", fontSize: 12,
   display: "flex", alignItems: "center",
 };
 const textareaStyle = {
   width: "100%", padding: "8px 10px", borderRadius: 6,
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid var(--pane-border)",
-  color: "white", fontSize: 13, fontFamily: "'JetBrains Mono', monospace",
+  background: "var(--bg-tertiary)",
+  border: "1px solid var(--border)",
+  color: "var(--text-primary)", fontSize: 13, fontFamily: "var(--font-mono)",
   outline: "none", boxSizing: "border-box",
   resize: "vertical",
 };
-const hintStyle = { fontSize: 11, color: "rgba(255,255,255,0.35)" };
+const hintStyle = { fontSize: 11, color: "var(--text-muted)" };
