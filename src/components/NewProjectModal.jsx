@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { X, FolderOpen, GitBranch, FolderPlus } from "lucide-react";
+import { createTranslator } from "../i18n";
 
 function deriveRepoDirName(url) {
   const s = String(url || "").trim();
@@ -10,7 +11,8 @@ function deriveRepoDirName(url) {
   return m ? m[1] : null;
 }
 
-export default function NewProjectModal({ open, onClose, onCloned, onPickedLocalFolder }) {
+export default function NewProjectModal({ open, onClose, onCloned, onPickedLocalFolder, locale = "en-US" }) {
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [url, setUrl] = useState("");
   const [parentDir, setParentDir] = useState("");
   const [busy, setBusy] = useState(false);
@@ -53,7 +55,7 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
     try {
       const result = await window.api?.cloneRepo?.({ url: url.trim(), parentDir });
       if (!result?.ok) {
-        setError(result?.stderr || "Clone failed");
+        setError(result?.stderr || t("project.create.cloneFailed"));
         return;
       }
       onCloned?.(result.path, contextValue.trim() || undefined);
@@ -63,7 +65,7 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
     } finally {
       setBusy(false);
     }
-  }, [canClone, url, parentDir, onCloned, onClose, contextValue]);
+  }, [canClone, url, parentDir, onCloned, onClose, contextValue, t]);
 
   const handlePickLocal = useCallback(async () => {
     if (busy) return;
@@ -90,13 +92,13 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
         <div style={headerStyle}>
           <div style={titleRowStyle}>
             <FolderPlus size={14} strokeWidth={1.8} />
-            <span style={titleStyle}>New Project</span>
+            <span style={titleStyle}>{t("project.create.title")}</span>
           </div>
           <button
             type="button"
             style={closeBtnStyle}
             onClick={() => { if (!busy) onClose?.(); }}
-            aria-label="Close"
+            aria-label={t("project.create.close")}
           >
             <X size={14} />
           </button>
@@ -106,12 +108,12 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>
               <GitBranch size={12} strokeWidth={1.8} />
-              <span>Clone from Git</span>
+              <span>{t("project.create.cloneFromGit")}</span>
             </div>
             <input
               autoFocus
               type="text"
-              placeholder="https://github.com/owner/repo or owner/repo"
+              placeholder={t("project.create.repoPlaceholder")}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleClone(); }}
@@ -120,10 +122,10 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
               disabled={busy}
             />
             <div style={hintStyle}>
-              Uses <code style={codeStyle}>gh repo clone</code> for GitHub, falls back to <code style={codeStyle}>git clone</code>.
+              {t("project.create.cloneHint")}
             </div>
 
-            <div style={{ ...labelStyle, marginTop: 10 }}>Destination parent folder</div>
+            <div style={{ ...labelStyle, marginTop: 10 }}>{t("project.create.destinationParentFolder")}</div>
             <div style={rowStyle}>
               <input
                 type="text"
@@ -135,28 +137,28 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
               />
               <button type="button" style={secondaryBtnStyle} onClick={pickParent} disabled={busy}>
                 <FolderOpen size={12} strokeWidth={1.8} style={{ marginRight: 6 }} />
-                Browse
+                {t("project.create.browse")}
               </button>
             </div>
             {previewName && parentDir && (
               <div style={hintStyle}>
-                Will clone into <code style={codeStyle}>{parentDir.replace(/\/$/, "")}/{previewName}</code>
+                {t("project.create.willCloneInto", { path: `${parentDir.replace(/\/$/, "")}/${previewName}` })}
               </div>
             )}
           </div>
 
           <div style={dividerRowStyle}>
             <div style={dividerLineStyle} />
-            <span style={dividerTextStyle}>OR</span>
+            <span style={dividerTextStyle}>{t("project.create.or")}</span>
             <div style={dividerLineStyle} />
           </div>
 
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>
               <FolderOpen size={12} strokeWidth={1.8} />
-              <span>Open Local Folder</span>
+              <span>{t("project.create.openLocalFolder")}</span>
             </div>
-            <div style={hintStyle}>Pick an existing folder on your machine.</div>
+            <div style={hintStyle}>{t("project.create.localFolderHint")}</div>
             <button
               type="button"
               style={{ ...secondaryBtnStyle, marginTop: 8, alignSelf: "flex-start" }}
@@ -164,25 +166,25 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
               disabled={busy}
             >
               <FolderOpen size={12} strokeWidth={1.8} style={{ marginRight: 6 }} />
-              Choose folder…
+              {t("project.create.chooseFolder")}
             </button>
           </div>
 
           <div style={sectionStyle}>
             <div style={sectionHeaderStyle}>
-              <span>Project Context (optional)</span>
+              <span>{t("project.create.contextTitle")}</span>
             </div>
             <textarea
               rows={5}
               value={contextValue}
               onChange={(e) => setContextValue(e.target.value)}
-              placeholder="Notes Agent should know about this project..."
+              placeholder={t("project.create.contextPlaceholder")}
               style={{ ...inputStyle, resize: "vertical", minHeight: 88 }}
               spellCheck={false}
               disabled={busy}
             />
             <div style={hintStyle}>
-              Appended to the system prompt for every chat in this project. Editable later from the project menu.
+              {t("project.create.contextHint")}
             </div>
           </div>
 
@@ -191,7 +193,7 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
 
         <div style={footerStyle}>
           <button type="button" style={secondaryBtnStyle} onClick={() => { if (!busy) onClose?.(); }} disabled={busy}>
-            Cancel
+            {t("project.create.cancel")}
           </button>
           <button
             type="button"
@@ -199,7 +201,7 @@ export default function NewProjectModal({ open, onClose, onCloned, onPickedLocal
             onClick={handleClone}
             disabled={!canClone}
           >
-            {busy ? "Cloning…" : "Clone"}
+            {busy ? t("project.create.cloning") : t("project.create.clone")}
           </button>
         </div>
       </div>
@@ -283,11 +285,6 @@ const inputStyle = {
 };
 const labelStyle = { fontSize: 11, color: "var(--text-secondary)", marginBottom: 4 };
 const hintStyle = { fontSize: 11, color: "var(--text-muted)", marginTop: 6 };
-const codeStyle = {
-  fontFamily: "var(--font-mono)", fontSize: 10.5,
-  background: "var(--hover-overlay)", padding: "1px 5px",
-  borderRadius: 4,
-};
 const errorStyle = {
   fontSize: 12, color: "var(--accent)",
   background: "var(--hover-overlay)",

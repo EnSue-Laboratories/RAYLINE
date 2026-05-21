@@ -230,7 +230,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onEditProjectContext, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, windowsChrome = false, hasUpdate = false, locale = "en-US" }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd, onPickFolder, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onEditProjectContext, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, windowsChrome = false, locale = "en-US" }) {
   const s = useFontScale();
   const t = useMemo(() => createTranslator(locale), [locale]);
   const [search, setSearch]     = useState("");
@@ -315,16 +315,22 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
     searchRunRef.current = runId;
 
     if (!searchActive) {
-      setSearchLoading(false);
-      setSearchResults(convos);
-      return undefined;
+      const resetId = setTimeout(() => {
+        if (searchRunRef.current !== runId) return;
+        setSearchLoading(false);
+        setSearchResults(convos);
+      }, 0);
+      return () => clearTimeout(resetId);
     }
-
-    setSearchLoading(true);
-    setSearchResults([]);
 
     const tokens = getSearchTokens(searchQuery);
     let cancelled = false;
+
+    const startId = setTimeout(() => {
+      if (cancelled || searchRunRef.current !== runId) return;
+      setSearchLoading(true);
+      setSearchResults([]);
+    }, 0);
 
     const timeoutId = setTimeout(() => {
       void (async () => {
@@ -375,6 +381,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
 
     return () => {
       cancelled = true;
+      clearTimeout(startId);
       clearTimeout(timeoutId);
     };
   }, [convos, loadConversationSearchRecord, searchActive, searchQuery]);
@@ -683,6 +690,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             onEditContext={onEditProjectContext}
             searchActive={searchActive}
             multicaModels={multicaModels}
+            locale={locale}
           />
         ))
         }
