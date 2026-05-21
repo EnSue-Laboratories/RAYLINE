@@ -2,6 +2,7 @@ import { memo, useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, FolderClosed, Plus, MoreHorizontal, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { createTranslator } from "../i18n";
 import { getMOrMulticaFallback } from "../data/models";
 import { relativeTime } from "../utils/time";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
@@ -23,8 +24,10 @@ function ProjectGroup({
   onEditContext,
   searchActive,
   multicaModels = [],
+  locale = "en-US",
 }) {
   const s = useFontScale();
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [headerHovered, setHeaderHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
@@ -164,7 +167,7 @@ function ProjectGroup({
           >
             <button
               onClick={() => onNewInProject(project.cwdRoot)}
-              title="New chat in project"
+              title={t("projectGroup.newChatInProject")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -186,7 +189,7 @@ function ProjectGroup({
             <button
               ref={moreRef}
               onClick={openMenu}
-              title="More options"
+              title={t("projectGroup.moreOptions")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -241,7 +244,7 @@ function ProjectGroup({
         >
           <MenuBtn
             s={s}
-            label="Edit context…"
+            label={t("projectGroup.editContext")}
             onClick={() => {
               setContextModalOpen(true);
               closeMenu();
@@ -249,7 +252,7 @@ function ProjectGroup({
           />
           <MenuBtn
             s={s}
-            label="Open in Finder"
+            label={t("projectGroup.openInFinder")}
             onClick={() => {
               window.api?.openPath?.(project.cwdRoot);
               closeMenu();
@@ -257,7 +260,7 @@ function ProjectGroup({
           />
           <MenuBtn
             s={s}
-            label="Copy path"
+            label={t("projectGroup.copyPath")}
             onClick={() => {
               navigator.clipboard.writeText(project.cwdRoot);
               closeMenu();
@@ -269,7 +272,7 @@ function ProjectGroup({
 
           <MenuBtn
             s={s}
-            label="Hide project"
+            label={t("projectGroup.hideProject")}
             danger
             onClick={() => {
               onHideProject(project.cwdRoot);
@@ -286,6 +289,7 @@ function ProjectGroup({
         initialValue={project.context || ""}
         onClose={() => setContextModalOpen(false)}
         onSave={(value) => onEditContext?.(project.cwdRoot, value)}
+        locale={locale}
       />
     </div>
   );
@@ -647,7 +651,8 @@ function areProjectGroupsEqual(prev, next) {
     prev.onHideProject !== next.onHideProject ||
     prev.onEditContext !== next.onEditContext ||
     prev.searchActive !== next.searchActive ||
-    prev.multicaModels !== next.multicaModels
+    prev.multicaModels !== next.multicaModels ||
+    prev.locale !== next.locale
   ) {
     return false;
   }

@@ -4012,13 +4012,11 @@ export default function App() {
             onNew={handleNew}
             onOpenDispatch={() => setShowDispatchCard(true)}
             onDelete={handleDelete}
-            onToggleSidebar={() => setSidebarOpen((o) => !o)}
             isOpen={useWindowsSidebarChrome ? sidebarOpen : true}
             windowsChrome={useWindowsSidebarChrome}
             locale={locale}
             cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
             onPickFolder={handlePickFolder}
-            onOpenSettings={() => setShowSettings(true)}
             onOpenProjectManager={() => window.api?.openProjectManager()}
             onOpenNewProject={() => setShowNewProject(true)}
             projects={projects}
@@ -4031,7 +4029,6 @@ export default function App() {
             onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
             developerMode={developerMode}
             multicaModels={dynamicModels}
-            hasUpdate={hasUpdate}
           />
         </div>
       </div>
@@ -4146,6 +4143,7 @@ export default function App() {
         onClose={() => setShowNewProject(false)}
         onCloned={handleClonedRepo}
         onPickedLocalFolder={registerManualProject}
+        locale={locale}
       />
 
       {/* Optional in-app terminal drawer. The default terminal surface is the dedicated window. */}
