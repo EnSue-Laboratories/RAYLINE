@@ -9,6 +9,7 @@ const {
   buildCodexUpstreamEnv,
   summarizeProviderUpstream,
 } = require("./provider-upstreams.cjs");
+const { describeRemoteRuntime, normalizeRemoteRuntime, spawnRemoteCommand } = require("./remote-runtime.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
@@ -109,19 +110,25 @@ function readConfiguredMcpServers() {
   }
 }
 
-function buildClaudiPrompt(prompt, files, mcpServers) {
+function buildClaudiPrompt(prompt, files, mcpServers, options = {}) {
   let fullPrompt = prompt;
 
   if (files && files.length > 0) {
     const filePaths = files.map((f) => f.path).join("\n");
-    fullPrompt = `[Attached files:\n${filePaths}]\n\n${fullPrompt}`;
+    fullPrompt = options.remote
+      ? `[Attached files were provided in RayLine, but these local paths were not copied to the remote SSH host:\n${filePaths}]\n\n${fullPrompt}`
+      : `[Attached files:\n${filePaths}]\n\n${fullPrompt}`;
   }
 
   const hasTerminalSessions = (mcpServers || []).some(
     ([name, config]) => name === "terminal-sessions" && config?.command && config?.enabled !== false
   );
 
-  const terminalInstructions = hasTerminalSessions
+  const terminalInstructions = options.remote
+    ? `Terminal sessions:
+You are running on a remote SSH host from RayLine. RayLine's local terminal MCP and $CLAUDI_TERMINAL_CLI are not available on this host.
+Use normal shell commands on the remote host for long-running processes, and tell the user when a command must keep running after your turn.`
+    : hasTerminalSessions
     ? `Terminal sessions:
 RayLine's terminal means the dedicated terminal window inside the app. Sessions created there are user-visible and remain available across turns.
 Use RayLine's terminal when you want the user to see or interact with a shell, when a process should keep running, or when stdin needs to be sent over time.
@@ -238,11 +245,12 @@ function appendCodexMcpOverrides(args, mcpServers) {
   }
 }
 
-async function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, files, sessionId, resumeSessionId, providerUpstreamConfig }, webContents) {
+async function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, files, sessionId, resumeSessionId, providerUpstreamConfig, remoteRuntime }, webContents) {
   cancelCodexAgent(conversationId);
 
   const args = ["exec"];
   const launchModel = model;
+  const remote = normalizeRemoteRuntime(remoteRuntime);
 
   // Resume an existing thread if requested
   if (resumeSessionId) {
@@ -259,12 +267,12 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
     args.push("-c", `model_reasoning_effort="${effort}"`);
   }
 
-  const mcpServers = readConfiguredMcpServers();
+  const mcpServers = remote ? [] : readConfiguredMcpServers();
   appendCodexMcpOverrides(args, mcpServers);
   const upstreamSummary = summarizeProviderUpstream(providerUpstreamConfig, "codex");
   let upstreamRuntime = null;
   try {
-    upstreamRuntime = await appendCodexUpstreamArgs(args, providerUpstreamConfig);
+    upstreamRuntime = await appendCodexUpstreamArgs(args, providerUpstreamConfig, launchModel, { bridge: !remote });
   } catch (error) {
     log("Failed to prepare codex upstream:", error?.message || error);
     webContents.send("agent-error", { conversationId, error: error?.message || "Failed to prepare Codex upstream" });
@@ -274,7 +282,9 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
 
   // Working directory — only pass -C for new sessions (resume doesn't accept it)
   let launchCwd = process.cwd();
-  if (cwd && isDirectory(cwd)) {
+  if (remote) {
+    launchCwd = remote.cwd || process.cwd();
+  } else if (cwd && isDirectory(cwd)) {
     launchCwd = cwd;
     if (!resumeSessionId) {
       args.push("-C", cwd);
@@ -288,7 +298,7 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
   }
 
   // Handle images — decode base64 data URLs to temp files, pass via -i
-  if (images && images.length > 0) {
+  if (!remote && images && images.length > 0) {
     for (let i = 0; i < images.length; i++) {
       const dataUrl = images[i];
       const match = dataUrl.match(/^data:image\/([\w+.-]+);base64,(.+)$/);
@@ -303,11 +313,11 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
 
   // `--image` is variadic in the Codex CLI, so terminate option parsing
   // before the prompt or the prompt may be consumed as another image path.
-  const fullPrompt = buildClaudiPrompt(prompt, files, mcpServers);
+  const fullPrompt = buildClaudiPrompt(prompt, files, mcpServers, { remote: Boolean(remote) });
   args.push("--", fullPrompt);
 
-  const codexBin = resolveCodexBin();
-  if (!codexBin) {
+  const codexBin = remote ? (remote.commandPath || "codex") : resolveCodexBin();
+  if (!remote && !codexBin) {
     const error = "Unable to locate the Codex CLI binary";
     log(error);
     webContents.send("agent-error", { conversationId, error });
@@ -315,25 +325,37 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
     return null;
   }
 
-  log("Starting codex agent:", { conversationId, model: launchModel, requestedModel: model, effort, cwd: launchCwd, resumeSessionId, upstream: upstreamSummary });
+  log("Starting codex agent:", { conversationId, model: launchModel, requestedModel: model, effort, cwd: launchCwd, resumeSessionId, upstream: upstreamSummary, remote: describeRemoteRuntime(remote) });
   log("Full args:", args.filter(a => a !== fullPrompt).join(" "));
   log("Prompt:", fullPrompt.slice(0, 100));
 
-  const child = spawnCli(codexBin, args, {
-    cwd: launchCwd,
-    env: {
-      ...process.env,
-      FORCE_COLOR: "0",
-      PATH: buildSpawnPath(),
-      ...buildCodexUpstreamEnv(providerUpstreamConfig, upstreamRuntime),
-      CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
-      CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",
-      CLAUDI_TERMINAL_MCP_CONFIG: global.mcpConfigPath || "",
-    },
-    // Codex stalls before the first network request when stdin is /dev/null.
-    // Give it a pipe and immediately close it so it observes EOF correctly.
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  const codexEnv = buildCodexUpstreamEnv(providerUpstreamConfig, upstreamRuntime);
+  const child = remote
+    ? spawnRemoteCommand(remote, codexBin, args, {
+        cwd: process.cwd(),
+        env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+        // Codex stalls before the first network request when stdin is /dev/null.
+        // Give it a pipe and immediately close it so it observes EOF correctly.
+        stdio: ["pipe", "pipe", "pipe"],
+      }, {
+        env: { FORCE_COLOR: "0", ...codexEnv },
+        cwd: remote.cwd,
+      })
+    : spawnCli(codexBin, args, {
+        cwd: launchCwd,
+        env: {
+          ...process.env,
+          FORCE_COLOR: "0",
+          PATH: buildSpawnPath(),
+          ...codexEnv,
+          CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
+          CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",
+          CLAUDI_TERMINAL_MCP_CONFIG: global.mcpConfigPath || "",
+        },
+        // Codex stalls before the first network request when stdin is /dev/null.
+        // Give it a pipe and immediately close it so it observes EOF correctly.
+        stdio: ["pipe", "pipe", "pipe"],
+      });
   child.stdin?.on("error", () => {});
   child.stdin?.end();
 

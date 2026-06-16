@@ -51,6 +51,7 @@ export default function NewChatCard({
   onPickFolder,
   onCancel,
   developerMode = true,
+  extraModels = [],
 }) {
   const s = useFontScale();
   const textareaRef = useRef(null);
@@ -583,7 +584,7 @@ export default function NewChatCard({
 
         {/* Toolbar row */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <ModelPickerWithMultica value={model} onChange={setModel} />
+          <ModelPickerWithMultica value={model} onChange={setModel} extraModels={extraModels} />
 
           {/* Attach */}
           <button onClick={handleAttach} style={toolBtnStyle(false)}

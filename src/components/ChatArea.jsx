@@ -63,6 +63,7 @@ const ChatTranscript = memo(function ChatTranscript({
   messageBodyRef,
   endRef,
   runtimeSetup,
+  extraModels = [],
 }) {
   const messages = convo?.msgs || EMPTY_MESSAGES;
 
@@ -90,6 +91,7 @@ const ChatTranscript = memo(function ChatTranscript({
         onCreateChat={onCreateChat}
         onCancel={onCancelNewChat}
         developerMode={developerMode}
+        extraModels={extraModels}
       />
     );
   }
@@ -119,7 +121,7 @@ const ChatTranscript = memo(function ChatTranscript({
   );
 });
 
-export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, windowControlsVisible = false, locale, runtimeSetup = null }) {
+export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, windowControlsVisible = false, locale, runtimeSetup = null, extraModels = [] }) {
   const s = useFontScale();
   const t = createTranslator(locale);
   const isDraftContext = showNewChatCard ? newChatDefaultCwd == null : isDraftConversation(convo, draftsPath);
@@ -650,7 +652,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
               locale={locale}
             />
           )}
-          {!showNewChatCard && <MemoModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} />}
+          {!showNewChatCard && <MemoModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} extraModels={extraModels} />}
           {!showNewChatCard && convo?.msgs?.length > 0 && (
             <MemoExportConversationBtn convo={convo} />
           )}
@@ -723,6 +725,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
           messageBodyRef={setMessageBodyNode}
           endRef={endRef}
           runtimeSetup={runtimeSetup}
+          extraModels={extraModels}
         />
       </div>
 

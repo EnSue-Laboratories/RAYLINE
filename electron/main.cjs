@@ -33,6 +33,7 @@ const terminalManager = require("./terminal-manager.cjs");
 const ghManager = require("./github-manager.cjs");
 const { createLogger, isTruthyFlag, isVerboseLoggingEnabled } = require("./logger.cjs");
 const { patchClaudeSettingsWin32, patchClaudeConfigWin32, cleanCodexProviderKey, normalizeProviderUpstreamConfig } = require("./provider-upstreams.cjs");
+const { normalizeRemoteRuntime, spawnRemoteCommand } = require("./remote-runtime.cjs");
 
 const isDev = !app.isPackaged;
 const isMac = process.platform === "darwin";
@@ -837,7 +838,8 @@ ipcMain.handle("store-message-image", async (_event, input = {}) => {
 
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
-  if (opts.provider === "multica") {
+  const runtimeProvider = opts.runtimeProvider || opts.remoteRuntime?.provider || opts.provider;
+  if (runtimeProvider === "multica") {
     startMulticaAgent(opts, event.sender).catch((err) => {
       event.sender.send("agent-stream", {
         conversationId: opts.conversationId,
@@ -845,9 +847,9 @@ ipcMain.on("agent-start", (event, opts) => {
       });
       event.sender.send("agent-done", { conversationId: opts.conversationId });
     });
-  } else if (opts.provider === "codex") {
+  } else if (runtimeProvider === "codex") {
     startCodexAgent(opts, event.sender);
-  } else if (opts.provider === "opencode") {
+  } else if (runtimeProvider === "opencode") {
     startOpenCodeAgent(opts, event.sender);
   } else {
     startAgent(opts, event.sender);
@@ -864,9 +866,10 @@ ipcMain.on("agent-cancel", (_event, { conversationId }) => {
 });
 
 ipcMain.on("agent-edit-resend", (event, opts) => {
-  if (opts.provider === "codex") {
+  const runtimeProvider = opts.runtimeProvider || opts.remoteRuntime?.provider || opts.provider;
+  if (runtimeProvider === "codex") {
     startCodexAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
-  } else if (opts.provider === "opencode") {
+  } else if (runtimeProvider === "opencode") {
     startOpenCodeAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
   } else {
     startAgent({ ...opts, forkSession: true }, event.sender);
@@ -2018,6 +2021,128 @@ ipcMain.handle("shell-run", async (_event, { command, cwd }) => {
         exitCode,
         timedOut,
         truncated,
+      });
+    });
+  });
+});
+
+ipcMain.handle("remote-runtime-check", async (_event, input = {}) => {
+  const runtime = normalizeRemoteRuntime({
+    type: "ssh",
+    sshCommand: input.sshCommand,
+  });
+  if (!runtime) {
+    return { ok: false, error: "A valid SSH command is required." };
+  }
+
+  const probeScript = `
+find_remote_cmd() {
+  name="$1"
+  check_cmd_path() {
+    candidate="$1"
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+    return 1
+  }
+  if command -v "$name" >/dev/null 2>&1; then
+    command -v "$name"
+    return 0
+  fi
+  for dir in "$HOME/.npm-global/bin" "$HOME/.local/bin" "$HOME/bin" "$HOME/.bun/bin" "$HOME/.cargo/bin"; do
+    check_cmd_path "$dir/$name" && return 0
+  done
+  if command -v npm >/dev/null 2>&1; then
+    npm_prefix="$(npm config get prefix 2>/dev/null | head -n 1)"
+    check_cmd_path "$npm_prefix/bin/$name" && return 0
+  fi
+  if command -v pnpm >/dev/null 2>&1; then
+    pnpm_bin="$(pnpm bin -g 2>/dev/null | head -n 1)"
+    check_cmd_path "$pnpm_bin/$name" && return 0
+  fi
+  for shell_name in bash zsh; do
+    if command -v "$shell_name" >/dev/null 2>&1; then
+      found="$("$shell_name" -lc "command -v $name" 2>/dev/null | head -n 1)"
+      if [ -n "$found" ]; then
+        printf '%s\\n' "$found"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+printf 'RAYLINE_SSH_OK\\n'
+claude_path="$(find_remote_cmd claude || true)"
+codex_path="$(find_remote_cmd codex || true)"
+if [ -n "$claude_path" ]; then printf 'RAYLINE_CLAUDE=%s\\n' "$claude_path"; fi
+if [ -n "$codex_path" ]; then printf 'RAYLINE_CODEX=%s\\n' "$codex_path"; fi
+  `.trim();
+
+  return new Promise((resolve) => {
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let settled = false;
+
+    const appendChunk = (current, chunk) => {
+      if (current.length >= SHELL_OUTPUT_LIMIT) return current;
+      const text = chunk.toString();
+      const remaining = SHELL_OUTPUT_LIMIT - current.length;
+      return current + text.slice(0, remaining);
+    };
+
+    const finish = (payload) => {
+      if (settled) return;
+      settled = true;
+      resolve(payload);
+    };
+
+    let child;
+    try {
+      child = spawnRemoteCommand(runtime, "sh", ["-lc", probeScript], {
+        cwd: process.cwd(),
+        env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error) {
+      finish({ ok: false, error: error.message || String(error) });
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try { child.kill(); } catch {}
+    }, SHELL_COMMAND_TIMEOUT_MS);
+
+    child.stdout.on("data", (chunk) => {
+      stdout = appendChunk(stdout, chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr = appendChunk(stderr, chunk);
+    });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      finish({ ok: false, stdout, stderr, timedOut, error: error.message || String(error) });
+    });
+    child.on("close", (exitCode, signal) => {
+      clearTimeout(timer);
+      const connected = stdout.includes("RAYLINE_SSH_OK");
+      const claudeMatch = stdout.match(/^RAYLINE_CLAUDE=(.+)$/m);
+      const codexMatch = stdout.match(/^RAYLINE_CODEX=(.+)$/m);
+      finish({
+        ok: exitCode === 0 && connected,
+        connected,
+        claude: Boolean(claudeMatch),
+        codex: Boolean(codexMatch),
+        claudePath: claudeMatch?.[1] || "",
+        codexPath: codexMatch?.[1] || "",
+        stdout,
+        stderr,
+        exitCode,
+        signal,
+        timedOut,
+        ...(timedOut ? { error: "SSH check timed out." } : {}),
       });
     });
   });

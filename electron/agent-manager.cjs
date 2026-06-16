@@ -6,6 +6,7 @@ const { findSessionCwd, moveSession } = require("./session-reader.cjs");
 const { fetchClaudeUsage } = require("./claude-usage-fetcher.cjs");
 const { createLogger } = require("./logger.cjs");
 const { buildClaudeUpstreamEnv, summarizeProviderUpstream, appendClaudeUpstreamArgs } = require("./provider-upstreams.cjs");
+const { describeRemoteRuntime, normalizeRemoteRuntime, spawnRemoteCommand } = require("./remote-runtime.cjs");
 
 const activeAgents = new Map();
 const log = createLogger("agent-manager");
@@ -75,7 +76,7 @@ function resolveLaunchCwd({ cwd, sessionId }) {
   throw new Error(`Invalid working directory: ${cwd}`);
 }
 
-function buildClaudeArgs({ model, sessionId, resumeSessionId, forkSession, projectContext }) {
+function buildClaudeArgs({ model, sessionId, resumeSessionId, forkSession, projectContext, includeLocalMcp = true, remote = false }) {
   const args = [
     "--print",
     "--input-format=stream-json",
@@ -171,6 +172,14 @@ RayLine has a built-in terminal window. You have MCP tools to control it:
 Use these INSTEAD of the Bash tool when you need: long-running processes (dev servers, watchers), interactive prompts needing stdin, or persistent shells across turns.
 The user can see and type into these terminals in real time.`;
 
+  if (remote) {
+    appendPrompt += `
+
+REMOTE SSH RUNTIME:
+You are running on a remote SSH host from RayLine. RayLine's local terminal MCP tools and local terminal CLI are not available on this host.
+Use normal shell commands on the remote host for long-running processes, and tell the user when a command must keep running after your turn.`;
+  }
+
   const trimmedProjectContext = typeof projectContext === "string" ? projectContext.trim() : "";
   if (trimmedProjectContext) {
     appendPrompt += `\n\nPROJECT CONTEXT (set in RayLine for this project):\n${trimmedProjectContext}`;
@@ -178,7 +187,7 @@ The user can see and type into these terminals in real time.`;
 
   args.push("--append-system-prompt", appendPrompt);
 
-  if (global.mcpConfigPath && fs.existsSync(global.mcpConfigPath)) {
+  if (includeLocalMcp && global.mcpConfigPath && fs.existsSync(global.mcpConfigPath)) {
     args.push("--mcp-config", global.mcpConfigPath);
   }
 
@@ -216,14 +225,15 @@ function classifyPermissionRequest(req) {
   };
 }
 
-function buildPromptWithAttachments(prompt, images, files) {
+function buildPromptWithAttachments(prompt, images, files, options = {}) {
   let fullPrompt = prompt;
+  const isRemote = Boolean(options.remote);
   if (images && images.length > 0) {
     const imgPaths = [];
     for (let i = 0; i < images.length; i++) {
       const dataUrl = images[i];
       const match = dataUrl.match(/^data:image\/([\w+.-]+);base64,(.+)$/);
-      if (match) {
+      if (match && !isRemote) {
         const ext = match[1] === "jpeg" ? "jpg" : match[1];
         const tmpPath = path.join(os.tmpdir(), `ensue-img-${Date.now()}-${i}.${ext}`);
         fs.writeFileSync(tmpPath, Buffer.from(match[2], "base64"));
@@ -232,23 +242,28 @@ function buildPromptWithAttachments(prompt, images, files) {
     }
     if (imgPaths.length > 0) {
       fullPrompt = `[Attached images: ${imgPaths.join(", ")}]\n\n${prompt}`;
+    } else if (isRemote) {
+      fullPrompt = `[Attached images were provided in RayLine, but they were not copied to the remote SSH host.]\n\n${prompt}`;
     }
   }
 
   if (files && files.length > 0) {
     const filePaths = files.map((f) => f.path).join("\n");
-    fullPrompt = `[Attached files:\n${filePaths}]\n\n${fullPrompt}`;
+    fullPrompt = isRemote
+      ? `[Attached files were provided in RayLine, but these local paths were not copied to the remote SSH host:\n${filePaths}]\n\n${fullPrompt}`
+      : `[Attached files:\n${filePaths}]\n\n${fullPrompt}`;
   }
 
   return fullPrompt;
 }
 
-function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession, providerUpstreamConfig, projectContext }, webContents) {
+function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession, providerUpstreamConfig, remoteRuntime, projectContext }, webContents) {
   cancelAgent(conversationId);
 
   const agentSessionId = resumeSessionId || sessionId;
-  const claudeBin = resolveClaudeBin();
-  if (!claudeBin) {
+  const remote = normalizeRemoteRuntime(remoteRuntime);
+  const claudeBin = remote ? (remote.commandPath || "claude") : resolveClaudeBin();
+  if (!remote && !claudeBin) {
     const error = "Unable to locate the Claude CLI binary";
     log(error);
     webContents.send("agent-error", { conversationId, error });
@@ -258,7 +273,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
 
   let launchCwd;
   try {
-    launchCwd = resolveLaunchCwd({ cwd, sessionId: agentSessionId });
+    launchCwd = remote ? (remote.cwd || process.cwd()) : resolveLaunchCwd({ cwd, sessionId: agentSessionId });
   } catch (err) {
     log("Invalid cwd:", { cwd, sessionId: agentSessionId, error: err.message });
     webContents.send("agent-error", { conversationId, error: err.message });
@@ -266,7 +281,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     return null;
   }
 
-  const fullPrompt = buildPromptWithAttachments(prompt, images, files);
+  const fullPrompt = buildPromptWithAttachments(prompt, images, files, { remote: Boolean(remote) });
 
   const existing = activeAgents.get(conversationId);
   const sessionAllowlist = existing?.sessionAllowlist instanceof Set
@@ -299,7 +314,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
   const upstreamEnv = buildClaudeUpstreamEnv(providerUpstreamConfig);
   const upstreamSummary = summarizeProviderUpstream(providerUpstreamConfig, "claude");
 
-  log("Starting agent:", { conversationId, model, cwd: launchCwd, sessionId, resumeSessionId, forkSession, upstream: upstreamSummary });
+  log("Starting agent:", { conversationId, model, cwd: launchCwd, sessionId, resumeSessionId, forkSession, upstream: upstreamSummary, remote: describeRemoteRuntime(remote) });
   const spawnRun = ({ runPrompt, runSessionId, runResumeSessionId, runForkSession }) => {
     state.runCount += 1;
     state.waitingForQuestion = false;
@@ -313,10 +328,12 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
       resumeSessionId: runResumeSessionId,
       forkSession: runForkSession,
       projectContext,
+      includeLocalMcp: !remote,
+      remote: Boolean(remote),
     });
-    appendClaudeUpstreamArgs(args, providerUpstreamConfig, model);
+    appendClaudeUpstreamArgs(args, providerUpstreamConfig, model, { patchLocalSettings: !remote });
 
-    if (runResumeSessionId && launchCwd) {
+    if (!remote && runResumeSessionId && launchCwd) {
       try {
         const prepared = moveSession(runResumeSessionId, launchCwd);
         log("Prepared resume session for launch cwd", {
@@ -349,11 +366,20 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     log("Full args:", args.join(" "));
     log("Prompt:", runPrompt.slice(0, 100));
 
-    const child = spawnCli(claudeBin, args, {
-      cwd: launchCwd,
-      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath(), ...upstreamEnv },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const child = remote
+      ? spawnRemoteCommand(remote, claudeBin, args, {
+          cwd: process.cwd(),
+          env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+          stdio: ["pipe", "pipe", "pipe"],
+        }, {
+          env: { FORCE_COLOR: "0", ...upstreamEnv },
+          cwd: remote.cwd,
+        })
+      : spawnCli(claudeBin, args, {
+          cwd: launchCwd,
+          env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath(), ...upstreamEnv },
+          stdio: ["pipe", "pipe", "pipe"],
+        });
 
     state.child = child;
     state.stdinClosed = false;

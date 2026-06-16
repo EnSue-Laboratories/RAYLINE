@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useState, useCallback } from "react";
 import { loadMulticaState, saveMulticaState } from "../multica/store";
 import { useOpenCodeModels } from "./openCodeModels.jsx";
@@ -68,14 +69,14 @@ export function useMulticaModels() {
   return { models, loading, error, refresh, state };
 }
 
-export function ModelPickerWithMultica({ value, onChange }) {
+export function ModelPickerWithMultica({ value, onChange, extraModels = [] }) {
   const { models, error, loading } = useMulticaModels();
   const { models: openCodeModels } = useOpenCodeModels();
   return (
     <ModelPicker
       value={value}
       onChange={onChange}
-      extraModels={[...openCodeModels, ...models]}
+      extraModels={[...extraModels, ...openCodeModels, ...models]}
       extraError={error}
       extraLoading={loading}
     />

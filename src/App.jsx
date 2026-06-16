@@ -13,6 +13,7 @@ import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
 import NewProjectModal from "./components/NewProjectModal";
 import { DEFAULT_MODEL_ID, getAvailableModels, getMOrMulticaFallback, isMulticaModelId, normalizeModelId } from "./data/models";
+import { buildRemoteModels, getRemoteRuntimeConfig, getRuntimeProviderForModel, getRuntimeProviderForProvider } from "./data/remoteModels";
 import { useMulticaModels } from "./data/multicaModels.jsx";
 import { useTheme } from "./contexts/ThemeContext.jsx";
 import { useOpenCodeModels } from "./data/openCodeModels.jsx";
@@ -75,7 +76,7 @@ function getOpenCodeRuntimeConfig(model) {
 
 function getProviderUpstreamRuntimeConfig(provider, getActiveConfig) {
   if (provider === "multica" || provider === "opencode") return undefined;
-  return getActiveConfig?.(provider) || undefined;
+  return getActiveConfig?.(getRuntimeProviderForProvider(provider)) || undefined;
 }
 
 const SHELL_TRANSCRIPT_LIMIT = 12000;
@@ -86,6 +87,7 @@ const SIDEBAR_WIDTH = 264;
 const DEFAULT_SIDEBAR_ACTIVE_OPACITY = 4;
 const DEFAULT_FONT_SIZE = 17;
 const EMPTY_CONVERSATION_DATA = { messages: [], isStreaming: false, error: null };
+const SSH_COMMAND_PATTERN = /^\s*ssh(?:\s|$)/i;
 
 const logSessionState = createLogger("session-state");
 
@@ -316,6 +318,34 @@ function clampNumber(value, min, max, fallback) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.min(max, Math.max(min, numeric));
+}
+
+function normalizeRemoteSshCommand(value) {
+  return typeof value === "string" ? value.slice(0, 2000) : "";
+}
+
+function normalizeRemoteSshRuntime(value, fallbackCommand = "") {
+  if (!value || typeof value !== "object") {
+    return {
+      sshCommand: normalizeRemoteSshCommand(fallbackCommand).trim(),
+      connected: false,
+      claude: false,
+      codex: false,
+      claudePath: "",
+      codexPath: "",
+      checkedAt: 0,
+    };
+  }
+
+  return {
+    sshCommand: normalizeRemoteSshCommand(value.sshCommand || fallbackCommand).trim(),
+    connected: value.connected === true,
+    claude: value.claude === true,
+    codex: value.codex === true,
+    claudePath: typeof value.claudePath === "string" ? value.claudePath.trim() : "",
+    codexPath: typeof value.codexPath === "string" ? value.codexPath.trim() : "",
+    checkedAt: Number.isFinite(value.checkedAt) ? value.checkedAt : 0,
+  };
 }
 
 function stripAnsi(text) {
@@ -957,9 +987,10 @@ function markConversationSessionSynced(conversation, sessionId, syncedThroughMes
 }
 
 function createSeedSession(conversation, provider, { model, syncedThroughMessageCount = 0, origin = "fresh" } = {}) {
+  const runtimeProvider = getRuntimeProviderForProvider(provider);
   return createConversationSession({
     provider,
-    nativeSessionId: provider === "claude" ? crypto.randomUUID() : null,
+    nativeSessionId: runtimeProvider === "claude" ? crypto.randomUUID() : null,
     model: model || conversation?.model || null,
     syncedThroughMessageCount,
     createdAt: Date.now(),
@@ -1214,7 +1245,7 @@ export default function App() {
     markMulticaConnected,
   } = useAgent();
   const terminal = useTerminal();
-  const { closeWindow: closeTerminalWindow, openWindow: openTerminalWindow } = terminal;
+  const { closeWindow: closeTerminalWindow, openWindow: openTerminalWindow, windowOpen: terminalWindowOpen } = terminal;
   const { createSession: createTerminalSession, sendInput: sendTerminalInput } = terminal;
   const prefersReducedMotion = usePrefersReducedMotion();
   const { models: multicaModels } = useMulticaModels();
@@ -1251,6 +1282,8 @@ export default function App() {
   const [developerMode, setDeveloperMode] = useState(true);
   const [sidebarTerminalEnabled, setSidebarTerminalEnabled] = useState(false);
   const [sidebarTerminalOpen, setSidebarTerminalOpen] = useState(false);
+  const [remoteSshCommand, setRemoteSshCommand] = useState("");
+  const [remoteSshRuntime, setRemoteSshRuntime] = useState(() => normalizeRemoteSshRuntime(null));
   const [chromeControlsOnHover, setChromeControlsOnHover] = useState(false);
   const [notificationSound, setNotificationSound] = useState("glass");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
@@ -1364,13 +1397,17 @@ export default function App() {
     ),
     [active, persistableConversations]
   );
+  const remoteModels = useMemo(
+    () => buildRemoteModels(remoteSshCommand, remoteSshRuntime),
+    [remoteSshCommand, remoteSshRuntime]
+  );
   const dispatchAvailableModels = useMemo(
-    () => getAvailableModels([...providerOverrideModels, ...openCodeModels, ...multicaModels]),
-    [multicaModels, openCodeModels, providerOverrideModels]
+    () => getAvailableModels([...remoteModels, ...providerOverrideModels, ...openCodeModels, ...multicaModels]),
+    [multicaModels, openCodeModels, providerOverrideModels, remoteModels]
   );
   const dynamicModels = useMemo(
-    () => [...providerOverrideModels, ...openCodeModels, ...multicaModels],
-    [multicaModels, openCodeModels, providerOverrideModels]
+    () => [...remoteModels, ...providerOverrideModels, ...openCodeModels, ...multicaModels],
+    [multicaModels, openCodeModels, providerOverrideModels, remoteModels]
   );
   const effectivePlatform = useMemo(() => {
     if (platform) return platform;
@@ -1408,22 +1445,26 @@ export default function App() {
     const opencodeInstalled = cliInstalled?.opencode === true || openCodeStatus?.installed === true;
     const opencode = opencodeInstalled && openCodeModels.length > 0;
     const multica = multicaModels.length > 0;
+    const remote = remoteModels.length > 0;
     return {
       claude,
       codex,
       opencode,
       multica,
+      remote,
       opencodeInstalled,
-      any: claude || codex || opencode || multica,
+      any: claude || codex || opencode || multica || remote,
     };
-  }, [cliInstalled, multicaModels.length, openCodeModels.length, openCodeStatus?.installed]);
+  }, [cliInstalled, multicaModels.length, openCodeModels.length, openCodeStatus?.installed, remoteModels.length]);
 
-  const isRuntimeProviderAvailable = useCallback((provider) => {
+  const isRuntimeProviderAvailable = useCallback((provider, model = null) => {
+    if (getRemoteRuntimeConfig(model)) return true;
     if (!cliInstalled) return true;
-    if (provider === "claude") return runtimeAvailability.claude;
-    if (provider === "codex") return runtimeAvailability.codex;
-    if (provider === "opencode") return runtimeAvailability.opencode;
-    if (provider === "multica") return runtimeAvailability.multica;
+    const runtimeProvider = getRuntimeProviderForProvider(provider);
+    if (runtimeProvider === "claude") return runtimeAvailability.claude;
+    if (runtimeProvider === "codex") return runtimeAvailability.codex;
+    if (runtimeProvider === "opencode") return runtimeAvailability.opencode;
+    if (runtimeProvider === "multica") return runtimeAvailability.multica;
     return true;
   }, [cliInstalled, runtimeAvailability]);
 
@@ -1499,6 +1540,8 @@ export default function App() {
     appOpacity,
     developerMode,
     sidebarTerminalEnabled,
+    remoteSshCommand,
+    remoteSshRuntime,
     chromeControlsOnHover,
     notificationSound,
     notificationsMuted,
@@ -1523,6 +1566,8 @@ export default function App() {
     persistableConversations,
     projects,
     queuedMessages,
+    remoteSshCommand,
+    remoteSshRuntime,
     sidebarActiveOpacity,
     sidebarTerminalEnabled,
     wallpaper,
@@ -1796,6 +1841,11 @@ export default function App() {
         if (state.appOpacity != null) setAppOpacity(clampNumber(state.appOpacity, 30, 100, 100));
         if (state.developerMode != null) setDeveloperMode(!!state.developerMode);
         if (typeof state.sidebarTerminalEnabled === "boolean") setSidebarTerminalEnabled(state.sidebarTerminalEnabled);
+        if (typeof state.remoteSshCommand === "string") {
+          const restoredRemoteSshCommand = normalizeRemoteSshCommand(state.remoteSshCommand);
+          setRemoteSshCommand(restoredRemoteSshCommand);
+          setRemoteSshRuntime(normalizeRemoteSshRuntime(state.remoteSshRuntime, restoredRemoteSshCommand));
+        }
         if (typeof state.chromeControlsOnHover === "boolean") setChromeControlsOnHover(state.chromeControlsOnHover);
         if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
         if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
@@ -2508,10 +2558,17 @@ export default function App() {
     const nextCodexThreadId = data._codexThreadId || null;
     const nextClaudeSessionId = data._claudeSessionId || null;
     const nextOpenCodeSessionId = data._opencodeSessionId || null;
+    const getCaptureProvider = (runtimeProvider) => (
+      [activeSession?.provider, normalizedConvo.lastProvider]
+        .find((provider) => provider && getRuntimeProviderForProvider(provider) === runtimeProvider) ||
+      runtimeProvider
+    );
+    const codexCaptureProvider = getCaptureProvider("codex");
+    const claudeCaptureProvider = getCaptureProvider("claude");
     const hasNewCodexThreadId =
-      nextCodexThreadId && normalizedConvo.providerSessions?.codex !== nextCodexThreadId;
+      nextCodexThreadId && normalizedConvo.providerSessions?.[codexCaptureProvider] !== nextCodexThreadId;
     const hasNewClaudeSessionId =
-      nextClaudeSessionId && normalizedConvo.providerSessions?.claude !== nextClaudeSessionId;
+      nextClaudeSessionId && normalizedConvo.providerSessions?.[claudeCaptureProvider] !== nextClaudeSessionId;
     const hasNewOpenCodeSessionId =
       nextOpenCodeSessionId && normalizedConvo.providerSessions?.opencode !== nextOpenCodeSessionId;
 
@@ -2528,6 +2585,8 @@ export default function App() {
       providerSessions: normalizedConvo.providerSessions || null,
       activeSessionId: normalizedConvo.activeSessionId || null,
       activeSession,
+      codexCaptureProvider,
+      claudeCaptureProvider,
     });
 
     setConvoList((p) =>
@@ -2539,10 +2598,10 @@ export default function App() {
             next,
             {
               id:
-                activeSession?.provider === "codex" && !activeSession.nativeSessionId
+                activeSession?.provider === codexCaptureProvider && !activeSession.nativeSessionId
                   ? activeSession.id
                   : undefined,
-              provider: "codex",
+              provider: codexCaptureProvider,
               nativeSessionId: nextCodexThreadId,
               model: next.model,
               syncedThroughMessageCount: Math.max(
@@ -2554,7 +2613,7 @@ export default function App() {
             {
               activate: true,
               preferPendingActive: true,
-              lastProvider: next.lastProvider || "codex",
+              lastProvider: next.lastProvider || codexCaptureProvider,
             }
           );
         }
@@ -2563,10 +2622,10 @@ export default function App() {
             next,
             {
               id:
-                activeSession?.provider === "claude" && !activeSession.nativeSessionId
+                activeSession?.provider === claudeCaptureProvider && !activeSession.nativeSessionId
                   ? activeSession.id
                   : undefined,
-              provider: "claude",
+              provider: claudeCaptureProvider,
               nativeSessionId: nextClaudeSessionId,
               model: next.model,
               syncedThroughMessageCount: Math.max(
@@ -2578,7 +2637,7 @@ export default function App() {
             {
               activate: true,
               preferPendingActive: true,
-              lastProvider: next.lastProvider || "claude",
+              lastProvider: next.lastProvider || claudeCaptureProvider,
             }
           );
         }
@@ -2797,7 +2856,9 @@ export default function App() {
         const files = attachments?.filter((a) => a.type === "file");
         const m = getMOrMulticaFallback(normalizedConversation.model, dynamicModels);
         const currentProvider = m.provider || "claude";
-        if (!isRuntimeProviderAvailable(currentProvider)) {
+        const runtimeProvider = getRuntimeProviderForModel(m) || currentProvider;
+        const remoteRuntime = getRemoteRuntimeConfig(m);
+        if (!isRuntimeProviderAvailable(currentProvider, m)) {
           refreshRuntimeSetup();
           return false;
         }
@@ -2895,7 +2956,7 @@ export default function App() {
                   ? {
                       ...activeSession,
                       nativeSessionId:
-                        currentProvider === "claude"
+                        runtimeProvider === "claude"
                           ? activeSession.nativeSessionId || crypto.randomUUID()
                           : activeSession.nativeSessionId || null,
                       model: normalizedConversation.model,
@@ -2911,7 +2972,7 @@ export default function App() {
               )
             : null;
         const initialSessionId =
-          needsFreshSession && currentProvider === "claude"
+          needsFreshSession && runtimeProvider === "claude"
             ? seededSession?.nativeSessionId || undefined
             : undefined;
         const resumeSessionId = currentProviderSession?.nativeSessionId || undefined;
@@ -2942,6 +3003,7 @@ export default function App() {
           isFirstMessage,
           messageIndex,
           currentProvider,
+          runtimeProvider,
           prevProvider: prevProvider || null,
           providerSwitched,
           multicaModelSwitched,
@@ -3021,10 +3083,12 @@ export default function App() {
           prompt: wirePrompt,
           model: m.cliFlag,
           provider: m.provider || "claude",
+          runtimeProvider,
           effort: m.effort,
           thinking: getModelThinkingValue(m),
           openCodeConfig: getOpenCodeRuntimeConfig(m),
           providerUpstreamConfig: getProviderUpstreamRuntimeConfig(currentProvider, getProviderUpstreamConfig),
+          remoteRuntime,
           cwd: effectiveCwd,
           projectContext: resolveProjectContext(effectiveCwd),
           images:
@@ -3542,6 +3606,8 @@ export default function App() {
       }
 
       const currentProvider = m.provider || "claude";
+      const runtimeProvider = getRuntimeProviderForModel(m) || currentProvider;
+      const remoteRuntime = getRemoteRuntimeConfig(m);
       const activeSession = getActiveConversationSession(normalizedConvo);
       const prevProvider = await resolveConversationLastProvider(normalizedConvo);
       const currentProviderSession = await resolveConversationProviderSession(
@@ -3578,6 +3644,7 @@ export default function App() {
       logSendFlow("handleEdit:start", {
         conversationId: active,
         currentProvider,
+        runtimeProvider,
         prevProvider: prevProvider || null,
         providerSwitched,
         sessionId: normalizedConvo.sessionId || null,
@@ -3614,10 +3681,12 @@ export default function App() {
         wirePrompt,
         model: m.cliFlag,
         provider: currentProvider,
+        runtimeProvider,
         effort: m.effort,
         thinking: getModelThinkingValue(m),
         openCodeConfig: getOpenCodeRuntimeConfig(m),
         providerUpstreamConfig: getProviderUpstreamRuntimeConfig(currentProvider, getProviderUpstreamConfig),
+        remoteRuntime,
         cwd: convoCwd,
         projectContext: resolveProjectContext(convoCwd),
         multicaContext,
@@ -3860,8 +3929,8 @@ export default function App() {
         return;
       }
 
-      if (terminal.windowOpen) {
-        await terminal.closeWindow();
+      if (terminalWindowOpen) {
+        await closeTerminalWindow();
       }
       setSidebarTerminalOpen(true);
       if (terminal.sessions.length === 0) {
@@ -3895,6 +3964,50 @@ export default function App() {
       terminal.openWindow();
     }
   };
+
+  const handleRemoteSshCommandChange = useCallback((value) => {
+    const nextCommand = normalizeRemoteSshCommand(value);
+    const normalizedNextCommand = nextCommand.trim();
+    setRemoteSshCommand(nextCommand);
+    setRemoteSshRuntime((prev) => (
+      prev?.sshCommand === normalizedNextCommand
+        ? prev
+        : normalizeRemoteSshRuntime(null, normalizedNextCommand)
+    ));
+  }, []);
+
+  const handleConnectRemoteSsh = useCallback(async (command) => {
+    const sshCommand = normalizeRemoteSshCommand(command).trim();
+    if (!sshCommand) return { ok: false, error: "required" };
+    if (!SSH_COMMAND_PATTERN.test(sshCommand)) return { ok: false, error: "invalid" };
+    if (!window.api?.remoteRuntimeCheck) return { ok: false, error: "Remote runtime check is unavailable." };
+    const result = await window.api.remoteRuntimeCheck({ sshCommand });
+    if (!result?.ok) {
+      setRemoteSshRuntime(normalizeRemoteSshRuntime({
+        sshCommand,
+        connected: result?.connected === true,
+        checkedAt: Date.now(),
+      }, sshCommand));
+      return { ok: false, error: result?.error || result?.stderr || "SSH check failed." };
+    }
+    const nextRuntime = normalizeRemoteSshRuntime({
+      sshCommand,
+      connected: result.connected === true,
+      claude: Boolean(result.claude),
+      codex: Boolean(result.codex),
+      claudePath: result.claudePath,
+      codexPath: result.codexPath,
+      checkedAt: Date.now(),
+    }, sshCommand);
+    setRemoteSshRuntime(nextRuntime);
+    return {
+      ok: true,
+      claude: nextRuntime.claude,
+      codex: nextRuntime.codex,
+      claudePath: nextRuntime.claudePath,
+      codexPath: nextRuntime.codexPath,
+    };
+  }, []);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const sidebarPaneTransition = prefersReducedMotion
@@ -4055,6 +4168,9 @@ export default function App() {
           onDeveloperModeChange={setDeveloperMode}
           sidebarTerminalEnabled={sidebarTerminalEnabled}
           onSidebarTerminalEnabledChange={setSidebarTerminalEnabled}
+          remoteSshCommand={remoteSshCommand}
+          onRemoteSshCommandChange={handleRemoteSshCommandChange}
+          onConnectRemoteSsh={handleConnectRemoteSsh}
           chromeControlsOnHover={chromeControlsOnHover}
           onChromeControlsOnHoverChange={setChromeControlsOnHover}
           notificationSound={notificationSound}
@@ -4117,6 +4233,7 @@ export default function App() {
           windowControlsVisible={showWindowControls}
           locale={locale}
           runtimeSetup={runtimeSetup}
+          extraModels={remoteModels}
         />
       )}
 
