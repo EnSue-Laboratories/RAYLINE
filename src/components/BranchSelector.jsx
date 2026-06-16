@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { createElement, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { GitBranch, Plus, Check, X, ChevronDown, Trash2, ArrowUpFromLine } from "lucide-react";
+import { GitBranch, Plus, Check, X, ChevronDown, Trash2, ArrowUpFromLine, Loader2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { createTranslator } from "../i18n";
 
@@ -8,7 +8,7 @@ const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
 
 function IconActionButton({
-  icon: Icon,
+  icon,
   tooltip,
   onClick,
   disabled = false,
@@ -22,13 +22,17 @@ function IconActionButton({
   const [hovered, setHovered] = useState(false);
   const [tipPos, setTipPos] = useState(null);
 
-  useEffect(() => {
-    if (!hovered || disabled || !btnRef.current) { setTipPos(null); return; }
-    const r = btnRef.current.getBoundingClientRect();
-    setTipPos({ left: r.left + r.width / 2, top: r.top });
-  }, [hovered, disabled]);
-
   const active = !disabled && visible;
+  const handleMouseEnter = () => {
+    if (!active) return;
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setTipPos({ left: r.left + r.width / 2, top: r.top });
+    setHovered(true);
+  };
+  const handleMouseLeave = () => {
+    setHovered(false);
+    setTipPos(null);
+  };
 
   return (
     <>
@@ -41,8 +45,8 @@ function IconActionButton({
           e.stopPropagation();
           if (!disabled) onClick?.(e);
         }}
-        onMouseEnter={() => { if (active) setHovered(true); }}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         style={{
           display: "flex",
           alignItems: "center",
@@ -62,7 +66,7 @@ function IconActionButton({
           padding: 0,
         }}
       >
-        <Icon size={11} strokeWidth={2} />
+        {createElement(icon, { size: 11, strokeWidth: 2 })}
       </button>
       {hovered && active && tipPos && createPortal(
         <div
@@ -292,11 +296,12 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
     if (!confirmPromote || !mainWorktree) return;
     setPromoteError(null);
     setPromoting(true);
+    const promotedWorktree = confirmPromote;
     try {
       const result = await window.api.gitWorktreePromote(
         mainWorktree.path,
-        confirmPromote.path,
-        confirmPromote.branch || null,
+        promotedWorktree.path,
+        promotedWorktree.branch || null,
       );
       if (!result?.success) {
         setPromoteError(result?.error || t("git.branch.promoteFailed"));
@@ -304,12 +309,13 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
         return;
       }
       // If the user was inside the worktree being promoted, switch them to the main repo.
-      if (cwd === confirmPromote.path && onCwdChange) {
+      if (cwd === promotedWorktree.path && onCwdChange) {
         onCwdChange(mainWorktree.path);
       }
-      setConfirmPromote(null);
-      setPromoting(false);
-      refresh();
+      if (promotedWorktree.branch) setCurrent(promotedWorktree.branch);
+      setWorktrees((items) => items.filter((item) => item.path !== promotedWorktree.path));
+      closeMenu();
+      window.setTimeout(() => { void refresh(); }, result.cleanupPending ? 5000 : 0);
       onRefocusTerminal?.();
     } catch (e) {
       setPromoteError(e.message || t("git.branch.promoteFailed"));
@@ -663,15 +669,20 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                           <button
                             onClick={handlePromoteWorktree}
                             disabled={promoting}
+                            aria-label={promoting ? t("git.branch.promoting") : t("git.branch.promoteTooltip")}
                             style={{
                               display: "flex", alignItems: "center", justifyContent: "center",
                               width: 24, height: 24, borderRadius: 6,
                               background: "var(--badge-open-bg)", border: "none",
                               color: "var(--badge-open-text)",
                               cursor: promoting ? "default" : "pointer",
-                              opacity: promoting ? 0.5 : 1,
+                              opacity: promoting ? 0.8 : 1,
                             }}
-                          ><Check size={12} strokeWidth={2} /></button>
+                          >
+                            {promoting
+                              ? <Loader2 size={12} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
+                              : <Check size={12} strokeWidth={2} />}
+                          </button>
                           <button
                             onClick={() => { setConfirmPromote(null); setPromoteError(null); }}
                             disabled={promoting}
@@ -694,7 +705,9 @@ export default function BranchSelector({ cwd, onCwdChange, hasMessages, onRefocu
                       }}>
                         {promoteError
                           ? promoteError
-                          : t("git.branch.promoteHint")}
+                          : promoting
+                            ? t("git.branch.promoting")
+                            : t("git.branch.promoteHint")}
                       </div>
                     </div>
                   );
