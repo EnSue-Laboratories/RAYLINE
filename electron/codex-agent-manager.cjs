@@ -9,6 +9,7 @@ const {
   buildCodexUpstreamEnv,
   summarizeProviderUpstream,
 } = require("./provider-upstreams.cjs");
+const { buildProxyEnv } = require("./network-proxy.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
@@ -238,7 +239,7 @@ function appendCodexMcpOverrides(args, mcpServers) {
   }
 }
 
-async function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, files, sessionId, resumeSessionId, providerUpstreamConfig }, webContents) {
+async function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, files, sessionId, resumeSessionId, providerUpstreamConfig, networkProxy }, webContents) {
   cancelCodexAgent(conversationId);
 
   const args = ["exec"];
@@ -325,6 +326,7 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
       ...process.env,
       FORCE_COLOR: "0",
       PATH: buildSpawnPath(),
+      ...buildProxyEnv(networkProxy),
       ...buildCodexUpstreamEnv(providerUpstreamConfig, upstreamRuntime),
       CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
       CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",

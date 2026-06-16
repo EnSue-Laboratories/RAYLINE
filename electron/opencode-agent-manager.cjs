@@ -4,6 +4,7 @@ const os = require("os");
 const net = require("net");
 const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { createLogger } = require("./logger.cjs");
+const { buildProxyEnv } = require("./network-proxy.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
@@ -102,7 +103,7 @@ function shouldEnableThinking(model, thinking) {
   return inferThinkingModel(model);
 }
 
-function buildOpenCodeEnv(extra = {}) {
+function buildOpenCodeEnv(extra = {}, networkProxy) {
   return {
     ...process.env,
     FORCE_COLOR: "0",
@@ -111,6 +112,7 @@ function buildOpenCodeEnv(extra = {}) {
     CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
     CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",
     CLAUDI_TERMINAL_MCP_CONFIG: global.mcpConfigPath || "",
+    ...buildProxyEnv(networkProxy),
     ...extra,
   };
 }
@@ -185,9 +187,9 @@ function normalizeOpenCodeRuntimeConfig(openCodeConfig, model) {
   return { providerId, modelId, apiKey, baseURL };
 }
 
-function createOpenCodeRuntimeEnv(openCodeConfig, model) {
+function createOpenCodeRuntimeEnv(openCodeConfig, model, networkProxy) {
   const normalized = normalizeOpenCodeRuntimeConfig(openCodeConfig, model);
-  if (!normalized) return { env: buildOpenCodeEnv(), cleanup: () => {} };
+  if (!normalized) return { env: buildOpenCodeEnv({}, networkProxy), cleanup: () => {} };
 
   const envPatch = {};
   const providerOptions = {};
@@ -213,7 +215,7 @@ function createOpenCodeRuntimeEnv(openCodeConfig, model) {
     env: buildOpenCodeEnv({
       ...envPatch,
       OPENCODE_CONFIG: configPath,
-    }),
+    }, networkProxy),
     cleanup: () => {
       fs.rmSync(configDir, { recursive: true, force: true });
     },
@@ -455,9 +457,9 @@ function finishOpenCodeAgent(conversationId, state, webContents, { exitCode = 0,
   });
 }
 
-function startOpenCodeServerAgent({ conversationId, prompt, model, openCodeConfig, images, files, sessionId, resumeSessionId, forkSession }, webContents, openCodeBin, launchCwd) {
+function startOpenCodeServerAgent({ conversationId, prompt, model, openCodeConfig, networkProxy, images, files, sessionId, resumeSessionId, forkSession }, webContents, openCodeBin, launchCwd) {
   const nativeSessionId = resumeSessionId || sessionId;
-  const runtime = createOpenCodeRuntimeEnv(openCodeConfig, model);
+  const runtime = createOpenCodeRuntimeEnv(openCodeConfig, model, networkProxy);
   const state = {
     child: null,
     webContents,
@@ -572,7 +574,7 @@ function startOpenCodeServerAgent({ conversationId, prompt, model, openCodeConfi
   return state;
 }
 
-function startOpenCodeAgent({ conversationId, prompt, model, thinking, openCodeConfig, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents) {
+function startOpenCodeAgent({ conversationId, prompt, model, thinking, openCodeConfig, networkProxy, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents) {
   cancelOpenCodeAgent(conversationId);
 
   const openCodeBin = resolveOpenCodeBin();
@@ -600,7 +602,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, thinking, openCodeC
   const thinkingEnabled = shouldEnableThinking(model, thinking);
 
   if (thinkingEnabled) {
-    return startOpenCodeServerAgent({ conversationId, prompt, model, openCodeConfig, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents, openCodeBin, launchCwd);
+    return startOpenCodeServerAgent({ conversationId, prompt, model, openCodeConfig, networkProxy, cwd, images, files, sessionId, resumeSessionId, forkSession }, webContents, openCodeBin, launchCwd);
   }
 
   if (nativeSessionId) {
@@ -631,7 +633,7 @@ function startOpenCodeAgent({ conversationId, prompt, model, thinking, openCodeC
 
   const fullPrompt = buildRayLinePrompt(prompt, files);
   args.push("--", fullPrompt);
-  const runtime = createOpenCodeRuntimeEnv(openCodeConfig, model);
+  const runtime = createOpenCodeRuntimeEnv(openCodeConfig, model, networkProxy);
 
   log("Starting opencode agent:", { conversationId, model, thinking: thinkingEnabled, cwd: launchCwd, sessionId: nativeSessionId || null });
   log("Full args:", args.filter((arg) => arg !== fullPrompt).join(" "));

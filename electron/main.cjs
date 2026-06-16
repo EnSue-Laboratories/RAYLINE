@@ -33,6 +33,7 @@ const terminalManager = require("./terminal-manager.cjs");
 const ghManager = require("./github-manager.cjs");
 const { createLogger, isTruthyFlag, isVerboseLoggingEnabled } = require("./logger.cjs");
 const { patchClaudeSettingsWin32, patchClaudeConfigWin32, cleanCodexProviderKey, normalizeProviderUpstreamConfig } = require("./provider-upstreams.cjs");
+const { normalizeNetworkProxyConfig, buildProxyEnv } = require("./network-proxy.cjs");
 
 const isDev = !app.isPackaged;
 const isMac = process.platform === "darwin";
@@ -81,8 +82,20 @@ let pendingPreferredTerminalSessionName = null;
 let sidebarTerminalEnabledPreference = false;
 let latestPersistedState = null;
 let preservedPmRepos;
+let latestNetworkProxyConfig = normalizeNetworkProxyConfig();
 const log = createLogger("main");
 const logCheckpointMain = createLogger("checkpoint-main");
+
+function getEffectiveNetworkProxyConfig(input) {
+  return input != null ? normalizeNetworkProxyConfig(input) : latestNetworkProxyConfig;
+}
+
+function withNetworkProxyConfig(opts = {}) {
+  return {
+    ...opts,
+    networkProxy: getEffectiveNetworkProxyConfig(opts.networkProxy),
+  };
+}
 
 function terminalDebug(event, details = {}, meta = {}) {
   if (!TERMINAL_DEBUG_ENABLED) return;
@@ -835,22 +848,28 @@ ipcMain.handle("store-message-image", async (_event, input = {}) => {
   }
 });
 
+ipcMain.handle("set-network-proxy", async (_event, config = null) => {
+  latestNetworkProxyConfig = normalizeNetworkProxyConfig(config);
+  return latestNetworkProxyConfig;
+});
+
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
-  if (opts.provider === "multica") {
-    startMulticaAgent(opts, event.sender).catch((err) => {
+  const runOpts = withNetworkProxyConfig(opts);
+  if (runOpts.provider === "multica") {
+    startMulticaAgent(runOpts, event.sender).catch((err) => {
       event.sender.send("agent-stream", {
-        conversationId: opts.conversationId,
+        conversationId: runOpts.conversationId,
         event: { type: "multica:error", payload: { message: err?.message || String(err) } },
       });
-      event.sender.send("agent-done", { conversationId: opts.conversationId });
+      event.sender.send("agent-done", { conversationId: runOpts.conversationId });
     });
-  } else if (opts.provider === "codex") {
-    startCodexAgent(opts, event.sender);
-  } else if (opts.provider === "opencode") {
-    startOpenCodeAgent(opts, event.sender);
+  } else if (runOpts.provider === "codex") {
+    startCodexAgent(runOpts, event.sender);
+  } else if (runOpts.provider === "opencode") {
+    startOpenCodeAgent(runOpts, event.sender);
   } else {
-    startAgent(opts, event.sender);
+    startAgent(runOpts, event.sender);
   }
 });
 
@@ -864,12 +883,13 @@ ipcMain.on("agent-cancel", (_event, { conversationId }) => {
 });
 
 ipcMain.on("agent-edit-resend", (event, opts) => {
-  if (opts.provider === "codex") {
-    startCodexAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
-  } else if (opts.provider === "opencode") {
-    startOpenCodeAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
+  const runOpts = withNetworkProxyConfig(opts);
+  if (runOpts.provider === "codex") {
+    startCodexAgent({ ...runOpts, resumeSessionId: runOpts.resumeSessionId }, event.sender);
+  } else if (runOpts.provider === "opencode") {
+    startOpenCodeAgent({ ...runOpts, resumeSessionId: runOpts.resumeSessionId }, event.sender);
   } else {
-    startAgent({ ...opts, forkSession: true }, event.sender);
+    startAgent({ ...runOpts, forkSession: true }, event.sender);
   }
 });
 
@@ -961,6 +981,9 @@ const stateFilePath = path.join(app.getPath("userData"), "claudi-state.json");
 
 function rememberPersistedStateSnapshot(state) {
   latestPersistedState = state && typeof state === "object" ? state : null;
+  if (state && typeof state === "object" && state.networkProxy !== undefined) {
+    latestNetworkProxyConfig = normalizeNetworkProxyConfig(state.networkProxy);
+  }
   if (state?.pmRepos !== undefined) {
     preservedPmRepos = state.pmRepos;
   }
@@ -1550,7 +1573,7 @@ function parseDispatchPlanJson(text) {
   return plan;
 }
 
-function runClaudeDispatchPlanner({ prompt, plannerModel, cwd }) {
+function runClaudeDispatchPlanner({ prompt, plannerModel, cwd, networkProxy }) {
   return new Promise((resolve, reject) => {
     const claudeBin = resolveCliBin("claude", { envVarName: "CLAUDE_BIN" });
     if (!claudeBin) {
@@ -1570,7 +1593,7 @@ function runClaudeDispatchPlanner({ prompt, plannerModel, cwd }) {
     const launchCwd = cwd && fs.existsSync(cwd) ? cwd : process.cwd();
     const child = spawnCli(claudeBin, args, {
       cwd: launchCwd,
-      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath(), ...buildProxyEnv(networkProxy) },
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -1601,7 +1624,7 @@ function runClaudeDispatchPlanner({ prompt, plannerModel, cwd }) {
   });
 }
 
-function runCodexDispatchPlanner({ prompt, plannerModel, cwd }) {
+function runCodexDispatchPlanner({ prompt, plannerModel, cwd, networkProxy }) {
   return new Promise((resolve, reject) => {
     const codexBin = resolveCliBin("codex", { envVarName: "CODEX_BIN" });
     if (!codexBin) {
@@ -1630,7 +1653,7 @@ function runCodexDispatchPlanner({ prompt, plannerModel, cwd }) {
     const launchCwd = cwd && fs.existsSync(cwd) ? cwd : process.cwd();
     const child = spawnCli(codexBin, args, {
       cwd: launchCwd,
-      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath(), ...buildProxyEnv(networkProxy) },
       // Codex stalls before the first network request when stdin is /dev/null.
       // Give it a pipe and immediately close it so it observes EOF correctly.
       stdio: ["pipe", "pipe", "pipe"],
@@ -1740,7 +1763,7 @@ function collectOpenCodePlannerText(event, state) {
   }
 }
 
-function runOpenCodeDispatchPlanner({ prompt, plannerModel, cwd }) {
+function runOpenCodeDispatchPlanner({ prompt, plannerModel, cwd, networkProxy }) {
   return new Promise((resolve, reject) => {
     const openCodeBin = resolveOpenCodeBin();
     if (!openCodeBin) {
@@ -1760,7 +1783,7 @@ function runOpenCodeDispatchPlanner({ prompt, plannerModel, cwd }) {
     if (model) args.push("--model", model);
     if (shouldEnableThinking(model, plannerModel?.thinking)) args.push("--thinking");
     args.push("--", fullPrompt);
-    const runtime = createOpenCodeRuntimeEnv(plannerModel?.openCodeConfig, model);
+    const runtime = createOpenCodeRuntimeEnv(plannerModel?.openCodeConfig, model, networkProxy);
 
     const child = spawnCli(openCodeBin, args, {
       cwd: launchCwd,
@@ -1826,6 +1849,7 @@ function runOpenCodeDispatchPlanner({ prompt, plannerModel, cwd }) {
 
 async function runDispatchPlanner(opts = {}) {
   const plannerModel = opts.plannerModel || {};
+  const networkProxy = getEffectiveNetworkProxyConfig(opts.networkProxy);
   const prompt = buildDispatchPlannerPrompt({
     instructions: opts.instructions,
     cwd: opts.cwd,
@@ -1837,10 +1861,10 @@ async function runDispatchPlanner(opts = {}) {
     ? "codex"
     : (plannerModel.provider === "opencode" ? "opencode" : "claude");
   const text = provider === "codex"
-    ? await runCodexDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd })
+    ? await runCodexDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd, networkProxy })
     : provider === "opencode"
-      ? await runOpenCodeDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd })
-      : await runClaudeDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd });
+      ? await runOpenCodeDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd, networkProxy })
+      : await runClaudeDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd, networkProxy });
 
   try {
     return parseDispatchPlanJson(text);
@@ -1855,6 +1879,7 @@ async function runDispatchPlanner(opts = {}) {
       prompt: repairPrompt,
       plannerModel,
       cwd: opts.cwd,
+      networkProxy,
     });
     return parseDispatchPlanJson(repairedText);
   }
@@ -1886,7 +1911,7 @@ ipcMain.handle("quick-explain", async (_event, { text, model }) => {
       `Explain this briefly:\n\n${text}`,
     ];
     const child = spawnCli(claudeBin, args, {
-      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+      env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath(), ...buildProxyEnv(latestNetworkProxyConfig) },
       stdio: ["ignore", "pipe", "pipe"],
     });
     let out = "";
@@ -2707,7 +2732,7 @@ ipcMain.handle("git-gen-commit-message", async (_e, cwd) => {
     return await new Promise((resolve) => {
       const child = spawnCli(claudeBin, args, {
         cwd,
-        env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+        env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath(), ...buildProxyEnv(latestNetworkProxyConfig) },
         stdio: ["ignore", "pipe", "pipe"],
       });
       let out = "";

@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld("api", {
   saveState: (state) => ipcRenderer.invoke("save-state", state),
   saveStateSync: (state) => ipcRenderer.sendSync("save-state-sync", state),
   loadState: () => ipcRenderer.invoke("load-state"),
+  setNetworkProxy: (config) => ipcRenderer.invoke("set-network-proxy", config),
   getFilePath: (file) => {
     try { return webUtils.getPathForFile(file); } catch { return null; }
   },

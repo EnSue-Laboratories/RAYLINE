@@ -28,6 +28,7 @@ import { getPaneSurfaceStyle } from "./utils/paneSurface";
 import { DEFAULT_WALLPAPER, getPersistedWallpaper, getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 import { detectDefaultLocale, normalizeLocale } from "./i18n";
 import { createLogger } from "./utils/logger";
+import { normalizeNetworkProxy } from "./utils/networkProxy";
 import {
   pinTabPatch,
   runEndedPatch,
@@ -1256,6 +1257,7 @@ export default function App() {
   const [chromeControlsOnHover, setChromeControlsOnHover] = useState(false);
   const [notificationSound, setNotificationSound] = useState("glass");
   const [notificationsMuted, setNotificationsMuted] = useState(false);
+  const [networkProxy, setNetworkProxy] = useState(() => normalizeNetworkProxy());
   const [showSettings, setShowSettings] = useState(false);
   const [hasUpdate, setHasUpdate] = useState(false);
   const [projects, setProjects] = useState({});
@@ -1504,6 +1506,7 @@ export default function App() {
     chromeControlsOnHover,
     notificationSound,
     notificationsMuted,
+    networkProxy,
     queuedMessages,
   }), [
     appearance,
@@ -1521,6 +1524,7 @@ export default function App() {
     locale,
     notificationSound,
     notificationsMuted,
+    networkProxy,
     persistedActive,
     persistableConversations,
     projects,
@@ -1801,6 +1805,7 @@ export default function App() {
         if (typeof state.chromeControlsOnHover === "boolean") setChromeControlsOnHover(state.chromeControlsOnHover);
         if (typeof state.notificationSound === "string") setNotificationSound(state.notificationSound);
         if (typeof state.notificationsMuted === "boolean") setNotificationsMuted(state.notificationsMuted);
+        if (state.networkProxy != null) setNetworkProxy(normalizeNetworkProxy(state.networkProxy));
         // Migrate legacy "zh"/"en" language key to locale
         if (state.language === "zh") setLocale("zh-CN");
         else if (state.language === "en") setLocale("en-US");
@@ -1854,6 +1859,11 @@ export default function App() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [persistStatePayload, stateLoaded]);
+
+  useEffect(() => {
+    if (!stateLoaded || !window.api?.setNetworkProxy) return;
+    window.api.setNetworkProxy(networkProxy).catch(() => {});
+  }, [networkProxy, stateLoaded]);
 
   // Push window opacity to Electron
   useEffect(() => {
@@ -3027,6 +3037,7 @@ export default function App() {
           thinking: getModelThinkingValue(m),
           openCodeConfig: getOpenCodeRuntimeConfig(m),
           providerUpstreamConfig: getProviderUpstreamRuntimeConfig(currentProvider, getProviderUpstreamConfig),
+          networkProxy,
           cwd: effectiveCwd,
           projectContext: resolveProjectContext(effectiveCwd),
           images:
@@ -3079,7 +3090,7 @@ export default function App() {
         sendInFlightConversationIdsRef.current.delete(conversationId);
       }
     },
-    [buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, ensureMulticaContextForConversation, getConversation, getProviderUpstreamConfig, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, resolveProjectContext, startPreparedMessage, healConversationCwdIfMissing, isRuntimeProviderAvailable, refreshRuntimeSetup]
+    [buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, ensureMulticaContextForConversation, getConversation, getProviderUpstreamConfig, networkProxy, prepareMessage, resolveConversationLastProvider, resolveConversationProviderSession, resolveProjectContext, startPreparedMessage, healConversationCwdIfMissing, isRuntimeProviderAvailable, refreshRuntimeSetup]
   );
 
   const handleSend = useCallback(
@@ -3620,6 +3631,7 @@ export default function App() {
         thinking: getModelThinkingValue(m),
         openCodeConfig: getOpenCodeRuntimeConfig(m),
         providerUpstreamConfig: getProviderUpstreamRuntimeConfig(currentProvider, getProviderUpstreamConfig),
+        networkProxy,
         cwd: convoCwd,
         projectContext: resolveProjectContext(convoCwd),
         multicaContext,
@@ -3654,7 +3666,7 @@ export default function App() {
         );
       }
     },
-    [activeConvo, active, buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, editAndResend, ensureMulticaContextForConversation, getProviderUpstreamConfig, getConversation, resolveConversationLastProvider, resolveConversationProviderSession, resolveProjectContext]
+    [activeConvo, active, buildMulticaBootstrapPrompt, cwd, draftsPath, dynamicModels, editAndResend, ensureMulticaContextForConversation, getProviderUpstreamConfig, getConversation, networkProxy, resolveConversationLastProvider, resolveConversationProviderSession, resolveProjectContext]
   );
 
   const handleModelChange = (modelId) => {
@@ -4065,6 +4077,8 @@ export default function App() {
           onNotificationSoundChange={setNotificationSound}
           notificationsMuted={notificationsMuted}
           onNotificationsMutedChange={setNotificationsMuted}
+          networkProxy={networkProxy}
+          onNetworkProxyChange={setNetworkProxy}
           platform={platform}
           locale={locale}
           onLocaleChange={setLocale}

@@ -10,6 +10,7 @@ import { CHIME_SOUNDS, playChime } from "../utils/chime";
 import { loadMulticaState, normalizeMulticaServerUrl, saveMulticaState } from "../multica/store";
 import { useOpenCodeModels } from "../data/openCodeModels.jsx";
 import { useProviderUpstreams } from "../data/providerUpstreams.jsx";
+import { hasActiveNetworkProxy, normalizeNetworkProxy } from "../utils/networkProxy";
 import WindowDragSpacer from "./WindowDragSpacer";
 
 const EMPTY_UPSTREAM_CONFIG = {
@@ -26,7 +27,7 @@ function normalizeUpstreamDrafts(configs = {}) {
   };
 }
 
-export default function Settings({ wallpaper, onWallpaperChange, appearance, onAppearanceChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, windowControlsVisible = false, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, appearance, onAppearanceChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, networkProxy, onNetworkProxyChange, platform = null, locale = "en-US", onLocaleChange, windowControlsVisible = false, onClose }) {
   const s = useFontScale();
   const { mode, resolved, setMode } = useTheme();
   const t = createTranslator(locale);
@@ -140,6 +141,16 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
         ? t("settings.multicaServerConfigured")
         : t("settings.multicaNotConfigured");
   const multicaServerDirty = normalizedMulticaServerDraft !== (multica.serverUrl || "");
+  const networkProxyConfig = useMemo(() => normalizeNetworkProxy(networkProxy), [networkProxy]);
+  const networkProxyActive = hasActiveNetworkProxy(networkProxyConfig);
+  const networkProxyConfigured = Boolean(networkProxyConfig.url.trim());
+  const networkProxyStatus = networkProxyActive
+    ? t("settings.networkProxyEnabled")
+    : networkProxyConfig.enabled
+      ? t("settings.networkProxyMissingUrl")
+      : networkProxyConfigured
+        ? t("settings.networkProxyConfiguredOff")
+        : t("settings.networkProxyDisabled");
 
   const refreshMultica = useCallback(() => {
     const next = loadMulticaState();
@@ -203,6 +214,21 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
     }
     window.dispatchEvent(new CustomEvent("open-multica-setup"));
   }, [multicaServerDirty, normalizedMulticaServerDraft]);
+
+  const updateNetworkProxy = useCallback((patch) => {
+    onNetworkProxyChange?.(normalizeNetworkProxy({
+      ...networkProxyConfig,
+      ...patch,
+    }));
+  }, [networkProxyConfig, onNetworkProxyChange]);
+
+  const handleClearNetworkProxy = useCallback(() => {
+    onNetworkProxyChange?.(normalizeNetworkProxy({
+      enabled: false,
+      url: "",
+      noProxy: networkProxyConfig.noProxy,
+    }));
+  }, [networkProxyConfig.noProxy, onNetworkProxyChange]);
 
   useEffect(() => {
     const normalized = normalizeUpstreamDrafts(upstreamConfigsByProvider);
@@ -1290,6 +1316,124 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
             }}
           >
             {t("settings.integrations")}
+          </div>
+
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "color-mix(in srgb, var(--text-primary) 87%, transparent)",
+                marginBottom: 2,
+              }}
+            >
+              {t("settings.networkProxy")}
+            </div>
+            <div
+              style={{
+                fontSize: s(11),
+                color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
+                marginBottom: 12,
+              }}
+            >
+              {t("settings.networkProxyDescription")}
+            </div>
+
+            <div
+              style={{
+                padding: 12,
+                border: "1px solid var(--control-border)",
+                borderRadius: 8,
+                background: networkProxyActive ? "color-mix(in srgb, var(--text-primary) 4%, transparent)" : "color-mix(in srgb, var(--text-primary) 2%, transparent)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  marginBottom: 10,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: s(12),
+                      color: "color-mix(in srgb, var(--text-primary) 76%, transparent)",
+                    }}
+                  >
+                    {t("settings.networkProxyStatus")}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: s(10),
+                      color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
+                      marginTop: 2,
+                    }}
+                  >
+                    {networkProxyStatus}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={networkProxyConfig.enabled}
+                  aria-label={t("settings.networkProxyEnableLabel")}
+                  onClick={() => updateNetworkProxy({ enabled: !networkProxyConfig.enabled })}
+                  style={switchStyle(networkProxyConfig.enabled)}
+                >
+                  <span style={switchKnobStyle(networkProxyConfig.enabled)} />
+                </button>
+              </div>
+
+              <input
+                type="text"
+                value={networkProxyConfig.url}
+                placeholder={t("settings.networkProxyUrlPlaceholder")}
+                onChange={(e) => updateNetworkProxy({ url: e.target.value })}
+                aria-label={t("settings.networkProxy")}
+                spellCheck={false}
+                style={{ ...inputStyle, marginBottom: 8 }}
+              />
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) auto",
+                  gap: 8,
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
+                <input
+                  type="text"
+                  value={networkProxyConfig.noProxy}
+                  placeholder={t("settings.networkProxyBypassPlaceholder")}
+                  onChange={(e) => updateNetworkProxy({ noProxy: e.target.value })}
+                  aria-label={t("settings.networkProxyBypass")}
+                  spellCheck={false}
+                  style={inputStyle}
+                />
+                <button
+                  type="button"
+                  onClick={handleClearNetworkProxy}
+                  disabled={!networkProxyConfigured && !networkProxyConfig.enabled}
+                  style={compactButtonStyle(networkProxyConfigured || networkProxyConfig.enabled)}
+                >
+                  {t("settings.networkProxyClear")}
+                </button>
+              </div>
+
+              <div
+                style={{
+                  fontSize: s(10),
+                  color: "color-mix(in srgb, var(--text-primary) 30%, transparent)",
+                  lineHeight: 1.45,
+                }}
+              >
+                {t("settings.networkProxyHint")}
+              </div>
+            </div>
           </div>
 
           <div style={{ marginBottom: 28 }}>
