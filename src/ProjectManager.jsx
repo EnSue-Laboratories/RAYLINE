@@ -8,8 +8,6 @@ function GitHubIcon({ size = 48 }) {
     </svg>
   );
 }
-import AuroraCanvas from "./components/AuroraCanvas";
-import Grain from "./components/Grain";
 import AuthModal from "./pm-components/AuthModal";
 import AccountManager from "./pm-components/AccountManager";
 import CreateForm from "./pm-components/CreateForm";
@@ -368,7 +366,7 @@ export default function ProjectManager() {
     >
       <WindowControls visible={showWindowControls} />
 
-      {/* Background — wallpaper or aurora */}
+      {/* Background — wallpaper only; the default pane surface is opaque. */}
       {wallpaper?.dataUrl ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 0 }}>
           <div style={{
@@ -380,12 +378,7 @@ export default function ProjectManager() {
             transform: wallpaper.imgBlur ? "scale(1.05)" : "none",
           }} />
         </div>
-      ) : (
-        <>
-          <AuroraCanvas />
-          <Grain />
-        </>
-      )}
+      ) : null}
 
       {/* Drag region — leave the controls hit area clear on Windows */}
       <div
@@ -411,7 +404,7 @@ export default function ProjectManager() {
           position: "relative",
           zIndex: 10,
           ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
-          backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
+          backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "none",
         }}
       >
         {/* Spacer for traffic lights */}
@@ -529,7 +522,7 @@ export default function ProjectManager() {
           position: "relative",
           zIndex: 10,
           ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
-          backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
+          backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "none",
         }}
       >
         {/* Traffic light spacer */}

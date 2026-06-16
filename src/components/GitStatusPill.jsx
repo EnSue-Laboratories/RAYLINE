@@ -544,7 +544,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
             fontSize: s(12),
             fontFamily: "var(--font-ui)",
             cursor: canCommit ? "pointer" : "default",
-            transition: "all .15s",
+            transition: "background .15s, border-color .15s, color .15s",
           }}
         >
           {busy ? "…" : t("git.status.commitAndPush")}
@@ -680,7 +680,7 @@ export default function GitStatusPill({ cwd, defaultPrBranch, coauthorEnabled = 
           fontFamily: "var(--font-mono)",
           letterSpacing: ".04em",
           cursor: "pointer",
-          transition: "all .2s",
+          transition: "background .2s, border-color .2s, color .2s",
         }}
         onMouseEnter={(e) => { if (!open) e.currentTarget.style.borderColor = "color-mix(in srgb, var(--text-primary) 11%, transparent)"; }}
         onMouseLeave={(e) => { if (!open) e.currentTarget.style.borderColor = "var(--control-bg)"; }}

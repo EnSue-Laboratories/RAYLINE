@@ -2371,16 +2371,36 @@ ipcMain.handle("git-worktree-promote", async (_event, mainRepoPath, worktreePath
     return { success: false, error: err.message || "Failed to check main repo" };
   }
   try {
-    await git(["worktree", "remove", worktreePath], mainRepoPath);
+    const worktreePorcelain = await git(["status", "--porcelain"], worktreePath);
+    if (worktreePorcelain.trim().length > 0) {
+      return { success: false, code: "WORKTREE_DIRTY", error: "Worktree has uncommitted changes" };
+    }
   } catch (err) {
-    return { success: false, error: err.message || "Failed to remove worktree" };
+    return { success: false, error: err.message || "Failed to check worktree" };
   }
+
   if (branchName) {
     try {
+      await git(["checkout", "--detach"], worktreePath);
       await git(["checkout", branchName], mainRepoPath);
     } catch (err) {
-      return { success: false, error: `Worktree removed, but checkout failed: ${err.message || err}` };
+      try { await git(["checkout", branchName], worktreePath); } catch {}
+      return { success: false, error: err.message || "Failed to checkout branch in main repo" };
     }
+
+    setTimeout(() => {
+      gitLong(["worktree", "remove", worktreePath], mainRepoPath).catch((err) => {
+        console.warn("[git-worktree-promote] background worktree cleanup failed:", err.message || err);
+      });
+    }, 0).unref?.();
+
+    return { success: true, cleanupPending: true };
+  }
+
+  try {
+    await gitLong(["worktree", "remove", worktreePath], mainRepoPath);
+  } catch (err) {
+    return { success: false, error: err.message || "Failed to remove worktree" };
   }
   return { success: true };
 });
