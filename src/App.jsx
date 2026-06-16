@@ -1,6 +1,4 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import AuroraCanvas from "./components/AuroraCanvas";
-import Grain        from "./components/Grain";
 import Sidebar      from "./components/Sidebar";
 import SidebarChromeRail from "./components/SidebarChromeRail";
 import SidebarWindowsHeader from "./components/SidebarWindowsHeader";
@@ -3930,17 +3928,15 @@ export default function App() {
           }} />
         </div>
       ) : (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 0,
-          filter: appBlur > 0 ? `blur(${appBlur}px)` : "none",
-          transform: appBlur > 0 ? "scale(1.05)" : "none",
-          transition: "filter .2s",
-        }}>
-          <AuroraCanvas />
-          <Grain />
-        </div>
+        <div
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 0,
+            background: "var(--pane-background)",
+          }}
+        />
       )}
 
       <WindowControls visible={showWindowControls} />
@@ -3988,7 +3984,7 @@ export default function App() {
             hoverOpacity: clampNumber(sidebarActiveOpacity * 0.6, 0.8, sidebarActiveOpacity),
             activeOpacity: sidebarActiveOpacity,
           }),
-          backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "blur(56px) saturate(1.1)",
+          backdropFilter: wallpaper?.dataUrl ? "saturate(1.1)" : "none",
           transition: sidebarPaneTransition,
           overflow: "hidden",
         }}
