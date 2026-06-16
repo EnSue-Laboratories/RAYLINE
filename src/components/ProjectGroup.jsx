@@ -561,7 +561,7 @@ function MenuBtn({ s, label, onClick, danger = false }) {
         fontFamily: "var(--font-ui)",
         cursor: "pointer",
         textAlign: "left",
-        transition: "all .12s",
+        transition: "background .12s, color .12s",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = "var(--control-bg)";

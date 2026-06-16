@@ -1249,7 +1249,7 @@ export default function TerminalDrawer({
         ...(windowMode
           ? { background: "var(--bg-primary)" }
           : getPaneSurfaceStyle(hasWallpaper)),
-        backdropFilter: windowMode ? "none" : (hasWallpaper ? "saturate(1.1)" : "blur(56px) saturate(1.1)"),
+        backdropFilter: windowMode ? "none" : (hasWallpaper ? "saturate(1.1)" : "none"),
         borderLeft: windowMode ? "none" : "1px solid var(--border)",
         position: "relative",
         zIndex: 10,

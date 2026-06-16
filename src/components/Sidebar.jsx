@@ -230,7 +230,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onToggleSidebar, cwd, onPickFolder, onOpenSettings, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onEditProjectContext, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, windowsChrome = false, hasUpdate = false, locale = "en-US" }) {
+export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd, onPickFolder, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onEditProjectContext, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, windowsChrome = false, locale = "en-US" }) {
   const s = useFontScale();
   const t = useMemo(() => createTranslator(locale), [locale]);
   const [search, setSearch]     = useState("");
@@ -242,8 +242,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
   const pendingCollapsePersistRef = useRef({});
   const collapsePersistTimerRef = useRef(null);
   const [collapsedOverrides, setCollapsedOverrides] = useState({});
-  const [searchResults, setSearchResults] = useState(convos);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchState, setSearchState] = useState(() => ({ key: "", results: [] }));
   const searchCacheRef = useRef(new Map());
   const searchRunRef = useRef(0);
 
@@ -274,6 +273,17 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
 
   const searchQuery = useMemo(() => normalizeSearchText(search), [search]);
   const searchActive = searchQuery.length > 0;
+  const searchInputKey = useMemo(() => {
+    if (!searchActive) return "";
+    return [
+      searchQuery,
+      convos.map((conversation) => buildConversationSearchVersion(conversation)).join("\n"),
+    ].join("\n--\n");
+  }, [convos, searchActive, searchQuery]);
+  const searchResults = searchActive && searchState.key === searchInputKey
+    ? searchState.results
+    : [];
+  const searchLoading = searchActive && searchState.key !== searchInputKey;
 
   const loadConversationSearchRecord = useCallback(async (conversation) => {
     const version = buildConversationSearchVersion(conversation);
@@ -315,13 +325,8 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
     searchRunRef.current = runId;
 
     if (!searchActive) {
-      setSearchLoading(false);
-      setSearchResults(convos);
       return undefined;
     }
-
-    setSearchLoading(true);
-    setSearchResults([]);
 
     const tokens = getSearchTokens(searchQuery);
     let cancelled = false;
@@ -364,12 +369,10 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
 
         if (cancelled || searchRunRef.current !== runId) return;
 
-        setSearchResults(matches);
-        setSearchLoading(false);
+        setSearchState({ key: searchInputKey, results: matches });
       })().catch(() => {
         if (cancelled || searchRunRef.current !== runId) return;
-        setSearchResults([]);
-        setSearchLoading(false);
+        setSearchState({ key: searchInputKey, results: [] });
       });
     }, SEARCH_DEBOUNCE_MS);
 
@@ -377,7 +380,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
       cancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [convos, loadConversationSearchRecord, searchActive, searchQuery]);
+  }, [convos, loadConversationSearchRecord, searchActive, searchInputKey, searchQuery]);
 
   const visibleConvos = searchActive ? searchResults : convos;
 
@@ -451,7 +454,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             padding: "8px 10px", borderRadius: 7,
             background: "none", border: "none", cursor: "pointer",
             color: "var(--sb-text)", fontSize: s(12),
-            fontFamily: "var(--font-ui)", transition: "all .15s",
+            fontFamily: "var(--font-ui)", transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
             textAlign: "left",
           }}
           onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "var(--sb-text-hover)"; }}
@@ -467,7 +470,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             padding: "8px 10px", borderRadius: 7,
             background: "none", border: "none", cursor: "pointer",
             color: "var(--sb-text)", fontSize: s(12),
-            fontFamily: "var(--font-ui)", transition: "all .15s",
+            fontFamily: "var(--font-ui)", transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
             textAlign: "left",
           }}
           onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "var(--sb-text-hover)"; }}
@@ -483,7 +486,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             padding: "8px 10px", borderRadius: 7,
             background: "none", border: "none", cursor: "pointer",
             color: "var(--sb-text)", fontSize: s(12),
-            fontFamily: "var(--font-ui)", transition: "all .15s",
+            fontFamily: "var(--font-ui)", transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
             textAlign: "left",
           }}
           onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "var(--sb-text-hover)"; }}
@@ -500,7 +503,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
               padding: "8px 10px", borderRadius: 7,
               background: "none", border: "none", cursor: "pointer",
               color: "var(--sb-text)", fontSize: s(12),
-              fontFamily: "var(--font-ui)", transition: "all .15s",
+              fontFamily: "var(--font-ui)", transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
               textAlign: "left",
             }}
             onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "var(--sb-text-hover)"; }}
@@ -517,7 +520,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
             padding: "8px 10px", borderRadius: 7,
             background: "none", border: "none", cursor: "pointer",
             color: "var(--sb-text)", fontSize: s(12),
-            fontFamily: "var(--font-ui)", transition: "all .15s",
+            fontFamily: "var(--font-ui)", transition: "background .15s, color .15s, box-shadow .15s, backdrop-filter .15s",
             textAlign: "left",
           }}
           onMouseEnter={(e) => { applyPaneInteractionStyle(e.currentTarget, "hover"); e.currentTarget.style.color = "var(--sb-text-hover)"; }}
@@ -788,7 +791,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, onT
                     borderRadius: 8,
                     cursor: "pointer",
                     marginBottom: 1,
-                    transition: "all .12s",
+                    transition: "background .12s, box-shadow .12s, color .12s",
                     animation: `fadeSlide .2s ease ${i * 0.03}s both`,
                     ...(isActive ? getPaneInteractionStyle("active") : getPaneInteractionStyle("idle")),
                   }}
