@@ -846,7 +846,7 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
-                          fontFamily: "var(--font-content)",
+                          fontFamily: "'Lato',system-ui,sans-serif",
                           fontWeight: 300,
                         }}
                       >
