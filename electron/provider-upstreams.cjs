@@ -686,7 +686,7 @@ async function appendCodexUpstreamArgs(args, input, model, options = {}) {
   return { ...config, baseURL, targetBaseURL: bridge?.targetBaseURL || normalizeOpenAIBaseURL(config.baseURL), providerKey: key, bridge };
 }
 
-function appendClaudeUpstreamArgs(args, input, model) {
+function appendClaudeUpstreamArgs(args, input, model, options = {}) {
   const config = normalizeProviderUpstreamConfig(input, "claude");
   if (!config || !config.baseURL) return null;
 
@@ -695,7 +695,7 @@ function appendClaudeUpstreamArgs(args, input, model) {
   
   const models = Array.from(new Set([...config.modelList, model].filter(Boolean)));
 
-  if (IS_WINDOWS) {
+  if (IS_WINDOWS && options.patchLocalSettings !== false) {
     // 1. Write environment variables to ~/.claude/settings.json
     patchClaudeSettingsWin32({ baseURL, apiKey: config.apiKey }, model);
     

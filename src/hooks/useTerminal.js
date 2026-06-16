@@ -154,17 +154,25 @@ export default function useTerminal() {
   // ── Exposed functions ───────────────────────────────────────────────────────
 
   const createSession = useCallback(async ({ name, command, cwd, reveal = true }) => {
-    if (!window.api?.terminalCreate) return;
+    if (!window.api?.terminalCreate) return { error: "Terminal API unavailable" };
     try {
       pendingPreferredSessionRef.current = name;
-      await window.api.terminalCreate({ name, command, cwd, reveal });
+      const result = await window.api.terminalCreate({ name, command, cwd, reveal });
+      if (result?.error) {
+        pendingPreferredSessionRef.current = null;
+        console.error("[useTerminal] createSession failed:", result.error);
+        return result;
+      }
       await refreshSessions();
       setActiveSession(name);
       if (reveal) {
         await openWindow();
       }
+      return result || { ok: true, name };
     } catch (e) {
       console.error("[useTerminal] createSession failed:", e);
+      pendingPreferredSessionRef.current = null;
+      return { error: e?.message || String(e) };
     }
   }, [openWindow, refreshSessions]);
 

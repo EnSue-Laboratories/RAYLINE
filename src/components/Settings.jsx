@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { ArrowLeft, Check, ChevronDown, Copy, Image, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Copy, Image, Pencil, Plus, RefreshCw, RotateCcw, Terminal, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { useTheme } from "../contexts/ThemeContext.jsx";
 import { DEFAULT_APPEARANCE, FONT_OPTIONS, LOGO_RED, isValidHexColor, normalizeAppearance } from "../utils/appearance";
@@ -26,7 +26,7 @@ function normalizeUpstreamDrafts(configs = {}) {
   };
 }
 
-export default function Settings({ wallpaper, onWallpaperChange, appearance, onAppearanceChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, windowControlsVisible = false, onClose }) {
+export default function Settings({ wallpaper, onWallpaperChange, appearance, onAppearanceChange, fontSize, onFontSizeChange, defaultPrBranch, onDefaultPrBranchChange, coauthorEnabled = false, onCoauthorEnabledChange, appBlur = 0, onAppBlurChange, appOpacity = 100, onAppOpacityChange, developerMode = false, onDeveloperModeChange, sidebarTerminalEnabled = false, onSidebarTerminalEnabledChange, remoteSshCommand = "", onRemoteSshCommandChange, onConnectRemoteSsh, chromeControlsOnHover = false, onChromeControlsOnHoverChange, notificationSound = "glass", onNotificationSoundChange, notificationsMuted = false, onNotificationsMutedChange, platform = null, locale = "en-US", onLocaleChange, windowControlsVisible = false, onClose }) {
   const s = useFontScale();
   const { mode, resolved, setMode } = useTheme();
   const t = createTranslator(locale);
@@ -68,6 +68,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
   const [openCodeProviderHighlight, setOpenCodeProviderHighlight] = useState(0);
   const [openCodeSaving, setOpenCodeSaving] = useState(false);
   const [openCodeMessage, setOpenCodeMessage] = useState("");
+  const [remoteSshStatus, setRemoteSshStatus] = useState({ kind: "idle", text: "" });
   const openCodeProviderRef = useRef(null);
 
   // Sync from parent when wallpaper prop changes externally
@@ -256,6 +257,50 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
     setUpstreamDirtyProviders((prev) => ({ ...prev, [provider]: false }));
     setUpstreamMessages((prev) => ({ ...prev, [provider]: t("settings.upstreamCleared") }));
   }, [clearUpstreamConfig, t]);
+
+  useEffect(() => {
+    setRemoteSshStatus((prev) => prev.kind === "connecting" ? prev : { kind: "idle", text: "" });
+  }, [remoteSshCommand]);
+
+  const handleConnectRemoteSsh = useCallback(async () => {
+    const command = String(remoteSshCommand || "").trim();
+    if (!command) {
+      setRemoteSshStatus({ kind: "error", text: t("settings.remoteSshCommandRequired") });
+      return;
+    }
+    if (!onConnectRemoteSsh) {
+      setRemoteSshStatus({ kind: "error", text: t("settings.remoteSshUnavailable") });
+      return;
+    }
+
+    setRemoteSshStatus({ kind: "connecting", text: t("settings.remoteSshConnecting") });
+    const result = await onConnectRemoteSsh(command);
+    if (result?.ok) {
+      const runtimes = [
+        result.claude ? "Claude Code" : "",
+        result.codex ? "Codex" : "",
+      ].filter(Boolean).join(", ");
+      if (!runtimes) {
+        setRemoteSshStatus({
+          kind: "warning",
+          text: t("settings.remoteSshConnectedNoRuntime"),
+        });
+        return;
+      }
+      setRemoteSshStatus({
+        kind: "success",
+        text: t("settings.remoteSshConnected", { value: runtimes }),
+      });
+      return;
+    }
+
+    const error = result?.error === "required"
+      ? t("settings.remoteSshCommandRequired")
+      : result?.error === "invalid"
+        ? t("settings.remoteSshCommandInvalid")
+        : [t("settings.remoteSshFailed"), result?.error].filter(Boolean).join(" ");
+    setRemoteSshStatus({ kind: "error", text: error });
+  }, [onConnectRemoteSsh, remoteSshCommand, t]);
 
   const updateOpenCodeDraft = useCallback((patch) => {
     setOpenCodeDraft((prev) => ({ ...prev, ...patch }));
@@ -1482,6 +1527,82 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                 );
               })}
             </div>
+          </div>
+
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                fontSize: s(13),
+                color: "color-mix(in srgb, var(--text-primary) 87%, transparent)",
+                marginBottom: 2,
+              }}
+            >
+              {t("settings.remoteSsh")}
+            </div>
+            <div
+              style={{
+                fontSize: s(11),
+                color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
+                marginBottom: 10,
+              }}
+            >
+              {t("settings.remoteSshDescription")}
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) auto",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <input
+                type="text"
+                value={remoteSshCommand}
+                placeholder={t("settings.remoteSshPlaceholder")}
+                onChange={(e) => onRemoteSshCommandChange?.(e.target.value)}
+                spellCheck={false}
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                onClick={handleConnectRemoteSsh}
+                disabled={remoteSshStatus.kind === "connecting" || !String(remoteSshCommand || "").trim()}
+                style={compactButtonStyle(remoteSshStatus.kind !== "connecting" && !!String(remoteSshCommand || "").trim())}
+              >
+                <Terminal size={12} strokeWidth={1.8} />
+                {remoteSshStatus.kind === "connecting"
+                  ? t("settings.remoteSshConnecting")
+                  : t("settings.remoteSshConnect")}
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => onRemoteSshCommandChange?.("")}
+                disabled={!String(remoteSshCommand || "").trim()}
+                style={compactButtonStyle(!!String(remoteSshCommand || "").trim())}
+              >
+                {t("settings.remoteSshClear")}
+              </button>
+            </div>
+            {remoteSshStatus.text && (
+              <div
+                style={{
+                  fontSize: s(11),
+                  color: remoteSshStatus.kind === "error"
+                    ? "var(--danger-text)"
+                    : remoteSshStatus.kind === "success"
+                      ? "var(--success-text)"
+                      : remoteSshStatus.kind === "warning"
+                        ? "rgba(255,210,150,0.8)"
+                        : "color-mix(in srgb, var(--text-primary) 52%, transparent)",
+                  marginTop: 8,
+                }}
+              >
+                {remoteSshStatus.text}
+              </div>
+            )}
           </div>
 
           <div style={{ marginBottom: 28 }}>

@@ -7,7 +7,7 @@ import { useFontScale } from "../contexts/FontSizeContext";
 
 const MENU_GAP = 6;
 const VIEWPORT_PADDING = 8;
-const MIN_MENU_WIDTH = 220;
+const MIN_MENU_WIDTH = 340;
 const PREFERRED_MAX_HEIGHT = 420;
 const CLI_RECHECK_INTERVAL_MS = 5000;
 const DEFAULT_CLI_INSTALL_STATUS = { claude: true, codex: true, opencode: false };
@@ -16,6 +16,12 @@ const PROVIDER_INSTALL_GUIDES = {
   claude: { url: "https://docs.claude.com/en/docs/claude-code/setup", label: "Install Claude Code\u2026" },
   codex:  { url: "https://developers.openai.com/codex/cli",           label: "Install Codex CLI\u2026"   },
   opencode: { url: "https://opencode.ai/docs/cli/",                    label: "Install OpenCode\u2026"    },
+};
+
+const PROVIDER_ORDER = ["claude", "codex", "remote-claude", "remote-codex", "opencode", "multica"];
+const PROVIDER_LABELS = {
+  "remote-claude": "REMOTE SSH / CLAUDE",
+  "remote-codex": "REMOTE SSH / CODEX",
 };
 
 function extractMulticaErrorStatus(err) {
@@ -136,10 +142,12 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
     if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
-    const menuWidth = Math.max(MIN_MENU_WIDTH, rect.width);
+    const viewportWidth = window.innerWidth;
+    const availableWidth = Math.max(160, viewportWidth - VIEWPORT_PADDING * 2);
+    const menuWidth = Math.min(Math.max(MIN_MENU_WIDTH, rect.width), availableWidth);
     const left = Math.max(
       VIEWPORT_PADDING,
-      Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - VIEWPORT_PADDING)
+      Math.min(rect.right - menuWidth, viewportWidth - menuWidth - VIEWPORT_PADDING)
     );
     const spaceBelow = viewportHeight - rect.bottom - MENU_GAP - VIEWPORT_PADDING;
     const spaceAbove = rect.top - MENU_GAP - VIEWPORT_PADDING;
@@ -231,7 +239,7 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
           }}
         >
           {(() => {
-            return ["claude", "codex", "opencode", "multica"].map((provider, gi) => {
+            return PROVIDER_ORDER.map((provider, gi) => {
               const entries = allModels.filter((mm) => mm.provider === provider);
               const isMulticaEmpty = provider === "multica" && entries.length === 0;
               const isOpenCodeEmpty = provider === "opencode" && entries.length === 0;
@@ -239,12 +247,15 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
               const cliKnown = !guide || Object.prototype.hasOwnProperty.call(cliInstalled || {}, provider);
               const cliUnknown = Boolean(guide) && !cliKnown;
               const cliMissing = Boolean(guide) && cliKnown && cliInstalled[provider] === false;
+              const visibleEntries = entries.filter((mm) => !cliMissing || mm.remoteRuntime);
+              const isRemoteEmpty = provider.startsWith("remote-") && entries.length === 0;
               if (isOpenCodeEmpty && m.provider !== "opencode") return null;
+              if (isRemoteEmpty) return null;
               return (
                 <div key={provider}>
                   {gi > 0 && <div style={{ height: 1, background: "var(--control-bg)", margin: "4px 8px" }} />}
                   <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "color-mix(in srgb, var(--text-primary) 22%, transparent)", letterSpacing: ".12em", fontFamily: "var(--font-mono)" }}>
-                    {provider.toUpperCase()}
+                    {PROVIDER_LABELS[provider] || provider.toUpperCase()}
                   </div>
                   {cliUnknown && (
                     <button
@@ -455,14 +466,16 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                       </button>
                     );
                   })()}
-                  {!cliUnknown && !cliMissing && entries.map((mm) => (
+                  {!cliUnknown && visibleEntries.map((mm) => (
                     <button
                       key={mm.id}
                       onClick={() => { onChange(mm.id); setMenuStyle(null); set(false); }}
+                      title={`${mm.name} ${mm.tag}`}
                       style={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
+                        gap: 16,
                         width: "100%",
                         padding: "9px 13px",
                         background: mm.id === value ? "var(--control-bg)" : "transparent",
@@ -478,8 +491,10 @@ export default function ModelPicker({ value, onChange, extraModels = [], extraEr
                       onMouseEnter={(e) => { if (mm.id !== value) e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
                       onMouseLeave={(e) => { if (mm.id !== value) e.currentTarget.style.background = "transparent"; }}
                     >
-                      {mm.name}
-                      <span style={{ fontSize: s(9), opacity: 0.4, letterSpacing: ".1em" }}>{mm.tag}</span>
+                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {mm.name}
+                      </span>
+                      <span style={{ flexShrink: 0, fontSize: s(9), opacity: 0.4, letterSpacing: ".1em", whiteSpace: "nowrap" }}>{mm.tag}</span>
                     </button>
                   ))}
                 </div>

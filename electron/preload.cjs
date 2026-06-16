@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld("api", {
   opencodeGetProviderConfig: (providerId) => ipcRenderer.invoke("opencode-get-provider-config", providerId),
   syncProviderUpstreams: (provider, config) => ipcRenderer.invoke("sync-provider-upstreams", { provider, config }),
   shellRun: ({ command, cwd }) => ipcRenderer.invoke("shell-run", { command, cwd }),
+  remoteRuntimeCheck: ({ sshCommand }) => ipcRenderer.invoke("remote-runtime-check", { sshCommand }),
 
   // Git operations
   gitBranches: (cwd) => ipcRenderer.invoke("git-branches", cwd),
