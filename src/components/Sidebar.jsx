@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { memo, useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { createTranslator } from "../i18n";
 import { Plus, Search, Trash2, FolderOpen, ChevronRight, Workflow, FolderPlus } from "lucide-react";
@@ -230,7 +230,7 @@ function GitHubIcon({ size = 12 }) {
   );
 }
 
-export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd, onPickFolder, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onEditProjectContext, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, windowsChrome = false, locale = "en-US" }) {
+function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd, onPickFolder, onOpenProjectManager, onOpenDispatch, onOpenNewProject, projects, draftsPath, onToggleProjectCollapse, onHideProject, onEditProjectContext, onNewInProject, draftsCollapsed, onToggleDraftsCollapsed, developerMode = true, multicaModels = [], isOpen = true, windowsChrome = false, locale = "en-US" }) {
   const s = useFontScale();
   const t = useMemo(() => createTranslator(locale), [locale]);
   const [search, setSearch]     = useState("");
@@ -965,3 +965,5 @@ export default function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd
     </div>
   );
 }
+
+export default memo(Sidebar);
