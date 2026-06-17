@@ -458,11 +458,696 @@ function extractOpenCodeError(event) {
   );
 }
 
+// Target ~30fps under heavy token rates: at most one React commit per ~32ms,
+// regardless of how many stream events arrive in between.
+const STREAM_FLUSH_MIN_INTERVAL_MS = 32;
+
+// Terminal / must-show-now events bypass the rAF coalescer and flush
+// synchronously so completion (and the `isStreaming` flip) feels snappy.
+// Mirrors the reducer branches that set nextIsStreaming=false or finalize a
+// message. Missing one is non-fatal — onAgentDone/onAgentError are backstops.
+function isImmediateFlushEvent(event) {
+  if (!event || typeof event !== "object") return false;
+  const type = event.type;
+  if (type === "result") return true;
+  if (type === "turn.completed") return true;
+  if (type === "error") return true; // opencode error branch
+  if (type === "step_finish") return true; // opencode; cheap to always flush
+  if (type === "event_msg" && event.payload?.type === "task_complete") return true;
+  if (typeof type === "string" && type.startsWith("multica:")) {
+    const inner = type.slice("multica:".length);
+    if (
+      inner === "chat:done" ||
+      inner === "task:completed" ||
+      inner === "task:cancelled" ||
+      inner === "task:failed" ||
+      inner === "error"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Pure reducer: takes the previous conversations Map and a single stream event,
+// returns the next Map. Extracted verbatim from the original
+// `setConversations((prev) => { ... })` updater inside `onAgentStream` so that
+// many buffered events can be folded into a single React commit while
+// preserving exact ordering and all provider-specific logic.
+function applyStreamEventToConversations(prev, conversationId, event) {
+  const next = new Map(prev);
+  const convo = next.get(conversationId) || { messages: [], isStreaming: true, error: null };
+  const msgs = [...convo.messages];
+  let lastMsg = msgs[msgs.length - 1];
+  // Some runs finish logically before the underlying CLI process fully
+  // exits, e.g. a background shell keeps stdout/stderr open for a moment.
+  // Track the conversation-level flag separately so we can unblock the UI
+  // on terminal completion events without waiting for `agent-done`.
+  let nextIsStreaming = Boolean(convo.isStreaming);
+
+  if (event.session_id && convo._claudeSessionId !== event.session_id) {
+    convo._claudeSessionId = event.session_id;
+    log("Captured Claude session ID:", {
+      conversationId,
+      sessionId: event.session_id,
+      eventType: event.type,
+      subtype: event.subtype,
+    });
+  }
+
+  const ensureAssistant = () => {
+    if (!lastMsg || lastMsg.role !== "assistant") {
+      lastMsg = {
+        id: uid(),
+        role: "assistant",
+        parts: [],
+        isStreaming: true,
+        isThinking: false,
+        _streamState: cloneStreamState(),
+        _startedAt: Date.now(),
+        _usage: null,
+      };
+      msgs.push(lastMsg);
+    } else if (!lastMsg._startedAt) {
+      lastMsg = { ...lastMsg, _startedAt: Date.now() };
+      msgs[msgs.length - 1] = lastMsg;
+    }
+    return lastMsg;
+  };
+
+  if (typeof event.type === "string" && event.type.startsWith("multica:")) {
+    const inner = event.type.slice("multica:".length);
+    const p = event.payload || {};
+    // transient — resets per-session; stripped in buildPersistedConversationSnapshot
+    const connectedPatch = convo.multicaConnected ? null : { multicaConnected: true };
+
+    // No-op branches return early WITHOUT running ensureAssistant — we
+    // don't want a stray empty assistant bubble if a user echo arrives
+    // before any task:message.
+    if (inner === "chat:message" && p.role === "user") {
+      if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
+      return next;
+    }
+    if (inner === "agent:status") {
+      window.dispatchEvent(new CustomEvent("multica-agent-status", { detail: p.agent }));
+      if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
+      return next;
+    }
+
+    const assistant = ensureAssistant();
+
+    if (inner === "task:message") {
+      const part = mapMulticaTaskMessage(p);
+      if (!part) {
+        if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
+        return next;
+      }
+      const parts = [...(assistant.parts || [])];
+      if (p.type === "tool_result") {
+        const pendingIdx = findPendingMulticaToolIdx(parts, p.tool);
+        if (pendingIdx >= 0) {
+          parts[pendingIdx] = { ...parts[pendingIdx], result: p.output || "", status: "done" };
+        } else {
+          parts.push(part);
+        }
+      } else {
+        parts.push(part);
+      }
+      msgs[msgs.length - 1] = { ...assistant, parts, isStreaming: true };
+      next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: true });
+      return next;
+    }
+
+    if (inner === "chat:done" || inner === "task:completed") {
+      msgs[msgs.length - 1] = freezeElapsed({ ...assistant, isStreaming: false });
+      next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false });
+      return next;
+    }
+
+    if (inner === "task:cancelled") {
+      msgs[msgs.length - 1] = freezeElapsed({ ...assistant, isStreaming: false });
+      next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false, error: null });
+      return next;
+    }
+
+    if (inner === "task:failed" || inner === "error") {
+      msgs[msgs.length - 1] = freezeElapsed({
+        ...assistant, isStreaming: false,
+        parts: [...(assistant.parts || []), { type: "text", text: `_Multica ${inner}: ${p.message || p.reason || ""}_` }],
+      });
+      next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false, error: p.message || inner });
+      return next;
+    }
+
+    if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
+    return next;
+  }
+
+  if (event.type === "stream_event") {
+    const inner = event.event;
+    if (!inner) { next.set(conversationId, { ...convo, messages: msgs }); return next; }
+
+    // Helper to update the last assistant message and keep lastMsg in sync
+    const updateAssistant = (updates) => {
+      const merged = { ...lastMsg, ...updates };
+      msgs[msgs.length - 1] = merged;
+      lastMsg = merged;
+    };
+
+    // Context-window fullness tracking.
+    //
+    // We deliberately track the LATEST API call's usage (not the turn
+    // aggregate). A multi-tool-use turn re-sends the prompt once per
+    // call, so aggregating would make `cache_read` balloon by the number
+    // of calls — that measures how much *work* was done, not how full
+    // the window is. The cumulative snapshot at the END of the last
+    // call is what actually reflects "tokens currently in the window."
+    //
+    // - `message_start` → overwrite `_usage` (new API call begins)
+    // - `message_delta` → merge (output_tokens grows during generation)
+    // - `result` below → ignored for usage (it's turn-aggregated)
+    if (inner.type === "message_start" && inner.message?.usage) {
+      ensureAssistant();
+      updateAssistant({ _usage: { ...inner.message.usage } });
+    } else if (inner.type === "message_delta" && inner.usage) {
+      ensureAssistant();
+      updateAssistant({ _usage: mergeUsage(lastMsg._usage, inner.usage) });
+    }
+
+    if (inner.type === "content_block_start") {
+      const block = inner.content_block;
+      ensureAssistant();
+      const parts = cloneParts(lastMsg.parts);
+      const streamState = cloneStreamState(lastMsg._streamState);
+      const blockIndex = inner.index;
+
+      if (streamState.seenIndexes[blockIndex]) {
+        streamState.currentTurn += 1;
+        streamState.seenIndexes = {};
+        streamState.activeBlocks = {};
+        streamState.activeThinking = {};
+      }
+
+      streamState.seenIndexes[blockIndex] = true;
+      const streamKey = buildBlockKey(streamState.currentTurn, blockIndex);
+      streamState.activeBlocks[blockIndex] = streamKey;
+
+      if (block?.type === "thinking") {
+        parts.push({ type: "thinking", text: "", blockIndex, _streamKey: streamKey });
+        streamState.activeThinking[streamKey] = true;
+        updateAssistant({ parts, isStreaming: true, isThinking: true, _streamState: streamState });
+      } else if (block?.type === "tool_use") {
+        parts.push({
+          type: "tool",
+          id: block.id || "tc" + uid(),
+          name: block.name || "unknown",
+          args: {},
+          argsJson: "",
+          result: null,
+          status: "running",
+          blockIndex,
+          _streamKey: streamKey,
+        });
+        updateAssistant({ parts, isStreaming: true, _streamState: streamState });
+      } else if (block?.type === "text") {
+        parts.push({ type: "text", text: "", blockIndex, _streamKey: streamKey });
+        updateAssistant({ parts, isStreaming: true, _streamState: streamState });
+      } else if (block?.type === "image") {
+        // Anthropic vision-output blocks arrive whole (no per-delta data
+        // for image bytes), so push the full image part on start.
+        const imagePart = buildImagePartFromAnthropicBlock(block);
+        if (imagePart) {
+          parts.push({ ...imagePart, blockIndex, _streamKey: streamKey });
+          updateAssistant({ parts, isStreaming: true, _streamState: streamState });
+        }
+      }
+    } else if (inner.type === "content_block_delta") {
+      ensureAssistant();
+      const parts = cloneParts(lastMsg.parts);
+      const streamState = cloneStreamState(lastMsg._streamState);
+      const delta = inner.delta;
+      const streamKey = streamState.activeBlocks[inner.index];
+      if (delta?.type === "text_delta") {
+        const textIdx = findPartIndexByStreamKey(parts, streamKey, "text");
+        if (textIdx >= 0) {
+          parts[textIdx] = { ...parts[textIdx], text: parts[textIdx].text + (delta.text || "") };
+        }
+        updateAssistant({ parts, isStreaming: true, _streamState: streamState });
+      } else if (delta?.type === "input_json_delta") {
+        const toolIdx = findPartIndexByStreamKey(parts, streamKey, "tool");
+        if (toolIdx >= 0) {
+          const newJson = (parts[toolIdx].argsJson || "") + (delta.partial_json || "");
+          let newArgs = parts[toolIdx].args;
+          try {
+            newArgs = JSON.parse(newJson);
+          } catch {
+            // Keep accumulating partial JSON until it becomes parseable.
+          }
+          parts[toolIdx] = { ...parts[toolIdx], argsJson: newJson, args: newArgs };
+        }
+        updateAssistant({ parts, isStreaming: true, _streamState: streamState });
+      } else if (delta?.type === "thinking_delta") {
+        const thinkingIdx = findPartIndexByStreamKey(parts, streamKey, "thinking");
+        if (thinkingIdx >= 0) {
+          parts[thinkingIdx] = {
+            ...parts[thinkingIdx],
+            text: parts[thinkingIdx].text + (delta.thinking || ""),
+          };
+        }
+        updateAssistant({ parts, isStreaming: true, isThinking: true, _streamState: streamState });
+      }
+    } else if (inner.type === "content_block_stop") {
+      ensureAssistant();
+      const streamState = cloneStreamState(lastMsg._streamState);
+      const stoppedKey = streamState.activeBlocks[inner.index];
+      delete streamState.activeBlocks[inner.index];
+
+      if (stoppedKey && streamState.activeThinking[stoppedKey]) {
+        delete streamState.activeThinking[stoppedKey];
+      }
+
+      updateAssistant({
+        isThinking: Object.keys(streamState.activeThinking).length > 0,
+        _streamState: streamState,
+      });
+    }
+  } else if (event.type === "assistant") {
+    // With --include-partial-messages, assistant events contain full accumulated text.
+    // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
+    // Usage here is per-API-call, not cumulative — skip it to avoid flicker;
+    // the `result` event below owns the authoritative cumulative usage.
+    ensureAssistant();
+    const parts = cloneParts(lastMsg.parts);
+    const hasStreamParts = parts.length > 0;
+    if (!hasStreamParts && event.message?.content) {
+      for (const block of event.message.content) {
+        if (block.type === "text" && block.text) {
+          parts.push({ type: "text", text: block.text });
+        }
+        if (block.type === "tool_use") {
+          if (!findToolPart(parts, block.id)) {
+            parts.push({
+              type: "tool",
+              id: block.id,
+              name: block.name || "unknown",
+              args: block.input || {},
+              result: null,
+              status: "running",
+            });
+          }
+        }
+        if (block.type === "image") {
+          const imagePart = buildImagePartFromAnthropicBlock(block);
+          if (imagePart) parts.push(imagePart);
+        }
+      }
+      msgs[msgs.length - 1] = { ...lastMsg, parts, isThinking: false };
+      lastMsg = msgs[msgs.length - 1];
+    }
+  } else if (event.type === "user") {
+    // Capture the UUID from user events — needed for rewind/edit
+    if (event.uuid) {
+      log("User event UUID:", event.uuid, "has tool_result:",
+        event.message?.content?.some?.(b => b.type === "tool_result"));
+      // Find the last user message and store the Claude-assigned UUID
+      for (let mi = msgs.length - 1; mi >= 0; mi--) {
+        if (msgs[mi].role === "user" && !msgs[mi].claudeUuid) {
+          msgs[mi] = { ...msgs[mi], claudeUuid: event.uuid };
+          log("Stored claudeUuid on user msg:", msgs[mi].text?.slice(0, 50));
+          break;
+        }
+      }
+    }
+    if (event.message?.content) {
+      for (const block of event.message.content) {
+        if (block.type === "tool_result" && block.tool_use_id) {
+          for (let mi = msgs.length - 1; mi >= 0; mi--) {
+            if (msgs[mi].role === "assistant" && msgs[mi].parts) {
+              const parts = cloneParts(msgs[mi].parts);
+              const tpIdx = parts.findIndex(p => p.type === "tool" && p.id === block.tool_use_id);
+              if (tpIdx >= 0) {
+                parts[tpIdx] = { ...parts[tpIdx], result: block.content, status: "done" };
+                msgs[mi] = { ...msgs[mi], parts };
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  } else if (event.type === "result") {
+    if (lastMsg && lastMsg.role === "assistant") {
+      // Note: `event.usage` here is aggregated across every API call in
+      // the turn (ballooned `cache_read` when the turn had multiple tool
+      // loops). That's right for cost, wrong for window fullness — we
+      // already captured the final call's cumulative usage from
+      // `message_delta`. Leave `_usage` alone.
+      if (event.is_error || event.subtype === "error_during_execution") {
+        // Surface the error as text in the assistant message
+        const errorText = event.result || event.error
+          || (event.errors && event.errors.length > 0 ? event.errors.join("\n") : null)
+          || "An error occurred.";
+        const parts = cloneParts(lastMsg.parts);
+        parts.push({ type: "text", text: `**Error:** ${errorText}` });
+        msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
+      } else if (event.terminal_reason === "hook_stopped") {
+        const parts = cloneParts(lastMsg.parts);
+        const hasPausedStatus = parts.some((part) => part.type === "status" && part.kind === "paused");
+        if (!hasPausedStatus) {
+          parts.push({
+            type: "status",
+            kind: "paused",
+            title: "Paused by hook",
+            text: "Claude stopped after a tool hook returned continue: false. This is expected — send another message when you want to continue.",
+          });
+        }
+        msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
+      } else {
+        msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
+      }
+    }
+    nextIsStreaming = false;
+  }
+
+  // Claude Code plan quota — synthetic event emitted by the main process
+  // after each `result`, sourced from `api.anthropic.com/api/oauth/usage`
+  // (Pro/Max only — silently absent for API-key users). Already
+  // normalized to the same `{ five_hour, seven_day }` shape Codex uses,
+  // so it just attaches to the latest assistant message.
+  else if (event.type === "rate_limits" && event.rate_limits) {
+    const idx = findLatestAssistantIndex(msgs);
+    if (idx >= 0) {
+      msgs[idx] = { ...msgs[idx], _rateLimits: event.rate_limits };
+      if (idx === msgs.length - 1) lastMsg = msgs[idx];
+    }
+  }
+
+  else if (event.type === "session_snapshot" && event.provider === "codex") {
+    if (event.thread_id) {
+      convo._codexThreadId = event.thread_id;
+    }
+    const idx = findLatestAssistantIndex(msgs);
+    if (idx >= 0) {
+      msgs[idx] = {
+        ...msgs[idx],
+        ...(event.usage
+          ? { _usage: mergeUsage(msgs[idx]._usage, event.usage) }
+          : {}),
+        ...(event.rate_limits ? { _rateLimits: event.rate_limits } : {}),
+      };
+      if (idx === msgs.length - 1) lastMsg = msgs[idx];
+    }
+  }
+
+  // Claude Code emits a top-level `system` event with
+  // `subtype: "compact_boundary"` whenever auto-compaction runs. Flag
+  // the message transiently so the live status can show "compacting…";
+  // `freezeElapsed` strips this on stream end so it doesn't persist.
+  else if (event.type === "system" && event.subtype === "compact_boundary") {
+    const am = ensureAssistant();
+    msgs[msgs.length - 1] = { ...am, _compacting: true };
+    lastMsg = msgs[msgs.length - 1];
+  }
+
+  // --- OpenCode JSONL stream events ---
+  else if (
+    event.type === "opencode_stdout" ||
+    event.type === "step_start" ||
+    event.type === "tool_use" ||
+    event.type === "reasoning" ||
+    event.type === "text" ||
+    event.type === "step_finish" ||
+    event.type === "error"
+  ) {
+    const sessionId = extractOpenCodeSessionId(event);
+    if (sessionId) {
+      convo._opencodeSessionId = sessionId;
+      log("Captured OpenCode session ID:", {
+        conversationId,
+        sessionId,
+        eventType: event.type,
+      });
+    }
+
+    if (event.type === "step_start") {
+      ensureAssistant();
+    } else if (event.type === "tool_use") {
+      const am = ensureAssistant();
+      const tool = extractOpenCodeTool(event);
+      const parts = upsertOpenCodePart(cloneParts(am.parts), { type: "tool", ...tool });
+      msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
+      lastMsg = msgs[msgs.length - 1];
+    } else if (event.type === "reasoning") {
+      const thinkingPart = buildOpenCodeThinkingPart(event);
+      if (thinkingPart) {
+        const am = ensureAssistant();
+        const parts = upsertOpenCodePart(cloneParts(am.parts), thinkingPart);
+        const stillThinking = !Number.isFinite(thinkingPart.durationMs);
+        msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: stillThinking };
+        lastMsg = msgs[msgs.length - 1];
+      }
+    } else if (event.type === "text" || event.type === "opencode_stdout") {
+      const textParts = splitOpenCodeTextAndThinkingParts(event);
+      if (textParts.length > 0) {
+        const am = ensureAssistant();
+        const parts = textParts.reduce(
+          (acc, textPart) => upsertOpenCodePart(acc, textPart),
+          cloneParts(am.parts)
+        );
+        msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: false };
+        lastMsg = msgs[msgs.length - 1];
+      }
+    } else if (event.type === "error") {
+      const am = ensureAssistant();
+      const parts = cloneParts(am.parts);
+      parts.push({ type: "text", text: `**Error:** ${extractOpenCodeError(event)}` });
+      msgs[msgs.length - 1] = freezeElapsed({ ...am, parts, isStreaming: false, isThinking: false });
+      lastMsg = msgs[msgs.length - 1];
+      nextIsStreaming = false;
+    } else if (event.type === "step_finish") {
+      const am = ensureAssistant();
+      const usage = normalizeOpenCodeUsage(event.part, am._usage);
+      if (usage) {
+        msgs[msgs.length - 1] = { ...am, _usage: usage };
+        lastMsg = msgs[msgs.length - 1];
+      }
+      const reason = event.reason || event.part?.reason || event.status || "";
+      if (/^(stop|done|complete|completed|end_turn)$/i.test(String(reason))) {
+        msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
+        lastMsg = msgs[msgs.length - 1];
+        nextIsStreaming = false;
+      }
+    }
+  }
+
+  // --- Codex JSONL stream events ---
+  else if (event.type === "session_meta" && event.payload?.id) {
+    convo._codexThreadId = event.payload.id;
+    log("Captured Codex thread ID:", {
+      conversationId,
+      threadId: event.payload.id,
+      source: "session_meta",
+    });
+  } else if (event.type === "thread.started") {
+    convo._codexThreadId = event.thread_id;
+    log("Captured Codex thread ID:", {
+      conversationId,
+      threadId: event.thread_id,
+      source: "thread.started",
+    });
+  } else if (event.type === "event_msg" && event.payload?.type === "token_count") {
+    const tokenInfo = event.payload.info;
+    const usage = normalizeCodexUsage(
+      tokenInfo?.last_token_usage || tokenInfo?.total_token_usage,
+      tokenInfo?.model_context_window
+    );
+    const rateLimits = normalizeCodexRateLimits(event.payload.rate_limits);
+    if (usage || rateLimits) {
+      const am = ensureAssistant();
+      const patch = { ...am };
+      if (usage) patch._usage = usage;
+      if (rateLimits) patch._rateLimits = rateLimits;
+      msgs[msgs.length - 1] = patch;
+      lastMsg = msgs[msgs.length - 1];
+    }
+  } else if (event.type === "event_msg" && event.payload?.type === "task_started") {
+    const am = ensureAssistant();
+    const contextWindow = event.payload.model_context_window;
+    if (Number.isFinite(contextWindow)) {
+      msgs[msgs.length - 1] = {
+        ...am,
+        _usage: mergeUsage(am._usage, { context_window: contextWindow }),
+      };
+      lastMsg = msgs[msgs.length - 1];
+    }
+  } else if (event.type === "turn.started") {
+    ensureAssistant();
+  } else if (event.type === "item.started") {
+    const item = event.item || {};
+    if (item.type === "command_execution") {
+      const am = ensureAssistant();
+      const parts = cloneParts(am.parts);
+      parts.push({
+        type: "tool",
+        id: item.id || uid(),
+        name: item.command || "command",
+        args: { command: item.command },
+        result: null,
+        status: "running",
+      });
+      msgs[msgs.length - 1] = { ...am, parts };
+      lastMsg = msgs[msgs.length - 1];
+    }
+  } else if (event.type === "item.completed") {
+    const item = event.item || {};
+    if (item.type === "agent_message") {
+      const am = ensureAssistant();
+      const parts = cloneParts(am.parts);
+      parts.push({ type: "text", text: item.text || "" });
+      msgs[msgs.length - 1] = { ...am, parts };
+      lastMsg = msgs[msgs.length - 1];
+    } else if (item.type === "command_execution") {
+      const am = ensureAssistant();
+      const parts = cloneParts(am.parts);
+      const existingIdx = parts.findIndex(
+        (p) => p.type === "tool" && p.id === item.id
+      );
+      if (existingIdx >= 0) {
+        parts[existingIdx] = {
+          ...parts[existingIdx],
+          result: item.aggregated_output,
+          status: "done",
+        };
+      } else {
+        parts.push({
+          type: "tool",
+          id: item.id || uid(),
+          name: item.command || "command",
+          args: { command: item.command },
+          result: item.aggregated_output,
+          status: "done",
+        });
+      }
+      msgs[msgs.length - 1] = { ...am, parts };
+      lastMsg = msgs[msgs.length - 1];
+    }
+  } else if (event.type === "response_item") {
+    const payload = event.payload || {};
+    if (payload.type === "message" && payload.role === "assistant") {
+      const text = extractCodexResponseText(payload.content);
+      const images = extractCodexResponseImages(payload.content);
+      if (text || images.length > 0) {
+        const am = ensureAssistant();
+        const parts = cloneParts(am.parts);
+        if (text) parts.push({ type: "text", text });
+        for (const imagePart of images) parts.push(imagePart);
+        msgs[msgs.length - 1] = { ...am, parts };
+        lastMsg = msgs[msgs.length - 1];
+      }
+    } else if (payload.type === "function_call" || payload.type === "custom_tool_call") {
+      const am = ensureAssistant();
+      const parts = cloneParts(am.parts);
+      const toolId = payload.call_id || uid();
+      const existingIdx = parts.findIndex((p) => p.type === "tool" && p.id === toolId);
+      const nextTool = {
+        type: "tool",
+        id: toolId,
+        name: payload.name || "tool",
+        args: normalizeCodexToolArgs(payload),
+        result: existingIdx >= 0 ? parts[existingIdx].result : null,
+        status: payload.status === "completed" ? "done" : "running",
+      };
+
+      if (existingIdx >= 0) {
+        parts[existingIdx] = { ...parts[existingIdx], ...nextTool };
+      } else {
+        parts.push(nextTool);
+      }
+
+      msgs[msgs.length - 1] = { ...am, parts };
+      lastMsg = msgs[msgs.length - 1];
+    } else if (payload.type === "function_call_output" || payload.type === "custom_tool_call_output") {
+      const am = ensureAssistant();
+      const parts = cloneParts(am.parts);
+      const existingIdx = parts.findIndex(
+        (p) => p.type === "tool" && p.id === payload.call_id
+      );
+      const result = normalizeCodexToolResult(payload.output);
+
+      if (existingIdx >= 0) {
+        parts[existingIdx] = {
+          ...parts[existingIdx],
+          result,
+          status: "done",
+        };
+      } else {
+        parts.push({
+          type: "tool",
+          id: payload.call_id || uid(),
+          name: "tool",
+          args: {},
+          result,
+          status: "done",
+        });
+      }
+
+      msgs[msgs.length - 1] = { ...am, parts };
+      lastMsg = msgs[msgs.length - 1];
+    }
+  } else if (event.type === "turn.completed") {
+    if (lastMsg && lastMsg.role === "assistant") {
+      // RayLine's live Codex stdout still uses the older
+      // `thread.started`/`turn.completed` schema even though the saved
+      // session JSONL now contains the richer `token_count` event.
+      // Merge this older usage packet as an immediate fallback so the
+      // footer can render without waiting for session-file hydration.
+      const fallbackUsage = normalizeCodexUsage(event.usage);
+      msgs[msgs.length - 1] = freezeElapsed({
+        ...lastMsg,
+        ...(fallbackUsage
+          ? { _usage: mergeUsage(lastMsg._usage, fallbackUsage) }
+          : {}),
+        isStreaming: false,
+        isThinking: false,
+      });
+      lastMsg = msgs[msgs.length - 1];
+    }
+    nextIsStreaming = false;
+  } else if (event.type === "event_msg" && event.payload?.type === "task_complete") {
+    const completionText = event.payload.last_agent_message;
+    const am = ensureAssistant();
+    let parts = cloneParts(am.parts);
+    const hasText = parts.some((part) => part.type === "text" && part.text);
+
+    if (!hasText && completionText) {
+      parts.push({ type: "text", text: completionText });
+    }
+
+    msgs[msgs.length - 1] = freezeElapsed({
+      ...am,
+      parts,
+      isStreaming: false,
+      isThinking: false,
+    });
+    lastMsg = msgs[msgs.length - 1];
+    nextIsStreaming = false;
+  }
+
+  next.set(conversationId, { ...convo, messages: msgs, isStreaming: nextIsStreaming });
+  return next;
+}
+
 export default function useAgent() {
   const [conversations, setConversations] = useState(new Map());
   const cleanupRefs = useRef([]);
   const pendingStartsRef = useRef(new Map());
   const usageHydrationTimersRef = useRef(new Set());
+  // Stream-event coalescing (see PHASE 2 optimization): incoming IPC stream
+  // events are buffered here in arrival order and folded into React state on a
+  // controlled ~30fps cadence instead of one commit per token.
+  const pendingStreamEventsRef = useRef([]);
+  const streamFlushFrameRef = useRef(0);
+  const lastStreamFlushAtRef = useRef(0);
 
   useEffect(() => {
     if (!window.api) return;
@@ -521,652 +1206,61 @@ export default function useAgent() {
       });
     };
 
+    // Apply all buffered stream events in arrival order as a SINGLE React
+    // commit. Lossless: every queued event is reduced; ordering is preserved by
+    // the array + reduce. The evolving Map threads through each event so
+    // in-place `convo._claudeSessionId = ...` mutations on the shared convo
+    // object reference still work (each event does `new Map(prev)` whose
+    // `.get()` returns the same convo object).
+    const flushStreamEvents = () => {
+      const pending = pendingStreamEventsRef.current;
+      if (pending.length === 0) return;
+      pendingStreamEventsRef.current = [];
+      lastStreamFlushAtRef.current = performance.now();
+      setConversations((prev) =>
+        pending.reduce(
+          (map, item) => applyStreamEventToConversations(map, item.conversationId, item.event),
+          prev
+        )
+      );
+    };
+
+    // Schedule a coalesced flush via rAF, throttled to ~30fps. If a frame is
+    // already scheduled, no-op. In the rAF callback, if we flushed too
+    // recently, re-schedule another frame; otherwise flush now.
+    const scheduleStreamFlush = () => {
+      if (streamFlushFrameRef.current) return;
+      const tick = () => {
+        const now = performance.now();
+        if (now - lastStreamFlushAtRef.current < STREAM_FLUSH_MIN_INTERVAL_MS) {
+          streamFlushFrameRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        streamFlushFrameRef.current = 0;
+        flushStreamEvents();
+      };
+      streamFlushFrameRef.current = requestAnimationFrame(tick);
+    };
+
     const offStream = window.api.onAgentStream(({ conversationId, event }) => {
-      setConversations((prev) => {
-        const next = new Map(prev);
-        const convo = next.get(conversationId) || { messages: [], isStreaming: true, error: null };
-        const msgs = [...convo.messages];
-        let lastMsg = msgs[msgs.length - 1];
-        // Some runs finish logically before the underlying CLI process fully
-        // exits, e.g. a background shell keeps stdout/stderr open for a moment.
-        // Track the conversation-level flag separately so we can unblock the UI
-        // on terminal completion events without waiting for `agent-done`.
-        let nextIsStreaming = Boolean(convo.isStreaming);
-
-        if (event.session_id && convo._claudeSessionId !== event.session_id) {
-          convo._claudeSessionId = event.session_id;
-          log("Captured Claude session ID:", {
-            conversationId,
-            sessionId: event.session_id,
-            eventType: event.type,
-            subtype: event.subtype,
-          });
+      pendingStreamEventsRef.current.push({ conversationId, event });
+      // Terminal / must-show-now events bypass the coalescer so completion and
+      // the `isStreaming` flip feel snappy.
+      if (isImmediateFlushEvent(event)) {
+        if (streamFlushFrameRef.current) {
+          cancelAnimationFrame(streamFlushFrameRef.current);
+          streamFlushFrameRef.current = 0;
         }
-
-        const ensureAssistant = () => {
-          if (!lastMsg || lastMsg.role !== "assistant") {
-            lastMsg = {
-              id: uid(),
-              role: "assistant",
-              parts: [],
-              isStreaming: true,
-              isThinking: false,
-              _streamState: cloneStreamState(),
-              _startedAt: Date.now(),
-              _usage: null,
-            };
-            msgs.push(lastMsg);
-          } else if (!lastMsg._startedAt) {
-            lastMsg = { ...lastMsg, _startedAt: Date.now() };
-            msgs[msgs.length - 1] = lastMsg;
-          }
-          return lastMsg;
-        };
-
-        if (typeof event.type === "string" && event.type.startsWith("multica:")) {
-          const inner = event.type.slice("multica:".length);
-          const p = event.payload || {};
-          // transient — resets per-session; stripped in buildPersistedConversationSnapshot
-          const connectedPatch = convo.multicaConnected ? null : { multicaConnected: true };
-
-          // No-op branches return early WITHOUT running ensureAssistant — we
-          // don't want a stray empty assistant bubble if a user echo arrives
-          // before any task:message.
-          if (inner === "chat:message" && p.role === "user") {
-            if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
-            return next;
-          }
-          if (inner === "agent:status") {
-            window.dispatchEvent(new CustomEvent("multica-agent-status", { detail: p.agent }));
-            if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
-            return next;
-          }
-
-          const assistant = ensureAssistant();
-
-          if (inner === "task:message") {
-            const part = mapMulticaTaskMessage(p);
-            if (!part) {
-              if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
-              return next;
-            }
-            const parts = [...(assistant.parts || [])];
-            if (p.type === "tool_result") {
-              const pendingIdx = findPendingMulticaToolIdx(parts, p.tool);
-              if (pendingIdx >= 0) {
-                parts[pendingIdx] = { ...parts[pendingIdx], result: p.output || "", status: "done" };
-              } else {
-                parts.push(part);
-              }
-            } else {
-              parts.push(part);
-            }
-            msgs[msgs.length - 1] = { ...assistant, parts, isStreaming: true };
-            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: true });
-            return next;
-          }
-
-          if (inner === "chat:done" || inner === "task:completed") {
-            msgs[msgs.length - 1] = freezeElapsed({ ...assistant, isStreaming: false });
-            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false });
-            return next;
-          }
-
-          if (inner === "task:cancelled") {
-            msgs[msgs.length - 1] = freezeElapsed({ ...assistant, isStreaming: false });
-            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false, error: null });
-            return next;
-          }
-
-          if (inner === "task:failed" || inner === "error") {
-            msgs[msgs.length - 1] = freezeElapsed({
-              ...assistant, isStreaming: false,
-              parts: [...(assistant.parts || []), { type: "text", text: `_Multica ${inner}: ${p.message || p.reason || ""}_` }],
-            });
-            next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false, error: p.message || inner });
-            return next;
-          }
-
-          if (connectedPatch) next.set(conversationId, { ...convo, ...connectedPatch });
-          return next;
-        }
-
-        if (event.type === "stream_event") {
-          const inner = event.event;
-          if (!inner) { next.set(conversationId, { ...convo, messages: msgs }); return next; }
-
-          // Helper to update the last assistant message and keep lastMsg in sync
-          const updateAssistant = (updates) => {
-            const merged = { ...lastMsg, ...updates };
-            msgs[msgs.length - 1] = merged;
-            lastMsg = merged;
-          };
-
-          // Context-window fullness tracking.
-          //
-          // We deliberately track the LATEST API call's usage (not the turn
-          // aggregate). A multi-tool-use turn re-sends the prompt once per
-          // call, so aggregating would make `cache_read` balloon by the number
-          // of calls — that measures how much *work* was done, not how full
-          // the window is. The cumulative snapshot at the END of the last
-          // call is what actually reflects "tokens currently in the window."
-          //
-          // - `message_start` → overwrite `_usage` (new API call begins)
-          // - `message_delta` → merge (output_tokens grows during generation)
-          // - `result` below → ignored for usage (it's turn-aggregated)
-          if (inner.type === "message_start" && inner.message?.usage) {
-            ensureAssistant();
-            updateAssistant({ _usage: { ...inner.message.usage } });
-          } else if (inner.type === "message_delta" && inner.usage) {
-            ensureAssistant();
-            updateAssistant({ _usage: mergeUsage(lastMsg._usage, inner.usage) });
-          }
-
-          if (inner.type === "content_block_start") {
-            const block = inner.content_block;
-            ensureAssistant();
-            const parts = cloneParts(lastMsg.parts);
-            const streamState = cloneStreamState(lastMsg._streamState);
-            const blockIndex = inner.index;
-
-            if (streamState.seenIndexes[blockIndex]) {
-              streamState.currentTurn += 1;
-              streamState.seenIndexes = {};
-              streamState.activeBlocks = {};
-              streamState.activeThinking = {};
-            }
-
-            streamState.seenIndexes[blockIndex] = true;
-            const streamKey = buildBlockKey(streamState.currentTurn, blockIndex);
-            streamState.activeBlocks[blockIndex] = streamKey;
-
-            if (block?.type === "thinking") {
-              parts.push({ type: "thinking", text: "", blockIndex, _streamKey: streamKey });
-              streamState.activeThinking[streamKey] = true;
-              updateAssistant({ parts, isStreaming: true, isThinking: true, _streamState: streamState });
-            } else if (block?.type === "tool_use") {
-              parts.push({
-                type: "tool",
-                id: block.id || "tc" + uid(),
-                name: block.name || "unknown",
-                args: {},
-                argsJson: "",
-                result: null,
-                status: "running",
-                blockIndex,
-                _streamKey: streamKey,
-              });
-              updateAssistant({ parts, isStreaming: true, _streamState: streamState });
-            } else if (block?.type === "text") {
-              parts.push({ type: "text", text: "", blockIndex, _streamKey: streamKey });
-              updateAssistant({ parts, isStreaming: true, _streamState: streamState });
-            } else if (block?.type === "image") {
-              // Anthropic vision-output blocks arrive whole (no per-delta data
-              // for image bytes), so push the full image part on start.
-              const imagePart = buildImagePartFromAnthropicBlock(block);
-              if (imagePart) {
-                parts.push({ ...imagePart, blockIndex, _streamKey: streamKey });
-                updateAssistant({ parts, isStreaming: true, _streamState: streamState });
-              }
-            }
-          } else if (inner.type === "content_block_delta") {
-            ensureAssistant();
-            const parts = cloneParts(lastMsg.parts);
-            const streamState = cloneStreamState(lastMsg._streamState);
-            const delta = inner.delta;
-            const streamKey = streamState.activeBlocks[inner.index];
-            if (delta?.type === "text_delta") {
-              const textIdx = findPartIndexByStreamKey(parts, streamKey, "text");
-              if (textIdx >= 0) {
-                parts[textIdx] = { ...parts[textIdx], text: parts[textIdx].text + (delta.text || "") };
-              }
-              updateAssistant({ parts, isStreaming: true, _streamState: streamState });
-            } else if (delta?.type === "input_json_delta") {
-              const toolIdx = findPartIndexByStreamKey(parts, streamKey, "tool");
-              if (toolIdx >= 0) {
-                const newJson = (parts[toolIdx].argsJson || "") + (delta.partial_json || "");
-                let newArgs = parts[toolIdx].args;
-                try {
-                  newArgs = JSON.parse(newJson);
-                } catch {
-                  // Keep accumulating partial JSON until it becomes parseable.
-                }
-                parts[toolIdx] = { ...parts[toolIdx], argsJson: newJson, args: newArgs };
-              }
-              updateAssistant({ parts, isStreaming: true, _streamState: streamState });
-            } else if (delta?.type === "thinking_delta") {
-              const thinkingIdx = findPartIndexByStreamKey(parts, streamKey, "thinking");
-              if (thinkingIdx >= 0) {
-                parts[thinkingIdx] = {
-                  ...parts[thinkingIdx],
-                  text: parts[thinkingIdx].text + (delta.thinking || ""),
-                };
-              }
-              updateAssistant({ parts, isStreaming: true, isThinking: true, _streamState: streamState });
-            }
-          } else if (inner.type === "content_block_stop") {
-            ensureAssistant();
-            const streamState = cloneStreamState(lastMsg._streamState);
-            const stoppedKey = streamState.activeBlocks[inner.index];
-            delete streamState.activeBlocks[inner.index];
-
-            if (stoppedKey && streamState.activeThinking[stoppedKey]) {
-              delete streamState.activeThinking[stoppedKey];
-            }
-
-            updateAssistant({
-              isThinking: Object.keys(streamState.activeThinking).length > 0,
-              _streamState: streamState,
-            });
-          }
-        } else if (event.type === "assistant") {
-          // With --include-partial-messages, assistant events contain full accumulated text.
-          // Only use these if we have NO stream_event parts yet (fallback for non-streaming).
-          // Usage here is per-API-call, not cumulative — skip it to avoid flicker;
-          // the `result` event below owns the authoritative cumulative usage.
-          ensureAssistant();
-          const parts = cloneParts(lastMsg.parts);
-          const hasStreamParts = parts.length > 0;
-          if (!hasStreamParts && event.message?.content) {
-            for (const block of event.message.content) {
-              if (block.type === "text" && block.text) {
-                parts.push({ type: "text", text: block.text });
-              }
-              if (block.type === "tool_use") {
-                if (!findToolPart(parts, block.id)) {
-                  parts.push({
-                    type: "tool",
-                    id: block.id,
-                    name: block.name || "unknown",
-                    args: block.input || {},
-                    result: null,
-                    status: "running",
-                  });
-                }
-              }
-              if (block.type === "image") {
-                const imagePart = buildImagePartFromAnthropicBlock(block);
-                if (imagePart) parts.push(imagePart);
-              }
-            }
-            msgs[msgs.length - 1] = { ...lastMsg, parts, isThinking: false };
-            lastMsg = msgs[msgs.length - 1];
-          }
-        } else if (event.type === "user") {
-          // Capture the UUID from user events — needed for rewind/edit
-          if (event.uuid) {
-            log("User event UUID:", event.uuid, "has tool_result:",
-              event.message?.content?.some?.(b => b.type === "tool_result"));
-            // Find the last user message and store the Claude-assigned UUID
-            for (let mi = msgs.length - 1; mi >= 0; mi--) {
-              if (msgs[mi].role === "user" && !msgs[mi].claudeUuid) {
-                msgs[mi] = { ...msgs[mi], claudeUuid: event.uuid };
-                log("Stored claudeUuid on user msg:", msgs[mi].text?.slice(0, 50));
-                break;
-              }
-            }
-          }
-          if (event.message?.content) {
-            for (const block of event.message.content) {
-              if (block.type === "tool_result" && block.tool_use_id) {
-                for (let mi = msgs.length - 1; mi >= 0; mi--) {
-                  if (msgs[mi].role === "assistant" && msgs[mi].parts) {
-                    const parts = cloneParts(msgs[mi].parts);
-                    const tpIdx = parts.findIndex(p => p.type === "tool" && p.id === block.tool_use_id);
-                    if (tpIdx >= 0) {
-                      parts[tpIdx] = { ...parts[tpIdx], result: block.content, status: "done" };
-                      msgs[mi] = { ...msgs[mi], parts };
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        } else if (event.type === "result") {
-          if (lastMsg && lastMsg.role === "assistant") {
-            // Note: `event.usage` here is aggregated across every API call in
-            // the turn (ballooned `cache_read` when the turn had multiple tool
-            // loops). That's right for cost, wrong for window fullness — we
-            // already captured the final call's cumulative usage from
-            // `message_delta`. Leave `_usage` alone.
-            if (event.is_error || event.subtype === "error_during_execution") {
-              // Surface the error as text in the assistant message
-              const errorText = event.result || event.error
-                || (event.errors && event.errors.length > 0 ? event.errors.join("\n") : null)
-                || "An error occurred.";
-              const parts = cloneParts(lastMsg.parts);
-              parts.push({ type: "text", text: `**Error:** ${errorText}` });
-              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
-            } else if (event.terminal_reason === "hook_stopped") {
-              const parts = cloneParts(lastMsg.parts);
-              const hasPausedStatus = parts.some((part) => part.type === "status" && part.kind === "paused");
-              if (!hasPausedStatus) {
-                parts.push({
-                  type: "status",
-                  kind: "paused",
-                  title: "Paused by hook",
-                  text: "Claude stopped after a tool hook returned continue: false. This is expected — send another message when you want to continue.",
-                });
-              }
-              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
-            } else {
-              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
-            }
-          }
-          nextIsStreaming = false;
-        }
-
-        // Claude Code plan quota — synthetic event emitted by the main process
-        // after each `result`, sourced from `api.anthropic.com/api/oauth/usage`
-        // (Pro/Max only — silently absent for API-key users). Already
-        // normalized to the same `{ five_hour, seven_day }` shape Codex uses,
-        // so it just attaches to the latest assistant message.
-        else if (event.type === "rate_limits" && event.rate_limits) {
-          const idx = findLatestAssistantIndex(msgs);
-          if (idx >= 0) {
-            msgs[idx] = { ...msgs[idx], _rateLimits: event.rate_limits };
-            if (idx === msgs.length - 1) lastMsg = msgs[idx];
-          }
-        }
-
-        else if (event.type === "session_snapshot" && event.provider === "codex") {
-          if (event.thread_id) {
-            convo._codexThreadId = event.thread_id;
-          }
-          const idx = findLatestAssistantIndex(msgs);
-          if (idx >= 0) {
-            msgs[idx] = {
-              ...msgs[idx],
-              ...(event.usage
-                ? { _usage: mergeUsage(msgs[idx]._usage, event.usage) }
-                : {}),
-              ...(event.rate_limits ? { _rateLimits: event.rate_limits } : {}),
-            };
-            if (idx === msgs.length - 1) lastMsg = msgs[idx];
-          }
-        }
-
-        // Claude Code emits a top-level `system` event with
-        // `subtype: "compact_boundary"` whenever auto-compaction runs. Flag
-        // the message transiently so the live status can show "compacting…";
-        // `freezeElapsed` strips this on stream end so it doesn't persist.
-        else if (event.type === "system" && event.subtype === "compact_boundary") {
-          const am = ensureAssistant();
-          msgs[msgs.length - 1] = { ...am, _compacting: true };
-          lastMsg = msgs[msgs.length - 1];
-        }
-
-        // --- OpenCode JSONL stream events ---
-        else if (
-          event.type === "opencode_stdout" ||
-          event.type === "step_start" ||
-          event.type === "tool_use" ||
-          event.type === "reasoning" ||
-          event.type === "text" ||
-          event.type === "step_finish" ||
-          event.type === "error"
-        ) {
-          const sessionId = extractOpenCodeSessionId(event);
-          if (sessionId) {
-            convo._opencodeSessionId = sessionId;
-            log("Captured OpenCode session ID:", {
-              conversationId,
-              sessionId,
-              eventType: event.type,
-            });
-          }
-
-          if (event.type === "step_start") {
-            ensureAssistant();
-          } else if (event.type === "tool_use") {
-            const am = ensureAssistant();
-            const tool = extractOpenCodeTool(event);
-            const parts = upsertOpenCodePart(cloneParts(am.parts), { type: "tool", ...tool });
-            msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
-            lastMsg = msgs[msgs.length - 1];
-          } else if (event.type === "reasoning") {
-            const thinkingPart = buildOpenCodeThinkingPart(event);
-            if (thinkingPart) {
-              const am = ensureAssistant();
-              const parts = upsertOpenCodePart(cloneParts(am.parts), thinkingPart);
-              const stillThinking = !Number.isFinite(thinkingPart.durationMs);
-              msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: stillThinking };
-              lastMsg = msgs[msgs.length - 1];
-            }
-          } else if (event.type === "text" || event.type === "opencode_stdout") {
-            const textParts = splitOpenCodeTextAndThinkingParts(event);
-            if (textParts.length > 0) {
-              const am = ensureAssistant();
-              const parts = textParts.reduce(
-                (acc, textPart) => upsertOpenCodePart(acc, textPart),
-                cloneParts(am.parts)
-              );
-              msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: false };
-              lastMsg = msgs[msgs.length - 1];
-            }
-          } else if (event.type === "error") {
-            const am = ensureAssistant();
-            const parts = cloneParts(am.parts);
-            parts.push({ type: "text", text: `**Error:** ${extractOpenCodeError(event)}` });
-            msgs[msgs.length - 1] = freezeElapsed({ ...am, parts, isStreaming: false, isThinking: false });
-            lastMsg = msgs[msgs.length - 1];
-            nextIsStreaming = false;
-          } else if (event.type === "step_finish") {
-            const am = ensureAssistant();
-            const usage = normalizeOpenCodeUsage(event.part, am._usage);
-            if (usage) {
-              msgs[msgs.length - 1] = { ...am, _usage: usage };
-              lastMsg = msgs[msgs.length - 1];
-            }
-            const reason = event.reason || event.part?.reason || event.status || "";
-            if (/^(stop|done|complete|completed|end_turn)$/i.test(String(reason))) {
-              msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, isStreaming: false, isThinking: false });
-              lastMsg = msgs[msgs.length - 1];
-              nextIsStreaming = false;
-            }
-          }
-        }
-
-        // --- Codex JSONL stream events ---
-        else if (event.type === "session_meta" && event.payload?.id) {
-          convo._codexThreadId = event.payload.id;
-          log("Captured Codex thread ID:", {
-            conversationId,
-            threadId: event.payload.id,
-            source: "session_meta",
-          });
-        } else if (event.type === "thread.started") {
-          convo._codexThreadId = event.thread_id;
-          log("Captured Codex thread ID:", {
-            conversationId,
-            threadId: event.thread_id,
-            source: "thread.started",
-          });
-        } else if (event.type === "event_msg" && event.payload?.type === "token_count") {
-          const tokenInfo = event.payload.info;
-          const usage = normalizeCodexUsage(
-            tokenInfo?.last_token_usage || tokenInfo?.total_token_usage,
-            tokenInfo?.model_context_window
-          );
-          const rateLimits = normalizeCodexRateLimits(event.payload.rate_limits);
-          if (usage || rateLimits) {
-            const am = ensureAssistant();
-            const patch = { ...am };
-            if (usage) patch._usage = usage;
-            if (rateLimits) patch._rateLimits = rateLimits;
-            msgs[msgs.length - 1] = patch;
-            lastMsg = msgs[msgs.length - 1];
-          }
-        } else if (event.type === "event_msg" && event.payload?.type === "task_started") {
-          const am = ensureAssistant();
-          const contextWindow = event.payload.model_context_window;
-          if (Number.isFinite(contextWindow)) {
-            msgs[msgs.length - 1] = {
-              ...am,
-              _usage: mergeUsage(am._usage, { context_window: contextWindow }),
-            };
-            lastMsg = msgs[msgs.length - 1];
-          }
-        } else if (event.type === "turn.started") {
-          ensureAssistant();
-        } else if (event.type === "item.started") {
-          const item = event.item || {};
-          if (item.type === "command_execution") {
-            const am = ensureAssistant();
-            const parts = cloneParts(am.parts);
-            parts.push({
-              type: "tool",
-              id: item.id || uid(),
-              name: item.command || "command",
-              args: { command: item.command },
-              result: null,
-              status: "running",
-            });
-            msgs[msgs.length - 1] = { ...am, parts };
-            lastMsg = msgs[msgs.length - 1];
-          }
-        } else if (event.type === "item.completed") {
-          const item = event.item || {};
-          if (item.type === "agent_message") {
-            const am = ensureAssistant();
-            const parts = cloneParts(am.parts);
-            parts.push({ type: "text", text: item.text || "" });
-            msgs[msgs.length - 1] = { ...am, parts };
-            lastMsg = msgs[msgs.length - 1];
-          } else if (item.type === "command_execution") {
-            const am = ensureAssistant();
-            const parts = cloneParts(am.parts);
-            const existingIdx = parts.findIndex(
-              (p) => p.type === "tool" && p.id === item.id
-            );
-            if (existingIdx >= 0) {
-              parts[existingIdx] = {
-                ...parts[existingIdx],
-                result: item.aggregated_output,
-                status: "done",
-              };
-            } else {
-              parts.push({
-                type: "tool",
-                id: item.id || uid(),
-                name: item.command || "command",
-                args: { command: item.command },
-                result: item.aggregated_output,
-                status: "done",
-              });
-            }
-            msgs[msgs.length - 1] = { ...am, parts };
-            lastMsg = msgs[msgs.length - 1];
-          }
-        } else if (event.type === "response_item") {
-          const payload = event.payload || {};
-          if (payload.type === "message" && payload.role === "assistant") {
-            const text = extractCodexResponseText(payload.content);
-            const images = extractCodexResponseImages(payload.content);
-            if (text || images.length > 0) {
-              const am = ensureAssistant();
-              const parts = cloneParts(am.parts);
-              if (text) parts.push({ type: "text", text });
-              for (const imagePart of images) parts.push(imagePart);
-              msgs[msgs.length - 1] = { ...am, parts };
-              lastMsg = msgs[msgs.length - 1];
-            }
-          } else if (payload.type === "function_call" || payload.type === "custom_tool_call") {
-            const am = ensureAssistant();
-            const parts = cloneParts(am.parts);
-            const toolId = payload.call_id || uid();
-            const existingIdx = parts.findIndex((p) => p.type === "tool" && p.id === toolId);
-            const nextTool = {
-              type: "tool",
-              id: toolId,
-              name: payload.name || "tool",
-              args: normalizeCodexToolArgs(payload),
-              result: existingIdx >= 0 ? parts[existingIdx].result : null,
-              status: payload.status === "completed" ? "done" : "running",
-            };
-
-            if (existingIdx >= 0) {
-              parts[existingIdx] = { ...parts[existingIdx], ...nextTool };
-            } else {
-              parts.push(nextTool);
-            }
-
-            msgs[msgs.length - 1] = { ...am, parts };
-            lastMsg = msgs[msgs.length - 1];
-          } else if (payload.type === "function_call_output" || payload.type === "custom_tool_call_output") {
-            const am = ensureAssistant();
-            const parts = cloneParts(am.parts);
-            const existingIdx = parts.findIndex(
-              (p) => p.type === "tool" && p.id === payload.call_id
-            );
-            const result = normalizeCodexToolResult(payload.output);
-
-            if (existingIdx >= 0) {
-              parts[existingIdx] = {
-                ...parts[existingIdx],
-                result,
-                status: "done",
-              };
-            } else {
-              parts.push({
-                type: "tool",
-                id: payload.call_id || uid(),
-                name: "tool",
-                args: {},
-                result,
-                status: "done",
-              });
-            }
-
-            msgs[msgs.length - 1] = { ...am, parts };
-            lastMsg = msgs[msgs.length - 1];
-          }
-        } else if (event.type === "turn.completed") {
-          if (lastMsg && lastMsg.role === "assistant") {
-            // RayLine's live Codex stdout still uses the older
-            // `thread.started`/`turn.completed` schema even though the saved
-            // session JSONL now contains the richer `token_count` event.
-            // Merge this older usage packet as an immediate fallback so the
-            // footer can render without waiting for session-file hydration.
-            const fallbackUsage = normalizeCodexUsage(event.usage);
-            msgs[msgs.length - 1] = freezeElapsed({
-              ...lastMsg,
-              ...(fallbackUsage
-                ? { _usage: mergeUsage(lastMsg._usage, fallbackUsage) }
-                : {}),
-              isStreaming: false,
-              isThinking: false,
-            });
-            lastMsg = msgs[msgs.length - 1];
-          }
-          nextIsStreaming = false;
-        } else if (event.type === "event_msg" && event.payload?.type === "task_complete") {
-          const completionText = event.payload.last_agent_message;
-          const am = ensureAssistant();
-          let parts = cloneParts(am.parts);
-          const hasText = parts.some((part) => part.type === "text" && part.text);
-
-          if (!hasText && completionText) {
-            parts.push({ type: "text", text: completionText });
-          }
-
-          msgs[msgs.length - 1] = freezeElapsed({
-            ...am,
-            parts,
-            isStreaming: false,
-            isThinking: false,
-          });
-          lastMsg = msgs[msgs.length - 1];
-          nextIsStreaming = false;
-        }
-
-        next.set(conversationId, { ...convo, messages: msgs, isStreaming: nextIsStreaming });
-        return next;
-      });
+        flushStreamEvents();
+      } else {
+        scheduleStreamFlush();
+      }
     });
 
     const offDone = window.api.onAgentDone(({ conversationId, provider, threadId }) => {
+      // Backstop: apply any buffered tokens BEFORE this done finalization so we
+      // never freeze a message before its last coalesced tokens land.
+      flushStreamEvents();
       pendingStartsRef.current.delete(conversationId);
       let codexThreadId = null;
       let needsUsageHydration = false;
@@ -1204,6 +1298,9 @@ export default function useAgent() {
     });
 
     const offError = window.api.onAgentError(({ conversationId, error }) => {
+      // Backstop: apply any buffered tokens BEFORE this error finalization so
+      // buffered output isn't lost when the error message is appended.
+      flushStreamEvents();
       pendingStartsRef.current.delete(conversationId);
       setConversations((prev) => {
         const next = new Map(prev);
@@ -1228,6 +1325,13 @@ export default function useAgent() {
       cleanupFns.forEach((fn) => fn?.());
       usageHydrationTimers.forEach((timerId) => window.clearTimeout(timerId));
       usageHydrationTimers.clear();
+      // Cancel any scheduled stream flush and drop buffered events. No flush on
+      // unmount — the state being flushed into is going away anyway.
+      if (streamFlushFrameRef.current) {
+        cancelAnimationFrame(streamFlushFrameRef.current);
+        streamFlushFrameRef.current = 0;
+      }
+      pendingStreamEventsRef.current = [];
     };
   }, []);
 
