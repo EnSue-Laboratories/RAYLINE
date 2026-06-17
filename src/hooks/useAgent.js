@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, startTransition } from "react";
 import { createLogger } from "../utils/logger";
 
 let _msgId = 0;
@@ -1212,17 +1212,26 @@ export default function useAgent() {
     // in-place `convo._claudeSessionId = ...` mutations on the shared convo
     // object reference still work (each event does `new Map(prev)` whose
     // `.get()` returns the same convo object).
-    const flushStreamEvents = () => {
+    const flushStreamEvents = (urgent = false) => {
       const pending = pendingStreamEventsRef.current;
       if (pending.length === 0) return;
       pendingStreamEventsRef.current = [];
       lastStreamFlushAtRef.current = performance.now();
-      setConversations((prev) =>
-        pending.reduce(
-          (map, item) => applyStreamEventToConversations(map, item.conversationId, item.event),
-          prev
-        )
-      );
+      const commit = () =>
+        setConversations((prev) =>
+          pending.reduce(
+            (map, item) => applyStreamEventToConversations(map, item.conversationId, item.event),
+            prev
+          )
+        );
+      // Coalesced mid-stream flushes are marked as a non-urgent transition so
+      // React renders them at low priority and yields to urgent work (composer
+      // keystrokes, scroll) — this is what keeps typing smooth while a rich
+      // response streams. Terminal/backstop flushes commit urgently so the
+      // final content and the `isStreaming` flip appear immediately and stay
+      // correctly ordered before done/error finalization.
+      if (urgent) commit();
+      else startTransition(commit);
     };
 
     // Schedule a coalesced flush via rAF, throttled to ~30fps. If a frame is
@@ -1251,7 +1260,7 @@ export default function useAgent() {
           cancelAnimationFrame(streamFlushFrameRef.current);
           streamFlushFrameRef.current = 0;
         }
-        flushStreamEvents();
+        flushStreamEvents(true);
       } else {
         scheduleStreamFlush();
       }
@@ -1260,7 +1269,7 @@ export default function useAgent() {
     const offDone = window.api.onAgentDone(({ conversationId, provider, threadId }) => {
       // Backstop: apply any buffered tokens BEFORE this done finalization so we
       // never freeze a message before its last coalesced tokens land.
-      flushStreamEvents();
+      flushStreamEvents(true);
       pendingStartsRef.current.delete(conversationId);
       let codexThreadId = null;
       let needsUsageHydration = false;
@@ -1300,7 +1309,7 @@ export default function useAgent() {
     const offError = window.api.onAgentError(({ conversationId, error }) => {
       // Backstop: apply any buffered tokens BEFORE this error finalization so
       // buffered output isn't lost when the error message is appended.
-      flushStreamEvents();
+      flushStreamEvents(true);
       pendingStartsRef.current.delete(conversationId);
       setConversations((prev) => {
         const next = new Map(prev);
