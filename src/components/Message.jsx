@@ -128,6 +128,24 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
       return img ? <AssistantImage {...img} /> : null;
     }
     if (match) {
+      // While this segment is actively streaming, skip Prism syntax
+      // highlighting — re-highlighting code blocks on every ~15Hz stream
+      // commit is the dominant source of long main-thread tasks (it rebuilds
+      // thousands of token elements per frame) and is what makes typing janky.
+      // Render cheap plain monospace now; the completed (non-streaming) render
+      // upgrades to full highlighting once the fence/message settles.
+      if (isStreaming) {
+        return (
+          <code style={{
+            display: "block",
+            whiteSpace: "pre",
+            fontSize: s(12),
+            fontFamily: "var(--font-mono)",
+            lineHeight: 1.6,
+            color: "var(--text-secondary)",
+          }}>{codeString}</code>
+        );
+      }
       return (
         <SyntaxHighlighter
           style={oneDark}
