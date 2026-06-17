@@ -1384,15 +1384,54 @@ export default function App() {
   const [queuedMessages, setQueuedMessages] = useState([]);
   const [permissionRequests, setPermissionRequests] = useState([]);
   const labControlTimersRef = useRef(new Map());
-  const persistableConversations = useMemo(
-    () =>
-      convoList
-        .map((conversation) =>
-          buildPersistedConversationSnapshot(conversation, getConversation(conversation.id))
-        )
-        .filter((conversation) => hasConversationMessages(conversation, getConversation(conversation.id))),
-    [convoList, getConversation]
-  );
+  // Per-conversation snapshot cache. Building the persisted snapshot for a
+  // conversation runs normalizeConversationState over its whole stored history,
+  // and the unmemoized version rebuilt ALL conversations on every stream commit
+  // (getConversation changes identity each commit) — with hundreds of chats that
+  // is a ~200ms main-thread task per commit, which blocks typing and scrolling
+  // while a response streams. Reuse the prior snapshot when the conversation row
+  // and its live data are unchanged, so only the actively-streaming conversation
+  // (whose data ref changes) is rebuilt each commit. Output is identical.
+  const persistSnapshotCacheRef = useRef(new Map());
+  const persistableConversations = useMemo(() => {
+    const cache = persistSnapshotCacheRef.current;
+    const seen = new Set();
+    const out = [];
+    for (const conversation of convoList) {
+      const data = getConversation(conversation.id);
+      // Snapshots with no live messages depend only on `conversation` (the early
+      // return in buildPersistedConversationSnapshot), so unloaded conversations
+      // — whose `data` is a fresh empty object each call — still cache by row
+      // identity alone instead of rebuilding every commit.
+      const hasLive =
+        Array.isArray(data?.messages) && data.messages.some(isPersistableLiveMessage);
+      seen.add(conversation.id);
+      const cached = cache.get(conversation.id);
+      const reusable =
+        cached &&
+        cached.conversation === conversation &&
+        cached.hasLive === hasLive &&
+        (!hasLive || cached.data === data);
+      let entry;
+      if (reusable) {
+        entry = cached;
+      } else {
+        entry = {
+          conversation,
+          data,
+          hasLive,
+          snapshot: buildPersistedConversationSnapshot(conversation, data),
+          keep: hasConversationMessages(conversation, data),
+        };
+        cache.set(conversation.id, entry);
+      }
+      if (entry.keep) out.push(entry.snapshot);
+    }
+    for (const id of [...cache.keys()]) {
+      if (!seen.has(id)) cache.delete(id);
+    }
+    return out;
+  }, [convoList, getConversation]);
   const persistedActive = useMemo(
     () => (
       persistableConversations.some((conversation) => conversation.id === active)
