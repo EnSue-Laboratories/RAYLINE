@@ -836,6 +836,25 @@ ipcMain.handle("store-message-image", async (_event, input = {}) => {
   }
 });
 
+function handleAgentLaunchError(sender, opts, err, provider) {
+  const conversationId = opts?.conversationId;
+  if (!conversationId || sender.isDestroyed?.()) return;
+  const error = err?.message || String(err);
+  console.error("[agent] launch failed:", error);
+  sender.send("agent-error", { conversationId, error });
+  sender.send("agent-done", {
+    conversationId,
+    exitCode: -1,
+    ...(provider ? { provider } : {}),
+  });
+}
+
+function watchAgentLaunch(start, sender, opts, provider) {
+  Promise.resolve()
+    .then(start)
+    .catch((err) => handleAgentLaunchError(sender, opts, err, provider));
+}
+
 // IPC: agent
 ipcMain.on("agent-start", (event, opts) => {
   const runtimeProvider = opts.runtimeProvider || opts.remoteRuntime?.provider || opts.provider;
@@ -848,11 +867,11 @@ ipcMain.on("agent-start", (event, opts) => {
       event.sender.send("agent-done", { conversationId: opts.conversationId });
     });
   } else if (runtimeProvider === "codex") {
-    startCodexAgent(opts, event.sender);
+    watchAgentLaunch(() => startCodexAgent(opts, event.sender), event.sender, opts, "codex");
   } else if (runtimeProvider === "opencode") {
-    startOpenCodeAgent(opts, event.sender);
+    watchAgentLaunch(() => startOpenCodeAgent(opts, event.sender), event.sender, opts, "opencode");
   } else {
-    startAgent(opts, event.sender);
+    watchAgentLaunch(() => startAgent(opts, event.sender), event.sender, opts, "claude");
   }
 });
 
@@ -868,11 +887,26 @@ ipcMain.on("agent-cancel", (_event, { conversationId }) => {
 ipcMain.on("agent-edit-resend", (event, opts) => {
   const runtimeProvider = opts.runtimeProvider || opts.remoteRuntime?.provider || opts.provider;
   if (runtimeProvider === "codex") {
-    startCodexAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
+    watchAgentLaunch(
+      () => startCodexAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender),
+      event.sender,
+      opts,
+      "codex"
+    );
   } else if (runtimeProvider === "opencode") {
-    startOpenCodeAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender);
+    watchAgentLaunch(
+      () => startOpenCodeAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender),
+      event.sender,
+      opts,
+      "opencode"
+    );
   } else {
-    startAgent({ ...opts, forkSession: true }, event.sender);
+    watchAgentLaunch(
+      () => startAgent({ ...opts, forkSession: true }, event.sender),
+      event.sender,
+      opts,
+      "claude"
+    );
   }
 });
 

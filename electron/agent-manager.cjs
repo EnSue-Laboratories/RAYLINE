@@ -7,6 +7,7 @@ const { fetchClaudeUsage } = require("./claude-usage-fetcher.cjs");
 const { createLogger } = require("./logger.cjs");
 const { buildClaudeUpstreamEnv, summarizeProviderUpstream, appendClaudeUpstreamArgs } = require("./provider-upstreams.cjs");
 const { describeRemoteRuntime, normalizeRemoteRuntime, spawnRemoteCommand } = require("./remote-runtime.cjs");
+const { stageRemoteAttachments } = require("./remote-attachments.cjs");
 
 const activeAgents = new Map();
 const log = createLogger("agent-manager");
@@ -47,6 +48,13 @@ function shouldEmitStderrError({ stderrBuffer, resultEvent, exitCode, signal, ca
   if (cancelled || stoppedForQuestion) return false;
   if (resultEvent?.is_error || resultEvent?.subtype === "error_during_execution") return true;
   return !resultEvent && (exitCode !== 0 || Boolean(signal));
+}
+
+function cleanupRemoteAttachments(state) {
+  const cleanup = state?.remoteAttachmentCleanup;
+  if (!cleanup) return;
+  state.remoteAttachmentCleanup = null;
+  cleanup().catch((err) => log("Remote attachment cleanup failed:", err?.message || err));
 }
 
 let cachedClaudeBin = null;
@@ -228,10 +236,16 @@ function classifyPermissionRequest(req) {
 function buildPromptWithAttachments(prompt, images, files, options = {}) {
   let fullPrompt = prompt;
   const isRemote = Boolean(options.remote);
+  const imagesArePaths = Boolean(options.imagesArePaths);
   if (images && images.length > 0) {
     const imgPaths = [];
     for (let i = 0; i < images.length; i++) {
-      const dataUrl = images[i];
+      const dataUrl = typeof images[i] === "string" ? images[i] : images[i]?.dataUrl;
+      if (imagesArePaths && typeof dataUrl === "string" && dataUrl) {
+        imgPaths.push(dataUrl);
+        continue;
+      }
+      if (typeof dataUrl !== "string") continue;
       const match = dataUrl.match(/^data:image\/([\w+.-]+);base64,(.+)$/);
       if (match && !isRemote) {
         const ext = match[1] === "jpeg" ? "jpg" : match[1];
@@ -241,7 +255,8 @@ function buildPromptWithAttachments(prompt, images, files, options = {}) {
       }
     }
     if (imgPaths.length > 0) {
-      fullPrompt = `[Attached images: ${imgPaths.join(", ")}]\n\n${prompt}`;
+      const label = isRemote ? "Attached images uploaded to the remote SSH host" : "Attached images";
+      fullPrompt = `[${label}: ${imgPaths.join(", ")}]\n\n${prompt}`;
     } else if (isRemote) {
       fullPrompt = `[Attached images were provided in RayLine, but they were not copied to the remote SSH host.]\n\n${prompt}`;
     }
@@ -249,15 +264,14 @@ function buildPromptWithAttachments(prompt, images, files, options = {}) {
 
   if (files && files.length > 0) {
     const filePaths = files.map((f) => f.path).join("\n");
-    fullPrompt = isRemote
-      ? `[Attached files were provided in RayLine, but these local paths were not copied to the remote SSH host:\n${filePaths}]\n\n${fullPrompt}`
-      : `[Attached files:\n${filePaths}]\n\n${fullPrompt}`;
+    const label = isRemote ? "Attached files uploaded to the remote SSH host" : "Attached files";
+    fullPrompt = `[${label}:\n${filePaths}]\n\n${fullPrompt}`;
   }
 
   return fullPrompt;
 }
 
-function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession, providerUpstreamConfig, remoteRuntime, projectContext }, webContents) {
+async function startAgent({ conversationId, prompt, model, cwd, images, files, sessionId, resumeSessionId, forkSession, providerUpstreamConfig, remoteRuntime, projectContext }, webContents) {
   cancelAgent(conversationId);
 
   const agentSessionId = resumeSessionId || sessionId;
@@ -280,8 +294,6 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     webContents.send("agent-done", { conversationId, exitCode: -1 });
     return null;
   }
-
-  const fullPrompt = buildPromptWithAttachments(prompt, images, files, { remote: Boolean(remote) });
 
   const existing = activeAgents.get(conversationId);
   const sessionAllowlist = existing?.sessionAllowlist instanceof Set
@@ -309,7 +321,36 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     pendingPermissions: new Map(),
     sessionAllowlist,
     stdinClosed: false,
+    remoteAttachmentCleanup: null,
   };
+  activeAgents.set(conversationId, state);
+
+  let stagedRemoteAttachments = null;
+  if (remote) {
+    try {
+      stagedRemoteAttachments = await stageRemoteAttachments(remote, { images, files });
+    } catch (err) {
+      if (state.cancelled || activeAgents.get(conversationId) !== state) return null;
+      const error = `Failed to upload attachments to the remote SSH host: ${err?.message || err}`;
+      log(error);
+      activeAgents.delete(conversationId);
+      webContents.send("agent-error", { conversationId, error });
+      webContents.send("agent-done", { conversationId, exitCode: -1 });
+      return null;
+    }
+    if (state.cancelled || activeAgents.get(conversationId) !== state) {
+      await stagedRemoteAttachments?.cleanup?.().catch(() => {});
+      return null;
+    }
+    state.remoteAttachmentCleanup = stagedRemoteAttachments?.cleanup || null;
+  }
+
+  const fullPrompt = buildPromptWithAttachments(
+    prompt,
+    remote ? stagedRemoteAttachments?.images : images,
+    remote ? stagedRemoteAttachments?.files : files,
+    { remote: Boolean(remote), imagesArePaths: Boolean(remote) }
+  );
 
   const upstreamEnv = buildClaudeUpstreamEnv(providerUpstreamConfig);
   const upstreamSummary = summarizeProviderUpstream(providerUpstreamConfig, "claude");
@@ -366,20 +407,29 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     log("Full args:", args.join(" "));
     log("Prompt:", runPrompt.slice(0, 100));
 
-    const child = remote
-      ? spawnRemoteCommand(remote, claudeBin, args, {
-          cwd: process.cwd(),
-          env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
-          stdio: ["pipe", "pipe", "pipe"],
-        }, {
-          env: { FORCE_COLOR: "0", ...upstreamEnv },
-          cwd: remote.cwd,
-        })
-      : spawnCli(claudeBin, args, {
-          cwd: launchCwd,
-          env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath(), ...upstreamEnv },
-          stdio: ["pipe", "pipe", "pipe"],
-        });
+    let child;
+    try {
+      child = remote
+        ? spawnRemoteCommand(remote, claudeBin, args, {
+            cwd: process.cwd(),
+            env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+            stdio: ["pipe", "pipe", "pipe"],
+          }, {
+            env: { FORCE_COLOR: "0", ...upstreamEnv },
+            cwd: remote.cwd,
+          })
+        : spawnCli(claudeBin, args, {
+            cwd: launchCwd,
+            env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath(), ...upstreamEnv },
+            stdio: ["pipe", "pipe", "pipe"],
+          });
+    } catch (err) {
+      cleanupRemoteAttachments(state);
+      if (activeAgents.get(conversationId) === state) activeAgents.delete(conversationId);
+      webContents.send("agent-error", { conversationId, error: err.message || String(err) });
+      webContents.send("agent-done", { conversationId, exitCode: -1 });
+      return null;
+    }
 
     state.child = child;
     state.stdinClosed = false;
@@ -569,6 +619,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
           firstToolUseMs: state.firstToolUseMs,
         },
       });
+      cleanupRemoteAttachments(state);
 
       if (state.cancelled) {
         if (isCurrentState) {
@@ -604,6 +655,7 @@ function startAgent({ conversationId, prompt, model, cwd, images, files, session
     child.on("error", (err) => {
       const isCurrentState = activeAgents.get(conversationId) === state;
       log("Spawn error:", err.message);
+      cleanupRemoteAttachments(state);
       if (isCurrentState) activeAgents.delete(conversationId);
       webContents.send("agent-error", { conversationId, error: err.message });
       if (isCurrentState) webContents.send("agent-done", { conversationId, exitCode: -1 });
@@ -701,27 +753,45 @@ function respondPermission({ conversationId, requestId, behavior, message, updat
 
 function cancelAgent(conversationId) {
   const state = activeAgents.get(conversationId);
-  if (state?.child) {
-    log("Cancelling agent:", conversationId);
-    state.cancelled = true;
-    if (state.pendingPermissions?.size) {
-      for (const requestId of state.pendingPermissions.keys()) {
-        writeControlResponse(state, requestId, {
-          behavior: "deny",
-          message: "Cancelled",
-        });
-      }
-      state.pendingPermissions.clear();
+  if (!state) return;
+
+  log("Cancelling agent:", conversationId);
+  state.cancelled = true;
+  if (state.pendingPermissions?.size) {
+    for (const requestId of state.pendingPermissions.keys()) {
+      writeControlResponse(state, requestId, {
+        behavior: "deny",
+        message: "Cancelled",
+      });
     }
+    state.pendingPermissions.clear();
+  }
+  cleanupRemoteAttachments(state);
+
+  if (state.child) {
     try { state.endStdin?.(); } catch {}
     state.child.kill("SIGTERM");
+    return;
+  }
+
+  activeAgents.delete(conversationId);
+  if (!state.webContents?.isDestroyed?.()) {
+    state.webContents.send("agent-done", { conversationId, exitCode: null, signal: "SIGTERM" });
   }
 }
 
 function cancelAll() {
-  for (const [, state] of activeAgents) {
-    if (!state?.child) continue;
+  for (const [conversationId, state] of activeAgents) {
+    if (!state) continue;
     state.cancelled = true;
+    cleanupRemoteAttachments(state);
+    if (!state.child) {
+      activeAgents.delete(conversationId);
+      if (!state.webContents?.isDestroyed?.()) {
+        state.webContents.send("agent-done", { conversationId, exitCode: null, signal: "SIGTERM" });
+      }
+      continue;
+    }
     try { state.endStdin?.(); } catch {}
     state.child.kill("SIGTERM");
   }

@@ -10,6 +10,7 @@ const {
   summarizeProviderUpstream,
 } = require("./provider-upstreams.cjs");
 const { describeRemoteRuntime, normalizeRemoteRuntime, spawnRemoteCommand } = require("./remote-runtime.cjs");
+const { stageRemoteAttachments } = require("./remote-attachments.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
@@ -29,6 +30,13 @@ function shouldEmitStderrError({ stderrBuffer, exitCode, signal, cancelled, sawT
   if (cancelled) return false;
   if (sawTurnCompleted && exitCode === 0 && !signal) return false;
   return exitCode !== 0 || Boolean(signal) || !sawTurnCompleted;
+}
+
+function cleanupRemoteAttachments(state) {
+  const cleanup = state?.remoteAttachmentCleanup;
+  if (!cleanup) return;
+  state.remoteAttachmentCleanup = null;
+  cleanup().catch((err) => log("Remote attachment cleanup failed:", err?.message || err));
 }
 
 function scheduleSessionSnapshot(webContents, conversationId, threadId, attempt = 0) {
@@ -115,9 +123,8 @@ function buildClaudiPrompt(prompt, files, mcpServers, options = {}) {
 
   if (files && files.length > 0) {
     const filePaths = files.map((f) => f.path).join("\n");
-    fullPrompt = options.remote
-      ? `[Attached files were provided in RayLine, but these local paths were not copied to the remote SSH host:\n${filePaths}]\n\n${fullPrompt}`
-      : `[Attached files:\n${filePaths}]\n\n${fullPrompt}`;
+    const label = options.remote ? "Attached files uploaded to the remote SSH host" : "Attached files";
+    fullPrompt = `[${label}:\n${filePaths}]\n\n${fullPrompt}`;
   }
 
   const hasTerminalSessions = (mcpServers || []).some(
@@ -297,10 +304,47 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
     return null;
   }
 
+  const state = {
+    conversationId,
+    webContents,
+    child: null,
+    cancelled: false,
+    sawTurnCompleted: false,
+    lastErrorMessage: null,
+    threadId: null,
+    remoteAttachmentCleanup: null,
+  };
+  activeAgents.set(conversationId, state);
+
+  let stagedRemoteAttachments = null;
+  if (remote) {
+    try {
+      stagedRemoteAttachments = await stageRemoteAttachments(remote, { images, files });
+    } catch (error) {
+      if (state.cancelled || activeAgents.get(conversationId) !== state) return null;
+      const message = `Failed to upload attachments to the remote SSH host: ${error?.message || error}`;
+      log(message);
+      activeAgents.delete(conversationId);
+      webContents.send("agent-error", { conversationId, error: message });
+      webContents.send("agent-done", { conversationId, exitCode: -1, provider: "codex" });
+      return null;
+    }
+    if (state.cancelled || activeAgents.get(conversationId) !== state) {
+      await stagedRemoteAttachments?.cleanup?.().catch(() => {});
+      return null;
+    }
+    state.remoteAttachmentCleanup = stagedRemoteAttachments?.cleanup || null;
+  }
+
   // Handle images — decode base64 data URLs to temp files, pass via -i
-  if (!remote && images && images.length > 0) {
+  if (remote && stagedRemoteAttachments?.images?.length > 0) {
+    for (const remoteImagePath of stagedRemoteAttachments.images) {
+      args.push("-i", remoteImagePath);
+    }
+  } else if (!remote && images && images.length > 0) {
     for (let i = 0; i < images.length; i++) {
-      const dataUrl = images[i];
+      const dataUrl = typeof images[i] === "string" ? images[i] : images[i]?.dataUrl;
+      if (typeof dataUrl !== "string") continue;
       const match = dataUrl.match(/^data:image\/([\w+.-]+);base64,(.+)$/);
       if (match) {
         const ext = match[1] === "jpeg" ? "jpg" : match[1];
@@ -313,13 +357,19 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
 
   // `--image` is variadic in the Codex CLI, so terminate option parsing
   // before the prompt or the prompt may be consumed as another image path.
-  const fullPrompt = buildClaudiPrompt(prompt, files, mcpServers, { remote: Boolean(remote) });
+  const fullPrompt = buildClaudiPrompt(
+    prompt,
+    remote ? stagedRemoteAttachments?.files : files,
+    mcpServers,
+    { remote: Boolean(remote) }
+  );
   args.push("--", fullPrompt);
 
   const codexBin = remote ? (remote.commandPath || "codex") : resolveCodexBin();
   if (!remote && !codexBin) {
     const error = "Unable to locate the Codex CLI binary";
     log(error);
+    if (activeAgents.get(conversationId) === state) activeAgents.delete(conversationId);
     webContents.send("agent-error", { conversationId, error });
     webContents.send("agent-done", { conversationId, exitCode: -1 });
     return null;
@@ -330,32 +380,42 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
   log("Prompt:", fullPrompt.slice(0, 100));
 
   const codexEnv = buildCodexUpstreamEnv(providerUpstreamConfig, upstreamRuntime);
-  const child = remote
-    ? spawnRemoteCommand(remote, codexBin, args, {
-        cwd: process.cwd(),
-        env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
-        // Codex stalls before the first network request when stdin is /dev/null.
-        // Give it a pipe and immediately close it so it observes EOF correctly.
-        stdio: ["pipe", "pipe", "pipe"],
-      }, {
-        env: { FORCE_COLOR: "0", ...codexEnv },
-        cwd: remote.cwd,
-      })
-    : spawnCli(codexBin, args, {
-        cwd: launchCwd,
-        env: {
-          ...process.env,
-          FORCE_COLOR: "0",
-          PATH: buildSpawnPath(),
-          ...codexEnv,
-          CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
-          CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",
-          CLAUDI_TERMINAL_MCP_CONFIG: global.mcpConfigPath || "",
-        },
-        // Codex stalls before the first network request when stdin is /dev/null.
-        // Give it a pipe and immediately close it so it observes EOF correctly.
-        stdio: ["pipe", "pipe", "pipe"],
-      });
+  let child;
+  try {
+    child = remote
+      ? spawnRemoteCommand(remote, codexBin, args, {
+          cwd: process.cwd(),
+          env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+          // Codex stalls before the first network request when stdin is /dev/null.
+          // Give it a pipe and immediately close it so it observes EOF correctly.
+          stdio: ["pipe", "pipe", "pipe"],
+        }, {
+          env: { FORCE_COLOR: "0", ...codexEnv },
+          cwd: remote.cwd,
+        })
+      : spawnCli(codexBin, args, {
+          cwd: launchCwd,
+          env: {
+            ...process.env,
+            FORCE_COLOR: "0",
+            PATH: buildSpawnPath(),
+            ...codexEnv,
+            CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
+            CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",
+            CLAUDI_TERMINAL_MCP_CONFIG: global.mcpConfigPath || "",
+          },
+          // Codex stalls before the first network request when stdin is /dev/null.
+          // Give it a pipe and immediately close it so it observes EOF correctly.
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+  } catch (error) {
+    cleanupRemoteAttachments(state);
+    if (activeAgents.get(conversationId) === state) activeAgents.delete(conversationId);
+    webContents.send("agent-error", { conversationId, error: error.message || String(error) });
+    webContents.send("agent-done", { conversationId, exitCode: -1, provider: "codex" });
+    return null;
+  }
+  state.child = child;
   child.stdin?.on("error", () => {});
   child.stdin?.end();
 
@@ -364,16 +424,6 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
     child.once("exit", () => upstreamRuntime.bridge.close());
     child.once("error", () => upstreamRuntime.bridge.close());
   }
-
-  const state = {
-    child,
-    cancelled: false,
-    sawTurnCompleted: false,
-    lastErrorMessage: null,
-    threadId: null,
-  };
-
-  activeAgents.set(conversationId, state);
 
   let buffer = "";
   let stderrBuffer = "";
@@ -436,6 +486,7 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
       log("Flushing remaining buffer:", buffer.slice(0, 200));
       parseLine(buffer);
     }
+    cleanupRemoteAttachments(state);
 
     if (state.cancelled) {
       if (isCurrentState) {
@@ -486,6 +537,7 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
   child.on("error", (err) => {
     const isCurrentState = activeAgents.get(conversationId) === state;
     log("Spawn error:", err.message);
+    cleanupRemoteAttachments(state);
     if (isCurrentState) activeAgents.delete(conversationId);
     webContents.send("agent-error", { conversationId, error: err.message });
     if (isCurrentState) {
@@ -498,17 +550,47 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
 
 function cancelCodexAgent(conversationId) {
   const state = activeAgents.get(conversationId);
-  if (state?.child) {
-    log("Cancelling codex agent:", conversationId);
-    state.cancelled = true;
+  if (!state) return;
+
+  log("Cancelling codex agent:", conversationId);
+  state.cancelled = true;
+  cleanupRemoteAttachments(state);
+
+  if (state.child) {
     state.child.kill("SIGTERM");
+    return;
+  }
+
+  activeAgents.delete(conversationId);
+  if (!state.webContents?.isDestroyed?.()) {
+    state.webContents.send("agent-done", {
+      conversationId,
+      exitCode: null,
+      signal: "SIGTERM",
+      provider: "codex",
+      threadId: state.threadId,
+    });
   }
 }
 
 function cancelAllCodex() {
-  for (const [, state] of activeAgents) {
+  for (const [conversationId, state] of activeAgents) {
     state.cancelled = true;
-    state.child.kill("SIGTERM");
+    cleanupRemoteAttachments(state);
+    if (state.child) {
+      state.child.kill("SIGTERM");
+      continue;
+    }
+    activeAgents.delete(conversationId);
+    if (!state.webContents?.isDestroyed?.()) {
+      state.webContents.send("agent-done", {
+        conversationId,
+        exitCode: null,
+        signal: "SIGTERM",
+        provider: "codex",
+        threadId: state.threadId,
+      });
+    }
   }
 }
 
