@@ -89,7 +89,8 @@ function spawnRemoteCommand(remoteRuntime, command, args, options = {}, remoteOp
     cwd: remoteOptions.cwd || runtime.cwd,
   });
   const [sshBin, ...sshArgs] = parseSshCommand(runtime.sshCommand);
-  return spawn(sshBin, [...sshArgs, remoteCommand], options);
+  const extraSshArgs = Array.isArray(remoteOptions.sshArgs) ? remoteOptions.sshArgs.filter(Boolean) : [];
+  return spawn(sshBin, [...sshArgs, ...extraSshArgs, remoteCommand], options);
 }
 
 function describeRemoteRuntime(remoteRuntime) {
