@@ -8,6 +8,7 @@ const { createLogger } = require("./logger.cjs");
 const { buildClaudeUpstreamEnv, summarizeProviderUpstream, appendClaudeUpstreamArgs } = require("./provider-upstreams.cjs");
 const { describeRemoteRuntime, normalizeRemoteRuntime, spawnRemoteCommand } = require("./remote-runtime.cjs");
 const { stageRemoteAttachments } = require("./remote-attachments.cjs");
+const { startRemoteChannel } = require("./remote-channel.cjs");
 
 const activeAgents = new Map();
 const log = createLogger("agent-manager");
@@ -57,6 +58,20 @@ function cleanupRemoteAttachments(state) {
   cleanup().catch((err) => log("Remote attachment cleanup failed:", err?.message || err));
 }
 
+function finishRemoteChannel(state) {
+  const channel = state?.remoteChannel;
+  if (!channel) return;
+  state.remoteChannel = null;
+  channel.finish().catch((err) => log("Remote channel finish failed:", err?.message || err));
+}
+
+function disposeRemoteChannel(state) {
+  const channel = state?.remoteChannel;
+  if (!channel) return;
+  state.remoteChannel = null;
+  channel.dispose().catch((err) => log("Remote channel dispose failed:", err?.message || err));
+}
+
 let cachedClaudeBin = null;
 
 function resolveClaudeBin() {
@@ -84,7 +99,7 @@ function resolveLaunchCwd({ cwd, sessionId }) {
   throw new Error(`Invalid working directory: ${cwd}`);
 }
 
-function buildClaudeArgs({ model, sessionId, resumeSessionId, forkSession, projectContext, includeLocalMcp = true, remote = false }) {
+function buildClaudeArgs({ model, sessionId, resumeSessionId, forkSession, projectContext, includeLocalMcp = true, remote = false, remoteChannel = null }) {
   const args = [
     "--print",
     "--input-format=stream-json",
@@ -186,6 +201,10 @@ The user can see and type into these terminals in real time.`;
 REMOTE SSH RUNTIME:
 You are running on a remote SSH host from RayLine. RayLine's local terminal MCP tools and local terminal CLI are not available on this host.
 Use normal shell commands on the remote host for long-running processes, and tell the user when a command must keep running after your turn.`;
+
+    if (remoteChannel?.instructions) {
+      appendPrompt += `\n\n${remoteChannel.instructions}`;
+    }
   }
 
   const trimmedProjectContext = typeof projectContext === "string" ? projectContext.trim() : "";
@@ -322,6 +341,7 @@ async function startAgent({ conversationId, prompt, model, cwd, images, files, s
     sessionAllowlist,
     stdinClosed: false,
     remoteAttachmentCleanup: null,
+    remoteChannel: null,
   };
   activeAgents.set(conversationId, state);
 
@@ -343,6 +363,19 @@ async function startAgent({ conversationId, prompt, model, cwd, images, files, s
       return null;
     }
     state.remoteAttachmentCleanup = stagedRemoteAttachments?.cleanup || null;
+
+    try {
+      state.remoteChannel = await startRemoteChannel({ conversationId, provider: "claude" });
+      log("Started RayLine SSH channel:", state.remoteChannel.describe());
+    } catch (err) {
+      log("RayLine SSH channel unavailable:", err?.message || err);
+      state.remoteChannel = null;
+    }
+
+    if (state.cancelled || activeAgents.get(conversationId) !== state) {
+      disposeRemoteChannel(state);
+      return null;
+    }
   }
 
   const fullPrompt = buildPromptWithAttachments(
@@ -371,6 +404,7 @@ async function startAgent({ conversationId, prompt, model, cwd, images, files, s
       projectContext,
       includeLocalMcp: !remote,
       remote: Boolean(remote),
+      remoteChannel: state.remoteChannel,
     });
     appendClaudeUpstreamArgs(args, providerUpstreamConfig, model, { patchLocalSettings: !remote });
 
@@ -415,8 +449,9 @@ async function startAgent({ conversationId, prompt, model, cwd, images, files, s
             env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
             stdio: ["pipe", "pipe", "pipe"],
           }, {
-            env: { FORCE_COLOR: "0", ...upstreamEnv },
+            env: { FORCE_COLOR: "0", ...upstreamEnv, ...(state.remoteChannel?.env || {}) },
             cwd: remote.cwd,
+            sshArgs: state.remoteChannel?.sshArgs,
           })
         : spawnCli(claudeBin, args, {
             cwd: launchCwd,
@@ -425,6 +460,7 @@ async function startAgent({ conversationId, prompt, model, cwd, images, files, s
           });
     } catch (err) {
       cleanupRemoteAttachments(state);
+      disposeRemoteChannel(state);
       if (activeAgents.get(conversationId) === state) activeAgents.delete(conversationId);
       webContents.send("agent-error", { conversationId, error: err.message || String(err) });
       webContents.send("agent-done", { conversationId, exitCode: -1 });
@@ -620,6 +656,7 @@ async function startAgent({ conversationId, prompt, model, cwd, images, files, s
         },
       });
       cleanupRemoteAttachments(state);
+      finishRemoteChannel(state);
 
       if (state.cancelled) {
         if (isCurrentState) {
@@ -656,6 +693,7 @@ async function startAgent({ conversationId, prompt, model, cwd, images, files, s
       const isCurrentState = activeAgents.get(conversationId) === state;
       log("Spawn error:", err.message);
       cleanupRemoteAttachments(state);
+      disposeRemoteChannel(state);
       if (isCurrentState) activeAgents.delete(conversationId);
       webContents.send("agent-error", { conversationId, error: err.message });
       if (isCurrentState) webContents.send("agent-done", { conversationId, exitCode: -1 });
@@ -767,6 +805,7 @@ function cancelAgent(conversationId) {
     state.pendingPermissions.clear();
   }
   cleanupRemoteAttachments(state);
+  finishRemoteChannel(state);
 
   if (state.child) {
     try { state.endStdin?.(); } catch {}
@@ -785,6 +824,7 @@ function cancelAll() {
     if (!state) continue;
     state.cancelled = true;
     cleanupRemoteAttachments(state);
+    finishRemoteChannel(state);
     if (!state.child) {
       activeAgents.delete(conversationId);
       if (!state.webContents?.isDestroyed?.()) {

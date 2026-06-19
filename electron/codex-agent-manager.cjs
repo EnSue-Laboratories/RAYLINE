@@ -11,6 +11,7 @@ const {
 } = require("./provider-upstreams.cjs");
 const { describeRemoteRuntime, normalizeRemoteRuntime, spawnRemoteCommand } = require("./remote-runtime.cjs");
 const { stageRemoteAttachments } = require("./remote-attachments.cjs");
+const { startRemoteChannel } = require("./remote-channel.cjs");
 
 const activeAgents = new Map();
 const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
@@ -37,6 +38,20 @@ function cleanupRemoteAttachments(state) {
   if (!cleanup) return;
   state.remoteAttachmentCleanup = null;
   cleanup().catch((err) => log("Remote attachment cleanup failed:", err?.message || err));
+}
+
+function finishRemoteChannel(state) {
+  const channel = state?.remoteChannel;
+  if (!channel) return;
+  state.remoteChannel = null;
+  channel.finish().catch((err) => log("Remote channel finish failed:", err?.message || err));
+}
+
+function disposeRemoteChannel(state) {
+  const channel = state?.remoteChannel;
+  if (!channel) return;
+  state.remoteChannel = null;
+  channel.dispose().catch((err) => log("Remote channel dispose failed:", err?.message || err));
 }
 
 function scheduleSessionSnapshot(webContents, conversationId, threadId, attempt = 0) {
@@ -157,6 +172,10 @@ CLI examples:
 - node "$CLAUDI_TERMINAL_CLI" read <name> --lines 80
 - node "$CLAUDI_TERMINAL_CLI" kill <name>`;
 
+  const remoteChannelInstructions = options.remote && options.remoteChannel?.instructions
+    ? `\n\n${options.remoteChannel.instructions}`
+    : "";
+
   const claudiInstructions = `System context for this run:
 You are running inside RayLine, a desktop GUI client for coding agents.
 The user is interacting via a chat interface, not a terminal.
@@ -206,7 +225,7 @@ Example:
 
 When a control is not live-bound and the user submits it, RayLine will send a normal follow-up chat message with the selected value back into the conversation.
 
-${terminalInstructions}
+${terminalInstructions}${remoteChannelInstructions}
 
 The text below is the actual user prompt.
 --- USER PROMPT ---
@@ -313,6 +332,7 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
     lastErrorMessage: null,
     threadId: null,
     remoteAttachmentCleanup: null,
+    remoteChannel: null,
   };
   activeAgents.set(conversationId, state);
 
@@ -334,6 +354,19 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
       return null;
     }
     state.remoteAttachmentCleanup = stagedRemoteAttachments?.cleanup || null;
+
+    try {
+      state.remoteChannel = await startRemoteChannel({ conversationId, provider: "codex" });
+      log("Started RayLine SSH channel:", state.remoteChannel.describe());
+    } catch (error) {
+      log("RayLine SSH channel unavailable:", error?.message || error);
+      state.remoteChannel = null;
+    }
+
+    if (state.cancelled || activeAgents.get(conversationId) !== state) {
+      disposeRemoteChannel(state);
+      return null;
+    }
   }
 
   // Handle images — decode base64 data URLs to temp files, pass via -i
@@ -361,7 +394,7 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
     prompt,
     remote ? stagedRemoteAttachments?.files : files,
     mcpServers,
-    { remote: Boolean(remote) }
+    { remote: Boolean(remote), remoteChannel: state.remoteChannel }
   );
   args.push("--", fullPrompt);
 
@@ -390,8 +423,9 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
           // Give it a pipe and immediately close it so it observes EOF correctly.
           stdio: ["pipe", "pipe", "pipe"],
         }, {
-          env: { FORCE_COLOR: "0", ...codexEnv },
+          env: { FORCE_COLOR: "0", ...codexEnv, ...(state.remoteChannel?.env || {}) },
           cwd: remote.cwd,
+          sshArgs: state.remoteChannel?.sshArgs,
         })
       : spawnCli(codexBin, args, {
           cwd: launchCwd,
@@ -410,6 +444,7 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
         });
   } catch (error) {
     cleanupRemoteAttachments(state);
+    disposeRemoteChannel(state);
     if (activeAgents.get(conversationId) === state) activeAgents.delete(conversationId);
     webContents.send("agent-error", { conversationId, error: error.message || String(error) });
     webContents.send("agent-done", { conversationId, exitCode: -1, provider: "codex" });
@@ -487,6 +522,7 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
       parseLine(buffer);
     }
     cleanupRemoteAttachments(state);
+    finishRemoteChannel(state);
 
     if (state.cancelled) {
       if (isCurrentState) {
@@ -538,6 +574,7 @@ async function startCodexAgent({ conversationId, prompt, model, effort, cwd, ima
     const isCurrentState = activeAgents.get(conversationId) === state;
     log("Spawn error:", err.message);
     cleanupRemoteAttachments(state);
+    disposeRemoteChannel(state);
     if (isCurrentState) activeAgents.delete(conversationId);
     webContents.send("agent-error", { conversationId, error: err.message });
     if (isCurrentState) {
@@ -555,6 +592,7 @@ function cancelCodexAgent(conversationId) {
   log("Cancelling codex agent:", conversationId);
   state.cancelled = true;
   cleanupRemoteAttachments(state);
+  finishRemoteChannel(state);
 
   if (state.child) {
     state.child.kill("SIGTERM");
@@ -577,6 +615,7 @@ function cancelAllCodex() {
   for (const [conversationId, state] of activeAgents) {
     state.cancelled = true;
     cleanupRemoteAttachments(state);
+    finishRemoteChannel(state);
     if (state.child) {
       state.child.kill("SIGTERM");
       continue;
