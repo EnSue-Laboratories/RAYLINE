@@ -60,6 +60,17 @@ const sanitizeSchema = {
   },
 };
 
+// Returns a referentially-stable callback whose identity never changes while
+// always delegating to the latest `fn`. The latest value is kept in a ref that
+// is read only when the returned proxy is invoked (i.e. from event handlers,
+// after commit) — never during render. Isolating this in its own hook keeps the
+// latest-ref pattern contained and the call sites free of ref-read warnings.
+function useStableCallback(fn) {
+  const ref = useRef(fn);
+  useEffect(() => { ref.current = fn; }, [fn]);
+  return useCallback((...args) => ref.current?.(...args), []);
+}
+
 function PreBlock({ rawText, s = (x) => x, children }) {
   const [hovered, setHovered] = useState(false);
   return (
@@ -117,6 +128,24 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
       return img ? <AssistantImage {...img} /> : null;
     }
     if (match) {
+      // While this segment is actively streaming, skip Prism syntax
+      // highlighting — re-highlighting code blocks on every ~15Hz stream
+      // commit is the dominant source of long main-thread tasks (it rebuilds
+      // thousands of token elements per frame) and is what makes typing janky.
+      // Render cheap plain monospace now; the completed (non-streaming) render
+      // upgrades to full highlighting once the fence/message settles.
+      if (isStreaming) {
+        return (
+          <code style={{
+            display: "block",
+            whiteSpace: "pre",
+            fontSize: s(12),
+            fontFamily: "var(--font-mono)",
+            lineHeight: 1.6,
+            color: "var(--text-secondary)",
+          }}>{codeString}</code>
+        );
+      }
       return (
         <SyntaxHighlighter
           style={oneDark}
@@ -223,6 +252,20 @@ const MESSAGE_ROOT_STYLE = {
   contentVisibility: "auto",
   containIntrinsicSize: "180px",
 };
+
+// Module-level, referentially-stable plugin arrays. react-markdown compares
+// these by identity to decide whether the processor must be rebuilt; keeping
+// them constant avoids redundant work and lets MarkdownTextPart's memo skip
+// re-parsing unchanged parts during streaming.
+const ASSISTANT_REMARK_PLUGINS = [remarkGfm, remarkMath];
+const ASSISTANT_REHYPE_PLUGINS = [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex];
+const ASSISTANT_MARKDOWN_PROPS = {
+  remarkPlugins: ASSISTANT_REMARK_PLUGINS,
+  rehypePlugins: ASSISTANT_REHYPE_PLUGINS,
+};
+// User bubbles only need gfm (no math / raw HTML / katex).
+const USER_REMARK_PLUGINS = [remarkGfm];
+const USER_MARKDOWN_PROPS = { remarkPlugins: USER_REMARK_PLUGINS };
 
 function getImmediateImageSrc(image) {
   if (typeof image === "string") return image;
@@ -590,10 +633,51 @@ function renderControlAwareMarkdown({
   });
 }
 
+// Memoized wrapper around the per-text-part markdown render. A COMPLETED text
+// part (msg not streaming, OR not the last part) receives stable props:
+// `text` no longer grows, `isStreaming` is false, `components` is the stable
+// `scaledMdStatic`, and the callbacks are stable proxies (see Message). So memo
+// skips re-rendering — and therefore re-parsing — that part when an unrelated
+// later part changes. Only the active streaming last part re-parses as its
+// `text` grows.
+const MarkdownTextPart = memo(function MarkdownTextPart({
+  text,
+  blockKey,
+  isStreaming,
+  components,
+  onAnswer,
+  onControlChange,
+  canControlTarget,
+}) {
+  return (
+    <>
+      {renderControlAwareMarkdown({
+        text,
+        blockKey,
+        markdownProps: ASSISTANT_MARKDOWN_PROPS,
+        components,
+        isStreaming,
+        onAnswer,
+        onControlChange,
+        canControlTarget,
+      })}
+    </>
+  );
+});
+
 function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer, onControlChange, canControlTarget, wallpaper }) {
   const s = useFontScale();
-  const scaledMdStatic = useMemo(() => makeMdComponents(false, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
-  const scaledMdStreaming = useMemo(() => makeMdComponents(true, s, onAnswer, onControlChange, canControlTarget), [canControlTarget, onAnswer, onControlChange, s]);
+
+  // Wrap the incoming callbacks in stable proxies whose identity never changes
+  // across renders, even if the parent passes a fresh `onAnswer`/`onControlChange`
+  // each commit. This keeps `scaledMdStatic`/`scaledMdStreaming` and the props
+  // handed to MarkdownTextPart referentially stable so memo stays effective for
+  // completed parts during streaming.
+  const stableOnAnswer = useStableCallback(onAnswer);
+  const stableOnControlChange = useStableCallback(onControlChange);
+
+  const scaledMdStatic = useMemo(() => makeMdComponents(false, s, stableOnAnswer, stableOnControlChange, canControlTarget), [canControlTarget, stableOnAnswer, stableOnControlChange, s]);
+  const scaledMdStreaming = useMemo(() => makeMdComponents(true, s, stableOnAnswer, stableOnControlChange, canControlTarget), [canControlTarget, stableOnAnswer, stableOnControlChange, s]);
   const isUser = msg.role === "user";
   const isSystem = msg.role === "system";
   const isShellCommand = msg.mode === "shell-command";
@@ -801,10 +885,10 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                 {renderControlAwareMarkdown({
                   text: displayText,
                   blockKey: `user-${msg.id}`,
-                  markdownProps: { remarkPlugins: [remarkGfm] },
+                  markdownProps: USER_MARKDOWN_PROPS,
                   components: scaledMdStatic,
-                  onAnswer,
-                  onControlChange,
+                  onAnswer: stableOnAnswer,
+                  onControlChange: stableOnControlChange,
                   canControlTarget,
                 })}
               </div>
@@ -868,7 +952,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
               letterSpacing: "0.006em",
             }}
           >
-            <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]} components={scaledMdStatic}>
+            <Markdown remarkPlugins={ASSISTANT_REMARK_PLUGINS} rehypePlugins={ASSISTANT_REHYPE_PLUGINS} components={scaledMdStatic}>
               {sanitizeText(displayText)}
             </Markdown>
           </div>
@@ -909,6 +993,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
         {(msg.parts || []).map((part, i) => {
           if (part.type === "text" && part.text) {
             const isLastPart = i === (msg.parts || []).length - 1;
+            const partStreaming = Boolean(msg.isStreaming && isLastPart);
             return (
               <div key={i} style={{
                 color: "var(--text-primary)",
@@ -918,19 +1003,15 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                 letterSpacing: "0.008em",
                 marginBottom: 4,
               }}>
-                {renderControlAwareMarkdown({
-                  text: part.text,
-                  blockKey: `part-${part.id || i}`,
-                  markdownProps: {
-                    remarkPlugins: [remarkGfm, remarkMath],
-                    rehypePlugins: [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex],
-                  },
-                  components: (msg.isStreaming && isLastPart) ? scaledMdStreaming : scaledMdStatic,
-                  isStreaming: msg.isStreaming && isLastPart,
-                  onAnswer,
-                  onControlChange,
-                  canControlTarget,
-                })}
+                <MarkdownTextPart
+                  text={part.text}
+                  blockKey={`part-${part.id || i}`}
+                  isStreaming={partStreaming}
+                  components={partStreaming ? scaledMdStreaming : scaledMdStatic}
+                  onAnswer={stableOnAnswer}
+                  onControlChange={stableOnControlChange}
+                  canControlTarget={canControlTarget}
+                />
               </div>
             );
           }
@@ -1044,13 +1125,10 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
             {renderControlAwareMarkdown({
               text: msg.text,
               blockKey: `legacy-${msg.id}`,
-              markdownProps: {
-                remarkPlugins: [remarkGfm, remarkMath],
-                rehypePlugins: [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex],
-              },
+              markdownProps: ASSISTANT_MARKDOWN_PROPS,
               components: scaledMdStatic,
-              onAnswer,
-              onControlChange,
+              onAnswer: stableOnAnswer,
+              onControlChange: stableOnControlChange,
               canControlTarget,
             })}
           </div>

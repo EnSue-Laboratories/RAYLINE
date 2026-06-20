@@ -43,6 +43,10 @@ import { playChime } from "./utils/chime";
 const logCheckpoint = createLogger("checkpoint-ui");
 const logSendFlow = createLogger("send-flow");
 
+// How often the sidebar's live streaming preview text is allowed to refresh.
+// `isStreaming` still flips immediately; only the preview text is throttled.
+const SIDEBAR_PREVIEW_THROTTLE_MS = 500;
+
 function shouldPreviewRuntimeSetup() {
   if (typeof window === "undefined") return false;
   try {
@@ -1380,15 +1384,54 @@ export default function App() {
   const [queuedMessages, setQueuedMessages] = useState([]);
   const [permissionRequests, setPermissionRequests] = useState([]);
   const labControlTimersRef = useRef(new Map());
-  const persistableConversations = useMemo(
-    () =>
-      convoList
-        .map((conversation) =>
-          buildPersistedConversationSnapshot(conversation, getConversation(conversation.id))
-        )
-        .filter((conversation) => hasConversationMessages(conversation, getConversation(conversation.id))),
-    [convoList, getConversation]
-  );
+  // Per-conversation snapshot cache. Building the persisted snapshot for a
+  // conversation runs normalizeConversationState over its whole stored history,
+  // and the unmemoized version rebuilt ALL conversations on every stream commit
+  // (getConversation changes identity each commit) — with hundreds of chats that
+  // is a ~200ms main-thread task per commit, which blocks typing and scrolling
+  // while a response streams. Reuse the prior snapshot when the conversation row
+  // and its live data are unchanged, so only the actively-streaming conversation
+  // (whose data ref changes) is rebuilt each commit. Output is identical.
+  const persistSnapshotCacheRef = useRef(new Map());
+  const persistableConversations = useMemo(() => {
+    const cache = persistSnapshotCacheRef.current;
+    const seen = new Set();
+    const out = [];
+    for (const conversation of convoList) {
+      const data = getConversation(conversation.id);
+      // Snapshots with no live messages depend only on `conversation` (the early
+      // return in buildPersistedConversationSnapshot), so unloaded conversations
+      // — whose `data` is a fresh empty object each call — still cache by row
+      // identity alone instead of rebuilding every commit.
+      const hasLive =
+        Array.isArray(data?.messages) && data.messages.some(isPersistableLiveMessage);
+      seen.add(conversation.id);
+      const cached = cache.get(conversation.id);
+      const reusable =
+        cached &&
+        cached.conversation === conversation &&
+        cached.hasLive === hasLive &&
+        (!hasLive || cached.data === data);
+      let entry;
+      if (reusable) {
+        entry = cached;
+      } else {
+        entry = {
+          conversation,
+          data,
+          hasLive,
+          snapshot: buildPersistedConversationSnapshot(conversation, data),
+          keep: hasConversationMessages(conversation, data),
+        };
+        cache.set(conversation.id, entry);
+      }
+      if (entry.keep) out.push(entry.snapshot);
+    }
+    for (const id of [...cache.keys()]) {
+      if (!seen.has(id)) cache.delete(id);
+    }
+    return out;
+  }, [convoList, getConversation]);
   const persistedActive = useMemo(
     () => (
       persistableConversations.some((conversation) => conversation.id === active)
@@ -2387,10 +2430,18 @@ export default function App() {
     });
   }, [dynamicModels]);
 
-  const handleNew = () => {
+  const handleNew = useCallback(() => {
     setShowSettings(false);
     setShowNewChatCard(true);
-  };
+  }, []);
+
+  // Stable callbacks for the memoized <Sidebar> (avoid new identities per render).
+  const handleOpenDispatch = useCallback(() => setShowDispatchCard(true), []);
+  const handleToggleSidebar = useCallback(() => setSidebarOpen((o) => !o), []);
+  const handleOpenProjectManager = useCallback(() => window.api?.openProjectManager(), []);
+  const handleOpenNewProject = useCallback(() => setShowNewProject(true), []);
+  const handleOpenSettings = useCallback(() => setShowSettings(true), []);
+  const handleToggleDraftsCollapsed = useCallback(() => setDraftsCollapsed((p) => !p), []);
 
   const handleToggleProjectCollapse = useCallback((cwdRoot, nextCollapsed) => {
     const projectRoot = getMainRepoRoot(cwdRoot);
@@ -3284,7 +3335,7 @@ export default function App() {
         titleText: text,
       });
     },
-    [activeConvo, active, activeData, appendLocalMessages, createConversationDraft, cwd, defaultModel, draftsPath, dynamicModels, enqueueQueuedMessage, getConversation, sendMessageToConversation]
+    [activeConvo, active, activeData, appendLocalMessages, createConversationDraft, cwd, defaultModel, draftsPath, dynamicModels, enqueueQueuedMessage, getConversation, handleNew, sendMessageToConversation]
   );
 
   // Process queued messages when streaming ends
@@ -3847,23 +3898,117 @@ export default function App() {
     [activeConvo, activeData.error, activeData.isStreaming, activeData.messages]
   );
 
-  // Build convos for Sidebar
+  // Build convos for Sidebar.
+  // The live preview for a streaming conversation is throttled so the sidebar
+  // row text only refreshes a few times per second (not on every stream commit),
+  // while `isStreaming` still flips promptly and the final preview stays accurate.
+  // Unchanged rows reuse their previous object identity so memoized children skip.
+  const sidebarRowCacheRef = useRef(new Map());
+  const sidebarPreviewMetaRef = useRef(new Map());
+  const [sidebarPreviewTick, setSidebarPreviewTick] = useState(0);
+  const sidebarFlushTimerRef = useRef(null);
+  const sidebarPendingFlushRef = useRef(false);
+
+  useEffect(() => () => {
+    if (sidebarFlushTimerRef.current) {
+      clearTimeout(sidebarFlushTimerRef.current);
+      sidebarFlushTimerRef.current = null;
+    }
+  }, []);
+
   const convosForSidebar = useMemo(() => {
+    // `sidebarPreviewTick` is a re-run trigger for throttled streaming-preview flushes.
+    void sidebarPreviewTick;
+    const now = Date.now();
     const rows = [];
+    const rowCache = sidebarRowCacheRef.current;
+    const previewMeta = sidebarPreviewMetaRef.current;
+    const seen = new Set();
+    let pendingStreamingFlush = false;
+
     for (const c of convoList) {
       const data = getConversation(c.id);
       if (c.id !== active && !hasConversationMessages(c, data)) continue;
+      seen.add(c.id);
 
       const msgs = data.messages || [];
       const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
-      rows.push({
+      const isStreaming = !!data.isStreaming;
+      const livePreview = getSidebarMessagePreview(lastMsg) || c.lastPreview || "Empty";
+
+      // Throttle preview updates while streaming; flush immediately when not streaming.
+      const meta = previewMeta.get(c.id);
+      let emittedPreview;
+      if (!isStreaming) {
+        emittedPreview = livePreview;
+        previewMeta.set(c.id, { preview: livePreview, ts: now });
+      } else if (!meta) {
+        emittedPreview = livePreview;
+        previewMeta.set(c.id, { preview: livePreview, ts: now });
+      } else if (livePreview === meta.preview) {
+        emittedPreview = meta.preview;
+      } else if (now - meta.ts >= SIDEBAR_PREVIEW_THROTTLE_MS) {
+        emittedPreview = livePreview;
+        previewMeta.set(c.id, { preview: livePreview, ts: now });
+      } else {
+        // Hold the previously emitted preview; schedule a flush so the latest
+        // streamed text eventually appears even if commits pause.
+        emittedPreview = meta.preview;
+        pendingStreamingFlush = true;
+      }
+
+      const prevRow = rowCache.get(c.id);
+      if (
+        prevRow &&
+        prevRow.__source === c &&
+        prevRow.lastPreview === emittedPreview &&
+        prevRow.isStreaming === isStreaming
+      ) {
+        // Reuse previous object identity so memoized rows skip re-render.
+        rows.push(prevRow);
+        continue;
+      }
+
+      const row = {
         ...c,
-        lastPreview: getSidebarMessagePreview(lastMsg) || c.lastPreview || "Empty",
-        isStreaming: data.isStreaming,
-      });
+        lastPreview: emittedPreview,
+        isStreaming,
+        __source: c,
+      };
+      rowCache.set(c.id, row);
+      rows.push(row);
     }
+
+    // Drop cache entries for conversations no longer rendered.
+    for (const id of rowCache.keys()) {
+      if (!seen.has(id)) rowCache.delete(id);
+    }
+    for (const id of previewMeta.keys()) {
+      if (!seen.has(id)) previewMeta.delete(id);
+    }
+
+    // Record whether a throttled flush is owed; the timer is armed in an effect
+    // (below) to keep this memo free of render-time side effects.
+    sidebarPendingFlushRef.current = pendingStreamingFlush;
     return rows;
-  }, [active, convoList, getConversation]);
+    // sidebarPreviewTick intentionally included so a throttled flush re-runs this memo.
+  }, [active, convoList, getConversation, sidebarPreviewTick]);
+
+  // Arm/disarm the throttled streaming-preview flush based on the latest memo
+  // run. Kept out of the memo body so render stays side-effect free.
+  useEffect(() => {
+    if (sidebarPendingFlushRef.current) {
+      if (!sidebarFlushTimerRef.current) {
+        sidebarFlushTimerRef.current = setTimeout(() => {
+          sidebarFlushTimerRef.current = null;
+          setSidebarPreviewTick((t) => t + 1);
+        }, SIDEBAR_PREVIEW_THROTTLE_MS);
+      }
+    } else if (sidebarFlushTimerRef.current) {
+      clearTimeout(sidebarFlushTimerRef.current);
+      sidebarFlushTimerRef.current = null;
+    }
+  }, [convosForSidebar]);
 
   const tabs = useMemo(
     () => (pinnedTabs.length > 1 ? pinnedTabs : []),
@@ -4119,17 +4264,17 @@ export default function App() {
             active={active}
             onSelect={handleSelect}
             onNew={handleNew}
-            onOpenDispatch={() => setShowDispatchCard(true)}
+            onOpenDispatch={handleOpenDispatch}
             onDelete={handleDelete}
-            onToggleSidebar={() => setSidebarOpen((o) => !o)}
+            onToggleSidebar={handleToggleSidebar}
             isOpen={useWindowsSidebarChrome ? sidebarOpen : true}
             windowsChrome={useWindowsSidebarChrome}
             locale={locale}
             cwd={activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd)}
             onPickFolder={handlePickFolder}
-            onOpenSettings={() => setShowSettings(true)}
-            onOpenProjectManager={() => window.api?.openProjectManager()}
-            onOpenNewProject={() => setShowNewProject(true)}
+            onOpenSettings={handleOpenSettings}
+            onOpenProjectManager={handleOpenProjectManager}
+            onOpenNewProject={handleOpenNewProject}
             projects={projects}
             draftsPath={draftsPath}
             onToggleProjectCollapse={handleToggleProjectCollapse}
@@ -4137,7 +4282,7 @@ export default function App() {
             onEditProjectContext={handleEditProjectContext}
             onNewInProject={handleNewInProject}
             draftsCollapsed={draftsCollapsed}
-            onToggleDraftsCollapsed={() => setDraftsCollapsed(p => !p)}
+            onToggleDraftsCollapsed={handleToggleDraftsCollapsed}
             developerMode={developerMode}
             multicaModels={dynamicModels}
             hasUpdate={hasUpdate}
