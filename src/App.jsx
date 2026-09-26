@@ -1460,8 +1460,8 @@ export default function App() {
 
   const refreshCliInstalled = useCallback(async (options = {}) => {
     if (!window.api?.checkCliInstalled) {
-      setCliInstalled({ claude: true, codex: true, opencode: false });
-      return { claude: true, codex: true, opencode: false };
+      setCliInstalled({ claude: true, codex: true, opencode: false, grok: false });
+      return { claude: true, codex: true, opencode: false, grok: false };
     }
     setCliChecking(true);
     try {
@@ -1470,11 +1470,12 @@ export default function App() {
         claude: Boolean(result?.claude),
         codex: Boolean(result?.codex),
         opencode: Boolean(result?.opencode),
+        grok: Boolean(result?.grok),
       };
       setCliInstalled(next);
       return next;
     } catch {
-      const fallback = { claude: true, codex: true, opencode: false };
+      const fallback = { claude: true, codex: true, opencode: false, grok: false };
       setCliInstalled(fallback);
       return fallback;
     } finally {
@@ -1485,6 +1486,7 @@ export default function App() {
   const runtimeAvailability = useMemo(() => {
     const claude = cliInstalled?.claude === true;
     const codex = cliInstalled?.codex === true;
+    const grok = cliInstalled?.grok === true;
     const opencodeInstalled = cliInstalled?.opencode === true || openCodeStatus?.installed === true;
     const opencode = opencodeInstalled && openCodeModels.length > 0;
     const multica = multicaModels.length > 0;
@@ -1492,11 +1494,12 @@ export default function App() {
     return {
       claude,
       codex,
+      grok,
       opencode,
       multica,
       remote,
       opencodeInstalled,
-      any: claude || codex || opencode || multica || remote,
+      any: claude || codex || grok || opencode || multica || remote,
     };
   }, [cliInstalled, multicaModels.length, openCodeModels.length, openCodeStatus?.installed, remoteModels.length]);
 
@@ -1506,6 +1509,7 @@ export default function App() {
     const runtimeProvider = getRuntimeProviderForProvider(provider);
     if (runtimeProvider === "claude") return runtimeAvailability.claude;
     if (runtimeProvider === "codex") return runtimeAvailability.codex;
+    if (runtimeProvider === "grok") return runtimeAvailability.grok;
     if (runtimeProvider === "opencode") return runtimeAvailability.opencode;
     if (runtimeProvider === "multica") return runtimeAvailability.multica;
     return true;
@@ -1546,6 +1550,7 @@ export default function App() {
     installed: {
       claude: runtimeSetupPreview ? false : runtimeAvailability.claude,
       codex: runtimeSetupPreview ? false : runtimeAvailability.codex,
+      grok: runtimeSetupPreview ? false : runtimeAvailability.grok,
       opencode: runtimeSetupPreview ? false : runtimeAvailability.opencodeInstalled,
     },
     opencodeConfigured: runtimeSetupPreview ? false : openCodeModels.length > 0,
@@ -2609,6 +2614,7 @@ export default function App() {
     const nextCodexThreadId = data._codexThreadId || null;
     const nextClaudeSessionId = data._claudeSessionId || null;
     const nextOpenCodeSessionId = data._opencodeSessionId || null;
+    const nextGrokSessionId = data._grokSessionId || null;
     const getCaptureProvider = (runtimeProvider) => (
       [activeSession?.provider, normalizedConvo.lastProvider]
         .find((provider) => provider && getRuntimeProviderForProvider(provider) === runtimeProvider) ||
@@ -2622,14 +2628,17 @@ export default function App() {
       nextClaudeSessionId && normalizedConvo.providerSessions?.[claudeCaptureProvider] !== nextClaudeSessionId;
     const hasNewOpenCodeSessionId =
       nextOpenCodeSessionId && normalizedConvo.providerSessions?.opencode !== nextOpenCodeSessionId;
+    const hasNewGrokSessionId =
+      nextGrokSessionId && normalizedConvo.providerSessions?.grok !== nextGrokSessionId;
 
-    if (!hasNewCodexThreadId && !hasNewClaudeSessionId && !hasNewOpenCodeSessionId) return;
+    if (!hasNewCodexThreadId && !hasNewClaudeSessionId && !hasNewOpenCodeSessionId && !hasNewGrokSessionId) return;
 
     logSessionState("captureProviderSession", {
       conversationId: active,
       nextCodexThreadId,
       nextClaudeSessionId,
       nextOpenCodeSessionId,
+      nextGrokSessionId,
       lastProvider: normalizedConvo.lastProvider || null,
       sessionId: normalizedConvo.sessionId || null,
       sessionProvider: normalizedConvo.sessionProvider || null,
@@ -2713,6 +2722,30 @@ export default function App() {
               activate: true,
               preferPendingActive: true,
               lastProvider: next.lastProvider || "opencode",
+            }
+          );
+        }
+        if (hasNewGrokSessionId) {
+          next = upsertConversationSession(
+            next,
+            {
+              id:
+                activeSession?.provider === "grok" && !activeSession.nativeSessionId
+                  ? activeSession.id
+                  : undefined,
+              provider: "grok",
+              nativeSessionId: nextGrokSessionId,
+              model: next.model,
+              syncedThroughMessageCount: Math.max(
+                activeSession?.syncedThroughMessageCount || 0,
+                next.archivedMessages?.length || 0
+              ),
+              origin: "capture",
+            },
+            {
+              activate: true,
+              preferPendingActive: true,
+              lastProvider: next.lastProvider || "grok",
             }
           );
         }
@@ -3139,6 +3172,7 @@ export default function App() {
           thinking: getModelThinkingValue(m),
           openCodeConfig: getOpenCodeRuntimeConfig(m),
           providerUpstreamConfig: getProviderUpstreamRuntimeConfig(currentProvider, getProviderUpstreamConfig),
+          grokContinue: Boolean(m.grokContinue),
           remoteRuntime,
           cwd: effectiveCwd,
           projectContext: resolveProjectContext(effectiveCwd),
@@ -3737,6 +3771,7 @@ export default function App() {
         thinking: getModelThinkingValue(m),
         openCodeConfig: getOpenCodeRuntimeConfig(m),
         providerUpstreamConfig: getProviderUpstreamRuntimeConfig(currentProvider, getProviderUpstreamConfig),
+        grokContinue: Boolean(m.grokContinue),
         remoteRuntime,
         cwd: convoCwd,
         projectContext: resolveProjectContext(convoCwd),
@@ -4290,97 +4325,113 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main content: Settings or Chat */}
-      {showSettings ? (
-        <Settings
-          wallpaper={wallpaper}
-          onWallpaperChange={setWallpaper}
-          appearance={appearance}
-          onAppearanceChange={(next) => setAppearance(normalizeAppearance(next))}
-          fontSize={fontSize}
-          onFontSizeChange={setFontSize}
-          defaultPrBranch={defaultPrBranch}
-          onDefaultPrBranchChange={setDefaultPrBranch}
-          coauthorEnabled={coauthorEnabled}
-          onCoauthorEnabledChange={setCoauthorEnabled}
-          coauthorTrailer={coauthorTrailer}
-          onCoauthorTrailerChange={setCoauthorTrailer}
-          appBlur={appBlur}
-          onAppBlurChange={setAppBlur}
-          appOpacity={appOpacity}
-          onAppOpacityChange={setAppOpacity}
-          developerMode={developerMode}
-          onDeveloperModeChange={setDeveloperMode}
-          sidebarTerminalEnabled={sidebarTerminalEnabled}
-          onSidebarTerminalEnabledChange={setSidebarTerminalEnabled}
-          remoteSshCommand={remoteSshCommand}
-          onRemoteSshCommandChange={handleRemoteSshCommandChange}
-          onConnectRemoteSsh={handleConnectRemoteSsh}
-          chromeControlsOnHover={chromeControlsOnHover}
-          onChromeControlsOnHoverChange={setChromeControlsOnHover}
-          notificationSound={notificationSound}
-          onNotificationSoundChange={setNotificationSound}
-          notificationsMuted={notificationsMuted}
-          onNotificationsMutedChange={setNotificationsMuted}
-          platform={platform}
-          locale={locale}
-          onLocaleChange={setLocale}
-          windowControlsVisible={showWindowControls}
-          onClose={() => setShowSettings(false)}
-        />
-      ) : (
-        <ChatArea
-          convo={convo}
-          onSend={handleSend}
-          onCancel={handleCancel}
-          onEdit={handleEdit}
-          sidebarOpen={sidebarOpen}
-          onModelChange={handleModelChange}
-          defaultModel={defaultModel}
-          queuedMessages={activeQueuedMessages}
-          onUpdateQueuedMessage={updateQueuedMessage}
-          onRemoveQueuedMessage={removeQueuedMessage}
-          permissionRequests={activePermissionRequests}
-          onRespondPermission={respondPermission}
-          onToggleTerminal={handleToggleTerminal}
-          terminalOpen={sidebarTerminalEnabled ? sidebarTerminalOpen : terminal.windowOpen}
-          terminalCount={terminal.sessions.length}
-          tabs={tabs}
-          activeTabId={active}
-          onSelectTab={handleSelect}
-          onCloseTab={handleCloseTab}
-          wallpaper={wallpaper}
-          cwd={terminalCwd}
-          draftsPath={draftsPath}
-          onRefocusTerminal={handleRefocusTerminal}
-          onCwdChange={(newCwd) => {
-            setCwd(newCwd);
-            if (active) {
-              // Assign a new sessionId so next message starts a fresh Claude session
-              // in the new cwd instead of trying to --resume the old one
-              setConvoList((p) =>
-                p.map((c) => c.id === active ? { ...c, cwd: newCwd } : c)
-              );
-            }
+      {/* Main content: keep ChatArea mounted so composer state survives settings hops. */}
+      <div style={{ position: "relative", flex: 1, minWidth: 0, height: "100%", overflow: "hidden", display: "flex" }}>
+        <div
+          aria-hidden={showSettings}
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            opacity: showSettings ? 0 : 1,
+            pointerEvents: showSettings ? "none" : "auto",
+            transition: prefersReducedMotion ? "none" : "opacity .12s ease",
           }}
-          showNewChatCard={showNewChatCard}
-          onCreateChat={handleCreateChat}
-          onCancelNewChat={() => setShowNewChatCard(false)}
-          allCwdRoots={allCwdRoots}
-          projects={projectChooserProjects}
-          defaultPrBranch={defaultPrBranch}
-          newChatDefaultCwd={newChatDefaultCwd}
-          coauthorEnabled={coauthorEnabled}
-          coauthorTrailer={coauthorTrailer}
-          onControlChange={handleControlChange}
-          canControlTarget={canControlTarget}
-          developerMode={developerMode}
-          windowControlsVisible={showWindowControls}
-          locale={locale}
-          runtimeSetup={runtimeSetup}
-          extraModels={remoteModels}
-        />
-      )}
+        >
+          <ChatArea
+            convo={convo}
+            onSend={handleSend}
+            onCancel={handleCancel}
+            onEdit={handleEdit}
+            sidebarOpen={sidebarOpen}
+            onModelChange={handleModelChange}
+            defaultModel={defaultModel}
+            queuedMessages={activeQueuedMessages}
+            onUpdateQueuedMessage={updateQueuedMessage}
+            onRemoveQueuedMessage={removeQueuedMessage}
+            permissionRequests={activePermissionRequests}
+            onRespondPermission={respondPermission}
+            onToggleTerminal={handleToggleTerminal}
+            terminalOpen={sidebarTerminalEnabled ? sidebarTerminalOpen : terminal.windowOpen}
+            terminalCount={terminal.sessions.length}
+            tabs={tabs}
+            activeTabId={active}
+            onSelectTab={handleSelect}
+            onCloseTab={handleCloseTab}
+            wallpaper={wallpaper}
+            cwd={terminalCwd}
+            draftsPath={draftsPath}
+            onRefocusTerminal={handleRefocusTerminal}
+            onCwdChange={(newCwd) => {
+              setCwd(newCwd);
+              if (active) {
+                // Assign a new sessionId so next message starts a fresh Claude session
+                // in the new cwd instead of trying to --resume the old one
+                setConvoList((p) =>
+                  p.map((c) => c.id === active ? { ...c, cwd: newCwd } : c)
+                );
+              }
+            }}
+            showNewChatCard={showNewChatCard}
+            onCreateChat={handleCreateChat}
+            onCancelNewChat={() => setShowNewChatCard(false)}
+            allCwdRoots={allCwdRoots}
+            projects={projectChooserProjects}
+            defaultPrBranch={defaultPrBranch}
+            newChatDefaultCwd={newChatDefaultCwd}
+            coauthorEnabled={coauthorEnabled}
+            coauthorTrailer={coauthorTrailer}
+            onControlChange={handleControlChange}
+            canControlTarget={canControlTarget}
+            developerMode={developerMode}
+            windowControlsVisible={showWindowControls}
+            locale={locale}
+            runtimeSetup={runtimeSetup}
+            extraModels={remoteModels}
+          />
+        </div>
+
+        {showSettings && (
+          <div style={{ position: "absolute", inset: 0, zIndex: 80, display: "flex" }}>
+            <Settings
+              wallpaper={wallpaper}
+              onWallpaperChange={setWallpaper}
+              appearance={appearance}
+              onAppearanceChange={(next) => setAppearance(normalizeAppearance(next))}
+              fontSize={fontSize}
+              onFontSizeChange={setFontSize}
+              defaultPrBranch={defaultPrBranch}
+              onDefaultPrBranchChange={setDefaultPrBranch}
+              coauthorEnabled={coauthorEnabled}
+              onCoauthorEnabledChange={setCoauthorEnabled}
+              coauthorTrailer={coauthorTrailer}
+              onCoauthorTrailerChange={setCoauthorTrailer}
+              appBlur={appBlur}
+              onAppBlurChange={setAppBlur}
+              appOpacity={appOpacity}
+              onAppOpacityChange={setAppOpacity}
+              developerMode={developerMode}
+              onDeveloperModeChange={setDeveloperMode}
+              sidebarTerminalEnabled={sidebarTerminalEnabled}
+              onSidebarTerminalEnabledChange={setSidebarTerminalEnabled}
+              remoteSshCommand={remoteSshCommand}
+              onRemoteSshCommandChange={handleRemoteSshCommandChange}
+              onConnectRemoteSsh={handleConnectRemoteSsh}
+              chromeControlsOnHover={chromeControlsOnHover}
+              onChromeControlsOnHoverChange={setChromeControlsOnHover}
+              notificationSound={notificationSound}
+              onNotificationSoundChange={setNotificationSound}
+              notificationsMuted={notificationsMuted}
+              onNotificationsMutedChange={setNotificationsMuted}
+              platform={platform}
+              locale={locale}
+              onLocaleChange={setLocale}
+              windowControlsVisible={showWindowControls}
+              onClose={() => setShowSettings(false)}
+            />
+          </div>
+        )}
+      </div>
 
       {showDispatchCard && (
         <DispatchCard

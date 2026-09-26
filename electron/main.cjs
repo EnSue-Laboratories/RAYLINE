@@ -15,6 +15,12 @@ const {
   shouldEnableThinking,
 } = require("./opencode-agent-manager.cjs");
 const {
+  startGrokAgent,
+  cancelGrokAgent,
+  cancelAllGrok,
+  resolveGrokBin,
+} = require("./grok-agent-manager.cjs");
+const {
   startMulticaAgent,
   cancelMulticaAgent,
   multicaSendCode,
@@ -870,6 +876,8 @@ ipcMain.on("agent-start", (event, opts) => {
     watchAgentLaunch(() => startCodexAgent(opts, event.sender), event.sender, opts, "codex");
   } else if (runtimeProvider === "opencode") {
     watchAgentLaunch(() => startOpenCodeAgent(opts, event.sender), event.sender, opts, "opencode");
+  } else if (runtimeProvider === "grok") {
+    watchAgentLaunch(() => startGrokAgent(opts, event.sender), event.sender, opts, "grok");
   } else {
     watchAgentLaunch(() => startAgent(opts, event.sender), event.sender, opts, "claude");
   }
@@ -879,6 +887,7 @@ ipcMain.on("agent-cancel", (_event, { conversationId }) => {
   cancelAgent(conversationId);
   cancelCodexAgent(conversationId);
   cancelOpenCodeAgent(conversationId);
+  cancelGrokAgent(conversationId);
   cancelMulticaAgent(conversationId).catch((err) => {
     console.error("[multica] cancel failed", { conversationId, error: err?.message || String(err) });
   });
@@ -899,6 +908,13 @@ ipcMain.on("agent-edit-resend", (event, opts) => {
       event.sender,
       opts,
       "opencode"
+    );
+  } else if (runtimeProvider === "grok") {
+    watchAgentLaunch(
+      () => startGrokAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender),
+      event.sender,
+      opts,
+      "grok"
     );
   } else {
     watchAgentLaunch(
@@ -1348,6 +1364,7 @@ function getCliInstalledSnapshot({ force = false } = {}) {
     claude: Boolean(resolveCliBin("claude", { envVarName: "CLAUDE_BIN" })),
     codex: Boolean(resolveCliBin("codex", { envVarName: "CODEX_BIN" })),
     opencode: Boolean(resolveOpenCodeBin()),
+    grok: Boolean(resolveGrokBin()),
   };
   cliInstallCheckCacheAt = Date.now();
   return cliInstallCheckCache;
@@ -3069,5 +3086,6 @@ app.on("before-quit", () => {
   cancelAll();
   cancelAllCodex();
   cancelAllOpenCode();
+  cancelAllGrok();
   terminalManager.stopServer();
 });

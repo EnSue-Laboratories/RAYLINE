@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Pencil, FileText, PauseCircle, Terminal, ImageOff } from "lucide-react";
+import { AlertTriangle, Pencil, FileText, PauseCircle, Terminal, ImageOff } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -545,6 +545,71 @@ function AssistantImage({ src, alt, storagePath, originalPath }) {
   );
 }
 
+function ErrorBlock({ part, s = (x) => x }) {
+  const text = typeof part?.text === "string" ? part.text : String(part?.message || part?.error || "An error occurred.");
+  const summary = part?.summary || text.split("\n").map((line) => line.trim()).find(Boolean) || "Error";
+  const title = part?.title || "Error";
+
+  return (
+    <details
+      data-copy-image-ignore="true"
+      style={{
+        margin: "10px 0 14px",
+        maxWidth: "92%",
+        border: "1px solid var(--danger-border)",
+        borderRadius: 10,
+        background: "var(--danger-bg-soft)",
+        color: "var(--danger-text)",
+        overflow: "hidden",
+      }}
+    >
+      <summary
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "9px 11px",
+          cursor: "pointer",
+          listStyle: "none",
+          fontSize: s(11),
+          fontFamily: "var(--font-mono)",
+          letterSpacing: ".04em",
+        }}
+      >
+        <AlertTriangle size={14} strokeWidth={1.8} />
+        <span style={{ flexShrink: 0, textTransform: "uppercase" }}>{title}</span>
+        <span
+          style={{
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            color: "var(--danger-text-strong)",
+            letterSpacing: 0,
+            textTransform: "none",
+          }}
+        >
+          {summary}
+        </span>
+      </summary>
+      <pre
+        style={{
+          margin: 0,
+          padding: "0 11px 11px 33px",
+          whiteSpace: "pre-wrap",
+          overflowWrap: "anywhere",
+          color: "var(--text-secondary)",
+          fontSize: s(11),
+          lineHeight: 1.55,
+          fontFamily: "var(--font-mono)",
+        }}
+      >
+        {text}
+      </pre>
+    </details>
+  );
+}
+
 // Parse the body of a fenced ```image block. Accepts a bare URL/data URL, or
 // a small JSON object { src|url, alt }.
 function parseImageFenceBody(body) {
@@ -1023,6 +1088,9 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                 <AssistantImage {...normalized} />
               </div>
             );
+          }
+          if (part.type === "error") {
+            return <ErrorBlock key={`error-${i}`} part={part} s={s} />;
           }
           if (part.type === "thinking") {
             const isPartThinking = part._streamKey

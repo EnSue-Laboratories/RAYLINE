@@ -16,6 +16,8 @@ export const MODELS = [
   { id: "gpt54-med",   name: "GPT-5.4",         tag: "GPT-5.4",        cliFlag: "gpt-5.4", provider: "codex", effort: "medium", contextWindow: 1_050_000 },
   { id: "gpt54-high",  name: "GPT-5.4 high",    tag: "GPT-5.4 high",   cliFlag: "gpt-5.4", provider: "codex", effort: "high",   contextWindow: 1_050_000 },
   { id: "gpt54-xhigh", name: "GPT-5.4 xhigh",   tag: "GPT-5.4 xhigh",  cliFlag: "gpt-5.4", provider: "codex", effort: "xhigh",  contextWindow: 1_050_000 },
+  { id: "grok-46", name: "Grok 4.6", tag: "GROK", cliFlag: "grok-4.6", provider: "grok", contextWindow: 200_000 },
+  { id: "grok-46-continue", name: "Grok 4.6 (Continue project)", tag: "GROK C", cliFlag: "grok-4.6", provider: "grok", grokContinue: true, contextWindow: 200_000 },
 ];
 
 export const normalizeModelId = (id) => LEGACY_MODEL_IDS[id] || id;
@@ -80,6 +82,10 @@ export function isOpenCodeModelId(id) {
   return typeof id === "string" && id.startsWith("opencode:");
 }
 
+export function isGrokModelId(id) {
+  return typeof id === "string" && id.startsWith("grok");
+}
+
 export function parseOpenCodeModelId(id) {
   if (!isOpenCodeModelId(id)) return null;
   const value = id.slice("opencode:".length).trim();
@@ -117,6 +123,9 @@ export function getMOrMulticaFallback(id, extraModels = []) {
         modelId: parsed.modelId,
       };
     }
+  }
+  if (isGrokModelId(id)) {
+    return { id, name: "Grok", tag: "GROK", provider: "grok", cliFlag: id };
   }
   if (isProviderUpstreamModelId(id)) {
     return getM(id);

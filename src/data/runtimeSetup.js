@@ -2,6 +2,7 @@ export const RUNTIME_SETUP_DOCS = {
   claude: "https://code.claude.com/docs/en/setup",
   codex: "https://developers.openai.com/codex/cli",
   opencode: "https://opencode.ai/docs",
+  grok: "https://docs.x.ai/docs/grok-code",
 };
 
 export const RUNTIME_SETUP_PROVIDERS = [
@@ -28,6 +29,14 @@ export const RUNTIME_SETUP_PROVIDERS = [
     description: "Bring your own provider or API key.",
     primary: false,
     installNote: "Provider setup is still required after install.",
+  },
+  {
+    id: "grok",
+    name: "Grok",
+    eyebrow: "xAI",
+    description: "Use the local Grok Build CLI with RayLine projects.",
+    primary: false,
+    installNote: "Install or update with the Grok CLI setup path.",
   },
 ];
 
@@ -83,6 +92,17 @@ if curl -fsSL https://opencode.ai/install | bash; then
   fi
 fi`,
     signin: "opencode",
+  },
+  grok: {
+    install: `printf '\\033[1mRayLine Grok setup\\033[0m\\n'
+if command -v grok >/dev/null 2>&1; then
+  echo "Grok is already installed. Starting sign-in or setup..."
+  grok login || grok
+else
+  echo "Grok CLI is not on PATH in this shell."
+  echo "Open the Grok docs from RayLine and install the local CLI, then refresh runtime setup."
+fi`,
+    signin: "grok login",
   },
 };
 
@@ -140,6 +160,15 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
   Write-Host "Open the OpenCode docs from RayLine for the official Windows guidance."
 }`,
     signin: "opencode",
+  },
+  grok: {
+    install: `Write-Host "RayLine Grok setup"
+if (Get-Command grok -ErrorAction SilentlyContinue) {
+  grok login
+} else {
+  Write-Host "Grok CLI is not on PATH in this shell. Open the Grok docs from RayLine, install it, then refresh runtime setup."
+}`,
+    signin: "grok login",
   },
 };
 

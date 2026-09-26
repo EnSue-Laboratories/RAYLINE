@@ -10,15 +10,16 @@ const VIEWPORT_PADDING = 8;
 const MIN_MENU_WIDTH = 340;
 const PREFERRED_MAX_HEIGHT = 420;
 const CLI_RECHECK_INTERVAL_MS = 5000;
-const DEFAULT_CLI_INSTALL_STATUS = { claude: true, codex: true, opencode: false };
+const DEFAULT_CLI_INSTALL_STATUS = { claude: true, codex: true, opencode: false, grok: false };
 
 const PROVIDER_INSTALL_GUIDES = {
   claude: { url: "https://docs.claude.com/en/docs/claude-code/setup", label: "Install Claude Code\u2026" },
   codex:  { url: "https://developers.openai.com/codex/cli",           label: "Install Codex CLI\u2026"   },
   opencode: { url: "https://opencode.ai/docs/cli/",                    label: "Install OpenCode\u2026"    },
+  grok: { url: "https://docs.x.ai/docs/grok-code",                     label: "Install Grok\u2026"        },
 };
 
-const PROVIDER_ORDER = ["claude", "codex", "remote-claude", "remote-codex", "opencode", "multica"];
+const PROVIDER_ORDER = ["claude", "codex", "grok", "remote-claude", "remote-codex", "opencode", "multica"];
 const PROVIDER_LABELS = {
   "remote-claude": "REMOTE SSH / CLAUDE",
   "remote-codex": "REMOTE SSH / CODEX",

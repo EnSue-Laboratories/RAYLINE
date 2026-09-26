@@ -130,12 +130,12 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
   };
 
   const color = status === "error"
-    ? "rgba(255,160,160,0.7)"
+    ? "var(--danger-text)"
     : status === "success"
-      ? "rgba(255,255,255,0.55)"
+      ? "var(--success-text)"
       : status === "loading"
-        ? "rgba(255,255,255,0.55)"
-        : "rgba(255,255,255,0.3)";
+        ? "var(--text-secondary)"
+        : "var(--text-muted)";
 
   const isBusy = status === "loading";
 
@@ -169,12 +169,14 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
       }}
       onMouseEnter={(e) => {
         if (status === "idle") {
-          e.currentTarget.style.color = "rgba(255,255,255,0.5)";
+          e.currentTarget.style.color = "var(--text-secondary)";
+          e.currentTarget.style.background = "var(--control-bg-soft)";
         }
       }}
       onMouseLeave={(e) => {
         if (status === "idle") {
-          e.currentTarget.style.color = "rgba(255,255,255,0.3)";
+          e.currentTarget.style.color = "var(--text-muted)";
+          e.currentTarget.style.background = "none";
         }
       }}
     >

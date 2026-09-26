@@ -260,7 +260,7 @@ export default function RuntimeSetupCard({
                 Choose an agent runtime
               </h2>
               <p style={{ color: SECONDARY, fontSize: s(12), lineHeight: 1.55, margin: "9px 0 0", maxWidth: 520 }}>
-                RayLine needs one local coding-agent CLI before it can start a chat. Pick Codex or Claude Code for the shortest path; OpenCode is available for custom provider setups.
+                RayLine needs one local coding-agent CLI before it can start a chat. Pick Codex or Claude Code for the shortest path; OpenCode and Grok are available for additional local runtimes.
               </p>
             </div>
             <button

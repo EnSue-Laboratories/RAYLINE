@@ -28,7 +28,7 @@
 
 ## About
 
-RayLine supports Claude Code, Codex, and connected Multica agents in a native desktop chat, adding the workflow glue a plain terminal session can't give you.
+RayLine supports Claude Code, Codex, Grok, and connected Multica agents in a native desktop chat, adding the workflow glue a plain terminal session can't give you.
 
 
 ## Highlights
@@ -37,7 +37,7 @@ RayLine supports Claude Code, Codex, and connected Multica agents in a native de
 |---|---|
 | **Dispatch** | Fan out N agents in parallel, each in its own git worktree and branch — from a list of GitHub issues or your own prompts |
 | **Streaming chat** | Live tool calls, partial messages, and expandable thinking blocks |
-| **Multi-agent** | Switch between Claude, GPT-5.4 Codex, and connected Multica agents per conversation |
+| **Multi-agent** | Switch between Claude, Codex, Grok, OpenCode, and connected Multica agents per conversation |
 | **Checkpoints** | Rewind files to their pre-prompt state using lightweight git snapshots |
 | **Terminal drawer** | Persistent PTY sessions (`node-pty` + `xterm.js`) that live alongside the chat |
 | **Project Manager** | Built-in GitHub window for issues, PRs, and comments (`gh` CLI under the hood) |
@@ -57,6 +57,7 @@ You'll need Node.js. The rest depends on which RayLine features you plan to use:
 
 - `claude` on your `PATH` plus an authenticated Claude Code environment for Claude chats and Claude session history
 - `codex` on your `PATH` for Codex chats
+- `grok` on your `PATH` plus an authenticated Grok CLI environment for Grok Build chats and Grok session resume
 - `gh` on your `PATH` plus `gh auth login` for the GitHub Project Manager
 - a reachable Multica server plus email verification in Settings for Multica chats
 - on Windows, Python and the Visual Studio C++ build tools for the `node-pty` rebuild
@@ -74,7 +75,7 @@ Verbose debug logging is quiet by default. To enable it while capturing a dev lo
 RAYLINE_VERBOSE_LOGS=1 VITE_RAYLINE_VERBOSE_LOGS=1 npm run dev:electron 2>&1 | tee dev1.log
 ```
 
-Claude and Codex are available as soon as their CLIs resolve on your `PATH`. Use **Settings** to connect Multica, and open **GitHub Projects** to finish `gh` authentication if you want the built-in repo/issue/PR tooling.
+Claude, Codex, and Grok are available as soon as their CLIs resolve on your `PATH`. Use **Settings** to connect Multica, and open **GitHub Projects** to finish `gh` authentication if you want the built-in repo/issue/PR tooling.
 
 If Electron or `node-pty` was updated, rebuild the native module first:
 
@@ -91,11 +92,12 @@ flowchart LR
   R["Renderer<br/>React + Vite"] <-- "IPC · window.api" --> M["Main Process<br/>Electron + Node.js"]
   M -- "spawn" --> C["claude CLI<br/>JSONL stream"]
   M -- "spawn" --> X["codex CLI<br/>event stream"]
+  M -- "spawn" --> GR["grok CLI<br/>streaming JSONL"]
   M -- "HTTPS + WebSocket" --> U["Multica runtime"]
   M -- "spawn" --> G["gh CLI"]
   M -- "node-pty" --> T["PTY sessions"]
   M -- "git" --> K["Checkpoints + worktrees"]
-  M -- "fs" --> S["~/.claude + ~/.codex sessions"]
+  M -- "fs" --> S["~/.claude + ~/.codex + ~/.grok sessions"]
 ```
 
 ## Project Structure

@@ -21,6 +21,38 @@ import TabStrip from "./TabStrip";
 import useGitStatus from "../hooks/useGitStatus";
 import { isMulticaModelId } from "../data/models";
 
+const COMPOSER_DRAFT_STORAGE_PREFIX = "rayline.composerDraft:";
+const PENDING_COMPOSER_DRAFT_SCOPE = "pending:workspace";
+
+function getComposerDraftStorageKey(scope) {
+  return scope ? `${COMPOSER_DRAFT_STORAGE_PREFIX}${scope}` : null;
+}
+
+function readComposerDraft(scope) {
+  const key = getComposerDraftStorageKey(scope);
+  if (!key || typeof window === "undefined") return "";
+  try {
+    return window.localStorage?.getItem(key) || "";
+  } catch {
+    return "";
+  }
+}
+
+function writeComposerDraft(scope, value) {
+  const key = getComposerDraftStorageKey(scope);
+  if (!key || typeof window === "undefined") return;
+  try {
+    if (value) window.localStorage?.setItem(key, value);
+    else window.localStorage?.removeItem(key);
+  } catch {
+    // Draft persistence is best-effort; keep typing responsive if storage fails.
+  }
+}
+
+function getPendingComposerDraftScope(cwd) {
+  return `${PENDING_COMPOSER_DRAFT_SCOPE}:${cwd || "default"}`;
+}
+
 const EMPTY_MESSAGES = [];
 const MemoBranchSelector = memo(BranchSelector);
 const MemoExportConversationBtn = memo(ExportConversationBtn);
@@ -149,11 +181,12 @@ const ChatComposer = memo(function ChatComposer({
   branchNeedsAttention,
   branchHintText,
   convoId,
+  draftScope,
   hasWallpaper,
   t,
   s,
 }) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(() => readComposerDraft(draftScope));
   const [inputFocused, setInputFocused] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [editingQueueId, setEditingQueueId] = useState(null);
@@ -188,6 +221,22 @@ const ChatComposer = memo(function ChatComposer({
   const branchHintDismissed = Boolean(convoId && branchHintDismissedFor === convoId);
   const showBranchHint = isMulticaModel && !showNewChatCard && branchNeedsAttention && !branchHintDismissed && !shellMode;
 
+  const persistInput = useCallback((nextInput) => {
+    setInput(nextInput);
+    writeComposerDraft(draftScope, nextInput);
+  }, [draftScope]);
+
+  const resizeInput = useCallback(() => {
+    const el = inRef.current;
+    if (!el) return;
+    el.style.height = "20px";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }, []);
+
+  useEffect(() => {
+    window.requestAnimationFrame?.(resizeInput);
+  }, [resizeInput]);
+
   const send = useCallback(() => {
     if (!canSend) return;
     const nextInput = trimmedInput;
@@ -197,13 +246,14 @@ const ChatComposer = memo(function ChatComposer({
       setAttachments([]);
       setSelectedCmd(0);
     });
+    writeComposerDraft(draftScope, "");
     if (inRef.current) inRef.current.style.height = "20px";
     if (isMulticaModel && !shellMode) setBranchHintDismissedFor(convoId);
     onSend(nextInput, nextAttachments);
-  }, [attachments, canSend, convoId, isMulticaModel, onSend, shellMode, trimmedInput]);
+  }, [attachments, canSend, convoId, draftScope, isMulticaModel, onSend, shellMode, trimmedInput]);
 
   const handleInput = (e) => {
-    setInput(e.target.value);
+    persistInput(e.target.value);
     const el = e.target;
     el.style.height = "20px";
     el.style.height = Math.min(el.scrollHeight, 120) + "px";
@@ -231,13 +281,13 @@ const ChatComposer = memo(function ChatComposer({
       }
       if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
         e.preventDefault();
-        setInput(filteredCommands[selectedCmd].cmd + " ");
+        persistInput(filteredCommands[selectedCmd].cmd + " ");
         setSelectedCmd(0);
         return;
       }
       if (e.key === "Escape") {
         e.preventDefault();
-        setInput("");
+        persistInput("");
         setSelectedCmd(0);
         return;
       }
@@ -381,7 +431,11 @@ const ChatComposer = memo(function ChatComposer({
   useImperativeHandle(composerRef, () => ({
     quote(text) {
       const quoted = text.split("\n").map(l => `> ${l}`).join("\n");
-      setInput((prev) => prev ? `${prev}\n\n${quoted}\n\n` : `${quoted}\n\n`);
+      setInput((prev) => {
+        const next = prev ? `${prev}\n\n${quoted}\n\n` : `${quoted}\n\n`;
+        writeComposerDraft(draftScope, next);
+        return next;
+      });
       // Expand textarea to fit
       setTimeout(() => {
         if (inRef.current) {
@@ -396,7 +450,7 @@ const ChatComposer = memo(function ChatComposer({
     handleDragOver,
     handleDragLeave,
     resetDragState,
-  }), [handleDrop, handleDragEnter, handleDragOver, handleDragLeave, resetDragState]);
+  }), [draftScope, handleDrop, handleDragEnter, handleDragOver, handleDragLeave, resetDragState]);
 
   return (
     <div
@@ -673,7 +727,7 @@ const ChatComposer = memo(function ChatComposer({
             {filteredCommands.map((c, i) => (
               <div
                 key={c.cmd}
-                onClick={() => { setInput(c.cmd); setSelectedCmd(0); }}
+                onClick={() => { persistInput(c.cmd); setSelectedCmd(0); }}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -1041,6 +1095,9 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
   const hasNoUpstream = Boolean(gitStatus?.branch) && !gitStatus?.upstream && !gitStatus?.detached;
   const branchNeedsAttention = hasDirtyWorktree || hasNoUpstream;
   const convoId = convo?.id ?? null;
+  const composerDraftScope = convoId
+    ? `conversation:${convoId}`
+    : getPendingComposerDraftScope(cwd || draftsPath || newChatDefaultCwd);
   const branchHintText = (() => {
     if (hasDirtyWorktree && hasNoUpstream) return t("chatArea.branchWarnBoth");
     if (hasDirtyWorktree) return t("chatArea.branchWarnDirty");
@@ -1342,6 +1399,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
           transcript/header and streaming never re-renders the textarea. */}
       {!showNewChatCard &&
         <ChatComposer
+          key={composerDraftScope || "composer"}
           composerRef={composerApiRef}
           onSend={onSend}
           onCancel={onCancel}
@@ -1358,6 +1416,7 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
           branchNeedsAttention={branchNeedsAttention}
           branchHintText={branchHintText}
           convoId={convoId}
+          draftScope={composerDraftScope}
           hasWallpaper={Boolean(wallpaper?.dataUrl)}
           t={t}
           s={s}

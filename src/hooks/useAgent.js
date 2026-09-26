@@ -75,9 +75,15 @@ function mapMulticaTaskMessage(p) {
     case "text": return { type: "text", text: p.content || "" };
     case "tool_use": return { type: "tool", id: "mt" + uid(), name: p.tool, args: p.input || {}, result: null, status: "running" };
     case "tool_result": return { type: "tool", id: "mt" + uid(), name: p.tool, args: {}, result: p.output || "", status: "done" };
-    case "error": return { type: "text", text: `_${p.content || "error"}_` };
+    case "error": return buildErrorPart(p.content || "error", "Multica error");
     default: return null;
   }
+}
+
+function buildErrorPart(error, title = "Error") {
+  const text = typeof error === "string" ? error : String(error ?? "An error occurred.");
+  const summary = text.split("\n").map((line) => line.trim()).find(Boolean) || title;
+  return { type: "error", title, summary, text };
 }
 
 // Multica pairs: match an incoming tool_result to the most recent tool_use
@@ -293,6 +299,14 @@ function extractOpenCodeSessionId(event) {
     event?.part?.sessionID ||
     null
   );
+}
+
+function getProviderEventSessionKey(event) {
+  return event?.provider === "grok" ? "_grokSessionId" : "_opencodeSessionId";
+}
+
+function getProviderEventLabel(event) {
+  return event?.provider === "grok" ? "Grok" : "OpenCode";
 }
 
 function extractOpenCodeTool(event) {
@@ -593,7 +607,7 @@ function applyStreamEventToConversations(prev, conversationId, event) {
     if (inner === "task:failed" || inner === "error") {
       msgs[msgs.length - 1] = freezeElapsed({
         ...assistant, isStreaming: false,
-        parts: [...(assistant.parts || []), { type: "text", text: `_Multica ${inner}: ${p.message || p.reason || ""}_` }],
+        parts: [...(assistant.parts || []), buildErrorPart(p.message || p.reason || inner, `Multica ${inner}`)],
       });
       next.set(conversationId, { ...convo, ...connectedPatch, messages: msgs, isStreaming: false, error: p.message || inner });
       return next;
@@ -808,7 +822,7 @@ function applyStreamEventToConversations(prev, conversationId, event) {
           || (event.errors && event.errors.length > 0 ? event.errors.join("\n") : null)
           || "An error occurred.";
         const parts = cloneParts(lastMsg.parts);
-        parts.push({ type: "text", text: `**Error:** ${errorText}` });
+        parts.push(buildErrorPart(errorText));
         msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
       } else if (event.terminal_reason === "hook_stopped") {
         const parts = cloneParts(lastMsg.parts);
@@ -881,8 +895,9 @@ function applyStreamEventToConversations(prev, conversationId, event) {
   ) {
     const sessionId = extractOpenCodeSessionId(event);
     if (sessionId) {
-      convo._opencodeSessionId = sessionId;
-      log("Captured OpenCode session ID:", {
+      const sessionKey = getProviderEventSessionKey(event);
+      convo[sessionKey] = sessionId;
+      log(`Captured ${getProviderEventLabel(event)} session ID:`, {
         conversationId,
         sessionId,
         eventType: event.type,
@@ -920,7 +935,7 @@ function applyStreamEventToConversations(prev, conversationId, event) {
     } else if (event.type === "error") {
       const am = ensureAssistant();
       const parts = cloneParts(am.parts);
-      parts.push({ type: "text", text: `**Error:** ${extractOpenCodeError(event)}` });
+      parts.push(buildErrorPart(extractOpenCodeError(event), getProviderEventLabel(event) + " error"));
       msgs[msgs.length - 1] = freezeElapsed({ ...am, parts, isStreaming: false, isThinking: false });
       lastMsg = msgs[msgs.length - 1];
       nextIsStreaming = false;
@@ -1280,6 +1295,11 @@ export default function useAgent() {
           codexThreadId =
             convo._codexThreadId ||
             (provider === "codex" && typeof threadId === "string" && threadId ? threadId : null);
+          const providerSessionPatch = provider === "grok" && typeof threadId === "string" && threadId
+            ? { _grokSessionId: threadId }
+            : provider === "opencode" && typeof threadId === "string" && threadId
+              ? { _opencodeSessionId: threadId }
+              : {};
           const msgs = convo.messages.map((m) =>
             m.role === "assistant" ? freezeElapsed({ ...m, isStreaming: false, isThinking: false }) : m
           );
@@ -1294,6 +1314,7 @@ export default function useAgent() {
           next.set(conversationId, {
             ...convo,
             ...(codexThreadId ? { _codexThreadId: codexThreadId } : {}),
+            ...providerSessionPatch,
             messages: msgs,
             isStreaming: false,
           });
@@ -1319,7 +1340,7 @@ export default function useAgent() {
         const lastMsg = msgs[msgs.length - 1];
         if (lastMsg && lastMsg.role === "assistant") {
           const parts = cloneParts(lastMsg.parts);
-          parts.push({ type: "text", text: `**Error:** ${error}` });
+          parts.push(buildErrorPart(error));
           msgs[msgs.length - 1] = freezeElapsed({ ...lastMsg, parts, isStreaming: false, isThinking: false });
         }
         next.set(conversationId, { messages: msgs, error, isStreaming: false });
@@ -1382,7 +1403,7 @@ export default function useAgent() {
     });
   }, []);
 
-  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, runtimeProvider, effort, thinking, openCodeConfig, providerUpstreamConfig, remoteRuntime, cwd, projectContext, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
+  const startPreparedMessage = useCallback(({ conversationId, pendingId, sessionId, prompt, model, provider, runtimeProvider, effort, thinking, openCodeConfig, providerUpstreamConfig, grokContinue, remoteRuntime, cwd, projectContext, images, files, resumeSessionId, forkSession, multicaContext, multicaToken }) => {
     const expectedPendingId = pendingStartsRef.current.get(conversationId);
     if (pendingId && expectedPendingId !== pendingId) {
       log("Skipping stale or cancelled pending start", { conversationId, pendingId, expectedPendingId });
@@ -1390,7 +1411,7 @@ export default function useAgent() {
     }
     if (pendingId) pendingStartsRef.current.delete(conversationId);
     if (window.api) {
-      const payload = { conversationId, sessionId, prompt, model, provider, runtimeProvider, effort, thinking, openCodeConfig, providerUpstreamConfig, remoteRuntime, cwd, projectContext, images, files, resumeSessionId, forkSession };
+      const payload = { conversationId, sessionId, prompt, model, provider, runtimeProvider, effort, thinking, openCodeConfig, providerUpstreamConfig, grokContinue, remoteRuntime, cwd, projectContext, images, files, resumeSessionId, forkSession };
       if (provider === "multica") {
         payload._multica = multicaContext;
         payload._multicaToken = multicaToken;
@@ -1422,7 +1443,7 @@ export default function useAgent() {
     }
   }, []);
 
-  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, runtimeProvider, effort, thinking, openCodeConfig, providerUpstreamConfig, remoteRuntime, cwd, projectContext, multicaContext, multicaToken }) => {
+  const editAndResend = useCallback(({ conversationId, sessionId, messageIndex, newText, wirePrompt, model, provider, runtimeProvider, effort, thinking, openCodeConfig, providerUpstreamConfig, grokContinue, remoteRuntime, cwd, projectContext, multicaContext, multicaToken }) => {
     setConversations((prev) => {
       const next = new Map(prev);
       const convo = next.get(conversationId);
@@ -1447,6 +1468,7 @@ export default function useAgent() {
           thinking,
           openCodeConfig,
           providerUpstreamConfig,
+          grokContinue,
           remoteRuntime,
           cwd,
           projectContext,
@@ -1467,6 +1489,7 @@ export default function useAgent() {
         thinking,
         openCodeConfig,
         providerUpstreamConfig,
+        grokContinue,
         remoteRuntime,
         cwd,
         projectContext,
