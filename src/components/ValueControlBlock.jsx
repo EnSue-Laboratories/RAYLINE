@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
@@ -256,68 +256,67 @@ function PointerSlider({ min, max, step, value, onChange }) {
   );
 }
 
-export default function ValueControlBlock({ json, isStreaming, onAnswer, onControlChange, canControlTarget }) {
+function StreamingControlPlaceholder() {
   const s = useFontScale();
 
-  if (isStreaming) {
-    return (
+  return (
+    <div
+      style={{
+        margin: "12px 0",
+        borderRadius: 10,
+        border: "1px solid var(--control-bg-strong)",
+        background: "var(--control-bg-subtle)",
+        padding: "18px 16px",
+        color: "var(--text-muted)",
+        fontSize: s(11),
+        fontFamily: "var(--font-mono)",
+        letterSpacing: ".08em",
+      }}
+    >
+      CONTROL
+    </div>
+  );
+}
+
+function InvalidControlBlock({ error }) {
+  const s = useFontScale();
+
+  return (
+    <div
+      style={{
+        margin: "12px 0",
+        borderRadius: 10,
+        border: "1px solid var(--danger-border)",
+        background: "var(--danger-bg)",
+        padding: "14px 16px",
+      }}
+    >
       <div
         style={{
-          margin: "12px 0",
-          borderRadius: 10,
-          border: "1px solid var(--control-bg-strong)",
-          background: "var(--control-bg-subtle)",
-          padding: "18px 16px",
-          color: "var(--text-muted)",
-          fontSize: s(11),
+          fontSize: s(10),
           fontFamily: "var(--font-mono)",
+          color: "var(--danger-text)",
           letterSpacing: ".08em",
+          marginBottom: 8,
         }}
       >
-        CONTROL
+        INVALID CONTROL
       </div>
-    );
-  }
-
-  let normalized;
-  try {
-    normalized = normalizeControlBlock(json);
-  } catch (error) {
-    return (
       <div
         style={{
-          margin: "12px 0",
-          borderRadius: 10,
-          border: "1px solid var(--danger-border)",
-          background: "var(--danger-bg)",
-          padding: "14px 16px",
+          fontSize: s(13),
+          color: "var(--danger-text-strong)",
+          fontFamily: "var(--font-ui)",
         }}
       >
-        <div
-          style={{
-            fontSize: s(10),
-            fontFamily: "var(--font-mono)",
-            color: "var(--danger-text)",
-            letterSpacing: ".08em",
-            marginBottom: 8,
-          }}
-        >
-          INVALID CONTROL
-        </div>
-        <div
-          style={{
-            fontSize: s(13),
-            color: "var(--danger-text-strong)",
-            fontFamily: "var(--font-ui)",
-          }}
-        >
-          {error.message}
-        </div>
+        {error.message}
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  const { control, config } = normalized;
+function ParsedValueControlBlock({ json, control, config, onAnswer, onControlChange, canControlTarget }) {
+  const s = useFontScale();
   const cachedDraftValue = controlDraftCache.get(json);
   const [sliderValue, setSliderValue] = useState(
     Number.isFinite(cachedDraftValue) ? cachedDraftValue : config.initial
@@ -327,15 +326,6 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
   );
   const [submitted, setSubmitted] = useState(false);
   const [buttonHovered, setButtonHovered] = useState(false);
-
-  useEffect(() => {
-    const nextValue = Number.isFinite(controlDraftCache.get(json))
-      ? controlDraftCache.get(json)
-      : config.initial;
-    setSliderValue(nextValue);
-    setValueDraft(formatNumber(config.getValue(nextValue)));
-    setSubmitted(false);
-  }, [json, config.initial]);
 
   const value = useMemo(() => config.getValue(sliderValue), [config, sliderValue]);
   const valueText = `${formatNumber(value)}${control.unit || ""}`;
@@ -647,5 +637,38 @@ export default function ValueControlBlock({ json, isStreaming, onAnswer, onContr
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ValueControlBlock({ json, isStreaming, onAnswer, onControlChange, canControlTarget }) {
+  const normalized = useMemo(() => {
+    if (isStreaming) return null;
+
+    try {
+      return { value: normalizeControlBlock(json), error: null };
+    } catch (error) {
+      return { value: null, error };
+    }
+  }, [isStreaming, json]);
+
+  if (isStreaming) {
+    return <StreamingControlPlaceholder />;
+  }
+
+  if (normalized.error) {
+    return <InvalidControlBlock error={normalized.error} />;
+  }
+
+  const { control, config } = normalized.value;
+  return (
+    <ParsedValueControlBlock
+      key={json}
+      json={json}
+      control={control}
+      config={config}
+      onAnswer={onAnswer}
+      onControlChange={onControlChange}
+      canControlTarget={canControlTarget}
+    />
   );
 }

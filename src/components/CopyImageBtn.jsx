@@ -78,7 +78,7 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
         : 1;
       const overlayAlpha = 0.68 + (1 - wallpaperOpacity) * 0.25;
       const captureStyle = {
-        border: "1px solid rgba(255,255,255,0.08)",
+        border: "1px solid var(--control-border)",
         borderRadius: "18px",
         boxShadow: "0 20px 44px rgba(0,0,0,0.28)",
         padding: `${CAPTURE_PADDING_TOP}px ${CAPTURE_PADDING_X}px ${CAPTURE_PADDING_BOTTOM}px`,

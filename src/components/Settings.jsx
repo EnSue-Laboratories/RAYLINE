@@ -593,12 +593,12 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
     width: 42,
     height: 23,
     padding: 2,
-    border: "1px solid rgba(255,255,255,0.1)",
+    border: "1px solid var(--control-border)",
     borderRadius: 999,
     WebkitAppearance: "none",
     appearance: "none",
-    background: enabled ? "rgba(210,230,255,0.24)" : "rgba(255,255,255,0.045)",
-    boxShadow: enabled ? "inset 0 0 0 1px rgba(210,230,255,0.12)" : "none",
+    background: enabled ? "var(--toggle-on)" : "var(--control-bg)",
+    boxShadow: enabled ? "inset 0 0 0 1px var(--control-border-soft)" : "none",
     cursor: "pointer",
     transition: "all .2s",
   });
@@ -608,10 +608,10 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
     width: 17,
     height: 17,
     borderRadius: "50%",
-    background: enabled ? "rgba(245,248,255,0.95)" : "rgba(255,255,255,0.38)",
+    background: "var(--toggle-knob)",
     transform: enabled ? "translateX(17px)" : "translateX(0)",
     transition: "all .2s",
-    boxShadow: enabled ? "0 2px 10px rgba(190,220,255,0.24)" : "0 2px 8px rgba(0,0,0,0.18)",
+    boxShadow: "var(--shadow-sm)",
   });
 
   const openCodeProviderOptions = useMemo(() => [
@@ -715,6 +715,8 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
         }}
       >
         <button
+          type="button"
+          aria-label={t("chromeRail.closeSettings")}
           onClick={onClose}
           onMouseEnter={() => setBackHover(true)}
           onMouseLeave={() => setBackHover(false)}
@@ -935,62 +937,12 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
             )}
           </SettingBlock>
 
-          <div style={{ marginBottom: 24 }}>
-            <div
-              style={{
-                fontSize: s(13),
-                color: "color-mix(in srgb, var(--text-primary) 87%, transparent)",
-                marginBottom: 2,
-              }}
-            >
-              {t("settings.language")}
-            </div>
-            <div
-              style={{
-                fontSize: s(11),
-                color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
-                marginBottom: 10,
-              }}
-            >
-              {t("settings.languageDescription")}
-            </div>
-            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-              <select
-                value={locale}
-                onChange={(e) => onLocaleChange?.(e.target.value)}
-                style={{
-                  width: "100%",
-                  height: 32,
-                  padding: "0 28px 0 10px",
-                  background: "var(--control-bg)",
-                  border: "1px solid var(--control-border)",
-                  borderRadius: 7,
-                  color: "var(--text-primary)",
-                  fontFamily: "var(--font-ui)",
-                  fontSize: s(12),
-                  outline: "none",
-                  WebkitAppearance: "none",
-                  MozAppearance: "none",
-                  appearance: "none",
-                }}
-              >
-                <option value="en-US">{t("settings.languageEnglish")}</option>
-                <option value="zh-CN">{t("settings.languageChinese")}</option>
-              </select>
-              <ChevronDown
-                size={12}
-                strokeWidth={2}
-                style={{
-                  position: "absolute",
-                  right: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "color-mix(in srgb, var(--text-primary) 54%, transparent)",
-                  pointerEvents: "none",
-                }}
-              />
-            </div>
-          </div>
+          <LanguageSetting
+            locale={locale}
+            onLocaleChange={onLocaleChange}
+            t={t}
+            s={s}
+          />
 
           <div style={{ marginBottom: 24 }}>
             <div
@@ -1024,6 +976,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                 type="button"
                 role="switch"
                 aria-checked={chromeControlsOnHover}
+                  aria-label={t("settings.chromeControlsOnHover")}
                 onClick={() => onChromeControlsOnHoverChange?.(!chromeControlsOnHover)}
                 style={{
                   flexShrink: 0,
@@ -1350,7 +1303,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
             <div
               style={{
                 fontSize: s(11),
-                color: "rgba(255,255,255,0.3)",
+                color: "color-mix(in srgb, var(--text-primary) 33%, transparent)",
                 marginBottom: 12,
               }}
             >
@@ -1376,9 +1329,9 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                     key={def.id}
                     style={{
                       padding: 12,
-                      border: "1px solid rgba(255,255,255,0.06)",
+                      border: "1px solid var(--control-border-soft)",
                       borderRadius: 8,
-                      background: enabled ? "rgba(255,255,255,0.035)" : "rgba(255,255,255,0.02)",
+                      background: enabled ? "var(--control-bg-soft)" : "var(--control-bg-subtle)",
                     }}
                   >
                     <div
@@ -1394,7 +1347,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                         <div
                           style={{
                             fontSize: s(12),
-                            color: "rgba(255,255,255,0.76)",
+                            color: "color-mix(in srgb, var(--text-primary) 76%, transparent)",
                           }}
                         >
                           {t("settings.upstreamOverrideTitle", { provider: def.label })}
@@ -1402,7 +1355,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                         <div
                           style={{
                             fontSize: s(10),
-                            color: "rgba(255,255,255,0.28)",
+                            color: "color-mix(in srgb, var(--text-primary) 34%, transparent)",
                             marginTop: 2,
                           }}
                         >
@@ -1424,9 +1377,9 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                               flexShrink: 0,
                               padding: "2px 5px",
                               borderRadius: 5,
-                              border: activeOverride ? "1px solid rgba(180,220,255,0.18)" : "1px solid rgba(255,255,255,0.08)",
-                              background: activeOverride ? "rgba(180,220,255,0.08)" : "rgba(255,255,255,0.035)",
-                              color: activeOverride ? "rgba(210,230,255,0.72)" : "rgba(255,255,255,0.38)",
+                              border: activeOverride ? "1px solid var(--accent-border)" : "1px solid var(--control-border)",
+                              background: activeOverride ? "var(--accent-bg)" : "var(--control-bg-soft)",
+                              color: activeOverride ? "var(--accent-muted)" : "color-mix(in srgb, var(--text-primary) 44%, transparent)",
                               fontSize: s(9),
                               fontFamily: "'JetBrains Mono', monospace",
                               lineHeight: 1,
@@ -1485,7 +1438,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                         <div
                           style={{
                             fontSize: s(10),
-                            color: "rgba(255,255,255,0.28)",
+                            color: "color-mix(in srgb, var(--text-primary) 34%, transparent)",
                             marginTop: 6,
                             marginBottom: 10,
                           }}
@@ -1516,7 +1469,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                       <div
                         style={{
                           fontSize: s(11),
-                          color: "rgba(205,255,214,0.74)",
+                          color: "var(--success-text)",
                           marginTop: enabled ? 10 : 8,
                         }}
                       >
@@ -1595,7 +1548,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                     : remoteSshStatus.kind === "success"
                       ? "var(--success-text)"
                       : remoteSshStatus.kind === "warning"
-                        ? "rgba(255,210,150,0.8)"
+                        ? "var(--warning-text)"
                         : "color-mix(in srgb, var(--text-primary) 52%, transparent)",
                   marginTop: 8,
                 }}
@@ -1609,7 +1562,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
             <div
               style={{
                 fontSize: s(13),
-                color: "rgba(255,255,255,0.8)",
+                color: "var(--text-primary)",
                 marginBottom: 2,
               }}
             >
@@ -2186,8 +2139,8 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
                 style={{
                   fontSize: s(11),
                   color: openCodeMessage === t("settings.opencodeSaved")
-                    ? "rgba(205,255,214,0.74)"
-                    : "rgba(255,210,160,0.74)",
+                    ? "var(--success-text)"
+                    : "var(--warning-text)",
                   marginBottom: 12,
                 }}
               >
@@ -2811,117 +2764,6 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
             </>
           )}
 
-          {/* LANGUAGE section */}
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: s(10),
-              fontWeight: 600,
-              color: "color-mix(in srgb, var(--text-primary) 25%, transparent)",
-              letterSpacing: ".12em",
-              textTransform: "uppercase",
-              marginBottom: 20,
-              marginTop: 12,
-            }}
-          >
-            {t("settings.language")}
-          </div>
-
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: s(13), color: "color-mix(in srgb, var(--text-primary) 87%, transparent)", marginBottom: 10 }}>
-              {t("settings.languageLabel")}
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              {[["en-US", "settings.languageEnglish"], ["zh-CN", "settings.languageChinese"]].map(([lc, key]) => {
-                const selected = locale === lc;
-                return (
-                  <button
-                    key={lc}
-                    type="button"
-                    onClick={() => onLocaleChange?.(lc)}
-                    style={{
-                      padding: "6px 16px",
-                      borderRadius: 7,
-                      background: selected ? "color-mix(in srgb, var(--text-primary) 15%, transparent)" : "color-mix(in srgb, var(--text-primary) 4%, transparent)",
-                      border: selected ? "1px solid color-mix(in srgb, var(--text-primary) 22%, transparent)" : "1px solid color-mix(in srgb, var(--text-primary) 6%, transparent)",
-                      color: selected ? "color-mix(in srgb, var(--text-primary) 92%, transparent)" : "color-mix(in srgb, var(--text-primary) 50%, transparent)",
-                      fontSize: s(12),
-                      cursor: "pointer",
-                      transition: "all .2s",
-                      fontFamily: "var(--font-ui)",
-                    }}
-                  >
-                    {t(key)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {!showUpdaterSettings && (
-            <div style={{ marginBottom: 24 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: s(13),
-                      color: "color-mix(in srgb, var(--text-primary) 87%, transparent)",
-                      marginBottom: 2,
-                    }}
-                  >
-                    {t("settings.chromeControlsOnHover")}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: s(11),
-                      color: "color-mix(in srgb, var(--text-primary) 30%, transparent)",
-                    }}
-                  >
-                    {t("settings.chromeControlsOnHoverDescription")}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={chromeControlsOnHover}
-                  onClick={() => onChromeControlsOnHoverChange?.(!chromeControlsOnHover)}
-                  style={{
-                    flexShrink: 0,
-                    width: 38,
-                    height: 22,
-                    borderRadius: 999,
-                    border: "1px solid color-mix(in srgb, var(--text-primary) 12%, transparent)",
-                    background: chromeControlsOnHover ? "var(--toggle-on)" : "color-mix(in srgb, var(--text-primary) 6%, transparent)",
-                    position: "relative",
-                    cursor: "pointer",
-                    padding: 0,
-                    transition: "background 120ms ease",
-                  }}
-                >
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: 2,
-                      left: chromeControlsOnHover ? 18 : 2,
-                      width: 16,
-                      height: 16,
-                      borderRadius: "50%",
-                      background: "var(--toggle-knob)",
-                      transition: "left 120ms ease",
-                    }}
-                  />
-                </button>
-              </div>
-            </div>
-          )}
-
           {showUpdaterSettings && (
             <>
           {/* UPDATES section */}
@@ -2964,7 +2806,7 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
               </div>
             )}
             {updaterPhase === "error" && (
-              <div style={{ fontSize: s(12), color: "rgba(255,120,100,0.82)", marginBottom: 10 }}>
+              <div style={{ fontSize: s(12), color: "var(--danger-text)", marginBottom: 10 }}>
                 {t("settings.updateError")}
                 {updateError && <span style={{ opacity: 0.6, marginLeft: 6, fontFamily: "var(--font-mono)", fontSize: s(10) }}>{updateError.slice(0, 80)}</span>}
               </div>
@@ -3250,6 +3092,60 @@ function SettingBlock({ children, style }) {
       }}
     >
       {children}
+    </div>
+  );
+}
+
+function LanguageSetting({ locale, onLocaleChange, t, s }) {
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: s(10),
+          fontWeight: 600,
+          color: "color-mix(in srgb, var(--text-primary) 25%, transparent)",
+          letterSpacing: ".12em",
+          textTransform: "uppercase",
+          marginBottom: 14,
+        }}
+      >
+        {t("settings.language")}
+      </div>
+      <div
+        style={{
+          fontSize: s(13),
+          color: "color-mix(in srgb, var(--text-primary) 87%, transparent)",
+          marginBottom: 10,
+        }}
+      >
+        {t("settings.languageLabel")}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        {[["en-US", "settings.languageEnglish"], ["zh-CN", "settings.languageChinese"]].map(([lc, key]) => {
+          const selected = locale === lc;
+          return (
+            <button
+              key={lc}
+              type="button"
+              onClick={() => onLocaleChange?.(lc)}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 7,
+                background: selected ? "var(--control-bg-active)" : "var(--control-bg-subtle)",
+                border: selected ? "1px solid var(--control-border-strong)" : "1px solid var(--control-border-soft)",
+                color: selected ? "var(--text-primary)" : "var(--text-secondary)",
+                fontSize: s(12),
+                cursor: "pointer",
+                transition: "all .2s",
+                fontFamily: "var(--font-ui)",
+              }}
+            >
+              {t(key)}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

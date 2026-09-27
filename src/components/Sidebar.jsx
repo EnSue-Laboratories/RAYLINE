@@ -686,6 +686,7 @@ function Sidebar({ convos, active, onSelect, onNew, onDelete, cwd, onPickFolder,
             onEditContext={onEditProjectContext}
             searchActive={searchActive}
             multicaModels={multicaModels}
+            locale={locale}
           />
         ))
         }

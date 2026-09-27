@@ -1,3 +1,5 @@
+import { useTranslator } from "../contexts/LocaleContext";
+import useDismissibleLayer from "../hooks/useDismissibleLayer";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Check, FolderClosed, FolderOpen } from "lucide-react";
@@ -15,6 +17,7 @@ function clamp(value, min, max) {
 
 export default function ProjectPicker({ value, onChange, allCwdRoots, projects, onBrowse }) {
   const s = useFontScale();
+  const t = useTranslator();
   const [open, set] = useState(false);
   const ref = useRef(null);
   const menuRef = useRef(null);
@@ -22,7 +25,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
 
   const projectName = value
     ? (projects?.[value]?.name || value.split("/").pop())
-    : "Drafts";
+    : t("projectPicker.drafts");
 
   const updateMenuPosition = useCallback(() => {
     if (!ref.current) return;
@@ -53,18 +56,12 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
     });
   }, []);
 
-  useEffect(() => {
-    const h = (e) => {
-      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
-      setMenuStyle(null);
-      set(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  const close = useCallback(() => set(false), []);
+  useDismissibleLayer(open, ref, menuRef, close);
 
   useEffect(() => {
     if (!open || !ref.current) return;
+    menuRef.current?.querySelector("button")?.focus();
     const handleResize = () => updateMenuPosition();
     window.addEventListener("resize", handleResize);
     window.addEventListener("scroll", handleResize, true);
@@ -77,31 +74,33 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
     };
   }, [open, updateMenuPosition]);
 
-  const visibleRoots = (allCwdRoots || []).filter(
+  const visibleRoots = [...new Set(allCwdRoots || [])].filter(
     (cwdRoot) => !projects?.[cwdRoot]?.hidden || cwdRoot === value
   );
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
+    <div ref={ref} style={{ position: "relative", minWidth: 0, maxWidth: "100%" }}>
+      <button type="button" aria-label={t("projectPicker.choose")} aria-haspopup="menu" aria-expanded={open}
         onClick={() => {
           if (open) {
             set(false);
             setMenuStyle(null);
             return;
           }
+          window.dispatchEvent(new Event("rayline:close-menus"));
           updateMenuPosition();
           set(true);
         }}
         style={{
           display: "flex",
+          maxWidth: "100%",
           alignItems: "center",
           gap: 6,
           padding: "4px 10px",
           background: "color-mix(in srgb, var(--control-bg) 50%, transparent)",
           border: "1px solid var(--control-bg)",
           borderRadius: 7,
-          color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
+          color: "var(--text-secondary)",
           fontSize: s(10),
           fontFamily: "var(--font-mono)",
           cursor: "pointer",
@@ -121,13 +120,26 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
             flexShrink: 0,
           }}
         />
-        {projectName}
+        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{projectName}</span>
         <ChevronDown size={11} strokeWidth={2} />
       </button>
 
       {open && menuStyle && createPortal(
         <div
           ref={menuRef}
+          role="menu"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); ref.current?.querySelector("button")?.focus(); }
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              const buttons = [...menuRef.current.querySelectorAll("button")];
+              const index = buttons.indexOf(document.activeElement);
+              buttons[(index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+            }
+            if (event.key === "Tab") close();
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
           style={{
             position: "fixed",
             top: menuStyle.top,
@@ -140,7 +152,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
             border: "1px solid var(--pane-border)",
             borderRadius: 10,
             padding: 3,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+            boxShadow: "var(--shadow-md)",
             animation: "dropIn .15s ease",
             WebkitAppRegion: "no-drag",
             display: "flex",
@@ -159,7 +171,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
               background: value === null ? "var(--control-bg)" : "transparent",
               border: "none",
               borderRadius: 7,
-              color: value === null ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
+              color: value === null ? "var(--text-primary)" : "var(--text-secondary)",
               fontSize: s(11),
               fontFamily: "var(--font-mono)",
               cursor: "pointer",
@@ -171,7 +183,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
           >
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <FolderOpen size={12} strokeWidth={1.8} />
-              Drafts
+              {t("projectPicker.drafts")}
             </span>
             {value === null && <Check size={12} strokeWidth={2.2} />}
           </button>
@@ -197,7 +209,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
                     background: isSelected ? "var(--control-bg)" : "transparent",
                     border: "none",
                     borderRadius: 7,
-                    color: isSelected ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
+                    color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
                     fontSize: s(11),
                     fontFamily: "var(--font-mono)",
                     cursor: "pointer",
@@ -217,7 +229,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
                     <span
                       style={{
                         fontSize: s(9),
-                        color: "color-mix(in srgb, var(--text-primary) 22%, transparent)",
+                        color: "var(--text-muted)",
                         paddingLeft: 20,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -248,7 +260,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
               background: "transparent",
               border: "none",
               borderRadius: 7,
-              color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
+              color: "var(--text-secondary)",
               fontSize: s(11),
               fontFamily: "var(--font-mono)",
               cursor: "pointer",
@@ -260,7 +272,7 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
           >
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <FolderOpen size={12} strokeWidth={1.8} />
-              Browse...
+              {t("projectPicker.browse")}
             </span>
           </button>
         </div>,

@@ -99,7 +99,7 @@ function PreBlock({ rawText, s = (x) => x, children }) {
 }
 
 const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControlChange, canControlTarget) => ({
-  p: ({ children }) => <p style={{ margin: "0 0 12px" }}>{children}</p>,
+  p: ({ children }) => <p style={{ margin: "0 0 12px", ...TEXT_WRAP_STYLE }}>{children}</p>,
   code: ({ node, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || "");
     const isBlock = node?.position?.start?.line !== node?.position?.end?.line
@@ -200,10 +200,10 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
   ),
   ul: ({ children }) => <ul style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ul>,
   ol: ({ children }) => <ol style={{ paddingLeft: 20, margin: "4px 0 12px" }}>{children}</ol>,
-  li: ({ children }) => <li style={{ marginBottom: 4 }}>{children}</li>,
-  h1: ({ children }) => <h1 style={{ fontSize: s(20), fontWeight: 600, margin: "16px 0 8px" }}>{children}</h1>,
-  h2: ({ children }) => <h2 style={{ fontSize: s(17), fontWeight: 600, margin: "14px 0 6px" }}>{children}</h2>,
-  h3: ({ children }) => <h3 style={{ fontSize: s(15), fontWeight: 600, margin: "12px 0 4px" }}>{children}</h3>,
+  li: ({ children }) => <li style={{ marginBottom: 4, ...TEXT_WRAP_STYLE }}>{children}</li>,
+  h1: ({ children }) => <h1 style={{ fontSize: s(20), fontWeight: 600, margin: "16px 0 8px", ...TEXT_WRAP_STYLE }}>{children}</h1>,
+  h2: ({ children }) => <h2 style={{ fontSize: s(17), fontWeight: 600, margin: "14px 0 6px", ...TEXT_WRAP_STYLE }}>{children}</h2>,
+  h3: ({ children }) => <h3 style={{ fontSize: s(15), fontWeight: 600, margin: "12px 0 4px", ...TEXT_WRAP_STYLE }}>{children}</h3>,
   blockquote: ({ children }) => (
     <blockquote style={{
       borderLeft: "2px solid var(--border-strong)",
@@ -214,6 +214,7 @@ const makeMdComponents = (isStreaming = false, s = (x) => x, onAnswer, onControl
       fontStyle: "italic",
       fontSize: s(13),
       lineHeight: 1.7,
+      ...TEXT_WRAP_STYLE,
     }}>{children}</blockquote>
   ),
   a: ({ href, children }) => {
@@ -266,6 +267,13 @@ const ASSISTANT_MARKDOWN_PROPS = {
 // User bubbles only need gfm (no math / raw HTML / katex).
 const USER_REMARK_PLUGINS = [remarkGfm];
 const USER_MARKDOWN_PROPS = { remarkPlugins: USER_REMARK_PLUGINS };
+
+const TEXT_WRAP_STYLE = {
+  overflowWrap: "break-word",
+  wordBreak: "normal",
+  lineBreak: "strict",
+  textWrap: "pretty",
+};
 
 function getImmediateImageSrc(image) {
   if (typeof image === "string") return image;
@@ -946,6 +954,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                 fontWeight: 400,
                 textAlign: "left",
                 maxWidth: "85%",
+                ...TEXT_WRAP_STYLE,
               }}>
                 {renderControlAwareMarkdown({
                   text: displayText,
@@ -1067,6 +1076,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
                 fontFamily: "var(--font-content)",
                 letterSpacing: "0.008em",
                 marginBottom: 4,
+                ...TEXT_WRAP_STYLE,
               }}>
                 <MarkdownTextPart
                   text={part.text}
@@ -1189,6 +1199,7 @@ function Message({ msg, modelId, messageIndex, canEdit = false, onEdit, onAnswer
             lineHeight: 1.85,
             fontFamily: "var(--font-content)",
             letterSpacing: "0.008em",
+            ...TEXT_WRAP_STYLE,
           }}>
             {renderControlAwareMarkdown({
               text: msg.text,

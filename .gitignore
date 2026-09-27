@@ -15,3 +15,11 @@ ARCH.md
 .bash_history
 .histfile
 .claude/worktrees
+
+# Local generated artifacts and UI verification
+outputs/
+output/playwright/
+.playwright-cli/
+
+# Dependency directory may be a symlink in review worktrees.
+/node_modules

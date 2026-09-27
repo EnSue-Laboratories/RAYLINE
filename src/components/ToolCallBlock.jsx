@@ -18,12 +18,29 @@ function truncate(str, max) {
   return str.length > max ? str.slice(0, max) + "..." : str;
 }
 
+function redactSensitiveText(value) {
+  if (!value) return value;
+  return String(value)
+    .replace(/sk-[A-Za-z0-9_-]{16,}/g, "[redacted-key]")
+    .replace(/(Authorization\s*:\s*Bearer\s+)[A-Za-z0-9._~+/-]+/gi, "$1[redacted-token]")
+    .replace(/((?:api[_-]?key|x-api-key|bearer_token|token|KEY)\s*[=:]\s*["']?)[A-Za-z0-9._~+/-]{16,}(["']?)/gi, "$1[redacted-secret]$2");
+}
+
 function getToolLabel(tool) {
   if (!tool?.name) return "Tool";
   if (tool.args?.command && tool.name === tool.args.command) return "Command";
-  if (tool.name.startsWith("/") || tool.name.includes(" -lc ") || tool.name.includes(" --")) {
+  if (
+    tool.name.startsWith("/") ||
+    tool.name.startsWith("[bg] ") ||
+    tool.name.startsWith("Execute `") ||
+    tool.name.includes("\n") ||
+    tool.name.includes(" -lc ") ||
+    tool.name.includes(" --")
+  ) {
     return "Command";
   }
+  if (tool.name.length > 80 && tool.name.includes(":")) return truncate(redactSensitiveText(tool.name.split(":")[0]), 30);
+  if (tool.name.length > 80) return "Tool";
   return tool.name;
 }
 
@@ -34,20 +51,20 @@ function getPreview(tool) {
     let cmd = args.command?.replace(/\n/g, " ") || "";
     // Replace absolute/home paths with just the binary name
     cmd = cmd.replace(/(?:^|\s)[~/][\w.~/:-]+\/([\w.-]+)/g, (_, bin) => " " + bin);
-    return truncate(cmd.trim(), 30);
+    return truncate(redactSensitiveText(cmd.trim()), 30);
   }
   if (args.command) {
-    return truncate(args.command.replace(/\s+/g, " ").trim(), 48);
+    return truncate(redactSensitiveText(args.command.replace(/\s+/g, " ").trim()), 48);
   }
   if (tool.name === "Read") return args.file_path?.split("/").pop();
   if (tool.name === "Edit") return args.file_path?.split("/").pop();
   if (tool.name === "Write") return args.file_path?.split("/").slice(-2).join("/");
-  if (tool.name === "Grep") return truncate(args.pattern || args.query, 25);
-  if (tool.name === "Glob") return truncate(args.pattern || args.glob, 25);
-  if (tool.name === "Search") return truncate(args.query || args.pattern, 25);
-  if (tool.name === "Agent") return truncate(args.description, 30);
-  if (tool.name === "WebSearch") return truncate(args.query, 30);
-  if (tool.name === "WebFetch") return truncate(args.url, 30);
+  if (tool.name === "Grep") return truncate(redactSensitiveText(args.pattern || args.query), 25);
+  if (tool.name === "Glob") return truncate(redactSensitiveText(args.pattern || args.glob), 25);
+  if (tool.name === "Search") return truncate(redactSensitiveText(args.query || args.pattern), 25);
+  if (tool.name === "Agent") return truncate(redactSensitiveText(args.description), 30);
+  if (tool.name === "WebSearch") return truncate(redactSensitiveText(args.query), 30);
+  if (tool.name === "WebFetch") return truncate(redactSensitiveText(args.url), 30);
   if (tool.name === "Skill") return args.skill || args.name || null;
   if (tool.name === "LSP") return truncate(args.method || args.action, 25);
   if (tool.name === "NotebookEdit") return args.file_path?.split("/").pop();
@@ -56,7 +73,7 @@ function getPreview(tool) {
 
 function serializeValue(value) {
   if (value == null) return null;
-  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  return redactSensitiveText(typeof value === "string" ? value : JSON.stringify(value, null, 2));
 }
 
 function ToolBody({ label, value, maxHeight, fontScale }) {
@@ -100,7 +117,9 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
       <pre style={{
         color: "var(--text-secondary)",
         whiteSpace: "pre-wrap",
-        wordBreak: "break-all",
+        overflowWrap: "anywhere",
+        wordBreak: "normal",
+        lineBreak: "strict",
         margin: 0,
         padding: 8,
         background: "var(--control-bg-contrast)",

@@ -1,9 +1,10 @@
-import { memo, useState, useRef, useEffect, useMemo, useCallback } from "react";
+import useDismissibleLayer from "../hooks/useDismissibleLayer";
+import { memo, useState, useRef, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, FolderClosed, Plus, MoreHorizontal, Trash2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { createTranslator } from "../i18n";
 import { getMOrMulticaFallback } from "../data/models";
-import { relativeTime } from "../utils/time";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../utils/paneSurface";
 import ProjectContextModal from "./ProjectContextModal";
 
@@ -23,8 +24,10 @@ function ProjectGroup({
   onEditContext,
   searchActive,
   multicaModels = [],
+  locale = "en-US",
 }) {
   const s = useFontScale();
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [headerHovered, setHeaderHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
@@ -34,33 +37,21 @@ function ProjectGroup({
 
   const expanded = searchActive || !project.collapsed;
 
-  // Close context menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e) => {
-      if (moreRef.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
-      setMenuOpen(false);
-      setMenuPos(null);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    setMenuPos(null);
+  }, []);
+  useDismissibleLayer(menuOpen, moreRef, menuRef, closeMenu);
 
   if (project.hidden) return null;
 
   const openMenu = () => {
+    if (menuOpen) { closeMenu(); return; }
     if (!moreRef.current) return;
+    window.dispatchEvent(new Event("rayline:close-menus"));
     const rect = moreRef.current.getBoundingClientRect();
-    setMenuPos({
-      top: rect.bottom + 4,
-      left: rect.left,
-    });
+    setMenuPos({ top: Math.min(rect.bottom + 4, window.innerHeight - 180), left: Math.max(8, Math.min(rect.left, window.innerWidth - 196)) });
     setMenuOpen(true);
-  };
-
-  const closeMenu = () => {
-    setMenuOpen(false);
-    setMenuPos(null);
   };
 
   return (
@@ -81,8 +72,10 @@ function ProjectGroup({
         }}
         onMouseEnter={() => setHeaderHovered(true)}
         onMouseLeave={() => setHeaderHovered(false)}
-        onClick={() => onToggleCollapse(project.cwdRoot)}
       >
+        <button type="button" aria-expanded={expanded} aria-label={t("projectGroup.toggle", { project: project.name })}
+          onClick={() => onToggleCollapse(project.cwdRoot)}
+          style={{ display: "flex", alignItems: "center", gap: 5, flex: 1, minWidth: 0, padding: 0, border: 0, background: "transparent", color: "inherit", cursor: "pointer", textAlign: "left" }}>
         {/* Chevron */}
         <span
           style={{
@@ -126,27 +119,8 @@ function ProjectGroup({
           {project.name}
         </span>
 
-        <div style={{ marginLeft: "auto", width: 42, height: 18, position: "relative", flexShrink: 0 }}>
-          {project.latestTs && (
-            <span
-              style={{
-                position: "absolute",
-                right: 0,
-                top: "50%",
-                transform: "translateY(-50%)",
-                fontSize: s(9),
-                fontFamily: "var(--font-mono)",
-                color: "var(--sb-text-ghost)",
-                letterSpacing: ".04em",
-                opacity: headerHovered ? 0 : 1,
-                pointerEvents: "none",
-                transition: "opacity .15s",
-              }}
-            >
-              {relativeTime(project.latestTs)}
-            </span>
-          )}
-
+        </button>
+        <div style={{ marginLeft: "auto", width: 54, height: 26, position: "relative", flexShrink: 0 }}>
           <div
             style={{
               position: "absolute",
@@ -156,15 +130,17 @@ function ProjectGroup({
               display: "flex",
               alignItems: "center",
               gap: 2,
-              opacity: headerHovered ? 1 : 0,
-              pointerEvents: headerHovered ? "auto" : "none",
+              opacity: 1,
+              pointerEvents: "auto",
               transition: "opacity .15s",
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => onNewInProject(project.cwdRoot)}
-              title="New chat in project"
+              type="button"
+              aria-label={t("projectGroup.newChatInProject")}
+              onClick={(event) => { event.stopPropagation(); onNewInProject(project.cwdRoot); }}
+              title={t("projectGroup.newChatInProject")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -173,7 +149,9 @@ function ProjectGroup({
                 border: "none",
                 color: "var(--sb-text-icon)",
                 cursor: "pointer",
-                padding: 3,
+                padding: 5,
+                width: 26,
+                height: 26,
                 borderRadius: 4,
                 transition: "color .15s",
               }}
@@ -184,9 +162,12 @@ function ProjectGroup({
             </button>
 
             <button
+              type="button"
+              aria-label={t("projectGroup.moreOptions")}
+              aria-expanded={menuOpen}
               ref={moreRef}
               onClick={openMenu}
-              title="More options"
+              title={t("projectGroup.moreOptions")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -195,7 +176,9 @@ function ProjectGroup({
                 border: "none",
                 color: "var(--sb-text-icon)",
                 cursor: "pointer",
-                padding: 3,
+                padding: 5,
+                width: 26,
+                height: 26,
                 borderRadius: 4,
                 transition: "color .15s",
               }}
@@ -234,14 +217,14 @@ function ProjectGroup({
             border: "1px solid var(--pane-border)",
             borderRadius: 10,
             padding: 3,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+            boxShadow: "var(--shadow-md)",
             animation: "dropIn .15s ease",
             WebkitAppRegion: "no-drag",
           }}
         >
           <MenuBtn
             s={s}
-            label="Edit context…"
+            label={t("projectGroup.editContext")}
             onClick={() => {
               setContextModalOpen(true);
               closeMenu();
@@ -249,7 +232,7 @@ function ProjectGroup({
           />
           <MenuBtn
             s={s}
-            label="Open in Finder"
+            label={t("projectGroup.openInFinder")}
             onClick={() => {
               window.api?.openPath?.(project.cwdRoot);
               closeMenu();
@@ -257,7 +240,7 @@ function ProjectGroup({
           />
           <MenuBtn
             s={s}
-            label="Copy path"
+            label={t("projectGroup.copyPath")}
             onClick={() => {
               navigator.clipboard.writeText(project.cwdRoot);
               closeMenu();
@@ -269,7 +252,7 @@ function ProjectGroup({
 
           <MenuBtn
             s={s}
-            label="Hide project"
+            label={t("projectGroup.hideProject")}
             danger
             onClick={() => {
               onHideProject(project.cwdRoot);
@@ -286,6 +269,7 @@ function ProjectGroup({
         initialValue={project.context || ""}
         onClose={() => setContextModalOpen(false)}
         onSave={(value) => onEditContext?.(project.cwdRoot, value)}
+        locale={locale}
       />
     </div>
   );
@@ -647,7 +631,8 @@ function areProjectGroupsEqual(prev, next) {
     prev.onHideProject !== next.onHideProject ||
     prev.onEditContext !== next.onEditContext ||
     prev.searchActive !== next.searchActive ||
-    prev.multicaModels !== next.multicaModels
+    prev.multicaModels !== next.multicaModels ||
+    prev.locale !== next.locale
   ) {
     return false;
   }

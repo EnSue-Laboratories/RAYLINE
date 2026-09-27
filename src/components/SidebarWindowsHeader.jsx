@@ -1,3 +1,4 @@
+import { useTranslator } from "../contexts/LocaleContext";
 import { useState } from "react";
 import { PanelLeftClose, PanelLeftOpen, Plus, Settings } from "lucide-react";
 import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
@@ -12,6 +13,7 @@ function WinBtn({ label, onClick, active = false, children }) {
     <button
       type="button"
       title={label}
+      aria-label={label}
       onClick={onClick}
       onMouseDownCapture={(e) => e.stopPropagation()}
       onPointerDownCapture={(e) => e.stopPropagation()}
@@ -22,8 +24,8 @@ function WinBtn({ label, onClick, active = false, children }) {
         height: BTN_SIZE,
         display: "flex", alignItems: "center", justifyContent: "center",
         border: "none", borderRadius: 6, padding: 0, cursor: "pointer",
-        background: active ? "rgba(255,255,255,0.055)" : hov ? "rgba(255,255,255,0.07)" : "transparent",
-        color: hov || active ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.42)",
+        background: active ? "var(--control-bg-active)" : hov ? "var(--control-bg)" : "transparent",
+        color: hov || active ? "var(--text-primary)" : "var(--text-secondary)",
         transition: "background .15s, color .15s",
         WebkitAppRegion: "no-drag",
         userSelect: "none",
@@ -43,6 +45,7 @@ export default function SidebarWindowsHeader({
   onOpenSettings,
   hasUpdate = false,
 }) {
+  const t = useTranslator();
   return (
     <div
       onMouseDownCapture={(e) => e.stopPropagation()}
@@ -86,7 +89,7 @@ export default function SidebarWindowsHeader({
         <span style={{
           fontFamily: "'Barlow Condensed', 'Inter Tight', sans-serif",
           fontWeight: 600, fontSize: 18, letterSpacing: "0.12em",
-          color: "rgba(218,218,222,0.95)", userSelect: "none", lineHeight: 1,
+          color: "var(--text-primary)", userSelect: "none", lineHeight: 1,
         }}>
           R<span style={{ color: "var(--brand-logo-red, #FF4422)", letterSpacing: 0 }}>/</span>YLINE
           <span style={{ color: "var(--brand-logo-red, #FF4422)", letterSpacing: 0 }}>.</span>
@@ -98,7 +101,7 @@ export default function SidebarWindowsHeader({
 
       {/* Expand / Collapse */}
       <WinBtn
-        label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+        label={sidebarOpen ? t("chromeRail.collapseSidebar") : t("chromeRail.expandSidebar")}
         onClick={onToggleSidebar}
       >
         {sidebarOpen
@@ -107,14 +110,14 @@ export default function SidebarWindowsHeader({
       </WinBtn>
 
       {/* New chat */}
-      <WinBtn label="New chat" onClick={onNew}>
+      <WinBtn label={t("chromeRail.newChat")} onClick={onNew}>
         <Plus size={15} strokeWidth={1.6} />
       </WinBtn>
 
       {/* Settings */}
       <div style={{ position: "relative" }}>
         <WinBtn
-          label={settingsOpen ? "Close settings" : "Settings"}
+          label={settingsOpen ? t("chromeRail.closeSettings") : t("settings.title")}
           onClick={onOpenSettings}
           active={settingsOpen}
         >

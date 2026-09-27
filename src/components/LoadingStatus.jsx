@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { getM, isOpenCodeModelId } from "../data/models";
+import { getMOrMulticaFallback, isOpenCodeModelId } from "../data/models";
+import { useRuntimeModels } from "../data/runtimeModels";
 
 // Hard-coded rotating status phrases — cycles while the agent is working.
 const PHRASES = [
@@ -15,9 +16,6 @@ const PHRASES = [
   "Tracing logic",
   "Synthesizing",
 ];
-
-// Fallback context window when no model is known. Claude Sonnet/Opus defaults.
-const DEFAULT_CONTEXT_WINDOW = 200_000;
 
 const PHRASE_INTERVAL_MS = 2400;
 
@@ -128,6 +126,7 @@ function SlashSpinner() {
 
 export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, usage, rateLimits, isStreaming, modelId, compacting }) {
   const s = useFontScale();
+  const runtimeModels = useRuntimeModels();
   const [now, setNow] = useState(() => Date.now());
   const [phraseIdx, setPhraseIdx] = useState(0);
   const phraseRef = useRef(0);
@@ -152,7 +151,10 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
     : (frozenElapsedMs ?? (startedAt ? now - startedAt : 0));
 
   const isOpenCode = isOpenCodeModelId(modelId);
-  const model = modelId && !isOpenCode ? getM(modelId) : null;
+  const remoteId = modelId?.match(/^remote-ssh:(?:claude|codex):(.+)$/)?.[1];
+  const model = modelId && !isOpenCode
+    ? getMOrMulticaFallback(remoteId || modelId, remoteId ? [] : runtimeModels)
+    : null;
   const isCodex = model?.provider === "codex";
   const isClaude = model?.provider === "claude";
   const rawInputTokens = nonNegativeNumber(usage?.input_tokens);
@@ -170,7 +172,7 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
   const contextUsed = Number.isFinite(usage?.total_tokens) && usage.total_tokens > 0
     ? usage.total_tokens
     : derivedContextUsed;
-  const configuredContextWindow = model?.contextWindow || (isOpenCode ? null : DEFAULT_CONTEXT_WINDOW);
+  const configuredContextWindow = model?.contextWindow || null;
   const sourceContextWindow = Number.isFinite(usage?.context_window) && usage.context_window > 0
     ? usage.context_window
     : null;
@@ -180,6 +182,7 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
   const isLikelyCumulativeCodexUsage =
     isCodex &&
     !hasExplicitContextWindow &&
+    configuredContextWindow > 0 &&
     contextUsed > configuredContextWindow * 1.2;
   const costUsd = Number(usage?.cost_usd);
   const hasCost = Number.isFinite(costUsd) && costUsd > 0;

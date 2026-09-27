@@ -85,6 +85,16 @@ npm run rebuild
 
 If you're only working on the main UI, you can skip the rebuild — terminal sessions will stay unavailable until it succeeds.
 
+## Models and draft recovery
+
+Open the model picker and start typing a model name, provider, or reasoning effort (for example `grok47` or `codex luna max`). Arrow keys move through matches, Enter selects, and Escape closes only the picker. The same picker is used in existing chats and the new-chat form.
+
+The built-in catalog follows the official Claude Code aliases, Codex model catalog, and xAI text models. RayLine also reads model metadata from the installed Codex cache and runs `grok models` to discover configured CLI aliases. Installed-runtime metadata supplies supported reasoning efforts and context sizes; upstream overrides take precedence. Existing conversation model IDs and Grok project continuation remain supported. Model availability still depends on the installed CLI and account.
+
+Unsent text and attachments are retained per conversation. The new-chat form also restores its prompt, model, project, branch/worktree choices, and attachments after navigation or reload. Attachment payloads are written separately so typing does not repeatedly serialize images. Storage failures retain the current draft in memory. Project-row **+** and the toolbar's **New chat** open the same form, with the project preselected when applicable.
+
+See [the consolidation and verification record](docs/reviews/2026-09-27-ui-consolidation.md) for model sources, branch disposition, and regression coverage.
+
 ## Architecture
 
 ```mermaid

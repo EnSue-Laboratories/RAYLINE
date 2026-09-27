@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld("api", {
   getSystemInfo: () => ipcRenderer.invoke("system-info"),
   getDraftsPath: () => ipcRenderer.invoke("get-drafts-path"),
   pathExists: (p) => ipcRenderer.invoke("path-exists", p),
+  getModelCatalog: () => ipcRenderer.invoke("model-catalog"),
   checkCliInstalled: (options) => ipcRenderer.invoke("check-cli-installed", options),
   opencodeStatus: () => ipcRenderer.invoke("opencode-status"),
   opencodeSaveConfig: (input) => ipcRenderer.invoke("opencode-save-config", input),

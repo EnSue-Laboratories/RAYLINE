@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { X, FileText } from "lucide-react";
+import { createTranslator } from "../i18n";
 
-export default function ProjectContextModal({ open, projectName, initialValue, onClose, onSave }) {
+export default function ProjectContextModal({ open, projectName, initialValue, onClose, onSave, locale = "en-US" }) {
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const [value, setValue] = useState(initialValue || "");
 
   useEffect(() => {
@@ -18,9 +20,9 @@ export default function ProjectContextModal({ open, projectName, initialValue, o
 
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const onKey = (e) => { if (e.key === "Escape" && !e.isComposing) { e.preventDefault(); e.stopPropagation(); onClose?.(); } };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [open, onClose]);
 
   if (!open) return null;
@@ -35,13 +37,13 @@ export default function ProjectContextModal({ open, projectName, initialValue, o
         <div style={headerStyle}>
           <div style={titleRowStyle}>
             <FileText size={14} strokeWidth={1.8} />
-            <span style={titleStyle}>Project context — {projectName}</span>
+            <span style={titleStyle}>{t("project.context.title", { project: projectName })}</span>
           </div>
           <button
             type="button"
             style={closeBtnStyle}
             onClick={() => onClose?.()}
-            aria-label="Close"
+            aria-label={t("project.create.close")}
           >
             <X size={14} />
           </button>
@@ -49,7 +51,7 @@ export default function ProjectContextModal({ open, projectName, initialValue, o
 
         <div style={bodyStyle}>
           <div style={hintStyle}>
-            Appended to the system prompt for every chat in this project.
+            {t("project.context.hint")}
           </div>
           <textarea
             autoFocus
@@ -57,7 +59,7 @@ export default function ProjectContextModal({ open, projectName, initialValue, o
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                 e.preventDefault();
                 handleSave();
               }
@@ -69,14 +71,14 @@ export default function ProjectContextModal({ open, projectName, initialValue, o
 
         <div style={footerStyle}>
           <button type="button" style={secondaryBtnStyle} onClick={() => onClose?.()}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
             style={primaryBtnStyle(true)}
             onClick={handleSave}
           >
-            Save
+            {t("common.save")}
           </button>
         </div>
       </div>
@@ -110,7 +112,7 @@ const closeBtnStyle = {
   background: "none", border: "none", color: "var(--text-secondary)",
   cursor: "pointer", padding: 4, display: "flex",
 };
-const bodyStyle = { padding: 18, display: "flex", flexDirection: "column", gap: 8 };
+const bodyStyle = { overflowY: "auto", minHeight: 0, padding: 18, display: "flex", flexDirection: "column", gap: 8 };
 const footerStyle = {
   display: "flex", justifyContent: "flex-end", gap: 8,
   padding: "12px 18px", borderTop: "1px solid var(--border)",

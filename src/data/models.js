@@ -1,24 +1,78 @@
+import codexCatalog from "./codexModelCatalog.json" with { type: "json" };
+
 export const DEFAULT_MODEL_ID = "sonnet";
+const CODEX_CONTEXT_WINDOW = 272_000;
+const GROK_CONTEXT_WINDOW = 500_000;
+const LEGACY_MODEL_IDS = {};
 
-const LEGACY_MODEL_IDS = {
-  haiku: DEFAULT_MODEL_ID,
-};
+export function codexModelId(slug, effort) {
+  const known = /^gpt-(5\.[456]|6)-(astra|sol|luna|terra)$/.exec(slug);
+  const plain = /^gpt-(5\.[45])$/.exec(slug);
+  const suffix = effort === "medium" ? "med" : effort;
+  if (known) return `gpt${known[1].replace(".", "")}-${known[2]}-${suffix}`;
+  if (plain) return `gpt${plain[1].replace(".", "")}-${suffix}`;
+  return `codex-model:${encodeURIComponent(slug)}:${effort}`;
+}
 
-// `contextWindow` is the model's total usable context in tokens — used by the
-// loading footer to turn raw usage counts into a "% of window full" reading.
+export function buildCodexModels(records = []) {
+  return records.flatMap((record) => {
+    if (!record?.slug || record.visibility === "hide") return [];
+    const efforts = (record.supported_reasoning_levels || ["medium"])
+      .map((level) => typeof level === "string" ? level : level?.effort)
+      .filter((level) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(level));
+    const defaultEffort = record.default_reasoning_level || "medium";
+    return [...new Set(efforts)].sort((a, b) => (a === defaultEffort ? -1 : b === defaultEffort ? 1 : 0)).map((effort) => ({
+      id: codexModelId(record.slug, effort),
+      name: record.display_name || record.slug,
+      tag: record.display_name || record.slug,
+      cliFlag: record.slug,
+      provider: "codex",
+      effort,
+      contextWindow: record.context_window || CODEX_CONTEXT_WINDOW,
+    }));
+  });
+}
+
+const grokModel = (id, name, cliFlag, extra = {}) => ({
+  id, name, tag: name.toUpperCase(), cliFlag, provider: "grok",
+  contextWindow: GROK_CONTEXT_WINDOW, ...extra,
+});
+
 export const MODELS = [
-  { id: "opus",    name: "Claude Opus",      tag: "OPUS",    cliFlag: "opus",     provider: "claude", contextWindow: 200_000 },
+  // CLI aliases follow the installed provider/account rather than pinning old versions.
+  { id: "opus", name: "Claude Opus", tag: "OPUS", cliFlag: "opus", provider: "claude", contextWindow: 1_000_000 },
   { id: "opus-1m", name: "Claude Opus (1M)", tag: "OPUS 1M", cliFlag: "opus[1m]", provider: "claude", contextWindow: 1_000_000 },
-  { id: "sonnet",  name: "Claude Sonnet",    tag: "SONNET",  cliFlag: "sonnet",   provider: "claude", contextWindow: 200_000 },
-  { id: "gpt55-med",   name: "GPT-5.5",         tag: "GPT-5.5",        cliFlag: "gpt-5.5", provider: "codex", effort: "medium", contextWindow: 1_050_000 },
-  { id: "gpt55-high",  name: "GPT-5.5 high",    tag: "GPT-5.5 high",   cliFlag: "gpt-5.5", provider: "codex", effort: "high",   contextWindow: 1_050_000 },
-  { id: "gpt55-xhigh", name: "GPT-5.5 xhigh",   tag: "GPT-5.5 xhigh",  cliFlag: "gpt-5.5", provider: "codex", effort: "xhigh",  contextWindow: 1_050_000 },
-  { id: "gpt54-med",   name: "GPT-5.4",         tag: "GPT-5.4",        cliFlag: "gpt-5.4", provider: "codex", effort: "medium", contextWindow: 1_050_000 },
-  { id: "gpt54-high",  name: "GPT-5.4 high",    tag: "GPT-5.4 high",   cliFlag: "gpt-5.4", provider: "codex", effort: "high",   contextWindow: 1_050_000 },
-  { id: "gpt54-xhigh", name: "GPT-5.4 xhigh",   tag: "GPT-5.4 xhigh",  cliFlag: "gpt-5.4", provider: "codex", effort: "xhigh",  contextWindow: 1_050_000 },
-  { id: "grok-46", name: "Grok 4.6", tag: "GROK", cliFlag: "grok-4.6", provider: "grok", contextWindow: 200_000 },
-  { id: "grok-46-continue", name: "Grok 4.6 (Continue project)", tag: "GROK C", cliFlag: "grok-4.6", provider: "grok", grokContinue: true, contextWindow: 200_000 },
+  { id: "sonnet", name: "Claude Sonnet", tag: "SONNET", cliFlag: "sonnet", provider: "claude", contextWindow: 1_000_000 },
+  { id: "sonnet-1m", name: "Claude Sonnet (1M)", tag: "SONNET 1M", cliFlag: "sonnet[1m]", provider: "claude", contextWindow: 1_000_000 },
+  { id: "haiku", name: "Claude Haiku", tag: "HAIKU", cliFlag: "haiku", provider: "claude", contextWindow: 200_000 },
+  { id: "fable", name: "Claude Fable", tag: "FABLE", cliFlag: "fable", provider: "claude", contextWindow: 1_000_000 },
+  ...buildCodexModels(codexCatalog.models),
+  ...["medium", "high", "xhigh"].map((effort) => ({
+    id: codexModelId("gpt-5.4", effort), name: "GPT-5.4", tag: "GPT-5.4", cliFlag: "gpt-5.4", provider: "codex", effort,
+    contextWindow: 1_050_000, legacy: true,
+  })),
+  grokModel("grok-47", "Grok 4.7", "grok-4.7"),
+  grokModel("grok-46", "Grok 4.6", "grok-4.6"),
+  grokModel("grok-46-continue", "Grok 4.6", "grok-4.6", { grokContinue: true }),
+  grokModel("grok-46-direct", "Grok 4.6 Direct", "grok-4.6-direct", { legacy: true }),
+  grokModel("grok-46-public", "Grok 4.6 Public", "grok-4.6-public", { legacy: true }),
+  grokModel("grok-45", "Grok 4.5", "grok-4.5"),
+  grokModel("grok-43", "Grok 4.3", "grok-4.3", { contextWindow: 1_000_000 }),
+  grokModel("grok-420-0309-reasoning", "Grok 4.20 Reasoning", "grok-4.20-0309-reasoning", { contextWindow: 1_000_000 }),
+  grokModel("grok-420-0309-non-reasoning", "Grok 4.20 Non-reasoning", "grok-4.20-0309-non-reasoning", { contextWindow: 1_000_000 }),
+  grokModel("grok-build-01", "Grok Build 0.1", "grok-build-0.1", { contextWindow: 256_000 }),
+  grokModel("grok-420-reasoning", "Grok 4.20 Reasoning (CLI alias)", "grok-4.20-reasoning", { legacy: true, contextWindow: 1_000_000 }),
+  grokModel("grok-build-latest", "Grok Build latest", "grok-build-latest", { legacy: true, contextWindow: null }),
 ];
+
+export function buildRuntimeModels(catalog = {}) {
+  const codex = buildCodexModels(catalog.codex);
+  const grok = (catalog.grok || []).filter((slug) => typeof slug === "string" && /^grok-[a-z0-9._-]+$/i.test(slug)).map((slug) => {
+    const known = MODELS.find((m) => m.provider === "grok" && m.cliFlag === slug && !m.grokContinue);
+    return known ? { ...known, legacy: false } : grokModel(slug, slug, slug, { contextWindow: null });
+  });
+  return [...codex, ...grok].map((model) => ({ ...model, runtimeCatalog: true }));
+}
 
 export const normalizeModelId = (id) => LEGACY_MODEL_IDS[id] || id;
 
@@ -48,10 +102,12 @@ export function getAvailableModels(extraModels = []) {
       .filter((m) => m?.providerOverride && m.provider)
       .map((m) => m.provider)
   );
-  return [
-    ...MODELS.filter((m) => !overrides.has(m.provider)),
-    ...(extraModels || []),
+  const runtimeSlugs = new Set((extraModels || []).filter((m) => m.runtimeCatalog).map((m) => `${m.provider}:${m.cliFlag}`));
+  const candidates = [
+    ...MODELS.filter((m) => !overrides.has(m.provider) && (m.grokContinue || !runtimeSlugs.has(`${m.provider}:${m.cliFlag}`))),
+    ...(extraModels || []).filter((m) => !m.runtimeCatalog || !overrides.has(m.provider)),
   ];
+  return [...new Map(candidates.map((m) => [m.id, m])).values()];
 }
 
 export const getM = (id) => {
@@ -64,7 +120,7 @@ export const getM = (id) => {
       cliFlag: parsed.modelId,
       provider: parsed.provider,
       providerOverride: true,
-      contextWindow: parsed.provider === "codex" ? 1_050_000 : 200_000,
+      contextWindow: parsed.provider === "codex" ? CODEX_CONTEXT_WINDOW : 200_000,
     };
   }
   return (
@@ -124,8 +180,16 @@ export function getMOrMulticaFallback(id, extraModels = []) {
       };
     }
   }
+  if (baseHit) return baseHit;
+  if (typeof id === "string" && id.startsWith("codex-model:")) {
+    const [, encoded, effort] = id.split(":");
+    try {
+      const cliFlag = decodeURIComponent(encoded);
+      return { id, name: cliFlag, tag: cliFlag, cliFlag, effort, provider: "codex", contextWindow: CODEX_CONTEXT_WINDOW };
+    } catch { /* Use the normal fallback for malformed historical IDs. */ }
+  }
   if (isGrokModelId(id)) {
-    return { id, name: "Grok", tag: "GROK", provider: "grok", cliFlag: id };
+    return { id, name: "Grok", tag: "GROK", provider: "grok", cliFlag: id, contextWindow: null };
   }
   if (isProviderUpstreamModelId(id)) {
     return getM(id);

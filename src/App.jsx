@@ -1,3 +1,5 @@
+import { useRuntimeModels } from "./data/runtimeModels";
+import { LocaleContext } from "./contexts/LocaleContext";
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import Sidebar      from "./components/Sidebar";
 import SidebarChromeRail from "./components/SidebarChromeRail";
@@ -1297,6 +1299,7 @@ export default function App() {
   const [draftsCollapsed, setDraftsCollapsed] = useState(false);
   const [draftsPath, setDraftsPath] = useState(null);
   const [showNewChatCard, setShowNewChatCard] = useState(false);
+  const [newChatProject, setNewChatProject] = useState(undefined);
   const [showDispatchCard, setShowDispatchCard] = useState(false);
   const [showMulticaSetup, setShowMulticaSetup] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
@@ -1440,17 +1443,18 @@ export default function App() {
     ),
     [active, persistableConversations]
   );
+  const runtimeModels = useRuntimeModels();
   const remoteModels = useMemo(
     () => buildRemoteModels(remoteSshCommand, remoteSshRuntime),
     [remoteSshCommand, remoteSshRuntime]
   );
   const dispatchAvailableModels = useMemo(
-    () => getAvailableModels([...remoteModels, ...providerOverrideModels, ...openCodeModels, ...multicaModels]),
-    [multicaModels, openCodeModels, providerOverrideModels, remoteModels]
+    () => getAvailableModels([...runtimeModels, ...remoteModels, ...providerOverrideModels, ...openCodeModels, ...multicaModels]),
+    [multicaModels, openCodeModels, providerOverrideModels, remoteModels, runtimeModels]
   );
   const dynamicModels = useMemo(
-    () => [...remoteModels, ...providerOverrideModels, ...openCodeModels, ...multicaModels],
-    [multicaModels, openCodeModels, providerOverrideModels, remoteModels]
+    () => [...runtimeModels, ...remoteModels, ...providerOverrideModels, ...openCodeModels, ...multicaModels],
+    [multicaModels, openCodeModels, providerOverrideModels, remoteModels, runtimeModels]
   );
   const effectivePlatform = useMemo(() => {
     if (platform) return platform;
@@ -2436,6 +2440,7 @@ export default function App() {
   }, [dynamicModels]);
 
   const handleNew = useCallback(() => {
+    setNewChatProject(undefined);
     setShowSettings(false);
     setShowNewChatCard(true);
   }, []);
@@ -2517,26 +2522,10 @@ export default function App() {
   }, [registerManualProject]);
 
   const handleNewInProject = useCallback((cwdRoot) => {
-    const id = "c" + Date.now();
-    const n = createConversationDraft({
-      id,
-      title: "New chat",
-      modelId: defaultModel,
-      ts: Date.now(),
-      cwd: cwdRoot ?? null,
-    });
-    setConvoList((p) => [n, ...p]);
-    setActive(id);
+    setNewChatProject(cwdRoot ?? null);
     setShowSettings(false);
-    setShowNewChatCard(false);
-    if (cwdRoot) {
-      setProjects((prev) => (
-        prev[cwdRoot]?.hidden
-          ? { ...prev, [cwdRoot]: { ...prev[cwdRoot], hidden: false } }
-          : prev
-      ));
-    }
-  }, [createConversationDraft, defaultModel]);
+    setShowNewChatCard(true);
+  }, []);
 
   const pinnedTabs = useMemo(() => {
     return convoList
@@ -4064,6 +4053,7 @@ export default function App() {
   }, [convoList, draftsPath, projectChooserProjects]);
 
   const newChatDefaultCwd = useMemo(() => {
+    if (newChatProject !== undefined) return newChatProject;
     const activeCwd = activeConvo?.cwd;
     if (activeCwd && !isDraftProjectRoot(activeCwd, draftsPath)) return getMainRepoRoot(activeCwd);
     if (cwd && !isDraftProjectRoot(cwd, draftsPath)) return getMainRepoRoot(cwd);
@@ -4072,7 +4062,7 @@ export default function App() {
       if (c.cwd && !isDraftProjectRoot(c.cwd, draftsPath)) return getMainRepoRoot(c.cwd);
     }
     return null;
-  }, [activeConvo, cwd, convoList, draftsPath]);
+  }, [activeConvo, cwd, convoList, draftsPath, newChatProject]);
 
   const terminalCwd = activeConvo?.cwd === null ? (draftsPath || undefined) : (activeConvo?.cwd || cwd);
 
@@ -4189,6 +4179,10 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    window.dispatchEvent(new Event("rayline:close-menus"));
+  }, [showSettings, active, showNewChatCard]);
+
   // ── Render ─────────────────────────────────────────────────────────────────
   const sidebarPaneTransition = prefersReducedMotion
     ? "none"
@@ -4198,6 +4192,7 @@ export default function App() {
     : "opacity .16s ease, transform .22s cubic-bezier(.16,1,.3,1)";
 
   return (
+    <LocaleContext.Provider value={locale}>
     <FontSizeContext.Provider value={fontSize}>
     <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden", position: "relative" }}>
       {wallpaper?.dataUrl ? (
@@ -4329,6 +4324,7 @@ export default function App() {
       <div style={{ position: "relative", flex: 1, minWidth: 0, height: "100%", overflow: "hidden", display: "flex" }}>
         <div
           aria-hidden={showSettings}
+          inert={showSettings}
           style={{
             position: "absolute",
             inset: 0,
@@ -4451,6 +4447,7 @@ export default function App() {
       />
 
       <NewProjectModal
+        locale={locale}
         open={showNewProject}
         onClose={() => setShowNewProject(false)}
         onCloned={handleClonedRepo}
@@ -4479,5 +4476,6 @@ export default function App() {
       </div>
     </div>
     </FontSizeContext.Provider>
+    </LocaleContext.Provider>
   );
 }

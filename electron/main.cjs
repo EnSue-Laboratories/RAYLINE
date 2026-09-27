@@ -1,3 +1,4 @@
+const { getModelCatalog } = require("./model-catalog.cjs");
 const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell, clipboard } = require("electron");
 const { initAutoUpdater, handleCheckForUpdates, handleDownloadUpdate, handleInstallUpdate } = require("./auto-updater.cjs");
 const path = require("path");
@@ -1376,6 +1377,8 @@ function getCliInstalledSnapshot({ force = false } = {}) {
 ipcMain.handle("check-cli-installed", (_event, options = {}) => {
   return getCliInstalledSnapshot(options);
 });
+
+ipcMain.handle("model-catalog", () => getModelCatalog());
 
 ipcMain.handle("opencode-status", async () => {
   const status = getOpenCodeStatusSync();

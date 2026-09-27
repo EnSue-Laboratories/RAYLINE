@@ -1,3 +1,4 @@
+import { appendAdjacentTextPart } from "../utils/streamParts";
 import { useState, useCallback, useEffect, useRef, startTransition } from "react";
 import { createLogger } from "../utils/logger";
 
@@ -913,24 +914,44 @@ function applyStreamEventToConversations(prev, conversationId, event) {
       msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
       lastMsg = msgs[msgs.length - 1];
     } else if (event.type === "reasoning") {
-      const thinkingPart = buildOpenCodeThinkingPart(event);
-      if (thinkingPart) {
-        const am = ensureAssistant();
-        const parts = upsertOpenCodePart(cloneParts(am.parts), thinkingPart);
-        const stillThinking = !Number.isFinite(thinkingPart.durationMs);
-        msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: stillThinking };
-        lastMsg = msgs[msgs.length - 1];
+      if (event.provider === "grok") {
+        const text = extractOpenCodeReasoningText(event);
+        if (text) {
+          const am = ensureAssistant();
+          const parts = appendAdjacentTextPart(am.parts, "thinking", text);
+          msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: true };
+          lastMsg = msgs[msgs.length - 1];
+        }
+      } else {
+        const thinkingPart = buildOpenCodeThinkingPart(event);
+        if (thinkingPart) {
+          const am = ensureAssistant();
+          const parts = upsertOpenCodePart(cloneParts(am.parts), thinkingPart);
+          const stillThinking = !Number.isFinite(thinkingPart.durationMs);
+          msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: stillThinking };
+          lastMsg = msgs[msgs.length - 1];
+        }
       }
     } else if (event.type === "text" || event.type === "opencode_stdout") {
-      const textParts = splitOpenCodeTextAndThinkingParts(event);
-      if (textParts.length > 0) {
-        const am = ensureAssistant();
-        const parts = textParts.reduce(
-          (acc, textPart) => upsertOpenCodePart(acc, textPart),
-          cloneParts(am.parts)
-        );
-        msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: false };
-        lastMsg = msgs[msgs.length - 1];
+      if (event.provider === "grok") {
+        const text = extractOpenCodeText(event);
+        if (text) {
+          const am = ensureAssistant();
+          const parts = appendAdjacentTextPart(am.parts, "text", text);
+          msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: false };
+          lastMsg = msgs[msgs.length - 1];
+        }
+      } else {
+        const textParts = splitOpenCodeTextAndThinkingParts(event);
+        if (textParts.length > 0) {
+          const am = ensureAssistant();
+          const parts = textParts.reduce(
+            (acc, textPart) => upsertOpenCodePart(acc, textPart),
+            cloneParts(am.parts)
+          );
+          msgs[msgs.length - 1] = { ...am, parts, isStreaming: true, isThinking: false };
+          lastMsg = msgs[msgs.length - 1];
+        }
       }
     } else if (event.type === "error") {
       const am = ensureAssistant();

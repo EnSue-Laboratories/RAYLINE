@@ -1,6 +1,8 @@
+import { useTranslator } from "../contexts/LocaleContext";
+import { readDraft, writeDraft, clearDraft } from "../utils/composerDrafts";
 import { useState, useRef, useEffect, useCallback, forwardRef } from "react";
 import { createPortal } from "react-dom";
-import { Paperclip, X, GitBranch, GitFork, Link2 } from "lucide-react";
+import { Paperclip, X, GitBranch, GitFork, Link2, ArrowLeft, ArrowRight } from "lucide-react";
 import { ModelPickerWithMultica } from "../data/multicaModels.jsx";
 import ProjectPicker from "./ProjectPicker";
 import { useFontScale } from "../contexts/FontSizeContext";
@@ -54,17 +56,21 @@ export default function NewChatCard({
   extraModels = [],
 }) {
   const s = useFontScale();
+  const t = useTranslator();
+  const draftScope = `new-chat:${defaultCwd || "drafts"}`;
+  const [savedDraft] = useState(() => readDraft(draftScope));
+  const submittedRef = useRef(false);
   const textareaRef = useRef(null);
   const dragDepthRef = useRef(0);
 
-  const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState(defaultModel || "sonnet");
-  const [selectedCwd, setSelectedCwd] = useState(defaultCwd);
-  const [branch, setBranch] = useState("");
-  const [worktree, setWorktree] = useState(false);
-  const [worktreeName, setWorktreeName] = useState("");
-  const [attachments, setAttachments] = useState([]);
-  const [issueContext, setIssueContext] = useState(null);
+  const [prompt, setPrompt] = useState(savedDraft.prompt || "");
+  const [model, setModel] = useState(savedDraft.model || defaultModel || "sonnet");
+  const [selectedCwd, setSelectedCwd] = useState(Object.prototype.hasOwnProperty.call(savedDraft, "cwd") ? savedDraft.cwd : defaultCwd);
+  const [branch, setBranch] = useState(savedDraft.branch || "");
+  const [worktree, setWorktree] = useState(savedDraft.worktree || false);
+  const [worktreeName, setWorktreeName] = useState(savedDraft.worktreeName || "");
+  const [attachments, setAttachments] = useState(savedDraft.attachments || []);
+  const [issueContext, setIssueContext] = useState(savedDraft.issueContext || null);
   const [error, setError] = useState(null);
   const [creatingChat, setCreatingChat] = useState(false);
 
@@ -82,7 +88,7 @@ export default function NewChatCard({
   const [branchList, setBranchList] = useState([]);
   const [branchLoading, setBranchLoading] = useState(false);
   const [currentBranch, setCurrentBranch] = useState("");
-  const [branchMode, setBranchMode] = useState(null); // "existing" | "new" | null
+  const [branchMode, setBranchMode] = useState(savedDraft.branchMode || null); // "existing" | "new" | null
   const branchSearchRef = useRef(null);
   const branchMenuRef = useRef(null);
 
@@ -91,6 +97,10 @@ export default function NewChatCard({
   const treeBtnRef = useRef(null);
   const treeMenuRef = useRef(null);
   const isDraftSelection = selectedCwd == null;
+
+  useEffect(() => {
+    if (!submittedRef.current) writeDraft(draftScope, { prompt, model, cwd: selectedCwd, branch, branchMode, worktree, worktreeName, issueContext, attachments });
+  }, [draftScope, prompt, model, selectedCwd, branch, branchMode, worktree, worktreeName, issueContext, attachments]);
 
   const makeClaudiBranchName = useCallback((baseBranch) => {
     const suffix = Math.random().toString(36).slice(2, 8);
@@ -103,19 +113,26 @@ export default function NewChatCard({
     textareaRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    const closeMenus = () => { setShowIssueSearch(false); setShowBranchSearch(false); setShowTreeInput(false); };
+    window.addEventListener("rayline:close-menus", closeMenus);
+    return () => window.removeEventListener("rayline:close-menus", closeMenus);
+  }, []);
+
   // Escape key handler
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === "Escape") {
+      if (!textareaRef.current?.closest("[inert]") && e.key === "Escape" && !e.defaultPrevented && !e.isComposing && !creatingChat) {
+        e.preventDefault();
         if (showIssueSearch) { setShowIssueSearch(false); return; }
         if (showBranchSearch) { setShowBranchSearch(false); return; }
         if (showTreeInput) { setShowTreeInput(false); return; }
-        onCancel();
+        onCancel?.();
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onCancel, showIssueSearch, showBranchSearch, showTreeInput]);
+  }, [onCancel, showIssueSearch, showBranchSearch, showTreeInput, creatingChat]);
 
   // Close issue search on outside click
   useEffect(() => {
@@ -222,14 +239,14 @@ export default function NewChatCard({
     if (!trimmedPrompt || creatingChat) return;
 
     if ((trimmedBranch || worktree) && !selectedCwd) {
-      setError("Select a project before creating a branch or worktree.");
+      setError(t("newChat.selectProjectBeforeBranchOrWorktree"));
       return;
     }
 
     if (worktree) {
       const base = trimmedBranch || currentBranch;
       if (!base) {
-        setError("Pick a base branch first.");
+        setError(t("newChat.pickBaseBranchFirst"));
         return;
       }
       nextWorktreeBaseBranch = base;
@@ -251,17 +268,19 @@ export default function NewChatCard({
         issueContext: issueContext || undefined,
         attachments: attachments.length ? attachments : undefined,
       });
+      submittedRef.current = true;
+      clearDraft(draftScope);
     } catch (createError) {
-      setError(createError?.message || "Failed to create chat.");
+      setError(createError?.message || t("newChat.failedToCreateChat"));
     } finally {
       setCreatingChat(false);
     }
-  }, [attachments, branch, branchMode, creatingChat, currentBranch, issueContext, makeClaudiBranchName, model, onCreateChat, prompt, selectedCwd, worktree, worktreeName]);
+  }, [attachments, branch, branchMode, creatingChat, currentBranch, issueContext, makeClaudiBranchName, model, onCreateChat, prompt, selectedCwd, worktree, worktreeName, draftScope, t]);
 
   // Enter to create, Shift+Enter for newline
   const handleKeyDown = useCallback(
     (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         handleCreate();
       }
@@ -287,11 +306,10 @@ export default function NewChatCard({
     setWorktree(false);
     setWorktreeName("");
     setShowTreeInput(false);
-    if (nextCwd == null) {
-      setIssueContext(null);
-      setShowIssueSearch(false);
-      setIssueSearchQuery("");
-    }
+    setIssueContext(null);
+    setIssueList([]);
+    setShowIssueSearch(false);
+    setIssueSearchQuery("");
     setError(null);
   }, []);
 
@@ -303,13 +321,15 @@ export default function NewChatCard({
 
   const openBranchPicker = useCallback(() => {
     if (!selectedCwd) {
-      setError("Select a project before choosing a branch.");
+      setError(t("newChat.selectProjectBeforeBranch"));
       return;
     }
     setError(null);
     setBranchSearchQuery("");
-    setShowBranchSearch((prev) => !prev);
-  }, [selectedCwd]);
+    const wasOpen = showBranchSearch;
+    window.dispatchEvent(new Event("rayline:close-menus"));
+    setShowBranchSearch(!wasOpen);
+  }, [selectedCwd, t, showBranchSearch]);
 
   const selectExistingBranch = useCallback((name) => {
     setBranch(name);
@@ -331,12 +351,12 @@ export default function NewChatCard({
 
   const openTreeInput = useCallback(() => {
     if (!selectedCwd) {
-      setError("Select a project before creating a worktree.");
+      setError(t("newChat.selectProjectBeforeWorktree"));
       return;
     }
     setError(null);
     setShowTreeInput((prev) => !prev);
-  }, [selectedCwd]);
+  }, [selectedCwd, t]);
 
   const confirmTreeName = useCallback((value) => {
     setWorktreeName(value.trim());
@@ -475,9 +495,9 @@ export default function NewChatCard({
     strokeWidth: 2,
   };
 
-  const branchLabel = branch || currentBranch || (worktree ? "Base" : "Branch");
-  const treeLabel = worktreeName || "Tree";
-  const issueLabel = issueContext ? `#${issueContext.match(/Issue #(\d+)/)?.[1] || ""}` : "Issue";
+  const branchLabel = branch || currentBranch || (worktree ? t("newChat.base") : t("newChat.branch"));
+  const treeLabel = worktreeName || t("newChat.tree");
+  const issueLabel = issueContext ? `#${issueContext.match(/Issue #(\d+)/)?.[1] || ""}` : t("newChat.issue");
 
   return (
     <div
@@ -514,7 +534,8 @@ export default function NewChatCard({
         {/* Main textarea */}
         <textarea
           ref={textareaRef}
-          placeholder="What do you want to do?"
+          placeholder={t("newChat.promptPlaceholder")}
+          disabled={creatingChat}
           value={prompt}
           onChange={(e) => {
             setPrompt(e.target.value);
@@ -592,7 +613,7 @@ export default function NewChatCard({
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--control-bg)"; }}
           >
             <Paperclip style={chipIconStyle} />
-            File
+            {t("newChat.file")}
           </button>
 
           {/* Branch — searchable typeahead */}
@@ -606,6 +627,7 @@ export default function NewChatCard({
 
             {showBranchSearch && createPortal(
               <BranchSearchDropdown
+                onClose={() => setShowBranchSearch(false)}
                 ref={branchMenuRef}
                 anchorRef={branchSearchRef}
                 s={s}
@@ -633,6 +655,7 @@ export default function NewChatCard({
 
             {showTreeInput && createPortal(
               <WorktreeInputDropdown
+                onClose={() => setShowTreeInput(false)}
                 ref={treeMenuRef}
                 anchorRef={treeBtnRef}
                 s={s}
@@ -651,7 +674,9 @@ export default function NewChatCard({
             <button
               onClick={() => {
                 if (issueContext) { setIssueContext(null); return; }
-                setShowIssueSearch(v => !v);
+                const wasOpen = showIssueSearch;
+                window.dispatchEvent(new Event("rayline:close-menus"));
+                setShowIssueSearch(!wasOpen);
               }}
               style={toolBtnStyle(!!issueContext)}
             >
@@ -661,6 +686,7 @@ export default function NewChatCard({
 
             {showIssueSearch && createPortal(
               <IssueSearchDropdown
+                onClose={() => setShowIssueSearch(false)}
                 ref={issueMenuRef}
                 anchorRef={issueSearchRef}
                 s={s}
@@ -677,7 +703,7 @@ export default function NewChatCard({
 
         {/* Bottom bar */}
         <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8,
           paddingTop: 10, borderTop: "1px solid var(--pane-border)",
         }}>
           <ProjectPicker
@@ -687,12 +713,10 @@ export default function NewChatCard({
             projects={projects}
             onBrowse={handleBrowseProject}
           />
-          <span style={{
-            fontSize: s(10), color: "var(--text-disabled)",
-            fontFamily: "var(--font-mono)", letterSpacing: ".04em",
-          }}>
-            {creatingChat ? "Creating..." : "Enter to create"}
-          </span>
+          <button type="button" disabled={creatingChat || !prompt.trim()} onClick={handleCreate} aria-label={t("newChat.create")}
+            style={{ ...toolBtnStyle(true), marginLeft: "auto", opacity: creatingChat || !prompt.trim() ? 0.5 : 1 }}>
+            {creatingChat ? t("newChat.creating") : t("newChat.create")}<ArrowRight size={13} />
+          </button>
         </div>
 
         {error && (
@@ -706,22 +730,10 @@ export default function NewChatCard({
         )}
       </div>
       {onCancel && (
-        <div
-          onClick={onCancel}
-          style={{
-            fontSize: s(10),
-            fontFamily: "'JetBrains Mono', monospace",
-            color: "rgba(255,255,255,0.2)",
-            letterSpacing: ".06em",
-            cursor: "pointer",
-            transition: "color .15s",
-            userSelect: "none",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.45)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-        >
-          ESC TO CANCEL
-        </div>
+        <button type="button" onClick={onCancel} disabled={creatingChat} aria-label={t("newChat.back")}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", maxWidth: "100%", gap: 6, padding: "6px 12px", background: "var(--control-bg)", border: "1px solid var(--control-border)", borderRadius: 7, color: "var(--text-secondary)", cursor: "pointer", fontSize: s(11) }}>
+          <ArrowLeft size={13} />{t("newChat.back")}<span style={{ color: "var(--text-muted)", fontSize: s(10) }}>{t("newChat.cancelHint")}</span>
+        </button>
       )}
     </div>
   );
@@ -730,9 +742,10 @@ export default function NewChatCard({
 /* ── Issue search dropdown ──────────────────────────────────────── */
 
 const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
-  { anchorRef, s, query, onQueryChange, issues, loading, onSelect },
+  { anchorRef, s, onClose, query, onQueryChange, issues, loading, onSelect },
   ref
 ) {
+  const t = useTranslator();
   const [pos, setPos] = useState(null);
   const updatePosition = useCallback(() => {
     if (!anchorRef?.current) return;
@@ -759,6 +772,13 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
   return (
     <div
       ref={ref}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+          event.preventDefault(); event.stopPropagation(); onClose(); anchorRef.current?.querySelector("button")?.focus();
+        }
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
       style={{
         position: "fixed",
         top: pos.top,
@@ -771,7 +791,7 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
         border: "1px solid var(--pane-border)",
         borderRadius: 10,
         padding: 3,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        boxShadow: "var(--shadow-md)",
         animation: "dropIn .15s ease",
         WebkitAppRegion: "no-drag",
         display: "flex",
@@ -781,7 +801,7 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
       <input
         autoFocus
         type="text"
-        placeholder="Search issues..."
+        placeholder={t("newChat.searchIssues")}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         style={{
@@ -799,12 +819,12 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {loading && (
           <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-            Loading...
+            {t("newChat.loading")}
           </div>
         )}
         {!loading && issues.length === 0 && (
           <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-            No issues found
+            {t("newChat.noIssuesFound")}
           </div>
         )}
         {issues.map((issue) => (
@@ -849,9 +869,10 @@ const IssueSearchDropdown = forwardRef(function IssueSearchDropdown(
 });
 
 const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
-  { anchorRef, s, query, onQueryChange, branches, loading, currentBranch, worktree, onSelectBranch, onUseCustomBranch },
+  { anchorRef, s, onClose, query, onQueryChange, branches, loading, currentBranch, worktree, onSelectBranch, onUseCustomBranch },
   ref
 ) {
+  const t = useTranslator();
   const [pos, setPos] = useState(null);
   const trimmedQuery = query.trim();
   const exactBranchName = branches.find((branch) => branch.toLowerCase() === trimmedQuery.toLowerCase()) || null;
@@ -880,6 +901,13 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
   return (
     <div
       ref={ref}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+          event.preventDefault(); event.stopPropagation(); onClose(); anchorRef.current?.querySelector("button")?.focus();
+        }
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
       style={{
         position: "fixed",
         top: pos.top,
@@ -892,7 +920,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
         border: "1px solid var(--pane-border)",
         borderRadius: 10,
         padding: 3,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        boxShadow: "var(--shadow-md)",
         animation: "dropIn .15s ease",
         WebkitAppRegion: "no-drag",
         display: "flex",
@@ -902,11 +930,11 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
       <input
         autoFocus
         type="text"
-        placeholder={worktree ? "Pick a base branch..." : "Find or type a branch..."}
+        placeholder={worktree ? t("newChat.pickBaseBranch") : t("newChat.findOrTypeBranch")}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && trimmedQuery) {
+          if (e.key === "Enter" && trimmedQuery && !e.nativeEvent.isComposing && e.keyCode !== 229) {
             e.preventDefault();
             if (exactBranchName) onSelectBranch(exactBranchName);
             else if (!worktree) onUseCustomBranch(trimmedQuery);
@@ -945,18 +973,18 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
             onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
-            Use "{trimmedQuery}" as a new branch
+            {t("newChat.useAsNewBranch", { value: trimmedQuery })}
           </button>
         )}
 
         {loading && (
           <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-            Loading...
+            {t("newChat.loading")}
           </div>
         )}
         {!loading && branches.length === 0 && (
           <div style={{ padding: "12px 10px", fontSize: s(10), color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-            No branches found
+            {t("newChat.noBranchesFound")}
           </div>
         )}
 
@@ -987,7 +1015,7 @@ const BranchSearchDropdown = forwardRef(function BranchSearchDropdown(
             <span>{branchName}</span>
             {branchName === currentBranch && (
               <span style={{ fontSize: s(8.5), color: "var(--text-faint)", letterSpacing: ".04em" }}>
-                CURRENT
+                {t("newChat.currentBranch")}
               </span>
             )}
           </button>
@@ -1017,9 +1045,10 @@ function getNeutralDropdownItemStyle(s) {
 /* ── Worktree name input ────────────────────────────────────────── */
 
 const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
-  { anchorRef, s, initialValue, active, baseBranch, onConfirm, onDisable },
+  { anchorRef, s, onClose, initialValue, active, baseBranch, onConfirm, onDisable },
   ref
 ) {
+  const t = useTranslator();
   const [pos, setPos] = useState(null);
   const [value, setValue] = useState(initialValue || "");
 
@@ -1048,6 +1077,13 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
   return (
     <div
       ref={ref}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+          event.preventDefault(); event.stopPropagation(); onClose(); anchorRef.current?.querySelector("button")?.focus();
+        }
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
       style={{
         position: "fixed",
         top: pos.top,
@@ -1059,7 +1095,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
         border: "1px solid var(--pane-border)",
         borderRadius: 10,
         padding: 3,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+        boxShadow: "var(--shadow-md)",
         animation: "dropIn .15s ease",
         WebkitAppRegion: "no-drag",
         display: "flex",
@@ -1069,11 +1105,11 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
       <input
         autoFocus
         type="text"
-        placeholder="Name (empty = random)"
+        placeholder={t("newChat.worktreeNamePlaceholder")}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
+          if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) {
             e.preventDefault();
             onConfirm(value);
           }
@@ -1099,7 +1135,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
           color: "var(--text-muted)",
           letterSpacing: ".04em",
         }}>
-          FROM {baseBranch}
+          {t("newChat.worktreeFrom", { value: baseBranch })}
         </div>
       )}
 
@@ -1109,7 +1145,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
         onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
       >
-        {value.trim() ? `Use "${value.trim()}"` : "Use random name"}
+        {value.trim() ? t("newChat.useNamedWorktree", { value: value.trim() }) : t("newChat.useRandomWorktree")}
       </button>
 
       {active && (
@@ -1119,7 +1155,7 @@ const WorktreeInputDropdown = forwardRef(function WorktreeInputDropdown(
           onMouseEnter={(e) => { e.currentTarget.style.background = SHEET_HOVER; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
         >
-          Turn off worktree
+          {t("newChat.turnOffWorktree")}
         </button>
       )}
     </div>

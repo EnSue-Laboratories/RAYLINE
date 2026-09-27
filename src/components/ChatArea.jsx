@@ -1,3 +1,4 @@
+import { readDraft, writeDraft, clearDraft } from "../utils/composerDrafts";
 import { memo, useState, useRef, useCallback, useEffect, useMemo, useImperativeHandle } from "react";
 import { flushSync } from "react-dom";
 import { createTranslator } from "../i18n";
@@ -21,33 +22,9 @@ import TabStrip from "./TabStrip";
 import useGitStatus from "../hooks/useGitStatus";
 import { isMulticaModelId } from "../data/models";
 
-const COMPOSER_DRAFT_STORAGE_PREFIX = "rayline.composerDraft:";
 const PENDING_COMPOSER_DRAFT_SCOPE = "pending:workspace";
-
-function getComposerDraftStorageKey(scope) {
-  return scope ? `${COMPOSER_DRAFT_STORAGE_PREFIX}${scope}` : null;
-}
-
-function readComposerDraft(scope) {
-  const key = getComposerDraftStorageKey(scope);
-  if (!key || typeof window === "undefined") return "";
-  try {
-    return window.localStorage?.getItem(key) || "";
-  } catch {
-    return "";
-  }
-}
-
-function writeComposerDraft(scope, value) {
-  const key = getComposerDraftStorageKey(scope);
-  if (!key || typeof window === "undefined") return;
-  try {
-    if (value) window.localStorage?.setItem(key, value);
-    else window.localStorage?.removeItem(key);
-  } catch {
-    // Draft persistence is best-effort; keep typing responsive if storage fails.
-  }
-}
+function readComposerDraft(scope) { return readDraft(scope).text || ""; }
+function writeComposerDraft(scope, text) { writeDraft(scope, { ...readDraft(scope), text }); }
 
 function getPendingComposerDraftScope(cwd) {
   return `${PENDING_COMPOSER_DRAFT_SCOPE}:${cwd || "default"}`;
@@ -114,6 +91,7 @@ const ChatTranscript = memo(function ChatTranscript({
   if (showNewChatCard) {
     return (
       <NewChatCard
+        key={newChatDefaultCwd || "drafts"}
         defaultCwd={newChatDefaultCwd}
         defaultModel={convo?.model || defaultModel}
         defaultBranch={defaultPrBranch}
@@ -188,12 +166,16 @@ const ChatComposer = memo(function ChatComposer({
 }) {
   const [input, setInput] = useState(() => readComposerDraft(draftScope));
   const [inputFocused, setInputFocused] = useState(false);
-  const [attachments, setAttachments] = useState([]);
+  const [attachments, setAttachments] = useState(() => readDraft(draftScope).attachments || []);
   const [editingQueueId, setEditingQueueId] = useState(null);
   const [queueDraft, setQueueDraft] = useState("");
   const [selectedCmd, setSelectedCmd] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const [branchHintDismissedFor, setBranchHintDismissedFor] = useState(null);
+
+  useEffect(() => {
+    writeDraft(draftScope, input || attachments.length ? { text: input, attachments } : {});
+  }, [draftScope, input, attachments]);
 
   const inRef = useRef(null);
   const queueEditRef = useRef(null);
@@ -246,10 +228,18 @@ const ChatComposer = memo(function ChatComposer({
       setAttachments([]);
       setSelectedCmd(0);
     });
-    writeComposerDraft(draftScope, "");
+    clearDraft(draftScope);
     if (inRef.current) inRef.current.style.height = "20px";
     if (isMulticaModel && !shellMode) setBranchHintDismissedFor(convoId);
-    onSend(nextInput, nextAttachments);
+    Promise.resolve().then(() => onSend(nextInput, nextAttachments)).catch(() => {
+      // Restore a rejected send without overwriting anything typed in the meantime.
+      const current = readDraft(draftScope);
+      if (!current.text && !current.attachments?.length) {
+        writeDraft(draftScope, { text: nextInput, attachments: nextAttachments || [] });
+        setInput(nextInput);
+        setAttachments(nextAttachments || []);
+      }
+    });
   }, [attachments, canSend, convoId, draftScope, isMulticaModel, onSend, shellMode, trimmedInput]);
 
   const handleInput = (e) => {

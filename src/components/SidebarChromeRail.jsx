@@ -1,3 +1,4 @@
+import { useTranslator } from "../contexts/LocaleContext";
 import { useState } from "react";
 import { PanelLeftClose, PanelLeftOpen, Plus, Settings } from "lucide-react";
 import {
@@ -14,8 +15,7 @@ function RailButton({ label, onClick, active = false, visible = true, children }
     <button
       type="button"
       aria-label={label}
-      aria-hidden={!visible}
-      tabIndex={visible ? 0 : -1}
+      tabIndex={0}
       title={label}
       onClick={onClick}
       onMouseDownCapture={(event) => event.stopPropagation()}
@@ -60,12 +60,16 @@ function RailButton({ label, onClick, active = false, visible = true, children }
 }
 
 export default function SidebarChromeRail({ sidebarOpen, settingsOpen, controlsOnHover = false, onToggleSidebar, onNew, onOpenSettings }) {
+  const t = useTranslator();
   const [railHovered, setRailHovered] = useState(false);
-  const controlsVisible = !controlsOnHover || railHovered;
+  const [railFocused, setRailFocused] = useState(false);
+  const controlsVisible = !controlsOnHover || railHovered || railFocused;
 
   return (
     <div
-      aria-label="Window controls"
+      aria-label={t("chromeRail.controls")}
+      onFocusCapture={() => setRailFocused(true)}
+      onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setRailFocused(false); }}
       onMouseEnter={() => setRailHovered(true)}
       onMouseLeave={() => setRailHovered(false)}
       style={{
@@ -76,8 +80,8 @@ export default function SidebarChromeRail({ sidebarOpen, settingsOpen, controlsO
         width: SIDEBAR_CHROME_RAIL_WIDTH,
         height: SIDEBAR_CHROME_RAIL_HEIGHT,
         display: "flex",
-        alignItems: "right",
-        justifyContent: "right",
+        alignItems: "center",
+        justifyContent: "flex-end",
         gap: 0.1,
         pointerEvents: controlsOnHover ? "auto" : "none",
         WebkitAppRegion: "no-drag",
@@ -88,7 +92,7 @@ export default function SidebarChromeRail({ sidebarOpen, settingsOpen, controlsO
       onPointerDownCapture={(event) => event.stopPropagation()}
     >
       <RailButton
-        label={sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
+        label={sidebarOpen ? t("chromeRail.collapseSidebar") : t("chromeRail.expandSidebar")}
         onClick={onToggleSidebar}
         visible={controlsVisible}
       >
@@ -99,11 +103,11 @@ export default function SidebarChromeRail({ sidebarOpen, settingsOpen, controlsO
         )}
       </RailButton>
 
-      <RailButton label="New chat" onClick={onNew} visible={controlsVisible}>
+      <RailButton label={t("chromeRail.newChat")} onClick={onNew} visible={controlsVisible}>
         <Plus size={15} strokeWidth={1.6} />
       </RailButton>
 
-      <RailButton label={settingsOpen ? "Close settings" : "Settings"} onClick={onOpenSettings} active={settingsOpen} visible={controlsVisible}>
+      <RailButton label={settingsOpen ? t("chromeRail.closeSettings") : t("settings.title")} onClick={onOpenSettings} active={settingsOpen} visible={controlsVisible}>
         <Settings size={14} strokeWidth={1.55} />
       </RailButton>
     </div>

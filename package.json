@@ -21,7 +21,8 @@
     "lint": "eslint .",
     "verify:theme-tokens": "node scripts/verify-theme-tokens.mjs",
     "preview": "vite preview",
-    "rebuild": "electron-rebuild -f -w node-pty"
+    "rebuild": "electron-rebuild -f -w node-pty",
+    "test:ui-regressions": "node --test scripts/test-ui-regressions.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
