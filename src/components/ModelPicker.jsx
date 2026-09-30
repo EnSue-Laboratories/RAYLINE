@@ -13,9 +13,10 @@ const GUIDES = {
   claude: "https://code.claude.com/docs/en/setup",
   codex: "https://developers.openai.com/codex/cli",
   grok: "https://docs.x.ai/docs/grok-code",
+  agy: "https://antigravity.google/docs/cli",
   opencode: "https://opencode.ai/docs/cli/",
 };
-const ORDER = ["claude", "codex", "grok", "remote-claude", "remote-codex", "opencode", "multica"];
+const ORDER = ["claude", "codex", "grok", "agy", "remote-claude", "remote-codex", "opencode", "multica"];
 const EMPTY_MODELS = [];
 
 export default function ModelPicker({ value, onChange, extraModels = EMPTY_MODELS, extraError = null, extraLoading = false }) {
@@ -151,7 +152,7 @@ export default function ModelPicker({ value, onChange, extraModels = EMPTY_MODEL
           </div>
           {!query && <div style={{ flexShrink: 0, borderTop: "1px solid var(--pane-border)" }}>
             {Object.entries(GUIDES).filter(([provider]) => installed[provider] === false).map(([provider, url]) => (
-              <button type="button" key={provider} style={actionStyle} onClick={() => { window.open(url, "_blank", "noopener,noreferrer"); close(); }}>{t("models.install", { provider: provider === "codex" ? "Codex CLI" : provider === "claude" ? "Claude Code" : provider === "grok" ? "Grok" : "OpenCode" })}</button>
+              <button type="button" key={provider} style={actionStyle} onClick={() => { window.open(url, "_blank", "noopener,noreferrer"); close(); }}>{t("models.install", { provider: provider === "codex" ? "Codex CLI" : provider === "claude" ? "Claude Code" : provider === "grok" ? "Grok" : provider === "agy" ? "Antigravity" : "OpenCode" })}</button>
             ))}
             {(extraError || extraLoading) && <div role="status" style={{ padding: "6px 12px", fontSize: s(10), color: "var(--text-muted)" }}>{extraError ? t("models.agentsUnavailable") : t("models.loadingAgents")}</div>}
           </div>}

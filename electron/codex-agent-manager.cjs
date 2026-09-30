@@ -14,7 +14,7 @@ const { stageRemoteAttachments } = require("./remote-attachments.cjs");
 const { startRemoteChannel } = require("./remote-channel.cjs");
 
 const activeAgents = new Map();
-const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
+const TERMINAL_CLI_PATH = require("./runtime-env.cjs").terminalCliPath();
 const SESSION_SNAPSHOT_RETRY_DELAYS_MS = [0, 150, 500, 1200, 2500];
 const log = createLogger("codex-agent-manager");
 

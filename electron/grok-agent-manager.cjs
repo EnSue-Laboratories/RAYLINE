@@ -5,7 +5,7 @@ const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli
 const { createLogger } = require("./logger.cjs");
 
 const activeAgents = new Map();
-const TERMINAL_CLI_PATH = path.join(__dirname, "../scripts/claudi-terminal.cjs");
+const TERMINAL_CLI_PATH = require("./runtime-env.cjs").terminalCliPath();
 const log = createLogger("grok-agent-manager");
 
 let cachedGrokBin = null;
@@ -348,6 +348,7 @@ function cancelAllGrok() {
 }
 
 module.exports = {
+  buildRayLinePrompt,
   startGrokAgent,
   cancelGrokAgent,
   cancelAllGrok,

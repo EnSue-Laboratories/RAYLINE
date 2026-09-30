@@ -1,3 +1,4 @@
+const { withSystemProxy } = require("./runtime-env.cjs");
 const fs = require("fs/promises");
 const os = require("os");
 const path = require("path");
@@ -32,17 +33,33 @@ async function readGrokCatalog() {
   });
 }
 
+function parseAgyCatalog(stdout) {
+  return [...new Map(String(stdout).split(/\r?\n/).flatMap((line) => {
+    const match = /^([a-z0-9][a-z0-9._-]*)\t(.+)$/i.exec(line.trim());
+    return match ? [[match[1], { slug: match[1], name: match[2].trim().slice(0, 160) }]] : [];
+  })).values()];
+}
+async function readAgyCatalog() {
+  const bin = resolveCliBin("agy", { envVarName: "AGY_BIN" });
+  if (!bin) return [];
+  return new Promise((resolve) => {
+    execFileCli(bin, ["models"], { timeout: 8000, maxBuffer: 256 * 1024, env: withSystemProxy({ ...process.env, PATH: buildSpawnPath(), NO_COLOR: "1" }), windowsHide: true }, (error, stdout) => {
+      resolve(error ? [] : parseAgyCatalog(stdout));
+    });
+  });
+}
+
 let pending;
 let cached;
 let checkedAt = 0;
 async function getModelCatalog() {
   if (pending) return pending;
   if (cached && Date.now() - checkedAt < 60_000) return cached;
-  pending = Promise.all([readCodexCatalog(), readGrokCatalog()]).then(([codex, grok]) => {
-    cached = { codex, grok };
+  pending = Promise.all([readCodexCatalog(), readGrokCatalog(), readAgyCatalog()]).then(([codex, grok, agy]) => {
+    cached = { codex, grok, agy };
     checkedAt = Date.now();
     return cached;
   }).finally(() => { pending = null; });
   return pending;
 }
-module.exports = { getModelCatalog, readCodexCatalog };
+module.exports = { getModelCatalog, readCodexCatalog, readAgyCatalog, parseAgyCatalog };

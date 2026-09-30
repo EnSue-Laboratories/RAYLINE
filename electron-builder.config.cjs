@@ -97,10 +97,12 @@ module.exports = {
     target: ["AppImage", "deb", "rpm", "tar.gz"],
   },
   asarUnpack: [
+    "scripts/claudi-terminal.cjs",
+    "node_modules/ws/**",
     "electron/shell-init/**",
     "electron/vendor/**",
   ],
-  files: ["dist/**/*", "electron/**/*", "public/**/*"],
+  files: ["dist/**/*", "electron/**/*", "public/**/*", "scripts/claudi-terminal.cjs"],
   directories: {
     output: "release",
   },

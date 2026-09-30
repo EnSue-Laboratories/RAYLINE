@@ -81,7 +81,7 @@ function getOpenCodeRuntimeConfig(model) {
 }
 
 function getProviderUpstreamRuntimeConfig(provider, getActiveConfig) {
-  if (provider === "multica" || provider === "opencode") return undefined;
+  if (provider === "multica" || provider === "opencode" || provider === "agy") return undefined;
   return getActiveConfig?.(getRuntimeProviderForProvider(provider)) || undefined;
 }
 
@@ -1464,8 +1464,8 @@ export default function App() {
 
   const refreshCliInstalled = useCallback(async (options = {}) => {
     if (!window.api?.checkCliInstalled) {
-      setCliInstalled({ claude: true, codex: true, opencode: false, grok: false });
-      return { claude: true, codex: true, opencode: false, grok: false };
+      setCliInstalled({ claude: true, codex: true, opencode: false, grok: false, agy: false });
+      return { claude: true, codex: true, opencode: false, grok: false, agy: false };
     }
     setCliChecking(true);
     try {
@@ -1475,11 +1475,12 @@ export default function App() {
         codex: Boolean(result?.codex),
         opencode: Boolean(result?.opencode),
         grok: Boolean(result?.grok),
+        agy: Boolean(result?.agy),
       };
       setCliInstalled(next);
       return next;
     } catch {
-      const fallback = { claude: true, codex: true, opencode: false, grok: false };
+      const fallback = { claude: true, codex: true, opencode: false, grok: false, agy: false };
       setCliInstalled(fallback);
       return fallback;
     } finally {
@@ -1491,6 +1492,7 @@ export default function App() {
     const claude = cliInstalled?.claude === true;
     const codex = cliInstalled?.codex === true;
     const grok = cliInstalled?.grok === true;
+    const agy = cliInstalled?.agy === true;
     const opencodeInstalled = cliInstalled?.opencode === true || openCodeStatus?.installed === true;
     const opencode = opencodeInstalled && openCodeModels.length > 0;
     const multica = multicaModels.length > 0;
@@ -1499,11 +1501,12 @@ export default function App() {
       claude,
       codex,
       grok,
+      agy,
       opencode,
       multica,
       remote,
       opencodeInstalled,
-      any: claude || codex || grok || opencode || multica || remote,
+      any: claude || codex || grok || agy || opencode || multica || remote,
     };
   }, [cliInstalled, multicaModels.length, openCodeModels.length, openCodeStatus?.installed, remoteModels.length]);
 
@@ -1514,6 +1517,7 @@ export default function App() {
     if (runtimeProvider === "claude") return runtimeAvailability.claude;
     if (runtimeProvider === "codex") return runtimeAvailability.codex;
     if (runtimeProvider === "grok") return runtimeAvailability.grok;
+    if (runtimeProvider === "agy") return runtimeAvailability.agy;
     if (runtimeProvider === "opencode") return runtimeAvailability.opencode;
     if (runtimeProvider === "multica") return runtimeAvailability.multica;
     return true;
@@ -1555,6 +1559,7 @@ export default function App() {
       claude: runtimeSetupPreview ? false : runtimeAvailability.claude,
       codex: runtimeSetupPreview ? false : runtimeAvailability.codex,
       grok: runtimeSetupPreview ? false : runtimeAvailability.grok,
+      agy: runtimeSetupPreview ? false : runtimeAvailability.agy,
       opencode: runtimeSetupPreview ? false : runtimeAvailability.opencodeInstalled,
     },
     opencodeConfigured: runtimeSetupPreview ? false : openCodeModels.length > 0,
@@ -2604,6 +2609,7 @@ export default function App() {
     const nextClaudeSessionId = data._claudeSessionId || null;
     const nextOpenCodeSessionId = data._opencodeSessionId || null;
     const nextGrokSessionId = data._grokSessionId || null;
+    const nextAgySessionId = data._agySessionId || null;
     const getCaptureProvider = (runtimeProvider) => (
       [activeSession?.provider, normalizedConvo.lastProvider]
         .find((provider) => provider && getRuntimeProviderForProvider(provider) === runtimeProvider) ||
@@ -2620,7 +2626,8 @@ export default function App() {
     const hasNewGrokSessionId =
       nextGrokSessionId && normalizedConvo.providerSessions?.grok !== nextGrokSessionId;
 
-    if (!hasNewCodexThreadId && !hasNewClaudeSessionId && !hasNewOpenCodeSessionId && !hasNewGrokSessionId) return;
+    const hasNewAgySessionId = nextAgySessionId && normalizedConvo.providerSessions?.agy !== nextAgySessionId;
+    if (!hasNewCodexThreadId && !hasNewClaudeSessionId && !hasNewOpenCodeSessionId && !hasNewGrokSessionId && !hasNewAgySessionId) return;
 
     logSessionState("captureProviderSession", {
       conversationId: active,
@@ -2735,6 +2742,30 @@ export default function App() {
               activate: true,
               preferPendingActive: true,
               lastProvider: next.lastProvider || "grok",
+            }
+          );
+        }
+        if (hasNewAgySessionId) {
+          next = upsertConversationSession(
+            next,
+            {
+              id:
+                activeSession?.provider === "agy" && !activeSession.nativeSessionId
+                  ? activeSession.id
+                  : undefined,
+              provider: "agy",
+              nativeSessionId: nextAgySessionId,
+              model: next.model,
+              syncedThroughMessageCount: Math.max(
+                activeSession?.syncedThroughMessageCount || 0,
+                next.archivedMessages?.length || 0
+              ),
+              origin: "capture",
+            },
+            {
+              activate: true,
+              preferPendingActive: true,
+              lastProvider: next.lastProvider || "agy",
             }
           );
         }

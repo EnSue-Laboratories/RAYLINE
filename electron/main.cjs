@@ -1,6 +1,7 @@
 const { getModelCatalog } = require("./model-catalog.cjs");
 const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell, clipboard } = require("electron");
 const { initAutoUpdater, handleCheckForUpdates, handleDownloadUpdate, handleInstallUpdate } = require("./auto-updater.cjs");
+const { startAgyAgent, cancelAgyAgent, cancelAllAgy, resolveAgyBin } = require("./agy-agent-manager.cjs");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
@@ -619,8 +620,9 @@ app.whenReady().then(() => {
     const mcpConfig = {
       mcpServers: {
         "terminal-sessions": {
-          command: "node",
+          command: app.isPackaged ? process.execPath : "node",
           args: [path.join(__dirname, "mcp-terminal-server.cjs"), String(port)],
+          ...(app.isPackaged ? { env: { ELECTRON_RUN_AS_NODE: "1" } } : {}),
         },
       },
     };
@@ -889,6 +891,8 @@ ipcMain.on("agent-start", (event, opts) => {
     watchAgentLaunch(() => startCodexAgent(opts, event.sender), event.sender, opts, "codex");
   } else if (runtimeProvider === "opencode") {
     watchAgentLaunch(() => startOpenCodeAgent(opts, event.sender), event.sender, opts, "opencode");
+  } else if (runtimeProvider === "agy") {
+    watchAgentLaunch(() => startAgyAgent(opts, event.sender), event.sender, opts, "agy");
   } else if (runtimeProvider === "grok") {
     watchAgentLaunch(() => startGrokAgent(opts, event.sender), event.sender, opts, "grok");
   } else {
@@ -901,6 +905,7 @@ ipcMain.on("agent-cancel", (_event, { conversationId }) => {
   cancelCodexAgent(conversationId);
   cancelOpenCodeAgent(conversationId);
   cancelGrokAgent(conversationId);
+  cancelAgyAgent(conversationId);
   cancelMulticaAgent(conversationId).catch((err) => {
     console.error("[multica] cancel failed", { conversationId, error: err?.message || String(err) });
   });
@@ -922,6 +927,8 @@ ipcMain.on("agent-edit-resend", (event, opts) => {
       opts,
       "opencode"
     );
+  } else if (runtimeProvider === "agy") {
+    watchAgentLaunch(() => startAgyAgent(opts, event.sender), event.sender, opts, "agy");
   } else if (runtimeProvider === "grok") {
     watchAgentLaunch(
       () => startGrokAgent({ ...opts, resumeSessionId: opts.resumeSessionId }, event.sender),
@@ -1387,6 +1394,7 @@ function getCliInstalledSnapshot({ force = false } = {}) {
     codex: Boolean(resolveCliBin("codex", { envVarName: "CODEX_BIN" })),
     opencode: Boolean(resolveOpenCodeBin()),
     grok: Boolean(resolveGrokBin()),
+    agy: Boolean(resolveAgyBin()),
   };
   cliInstallCheckCacheAt = Date.now();
   return cliInstallCheckCache;
@@ -3111,5 +3119,6 @@ app.on("before-quit", () => {
   cancelAllCodex();
   cancelAllOpenCode();
   cancelAllGrok();
+  cancelAllAgy();
   terminalManager.stopServer();
 });

@@ -1,7 +1,22 @@
 {
   "source": "https://github.com/openai/codex/blob/694d8d45bd3d440fa4f4cbf22667ac6c17a13758/codex-rs/models-manager/models.json",
-  "checkedAt": "2026-09-27",
+  "checkedAt": "2026-09-30",
   "models": [
+    {
+      "slug": "gpt-6.1-sol",
+      "display_name": "GPT-6.1 Sol",
+      "context_window": 1050000,
+      "supported_reasoning_levels": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "default_reasoning_level": "medium",
+      "verified_reasoning": true,
+      "source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol"
+    },
     {
       "slug": "gpt-6-astra",
       "display_name": "GPT-6-Astra",

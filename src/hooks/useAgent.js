@@ -303,11 +303,11 @@ function extractOpenCodeSessionId(event) {
 }
 
 function getProviderEventSessionKey(event) {
-  return event?.provider === "grok" ? "_grokSessionId" : "_opencodeSessionId";
+  return event?.provider === "agy" ? "_agySessionId" : event?.provider === "grok" ? "_grokSessionId" : "_opencodeSessionId";
 }
 
 function getProviderEventLabel(event) {
-  return event?.provider === "grok" ? "Grok" : "OpenCode";
+  return event?.provider === "agy" ? "Antigravity" : event?.provider === "grok" ? "Grok" : "OpenCode";
 }
 
 function extractOpenCodeTool(event) {
@@ -914,7 +914,7 @@ function applyStreamEventToConversations(prev, conversationId, event) {
       msgs[msgs.length - 1] = { ...am, parts, isStreaming: true };
       lastMsg = msgs[msgs.length - 1];
     } else if (event.type === "reasoning") {
-      if (event.provider === "grok") {
+      if (event.provider === "grok" || event.provider === "agy") {
         const text = extractOpenCodeReasoningText(event);
         if (text) {
           const am = ensureAssistant();
@@ -933,7 +933,7 @@ function applyStreamEventToConversations(prev, conversationId, event) {
         }
       }
     } else if (event.type === "text" || event.type === "opencode_stdout") {
-      if (event.provider === "grok") {
+      if (event.provider === "grok" || event.provider === "agy") {
         const text = extractOpenCodeText(event);
         if (text) {
           const am = ensureAssistant();
@@ -1316,8 +1316,8 @@ export default function useAgent() {
           codexThreadId =
             convo._codexThreadId ||
             (provider === "codex" && typeof threadId === "string" && threadId ? threadId : null);
-          const providerSessionPatch = provider === "grok" && typeof threadId === "string" && threadId
-            ? { _grokSessionId: threadId }
+          const providerSessionPatch = (provider === "grok" || provider === "agy") && typeof threadId === "string" && threadId
+            ? { [provider === "agy" ? "_agySessionId" : "_grokSessionId"]: threadId }
             : provider === "opencode" && typeof threadId === "string" && threadId
               ? { _opencodeSessionId: threadId }
               : {};

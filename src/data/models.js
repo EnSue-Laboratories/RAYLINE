@@ -3,7 +3,7 @@ import codexCatalog from "./codexModelCatalog.json" with { type: "json" };
 export const DEFAULT_MODEL_ID = "sonnet";
 const CODEX_CONTEXT_WINDOW = 272_000;
 const GROK_CONTEXT_WINDOW = 500_000;
-const LEGACY_MODEL_IDS = {};
+const LEGACY_MODEL_IDS = { "codex-model:gpt-6.1-sol:none": "codex-model:gpt-6.1-sol:medium" };
 
 export function codexModelId(slug, effort) {
   const known = /^gpt-(5\.[456]|6)-(astra|sol|luna|terra)$/.exec(slug);
@@ -17,14 +17,20 @@ export function codexModelId(slug, effort) {
 export function buildCodexModels(records = []) {
   return records.flatMap((record) => {
     if (!record?.slug || record.visibility === "hide") return [];
-    const efforts = (record.supported_reasoning_levels || ["medium"])
+    const known = codexCatalog.models.find((model) => model.slug === record.slug);
+    const advertised = record.supported_reasoning_levels?.map((level) => typeof level === "string" ? level : level?.effort);
+    // Some compatibility catalogs expose only a generic "none" placeholder
+    // for newly released models. Do not let it erase verified reasoning levels.
+    const reasoning = known?.verified_reasoning && advertised?.every((level) => level === "none") ? known : record;
+    const displayName = record.display_name && record.display_name !== record.slug ? record.display_name : known?.display_name || record.slug;
+    const efforts = (reasoning.supported_reasoning_levels || ["medium"])
       .map((level) => typeof level === "string" ? level : level?.effort)
       .filter((level) => ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(level));
-    const defaultEffort = record.default_reasoning_level || "medium";
+    const defaultEffort = reasoning.default_reasoning_level || "medium";
     return [...new Set(efforts)].sort((a, b) => (a === defaultEffort ? -1 : b === defaultEffort ? 1 : 0)).map((effort) => ({
       id: codexModelId(record.slug, effort),
-      name: record.display_name || record.slug,
-      tag: record.display_name || record.slug,
+      name: displayName,
+      tag: displayName,
       cliFlag: record.slug,
       provider: "codex",
       effort,
@@ -38,7 +44,15 @@ const grokModel = (id, name, cliFlag, extra = {}) => ({
   contextWindow: GROK_CONTEXT_WINDOW, ...extra,
 });
 
+export function buildAgyModels(records = []) {
+  return records.filter((record) => record && /^[a-z0-9][a-z0-9._-]*$/i.test(record.slug)).map((record) => ({
+    id: `agy:${record.slug}`, name: record.name || record.slug, tag: `AGY ${record.name || record.slug}`,
+    cliFlag: record.slug, provider: "agy", contextWindow: null,
+  }));
+}
+
 export const MODELS = [
+  { id: "agy:default", name: "Antigravity (CLI default)", tag: "AGY", cliFlag: "", provider: "agy", contextWindow: null },
   // CLI aliases follow the installed provider/account rather than pinning old versions.
   { id: "opus", name: "Claude Opus", tag: "OPUS", cliFlag: "opus", provider: "claude", contextWindow: 1_000_000 },
   { id: "opus-1m", name: "Claude Opus (1M)", tag: "OPUS 1M", cliFlag: "opus[1m]", provider: "claude", contextWindow: 1_000_000 },
@@ -71,7 +85,7 @@ export function buildRuntimeModels(catalog = {}) {
     const known = MODELS.find((m) => m.provider === "grok" && m.cliFlag === slug && !m.grokContinue);
     return known ? { ...known, legacy: false } : grokModel(slug, slug, slug, { contextWindow: null });
   });
-  return [...codex, ...grok].map((model) => ({ ...model, runtimeCatalog: true }));
+  return [...codex, ...grok, ...buildAgyModels(catalog.agy)].map((model) => ({ ...model, runtimeCatalog: true }));
 }
 
 export const normalizeModelId = (id) => LEGACY_MODEL_IDS[id] || id;
@@ -187,6 +201,10 @@ export function getMOrMulticaFallback(id, extraModels = []) {
       const cliFlag = decodeURIComponent(encoded);
       return { id, name: cliFlag, tag: cliFlag, cliFlag, effort, provider: "codex", contextWindow: CODEX_CONTEXT_WINDOW };
     } catch { /* Use the normal fallback for malformed historical IDs. */ }
+  }
+  if (typeof id === "string" && /^agy:[a-z0-9][a-z0-9._-]*$/i.test(id)) {
+    const slug = id.slice(4);
+    return { id, name: slug, tag: `AGY ${slug}`, provider: "agy", cliFlag: slug === "default" ? "" : slug, contextWindow: null };
   }
   if (isGrokModelId(id)) {
     return { id, name: "Grok", tag: "GROK", provider: "grok", cliFlag: id, contextWindow: null };
