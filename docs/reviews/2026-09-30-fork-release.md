@@ -37,6 +37,8 @@ Packaged Electron / Playwright checks used real IPC and isolated profiles:
 - The packaged native node-pty module creates a real shell, accepts input and returns its output.
 - No renderer page errors observed during these checks.
 - `/Applications/RayLine.app` launches successfully. A private copy of the existing six-conversation profile loads; four visible conversations were switched, with the slowest observed click taking 966 ms. No private content is included in this report or release assets.
+- A minimal Finder-style environment (`PATH=/usr/bin:/bin:/usr/sbin:/sbin`) starts the installed app and discovers the installed Claude, Codex and Grok CLIs. No inherited developer-shell PATH is needed.
+- A second packaged launch exits normally and focuses the existing responsive process.
 - Two development-origin draft keys and the theme setting were migrated into a separate file-origin test profile and read successfully by the installed app.
 - `codesign --verify --deep --strict` passes on the built, installed and DMG-contained application. `hdiutil verify` passes. The installed and DMG-contained `app.asar` hashes match.
 
@@ -47,4 +49,11 @@ The package was built with the installed Electron 41.2.0 distribution and the sy
 
 ## Local handoff
 
-The previous application and a pre-release state snapshot are retained locally. The final transition waits for the agent running this conversation to finish before closing the development app, migrating composer drafts/theme and opening the installed application. This avoids interrupting the delivery conversation or having development and packaged applications write the same profile simultaneously. Local handoff receipts and private backups stay outside the repository.
+The previous application and a pre-release state snapshot are retained locally. The desktop `RayLine.app` shortcut and legacy `RayLine Dev.command` both point at `/Applications/RayLine.app`; neither starts Vite. The final transition waits for the agent running this conversation to finish before closing the development app, migrating composer drafts/theme and opening the installed application. This avoids interrupting the delivery conversation or having development and packaged applications write the same profile simultaneously. Local handoff receipts and private backups stay outside the repository.
+
+## Published delivery
+
+- Fork release: https://github.com/vickioo/RAYLINE/releases/tag/v0.1.9
+- Upstream integration request: https://github.com/EnSue-Laboratories/RAYLINE/pull/230
+- GitHub reports the uploaded DMG digest as the same SHA-256 recorded above.
+- The fork packaging workflow was paused for the publication event and restored immediately afterwards, preventing a second CI build from replacing the locally verified assets.
