@@ -16,9 +16,35 @@ npm run test:ui-regressions
 npm run test:state-store
 npm run verify:theme-tokens
 npm run build
-CI=true CSC_IDENTITY_AUTO_DISCOVERY=false RAYLINE_RELEASE_REPOSITORY=vickioo/RAYLINE npx electron-builder --config electron-builder.config.cjs --mac dmg --arm64 --publish never
+CI=true CSC_IDENTITY_AUTO_DISCOVERY=false RAYLINE_RELEASE_REPOSITORY=vickioo/RAYLINE npx electron-builder --config electron-builder.config.cjs --config.electronDist=node_modules/electron/dist --config.mac.identity=- --mac --dir --arm64 --publish never
+mkdir -p release/dmg-local
+ditto release/mac-arm64/RayLine.app release/dmg-local/RayLine.app
+ln -sfn /Applications release/dmg-local/Applications
+hdiutil create -volname "RayLine 0.1.9" -srcfolder release/dmg-local -ov -format UDZO release/RayLine-0.1.9-arm64.dmg
 ```
 
 ## Validation status
 
-Source regression tests (8), persistence tests (3), theme-token verification and changed-file ESLint passed. Installed-package testing and local handoff evidence will be appended after the package is built and inspected.
+Source regression tests (8), persistence tests (3), theme-token verification and changed-file ESLint passed. The shipped application is built from `5663a33edd26d28e63b020531713c8cd17c5e2c0`.
+
+Packaged Electron / Playwright checks used real IPC and isolated profiles:
+
+- Type `grok47`, filter to Grok 4.7, and select with Enter.
+- Conversation draft survives Settings, reload and switching conversations.
+- Project-row new chat preselects the project; Escape closes the model menu without cancelling the form; Back/reopen restores the new-chat draft.
+- Chinese/light and English/dark settings screenshots inspected, including version, commit and fork identity.
+- A 1,080,000-character tool result expands incrementally in 102 ms in the observed run. Persisted content compares exactly to the fixture.
+- The packaged native node-pty module creates a real shell, accepts input and returns its output.
+- No renderer page errors observed during these checks.
+- `/Applications/RayLine.app` launches successfully. A private copy of the existing six-conversation profile loads; four visible conversations were switched, with the slowest observed click taking 966 ms. No private content is included in this report or release assets.
+- Two development-origin draft keys and the theme setting were migrated into a separate file-origin test profile and read successfully by the installed app.
+- `codesign --verify --deep --strict` passes on the built, installed and DMG-contained application. `hdiutil verify` passes. The installed and DMG-contained `app.asar` hashes match.
+
+Artifact: `RayLine-0.1.9-arm64.dmg` (183,443,632 bytes).
+SHA-256: `b4ccf5e730d361a89ce6280eda303c4400cf069ccd2920ab4b91bdbfb7e624ea`.
+
+The package was built with the installed Electron 41.2.0 distribution and the system `hdiutil`, after GitHub binary downloads failed. It has an ad-hoc signature and is not Apple-notarized. This validation covers Apple Silicon macOS; paid provider requests, Windows/Linux packages and live SSH runs are outside this release verification.
+
+## Local handoff
+
+The previous application and a pre-release state snapshot are retained locally. The final transition waits for the agent running this conversation to finish before closing the development app, migrating composer drafts/theme and opening the installed application. This avoids interrupting the delivery conversation or having development and packaged applications write the same profile simultaneously. Local handoff receipts and private backups stay outside the repository.
