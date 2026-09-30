@@ -254,9 +254,10 @@ function appendCodexMcpOverrides(args, mcpServers) {
     }
 
     if (config.env && typeof config.env === "object") {
-      const envOverride = `mcp_servers."${name}".env=${JSON.stringify(config.env)}`;
+      const entries = Object.entries(config.env).map(([key, value]) => `${JSON.stringify(key)} = ${JSON.stringify(String(value))}`);
+      const envOverride = `mcp_servers."${name}".env={${entries.join(", ")}}`;
       args.push("-c", envOverride);
-      log("Codex MCP override:", envOverride);
+      log("Codex MCP environment keys:", Object.keys(config.env));
     }
 
     if (typeof config.cwd === "string" && config.cwd) {
