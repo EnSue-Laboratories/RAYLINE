@@ -2,7 +2,7 @@ import { useRef, useEffect } from "react";
 import useWindowActivity from "../hooks/useWindowActivity";
 
 const T_PER_MS = 0.00018;
-const FOCUSED_FRAME_MS = 1000 / 60;
+const FOCUSED_FRAME_MS = 1000 / 24;
 const BACKGROUND_FRAME_MS = 1000 / 12;
 const REDUCED_MOTION_FRAME_MS = 1000 / 8;
 

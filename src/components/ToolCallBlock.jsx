@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronRight, ChevronDown, Terminal, FileText, Pencil, Search, Code, Loader2 } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+
+import { useTranslator } from "../contexts/LocaleContext";
 
 const BODY_PREVIEW_LIMIT = 2400;
 
@@ -48,13 +50,13 @@ function getPreview(tool) {
   const args = tool.args;
   if (!args || typeof args !== "object") return null;
   if (tool.name === "Bash") {
-    let cmd = args.command?.replace(/\n/g, " ") || "";
+    let cmd = args.command?.slice(0, 1024).replace(/\n/g, " ") || "";
     // Replace absolute/home paths with just the binary name
     cmd = cmd.replace(/(?:^|\s)[~/][\w.~/:-]+\/([\w.-]+)/g, (_, bin) => " " + bin);
     return truncate(redactSensitiveText(cmd.trim()), 30);
   }
   if (args.command) {
-    return truncate(redactSensitiveText(args.command.replace(/\s+/g, " ").trim()), 48);
+    return truncate(redactSensitiveText(args.command.slice(0, 1024).replace(/\s+/g, " ").trim()), 48);
   }
   if (tool.name === "Read") return args.file_path?.split("/").pop();
   if (tool.name === "Edit") return args.file_path?.split("/").pop();
@@ -73,18 +75,28 @@ function getPreview(tool) {
 
 function serializeValue(value) {
   if (value == null) return null;
-  return redactSensitiveText(typeof value === "string" ? value : JSON.stringify(value, null, 2));
+  let raw;
+  if (typeof value === "string") {
+    raw = value;
+  } else {
+    try {
+      raw = JSON.stringify(value);
+    } catch {
+      raw = String(value);
+    }
+  }
+  return raw || null;
 }
 
 function ToolBody({ label, value, maxHeight, fontScale }) {
-  const [showFull, setShowFull] = useState(false);
-  const serialized = serializeValue(value);
+  const t = useTranslator();
+  const [visibleLimit, setVisibleLimit] = useState(BODY_PREVIEW_LIMIT);
+  const serialized = useMemo(() => serializeValue(value), [value]);
+  const displayValue = useMemo(() => redactSensitiveText(serialized?.slice(0, visibleLimit)), [serialized, visibleLimit]);
   if (!serialized) return null;
 
   const isTrimmed = serialized.length > BODY_PREVIEW_LIMIT;
-  const displayValue = !showFull && isTrimmed
-    ? `${serialized.slice(0, BODY_PREVIEW_LIMIT)}\n\n... [truncated ${serialized.length - BODY_PREVIEW_LIMIT} chars]`
-    : serialized;
+  const hasMore = serialized.length > visibleLimit;
 
   return (
     <div style={{ marginBottom: label === "ARGS" ? 8 : 0 }}>
@@ -96,10 +108,10 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
         justifyContent: "space-between",
         gap: 8,
       }}>
-        <span>{label}</span>
+        <span>{t(label === "ARGS" ? "tool.arguments" : "tool.result")}</span>
         {isTrimmed && (
           <button
-            onClick={() => setShowFull((prev) => !prev)}
+            onClick={() => setVisibleLimit((prev) => hasMore ? prev + BODY_PREVIEW_LIMIT * 8 : BODY_PREVIEW_LIMIT)}
             style={{
               border: "none",
               background: "none",
@@ -110,7 +122,7 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
               padding: 0,
             }}
           >
-            {showFull ? "show less" : "show full"}
+            {t(hasMore ? "tool.showMore" : "tool.showLess")}
           </button>
         )}
       </div>
@@ -129,12 +141,14 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
         overflow: "auto",
       }}>
         {displayValue}
+        {hasMore && `\n\n${t("tool.remaining", { count: serialized.length - visibleLimit })}`}
       </pre>
     </div>
   );
 }
 
 export default function ToolCallBlock({ tool }) {
+  const t = useTranslator();
   const [expanded, setExpanded] = useState(false);
   const s = useFontScale();
   const Icon = TOOL_ICONS[tool.name] || Code;
@@ -197,7 +211,7 @@ export default function ToolCallBlock({ tool }) {
             <Loader2 size={10} strokeWidth={2} style={{ color: "var(--text-muted)", animation: "spin 1s linear infinite" }} />
           )}
           {tool.status === "done" && (
-            <span style={{ color: "var(--text-disabled)", fontSize: s(10) }}>done</span>
+            <span style={{ color: "var(--text-disabled)", fontSize: s(10) }}>{t("tool.done")}</span>
           )}
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>

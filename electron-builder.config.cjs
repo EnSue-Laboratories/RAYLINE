@@ -1,3 +1,8 @@
+const { execFileSync } = require("node:child_process");
+const releaseRepository = process.env.RAYLINE_RELEASE_REPOSITORY || process.env.GITHUB_REPOSITORY || "EnSue-Laboratories/RAYLINE";
+if (!/^[\w.-]+\/[\w.-]+$/.test(releaseRepository)) throw new Error("Invalid release repository");
+const [releaseOwner, releaseRepo] = releaseRepository.split("/");
+const buildCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: __dirname, encoding: "utf8" }).trim();
 const isCi = String(process.env.CI || "").toLowerCase() === "true";
 
 function normalizeMacIdentity(identity) {
@@ -44,10 +49,13 @@ if (enableMacCodesign) {
 module.exports = {
   appId: "com.ensue.rayline",
   productName: "RayLine",
+  extraMetadata: {
+    raylineBuild: { commit: buildCommit, repository: releaseRepository },
+  },
   publish: {
     provider: "github",
-    owner: "EnSue-Laboratories",
-    repo: "RAYLINE",
+    owner: releaseOwner,
+    repo: releaseRepo,
     releaseType: "release",
   },
   win: {

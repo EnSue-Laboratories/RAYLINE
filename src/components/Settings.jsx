@@ -659,15 +659,16 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
 
   // ── Auto-updater state ──────────────────────────────────────────────────
   const [appVersion, setAppVersion] = useState(null);
+  const [appBuild, setAppBuild] = useState(null);
   const [updaterPhase, setUpdaterPhase] = useState("idle"); // idle|checking|available|not-available|downloading|ready|error
   const [updateVersion, setUpdateVersion] = useState(null);
   const [downloadPct, setDownloadPct] = useState(0);
   const [updateError, setUpdateError] = useState(null);
 
   useEffect(() => {
-    if (!showUpdaterSettings) return;
     window.api?.getAppVersion?.().then(setAppVersion).catch(() => {});
-  }, [showUpdaterSettings]);
+    window.api?.getAppBuild?.().then(setAppBuild).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!showUpdaterSettings) return;
@@ -761,6 +762,13 @@ export default function Settings({ wallpaper, onWallpaperChange, appearance, onA
         }}
       >
         <div style={{ width: "100%", maxWidth: 520, margin: "0 auto" }}>
+          {appVersion && (
+            <div data-testid="app-build" style={{ marginBottom: 20, color: "var(--text-muted)", fontSize: s(11), fontFamily: "var(--font-mono)" }}>
+              {t("settings.currentVersion")} v{appVersion}
+              {appBuild?.commit && ` · ${appBuild.commit.slice(0, 7)}`}
+              {appBuild?.repository && <div style={{ marginTop: 4 }}>{appBuild.repository}</div>}
+            </div>
+          )}
           {/* APPEARANCE section label */}
           <div
             style={{

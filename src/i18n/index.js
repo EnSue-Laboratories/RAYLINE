@@ -2,6 +2,13 @@ const DEFAULT_LOCALE = "en-US";
 
 const STRINGS = {
   "en-US": {
+    "tool.showMore": "show more",
+    "tool.showLess": "show less",
+    "tool.arguments": "ARGS",
+    "tool.result": "RESULT",
+    "tool.remaining": "… [{count} more chars]",
+    "tool.done": "done",
+
     "projectGroup.toggle": "Toggle project {project}",
     "chromeRail.controls": "Window controls",
     "chromeRail.closeSettings": "Close settings",
@@ -537,6 +544,13 @@ const STRINGS = {
     "sidebar.running": "RUNNING",
   },
   "zh-CN": {
+    "tool.showMore": "展开更多",
+    "tool.showLess": "收起",
+    "tool.arguments": "参数",
+    "tool.result": "结果",
+    "tool.remaining": "… [还有 {count} 个字符]",
+    "tool.done": "完成",
+
     "projectGroup.toggle": "展开或收起项目 {project}",
     "chromeRail.controls": "窗口控制",
     "chromeRail.closeSettings": "关闭设置",

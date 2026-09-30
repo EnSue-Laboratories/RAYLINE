@@ -18,7 +18,7 @@ ARCH.md
 
 # Local generated artifacts and UI verification
 outputs/
-output/playwright/
+output/
 .playwright-cli/
 
 # Dependency directory may be a symlink in review worktrees.

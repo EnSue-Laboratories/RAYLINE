@@ -42,6 +42,10 @@ const { createLogger, isTruthyFlag, isVerboseLoggingEnabled } = require("./logge
 const { patchClaudeSettingsWin32, patchClaudeConfigWin32, cleanCodexProviderKey, normalizeProviderUpstreamConfig } = require("./provider-upstreams.cjs");
 const { normalizeRemoteRuntime, spawnRemoteCommand } = require("./remote-runtime.cjs");
 
+// Explicit profile override supports safe packaged smoke tests and separate dev profiles.
+if (process.env.RAYLINE_USER_DATA_DIR) {
+  app.setPath("userData", path.resolve(process.env.RAYLINE_USER_DATA_DIR));
+}
 const isDev = !app.isPackaged;
 const isMac = process.platform === "darwin";
 const isWindows = process.platform === "win32";
@@ -81,8 +85,16 @@ if (isDev && isMac) {
   } catch {}
 }
 
+if (app.isPackaged && !app.requestSingleInstanceLock()) app.exit(0);
+
 let mainWindow;
 let pmWindow;
+app.on("second-instance", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+});
 let terminalWindow;
 let terminalWindowRevealTimer = null;
 let pendingPreferredTerminalSessionName = null;
@@ -1012,6 +1024,8 @@ ipcMain.handle("move-session", async (_event, sessionId, newCwd) => {
 
 // IPC: file-based state persistence (survives app name changes)
 const stateFilePath = path.join(app.getPath("userData"), "claudi-state.json");
+const { createStateStore } = require("./state-store.cjs");
+const stateStore = createStateStore(stateFilePath);
 
 function rememberPersistedStateSnapshot(state) {
   latestPersistedState = state && typeof state === "object" ? state : null;
@@ -1020,7 +1034,7 @@ function rememberPersistedStateSnapshot(state) {
   }
 }
 
-function persistStateToDisk(state) {
+function persistStateToDisk(state, sync = true) {
   try {
     rememberTerminalSurfacePreference(state);
     const merged = normalizeStateImagesForPersist({ ...state });
@@ -1028,8 +1042,11 @@ function persistStateToDisk(state) {
       merged.pmRepos = preservedPmRepos;
     }
     rememberPersistedStateSnapshot(merged);
-    fs.writeFileSync(stateFilePath, JSON.stringify(merged, null, 2));
-    return true;
+    if (sync) return stateStore.saveSync(merged);
+    return stateStore.save(merged).catch((error) => {
+      console.error("Failed to save state:", error);
+      return false;
+    });
   } catch (e) {
     console.error("Failed to save state:", e);
     return false;
@@ -1037,7 +1054,7 @@ function persistStateToDisk(state) {
 }
 
 ipcMain.handle("save-state", async (_event, state) => {
-  return persistStateToDisk(state);
+  return persistStateToDisk(state, false);
 });
 
 // ── Auto-updater ────────────────────────────────────────────────────────────
@@ -1045,6 +1062,10 @@ ipcMain.handle("updater-check",    () => handleCheckForUpdates());
 ipcMain.handle("updater-download", () => handleDownloadUpdate());
 ipcMain.handle("updater-install",  () => handleInstallUpdate());
 ipcMain.handle("get-app-version",  () => app.getVersion());
+ipcMain.handle("get-app-build", () => {
+  const metadata = require("../package.json").raylineBuild || {};
+  return { version: app.getVersion(), packaged: app.isPackaged, ...metadata };
+});
 
 ipcMain.on("save-state-sync", (event, state) => {
   event.returnValue = persistStateToDisk(state);
@@ -1056,7 +1077,7 @@ ipcMain.handle("load-state", async () => {
       const rawState = JSON.parse(fs.readFileSync(stateFilePath, "utf-8"));
       const state = normalizeStateImagesForPersist(rawState);
       if (state !== rawState) {
-        fs.writeFileSync(stateFilePath, JSON.stringify(state, null, 2));
+        await stateStore.save(state);
       }
       rememberPersistedStateSnapshot(state);
       rememberTerminalSurfacePreference(state);
@@ -1071,7 +1092,7 @@ ipcMain.handle("load-state", async () => {
     for (const old of oldPaths) {
       if (fs.existsSync(old)) {
         const data = normalizeStateImagesForPersist(JSON.parse(fs.readFileSync(old, "utf-8")));
-        fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
+        await stateStore.save(data);
         rememberPersistedStateSnapshot(data);
         rememberTerminalSurfacePreference(data);
         scheduleMessageImageSweep();
@@ -3011,7 +3032,7 @@ ipcMain.handle("gh-save-pm-state", async (_e, pmState) => {
     }
     data.pmRepos = pmState.repos || [];
     rememberPersistedStateSnapshot(data);
-    fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2));
+    await stateStore.save(data);
     return true;
   } catch { return false; }
 });

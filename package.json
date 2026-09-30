@@ -8,7 +8,7 @@
   },
   "homepage": "https://github.com/EnSue-Laboratories/RAYLINE",
   "private": true,
-  "version": "0.1.8",
+  "version": "0.1.9",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -22,7 +22,8 @@
     "verify:theme-tokens": "node scripts/verify-theme-tokens.mjs",
     "preview": "vite preview",
     "rebuild": "electron-rebuild -f -w node-pty",
-    "test:ui-regressions": "node --test scripts/test-ui-regressions.mjs"
+    "test:ui-regressions": "node --test scripts/test-ui-regressions.mjs",
+    "test:state-store": "node --test scripts/test-state-store.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
