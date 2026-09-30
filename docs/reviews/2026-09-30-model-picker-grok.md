@@ -24,7 +24,7 @@ A real request through RayLine's Grok adapter, in an empty temporary workspace, 
 - Opening a macOS terminal exposed `/etc/zshrc` retaining a history path inside the app's bootstrap directory, invalidating the installed signature. The bootstrap now restores that default path to the original user ZDOTDIR before loading user preferences. Explicit user history overrides remain effective; two real zsh checks cover both paths.
 - The final application starts from `/Applications` using a minimal Finder-style PATH. Its terminal returns the exact marker and closes cleanly; strict/deep signature verification still passes afterwards. Settings identifies version 0.1.11 and source `8a72e5e`.
 
-## Release candidate
+## Published package
 
 - Source commit: `8a72e5e` (model picker fix `9b6b4b2` plus terminal history correction).
 - DMG: `RayLine-0.1.11-arm64.dmg`, 180,351,498 bytes.
@@ -33,3 +33,13 @@ A real request through RayLine's Grok adapter, in an empty temporary workspace, 
 - Apple Silicon macOS build; ad-hoc signed and not Apple-notarized.
 
 The local transition waits for active agents to finish, quits normally to flush state, backs up the current profile and installed bundle, verifies and installs the staged app, then opens it through the existing desktop shortcut. It does not terminate active agents. Local receipts and backups are private and outside the repository.
+
+
+## Final acceptance and handoff
+
+- Published fork release: https://github.com/vickioo/RAYLINE/releases/tag/v0.1.11 (September 30, 2026, 23:47 China Standard Time).
+- GitHub reports the uploaded DMG as 180,351,498 bytes with the exact SHA-256 above. The release tag resolves to the packaged source commit `8a72e5e`. The fork packaging workflow was temporarily paused around publication and restored, preventing another build from replacing the verified asset.
+- Final self-check repeated all 28 regression tests, changed-file ESLint and theme validation. An isolated cold start of the staged application reconfirmed 72-option parity across conversation and all three dispatch controls, five GPT-6.1 effort choices, Grok 4.7 selection/default inheritance, nested Escape, draft reload and native terminal execution, with zero renderer errors. Strict/deep signature checks passed after terminal exit. A fresh read-only DMG mount passed signature verification and matched the staged app.asar hash; the test app and mounts were closed.
+- Upstream PR #230 now describes the shared picker, runtime availability, Grok verification and signed-bundle history fix, alongside the earlier desktop consolidation.
+- The one-time local transition waits for active agents to finish before a normal quit, private profile/application backup and replacement. It revalidates the staged signature/hash immediately before switching and checks renderer startup, terminal bridge availability and signature after launch. Its local receipt records the outcome; an eligible startup failure restores the previous bundle.
+- At the user's request, work stops after this handoff and enters overnight standby. This means no further development, autonomous agent work or repeated monitoring is scheduled. The one-time installation transition is the sole pending local action; this record does not claim that the still-running chat has already switched versions.
