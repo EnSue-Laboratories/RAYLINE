@@ -18,17 +18,17 @@ async function readCodexCatalog({ root = process.env.CODEX_HOME || path.join(os.
   } catch { return []; }
 }
 
-async function readGrokCatalog() {
-  const bin = resolveCliBin("grok", { envVarName: "GROK_BIN" });
+function parseGrokCatalog(stdout) {
+  return [...new Set(String(stdout || "").replace(/\x1b\[[0-9;]*m/g, "").split(/\r?\n/).flatMap((line) => {
+    const match = /^\s*[*-]\s+(grok-[a-z0-9._-]+)(?:\s|$)/i.exec(line);
+    return match ? [match[1]] : [];
+  }))];
+}
+async function readGrokCatalog({ bin = resolveCliBin("grok", { envVarName: "GROK_BIN" }), runCli = execFileCli } = {}) {
   if (!bin) return [];
   return new Promise((resolve) => {
-    execFileCli(bin, ["models"], { timeout: 4000, maxBuffer: 256 * 1024, env: { ...process.env, PATH: buildSpawnPath(), NO_COLOR: "1" }, windowsHide: true }, (error, stdout) => {
-      if (error) return resolve([]);
-      const slugs = String(stdout || "").split(/\r?\n/).flatMap((line) => {
-        const match = /^\s*[*-]\s+(grok-[a-z0-9._-]+)/i.exec(line);
-        return match ? [match[1]] : [];
-      });
-      resolve([...new Set(slugs)]);
+    runCli(bin, ["models"], { timeout: 4000, maxBuffer: 256 * 1024, env: { ...process.env, PATH: buildSpawnPath(), NO_COLOR: "1" }, windowsHide: true }, (error, stdout) => {
+      resolve(error ? [] : parseGrokCatalog(stdout));
     });
   });
 }
@@ -78,4 +78,4 @@ async function getModelCatalog() {
   }).finally(() => { pending = null; });
   return pending;
 }
-module.exports = { getModelCatalog, readCodexCatalog, readAgyCatalog, parseAgyCatalog };
+module.exports = { getModelCatalog, readGrokCatalog, parseGrokCatalog, readCodexCatalog, readAgyCatalog, parseAgyCatalog };

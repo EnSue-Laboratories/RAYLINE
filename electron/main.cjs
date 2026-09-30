@@ -1,4 +1,5 @@
 const { getModelCatalog } = require("./model-catalog.cjs");
+const { providers: plannerProviders } = require("./planner-capabilities.json");
 const { app, BrowserWindow, ipcMain, dialog, nativeImage, shell, clipboard } = require("electron");
 const { initAutoUpdater, handleCheckForUpdates, handleDownloadUpdate, handleInstallUpdate } = require("./auto-updater.cjs");
 const { startAgyAgent, cancelAgyAgent, cancelAllAgy, resolveAgyBin } = require("./agy-agent-manager.cjs");
@@ -1919,9 +1920,10 @@ async function runDispatchPlanner(opts = {}) {
     defaultTargetModel: opts.defaultTargetModel,
   });
 
-  const provider = plannerModel.provider === "codex"
-    ? "codex"
-    : (plannerModel.provider === "opencode" ? "opencode" : "claude");
+  const provider = plannerModel.provider || "claude";
+  if (!plannerProviders.includes(provider) || plannerModel.remoteRuntime) {
+    throw new Error(`Dispatch planning is not supported by ${provider}.`);
+  }
   const text = provider === "codex"
     ? await runCodexDispatchPlanner({ prompt, plannerModel, cwd: opts.cwd })
     : provider === "opencode"

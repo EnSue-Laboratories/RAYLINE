@@ -65,6 +65,7 @@ export const MODELS = [
     id: codexModelId("gpt-5.4", effort), name: "GPT-5.4", tag: "GPT-5.4", cliFlag: "gpt-5.4", provider: "codex", effort,
     contextWindow: 1_050_000, legacy: true,
   })),
+  grokModel("grok-default", "Grok (CLI default)", "", { contextWindow: null }),
   grokModel("grok-47", "Grok 4.7", "grok-4.7"),
   grokModel("grok-46", "Grok 4.6", "grok-4.6"),
   grokModel("grok-46-continue", "Grok 4.6", "grok-4.6", { grokContinue: true }),
@@ -118,7 +119,13 @@ export function getAvailableModels(extraModels = []) {
   );
   const runtimeSlugs = new Set((extraModels || []).filter((m) => m.runtimeCatalog).map((m) => `${m.provider}:${m.cliFlag}`));
   const candidates = [
-    ...MODELS.filter((m) => !overrides.has(m.provider) && (m.grokContinue || !runtimeSlugs.has(`${m.provider}:${m.cliFlag}`))),
+    ...MODELS.filter((m) => !overrides.has(m.provider) && (m.grokContinue || !runtimeSlugs.has(`${m.provider}:${m.cliFlag}`))).map((m) => (
+      // Static Grok names preserve saved conversations; only the CLI catalog
+      // proves that a configured model can actually be selected locally.
+      m.provider === "grok" && m.cliFlag
+        ? { ...m, unavailable: !runtimeSlugs.has(`grok:${m.cliFlag}`) }
+        : m
+    )),
     ...(extraModels || []).filter((m) => !m.runtimeCatalog || !overrides.has(m.provider)),
   ];
   return [...new Map(candidates.map((m) => [m.id, m])).values()];

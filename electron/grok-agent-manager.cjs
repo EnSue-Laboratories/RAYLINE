@@ -1,6 +1,5 @@
 const path = require("path");
 const fs = require("fs");
-const os = require("os");
 const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver.cjs");
 const { createLogger } = require("./logger.cjs");
 
@@ -294,8 +293,8 @@ function startGrokAgent({ conversationId, prompt, model, cwd, files, sessionId, 
     if (!isCurrentState) return;
     activeAgents.delete(conversationId);
 
-    const shouldEmitTerminalError = (
-      (!state.emittedStreamError && state.lastErrorMessage) ||
+    const shouldEmitTerminalError = !state.emittedStreamError && (
+      state.lastErrorMessage ||
       shouldEmitStderrError({
         stderrBuffer,
         exitCode,
@@ -349,6 +348,7 @@ function cancelAllGrok() {
 
 module.exports = {
   buildRayLinePrompt,
+  normalizeGrokEvent,
   startGrokAgent,
   cancelGrokAgent,
   cancelAllGrok,

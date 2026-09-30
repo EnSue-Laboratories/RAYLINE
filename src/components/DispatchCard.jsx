@@ -3,6 +3,11 @@ import { createPortal } from "react-dom";
 import { X, ChevronDown, Paperclip, Plus } from "lucide-react";
 import ImagePreview from "./ImagePreview";
 import { createTranslator } from "../i18n";
+import ModelPicker from "./ModelPicker";
+import { EMPTY_MODEL_EXTRAS, useModelCatalog } from "../data/useModelCatalog";
+import { normalizeModelId } from "../data/models";
+import { defaultPlannerModel, isPlannerModel, visibleModels } from "../utils/modelOptions";
+import useDismissibleLayer from "../hooks/useDismissibleLayer";
 
 const onFieldHoverIn = (e) => { e.currentTarget.style.borderColor = "var(--control-bg-active)"; };
 const onFieldHoverOut = (e) => { e.currentTarget.style.borderColor = "var(--control-bg)"; };
@@ -65,17 +70,6 @@ function makeCustomRowFromPlan(plan, index, validModelIds, usedBranches) {
   };
 }
 
-function getDefaultPlannerModelId(availableModels, defaultModel) {
-  const plannerModels = (availableModels || []).filter((m) => (
-    m.provider === "claude" || m.provider === "codex" || m.provider === "opencode"
-  ));
-  if (plannerModels.some((m) => m.id === defaultModel)) return defaultModel;
-  return plannerModels.find((m) => m.id === "gpt55-med")?.id
-    || plannerModels.find((m) => m.provider === "claude" && m.id === "sonnet")?.id
-    || plannerModels[0]?.id
-    || "";
-}
-
 function modelPayload(model, options = {}) {
   if (!model) return null;
   const includeRuntimeConfig = Boolean(options?.includeRuntimeConfig);
@@ -109,16 +103,17 @@ export default function DispatchCard({
   onDispatch,
   currentCwd,
   defaultModel = "sonnet",
-  availableModels = [],
+  extraModels = EMPTY_MODEL_EXTRAS,
   locale,
 }) {
   const t = useMemo(() => createTranslator(locale), [locale]);
+  const catalog = useModelCatalog(extraModels);
   const [tab, setTab] = useState("auto"); // "auto" | "custom"
   const [globalModel, setGlobalModel] = useState(defaultModel);
   const [customRows, setCustomRows] = useState([]);
   const [autoBrief, setAutoBrief] = useState("");
   const [autoPlannerModel, setAutoPlannerModel] = useState(() =>
-    getDefaultPlannerModelId(availableModels, defaultModel)
+    defaultPlannerModel(visibleModels(catalog.models, catalog.installed, [defaultModel]), defaultModel)
   );
   const [autoLoading, setAutoLoading] = useState(false);
   const [autoError, setAutoError] = useState(null);
@@ -127,21 +122,17 @@ export default function DispatchCard({
   const [errors, setErrors] = useState({}); // rowKey -> message
   const [banner, setBanner] = useState(null);
 
-  const plannerModels = useMemo(
-    () => (availableModels || []).filter((m) => (
-      m.provider === "claude" || m.provider === "codex" || m.provider === "opencode"
-    )),
-    [availableModels]
-  );
+  const availableModels = useMemo(() => visibleModels(catalog.models, catalog.installed, [defaultModel, globalModel, autoPlannerModel, ...customRows.map(row => row.model)]), [catalog.models, catalog.installed, defaultModel, globalModel, autoPlannerModel, customRows]);
+  const plannerModels = useMemo(() => availableModels.filter(isPlannerModel), [availableModels]);
 
   useEffect(() => {
-    if (!plannerModels.length) return;
-    if (plannerModels.some((m) => m.id === autoPlannerModel)) return;
-    setAutoPlannerModel(getDefaultPlannerModelId(availableModels, defaultModel));
+    if (plannerModels.some(model => model.id === normalizeModelId(autoPlannerModel))) return;
+    const next = defaultPlannerModel(availableModels, defaultModel);
+    if (next !== autoPlannerModel) setAutoPlannerModel(next);
   }, [plannerModels, autoPlannerModel, availableModels, defaultModel]);
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e) => { if (e.key === "Escape" && !e.defaultPrevented && !e.isComposing && e.keyCode !== 229) onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
@@ -165,7 +156,7 @@ export default function DispatchCard({
       return;
     }
 
-    const plannerModel = plannerModels.find((m) => m.id === autoPlannerModel) || plannerModels[0];
+    const plannerModel = plannerModels.find((m) => m.id === normalizeModelId(autoPlannerModel)) || plannerModels[0];
     if (!plannerModel) {
       setAutoError(t("dispatch.autoErrorNoPlanner"));
       return;
@@ -270,7 +261,7 @@ export default function DispatchCard({
 
   return (
     <div style={backdropStyle}>
-      <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={t("dispatch.title")} style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <header style={headerStyle}>
           <div style={headerTextStyle}>
             <div style={titleStyle}>{t("dispatch.title")}</div>
@@ -306,6 +297,7 @@ export default function DispatchCard({
               autoPlannerModel={autoPlannerModel}
               setAutoPlannerModel={setAutoPlannerModel}
               plannerModels={plannerModels}
+              catalog={catalog}
               autoLoading={autoLoading}
               autoError={autoError}
               onAutoFill={handleAutoFill}
@@ -316,7 +308,8 @@ export default function DispatchCard({
               rows={customRows}
               setRows={setCustomRows}
               currentCwd={currentCwd}
-              availableModels={availableModels}
+              catalog={catalog}
+              globalModel={globalModel}
               errors={errors}
               autoNote={autoNote}
               t={t}
@@ -326,18 +319,12 @@ export default function DispatchCard({
 
         {tab !== "auto" && (
           <footer style={footerStyle}>
-            <DispatchDropdown
+            <ModelPicker
+              catalog={catalog}
               ariaLabel={t("dispatch.defaultModel")}
               value={globalModel}
               onChange={setGlobalModel}
-              options={availableModels.map((m) => ({
-                value: m.id,
-                label: m.name || m.label || m.id,
-                triggerLabel: m.tag || m.label || m.id,
-                sublabel: m.tag,
-                group: (m.provider || "MODEL").toUpperCase(),
-              }))}
-              grouped
+              menuZIndex={1200}
             />
             <button
               onClick={handleSubmit}
@@ -403,6 +390,7 @@ function AutoTab({
   autoPlannerModel,
   setAutoPlannerModel,
   plannerModels,
+  catalog,
   autoLoading,
   autoError,
   onAutoFill,
@@ -416,6 +404,7 @@ function AutoTab({
         plannerModel={autoPlannerModel}
         setPlannerModel={setAutoPlannerModel}
         plannerModels={plannerModels}
+        catalog={catalog}
         loading={autoLoading}
         error={autoError}
         onAutoFill={onAutoFill}
@@ -429,7 +418,8 @@ function CustomTab({
   rows,
   setRows,
   currentCwd,
-  availableModels,
+  catalog,
+  globalModel,
   errors,
   autoNote,
   t,
@@ -497,7 +487,8 @@ function CustomTab({
           key={r.key}
           row={r}
           index={i}
-          availableModels={availableModels}
+          catalog={catalog}
+          globalModel={globalModel}
           issueOptions={issueOptions}
           issues={issues}
           error={errors[r.key]}
@@ -525,6 +516,7 @@ function AutoComposer({
   plannerModel,
   setPlannerModel,
   plannerModels,
+  catalog,
   loading,
   error,
   onAutoFill,
@@ -537,18 +529,14 @@ function AutoComposer({
         <div style={autoTitleStyle}>
           <span>{t("dispatch.autoComposerTitle")}</span>
         </div>
-        <DispatchDropdown
+        <ModelPicker
+          catalog={catalog}
           ariaLabel={t("dispatch.autoPlannerModel")}
           value={plannerModel}
           onChange={setPlannerModel}
-          options={plannerModels.map((m) => ({
-            value: m.id,
-            label: m.name || m.label || m.id,
-            triggerLabel: m.tag || m.label || m.id,
-            sublabel: m.tag,
-            group: (m.provider || "MODEL").toUpperCase(),
-          }))}
-          grouped
+          purpose="planner"
+          menuZIndex={1200}
+          disabled={loading}
         />
       </div>
       <textarea
@@ -581,7 +569,7 @@ function AutoComposer({
   );
 }
 
-function CustomRow({ row, index, availableModels, issueOptions, issues, error, onChange, onRemove, t }) {
+function CustomRow({ row, index, catalog, globalModel, issueOptions, issues, error, onChange, onRemove, t }) {
   const attachments = row.attachments || [];
 
   const addAttachments = (items) => {
@@ -638,7 +626,7 @@ function CustomRow({ row, index, availableModels, issueOptions, issues, error, o
           style={customBranchStyle}
         />
         <span style={customDividerStyle} aria-hidden />
-        <DispatchDropdown
+        <IssueDropdown
           compact
           ariaLabel={t("dispatch.attachIssue")}
           value={row.issue?.number ? String(row.issue.number) : ""}
@@ -647,13 +635,14 @@ function CustomRow({ row, index, availableModels, issueOptions, issues, error, o
           grouped
         />
         <span style={customDividerStyle} aria-hidden />
-        <DispatchDropdown
+        <ModelPicker
           compact
+          catalog={catalog}
           ariaLabel={t("dispatch.modelForSession", { number: index + 1 })}
           value={row.model}
-          onChange={(v) => onChange({ model: v })}
-          options={modelOptionsWithDefault(availableModels, t)}
-          grouped
+          onChange={(model) => onChange({ model })}
+          inheritModelId={globalModel}
+          menuZIndex={1200}
         />
         <span style={customDividerStyle} aria-hidden />
         <AttachmentPicker
@@ -733,7 +722,7 @@ function AttachmentPicker({ attachments, onChange }) {
     </label>
   );
 }
-function DispatchDropdown({
+function IssueDropdown({
   value,
   onChange,
   options,
@@ -771,15 +760,8 @@ function DispatchDropdown({
     });
   }, [fullWidth]);
 
-  useEffect(() => {
-    const h = (e) => {
-      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
-      setOpen(false);
-      setMenuStyle(null);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  const close = useCallback(() => { setOpen(false); setMenuStyle(null); }, []);
+  useDismissibleLayer(open, ref, menuRef, close);
 
   useEffect(() => {
     if (!open) return;
@@ -794,6 +776,7 @@ function DispatchDropdown({
 
   const toggle = () => {
     if (open) { setOpen(false); setMenuStyle(null); return; }
+    window.dispatchEvent(new Event("rayline:close-menus"));
     updateMenuPosition();
     setOpen(true);
   };
@@ -923,21 +906,6 @@ function DispatchDropdown({
       )}
     </div>
   );
-}
-
-function modelOptionsWithDefault(availableModels, t) {
-  const defaultLabel = t ? t("dispatch.modelDefault") : "(default)";
-  const inheritGroup = t ? t("dispatch.inheritGroup") : "INHERIT";
-  return [
-    { value: "", label: defaultLabel, group: inheritGroup },
-    ...availableModels.map((m) => ({
-      value: m.id,
-      label: m.name || m.label || m.id,
-      triggerLabel: m.tag || m.label || m.id,
-      sublabel: m.tag,
-      group: (m.provider || "MODEL").toUpperCase(),
-    })),
-  ];
 }
 
 function issueOptionsWithDefault(issues, loading, error, t) {

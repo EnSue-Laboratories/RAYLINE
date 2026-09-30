@@ -1,14 +1,14 @@
 {
   "name": "ensue",
   "productName": "RayLine",
-  "description": "RayLine \u2014 a desktop client for Claude Code",
+  "description": "RayLine — a desktop client for Claude Code",
   "author": {
     "name": "Ensue Laboratories",
     "email": "contact@ensue.dev"
   },
   "homepage": "https://github.com/EnSue-Laboratories/RAYLINE",
   "private": true,
-  "version": "0.1.10",
+  "version": "0.1.11",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -24,7 +24,9 @@
     "rebuild": "electron-rebuild -f -w node-pty",
     "test:ui-regressions": "node --test scripts/test-ui-regressions.mjs",
     "test:state-store": "node --test scripts/test-state-store.mjs",
-    "test:agy": "node --test scripts/test-agy.mjs"
+    "test:agy": "node --test scripts/test-agy.mjs",
+    "test:model-options": "node --test scripts/test-model-options.mjs",
+    "test:grok": "node --test scripts/test-grok.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

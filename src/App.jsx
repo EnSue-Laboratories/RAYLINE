@@ -14,7 +14,7 @@ import { usePrefersReducedMotion } from "./hooks/useWindowActivity";
 import Settings     from "./components/Settings";
 import MulticaSetupModal from "./components/MulticaSetupModal";
 import NewProjectModal from "./components/NewProjectModal";
-import { DEFAULT_MODEL_ID, getAvailableModels, getMOrMulticaFallback, isMulticaModelId, normalizeModelId } from "./data/models";
+import { DEFAULT_MODEL_ID, getMOrMulticaFallback, isMulticaModelId, normalizeModelId } from "./data/models";
 import { buildRemoteModels, getRemoteRuntimeConfig, getRuntimeProviderForModel, getRuntimeProviderForProvider } from "./data/remoteModels";
 import { useMulticaModels } from "./data/multicaModels.jsx";
 import { useTheme } from "./contexts/ThemeContext.jsx";
@@ -1447,10 +1447,6 @@ export default function App() {
   const remoteModels = useMemo(
     () => buildRemoteModels(remoteSshCommand, remoteSshRuntime),
     [remoteSshCommand, remoteSshRuntime]
-  );
-  const dispatchAvailableModels = useMemo(
-    () => getAvailableModels([...runtimeModels, ...remoteModels, ...providerOverrideModels, ...openCodeModels, ...multicaModels]),
-    [multicaModels, openCodeModels, providerOverrideModels, remoteModels, runtimeModels]
   );
   const dynamicModels = useMemo(
     () => [...runtimeModels, ...remoteModels, ...providerOverrideModels, ...openCodeModels, ...multicaModels],
@@ -4467,7 +4463,7 @@ export default function App() {
           currentCwd={newChatDefaultCwd || undefined}
           projects={projectChooserProjects}
           defaultModel={defaultModel}
-          availableModels={dispatchAvailableModels}
+          extraModels={dynamicModels}
           locale={locale}
         />
       )}

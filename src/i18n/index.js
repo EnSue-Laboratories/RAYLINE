@@ -2,6 +2,11 @@ const DEFAULT_LOCALE = "en-US";
 
 const STRINGS = {
   "en-US": {
+    "models.plannerUnavailable": "Not supported for planning",
+    "models.unavailable": "Unavailable",
+    "models.runtimeUnavailable": "Not available in this CLI. Refresh its model configuration or choose another model.",
+    "models.plannerHelp": "Automatic planning supports local Claude Code, Codex and OpenCode. Other models remain available for task execution.",
+
     "tool.showMore": "show more",
     "tool.showLess": "show less",
     "tool.arguments": "ARGS",
@@ -544,6 +549,11 @@ const STRINGS = {
     "sidebar.running": "RUNNING",
   },
   "zh-CN": {
+    "models.plannerUnavailable": "暂不支持自动规划",
+    "models.unavailable": "不可用",
+    "models.runtimeUnavailable": "当前 CLI 未提供此模型，请更新模型配置或选择其他模型。",
+    "models.plannerHelp": "自动规划支持本机 Claude Code、Codex 和 OpenCode。其他模型仍可用于执行任务。",
+
     "tool.showMore": "展开更多",
     "tool.showLess": "收起",
     "tool.arguments": "参数",
