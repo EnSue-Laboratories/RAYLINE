@@ -22,4 +22,14 @@ A real request through RayLine's Grok adapter, in an empty temporary workspace, 
 - Packaged UI checks confirmed all three dispatch controls share the conversation catalog (72 options on this installation), five GPT-6.1 reasoning levels, inherited defaults, keyboard filtering/selection, nested Escape and planner capability restrictions. The backend rejects an unsupported planner explicitly.
 - A real Grok 4.7 request submitted from the packaged UI returned `RAYLINE_GROK47_PACKAGED_OK`, provider `grok`, exit code 0 and no error events. Draft/history reload and Chinese/light plus English/dark controls passed; no renderer page errors were observed.
 - Opening a macOS terminal exposed `/etc/zshrc` retaining a history path inside the app's bootstrap directory, invalidating the installed signature. The bootstrap now restores that default path to the original user ZDOTDIR before loading user preferences. Explicit user history overrides remain effective; two real zsh checks cover both paths.
-- Final signature, DMG and publication verification is recorded below after repackaging.
+- The final application starts from `/Applications` using a minimal Finder-style PATH. Its terminal returns the exact marker and closes cleanly; strict/deep signature verification still passes afterwards. Settings identifies version 0.1.11 and source `8a72e5e`.
+
+## Release candidate
+
+- Source commit: `8a72e5e` (model picker fix `9b6b4b2` plus terminal history correction).
+- DMG: `RayLine-0.1.11-arm64.dmg`, 180,351,498 bytes.
+- DMG SHA-256: `30fa68bb77a3c2d54fea7495c929396b70d7c7a9dd3dd996ab691ef57351d024`.
+- app.asar SHA-256: `abaee3ea026318dea2c370fd9f738a982c072acc602877aca7a016f11a3d285f`.
+- Apple Silicon macOS build; ad-hoc signed and not Apple-notarized.
+
+The local transition waits for active agents to finish, quits normally to flush state, backs up the current profile and installed bundle, verifies and installs the staged app, then opens it through the existing desktop shortcut. It does not terminate active agents. Local receipts and backups are private and outside the repository.
