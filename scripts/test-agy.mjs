@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeAgyEvent, createAgyStreamState, buildAgyArgs } from "../electron/agy-agent-manager.cjs";
-import { parseAgyCatalog } from "../electron/model-catalog.cjs";
+import { parseAgyCatalog, readAgyCatalog } from "../electron/model-catalog.cjs";
 import { parseSystemProxy } from "../electron/runtime-env.cjs";
 import { buildRuntimeModels, getAvailableModels, getMOrMulticaFallback } from "../src/data/models.js";
 import { filterModels } from "../src/utils/modelSearch.js";
@@ -58,4 +58,23 @@ test("system proxy fills missing GUI environment without overriding explicit con
   assert.equal(parseSystemProxy(source, { HTTPS_PROXY: "https://explicit.invalid" }).HTTPS_PROXY, "https://explicit.invalid");
   assert.equal(parseSystemProxy(source, { https_proxy: "http://explicit.invalid" }).HTTPS_PROXY, undefined);
   assert.equal(parseSystemProxy(source.replaceAll("Enable : 1", "Enable : 0")).HTTP_PROXY, undefined);
+});
+
+
+test("AGY models survive a cold start and a later network timeout", async (t) => {
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "rayline-agy-catalog-"));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const cacheFile = path.join(dir, "models.json");
+  const success = await readAgyCatalog({ cacheFile, bin: "test-agy", runCli: (_bin, _args, _options, done) => done(null, "gemini-test\tTest Gemini") });
+  assert.equal(success.length, 1);
+  let calls = 0;
+  const failedRun = (_bin, _args, _options, done) => { calls++; done(new Error("network timeout"), ""); };
+  assert.deepEqual(await readAgyCatalog({ cacheFile, bin: "test-agy", runCli: failedRun }), success);
+  assert.equal(calls, 0);
+  await fs.writeFile(cacheFile, JSON.stringify({ checkedAt: 0, models: success }));
+  assert.deepEqual(await readAgyCatalog({ cacheFile, bin: "test-agy", runCli: failedRun }), success);
+  assert.equal(calls, 1);
 });

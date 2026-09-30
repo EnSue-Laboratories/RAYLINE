@@ -39,14 +39,30 @@ function parseAgyCatalog(stdout) {
     return match ? [[match[1], { slug: match[1], name: match[2].trim().slice(0, 160) }]] : [];
   })).values()];
 }
-async function readAgyCatalog() {
-  const bin = resolveCliBin("agy", { envVarName: "AGY_BIN" });
+async function readAgyCatalog({ cacheFile = path.join(os.homedir(), ".cache", "rayline", "agy-models.json"), bin = resolveCliBin("agy", { envVarName: "AGY_BIN" }), runCli = execFileCli } = {}) {
   if (!bin) return [];
-  return new Promise((resolve) => {
-    execFileCli(bin, ["models"], { timeout: 8000, maxBuffer: 256 * 1024, env: withSystemProxy({ ...process.env, PATH: buildSpawnPath(), NO_COLOR: "1" }), windowsHide: true }, (error, stdout) => {
+  let previous = [];
+  try {
+    if ((await fs.stat(cacheFile)).size < 256 * 1024) {
+      const stored = JSON.parse(await fs.readFile(cacheFile, "utf8"));
+      previous = parseAgyCatalog((stored.models || []).map((model) => `${model.slug}\t${model.name}`).join("\n"));
+      const age = Date.now() - stored.checkedAt;
+      if (previous.length && age >= 0 && age < 5 * 60_000) return previous;
+    }
+  } catch { /* Discovery is still available without a cache. */ }
+  const models = await new Promise((resolve) => {
+    runCli(bin, ["models"], { timeout: 15000, maxBuffer: 256 * 1024, env: withSystemProxy({ ...process.env, PATH: buildSpawnPath(), NO_COLOR: "1" }), windowsHide: true }, (error, stdout) => {
       resolve(error ? [] : parseAgyCatalog(stdout));
     });
   });
+  if (!models.length) return previous;
+  try {
+    await fs.mkdir(path.dirname(cacheFile), { recursive: true });
+    const temp = `${cacheFile}.${process.pid}.tmp`;
+    await fs.writeFile(temp, JSON.stringify({ checkedAt: Date.now(), models }), { mode: 0o600 });
+    await fs.rename(temp, cacheFile);
+  } catch { /* A read-only cache must not hide a successfully discovered model. */ }
+  return models;
 }
 
 let pending;
