@@ -16,7 +16,10 @@ A real request through RayLine's Grok adapter, in an empty temporary workspace, 
 
 ## Verification
 
-- 26 focused tests passed across model options, Grok catalog/failure behavior, AGY, UI regressions and persistence.
+- 28 focused tests passed across model options, Grok catalog/failure behavior, AGY, UI regressions and persistence.
 - Theme-token validation and ESLint for changed JavaScript files passed.
 - The CLI fixture verifies that an unknown-model error appearing in both JSON and stderr produces exactly one visible error and one completion event.
-- Packaged UI and release verification will be recorded after the installation candidate is tested.
+- Packaged UI checks confirmed all three dispatch controls share the conversation catalog (72 options on this installation), five GPT-6.1 reasoning levels, inherited defaults, keyboard filtering/selection, nested Escape and planner capability restrictions. The backend rejects an unsupported planner explicitly.
+- A real Grok 4.7 request submitted from the packaged UI returned `RAYLINE_GROK47_PACKAGED_OK`, provider `grok`, exit code 0 and no error events. Draft/history reload and Chinese/light plus English/dark controls passed; no renderer page errors were observed.
+- Opening a macOS terminal exposed `/etc/zshrc` retaining a history path inside the app's bootstrap directory, invalidating the installed signature. The bootstrap now restores that default path to the original user ZDOTDIR before loading user preferences. Explicit user history overrides remain effective; two real zsh checks cover both paths.
+- Final signature, DMG and publication verification is recorded below after repackaging.

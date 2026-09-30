@@ -1,7 +1,7 @@
 {
   "name": "ensue",
   "productName": "RayLine",
-  "description": "RayLine — a desktop client for Claude Code",
+  "description": "RayLine \u2014 a desktop client for Claude Code",
   "author": {
     "name": "Ensue Laboratories",
     "email": "contact@ensue.dev"
@@ -26,7 +26,8 @@
     "test:state-store": "node --test scripts/test-state-store.mjs",
     "test:agy": "node --test scripts/test-agy.mjs",
     "test:model-options": "node --test scripts/test-model-options.mjs",
-    "test:grok": "node --test scripts/test-grok.mjs"
+    "test:grok": "node --test scripts/test-grok.mjs",
+    "test:terminal-history": "node --test scripts/test-terminal-history.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

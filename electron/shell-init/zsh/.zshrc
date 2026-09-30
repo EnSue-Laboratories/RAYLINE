@@ -2,6 +2,11 @@
 
 RAYLINE_BOOTSTRAP_ZDOTDIR="${ZDOTDIR:-}"
 export ZDOTDIR="${RAYLINE_ORIG_ZDOTDIR:-$HOME}"
+# macOS /etc/zshrc derives HISTFILE before this bootstrap restores ZDOTDIR.
+# Never let terminal history write into the signed application resources.
+if [[ "${HISTFILE:-}" == "${RAYLINE_BOOTSTRAP_ZDOTDIR}/.zsh_history" ]]; then
+  HISTFILE="${ZDOTDIR}/.zsh_history"
+fi
 export CLICOLOR=1
 export CLICOLOR_FORCE=1
 export COLORTERM=truecolor
