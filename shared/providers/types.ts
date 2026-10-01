@@ -3,14 +3,18 @@
  *
  * Terminology:
  *  - "runtime provider": which agent backend actually runs a turn
- *    (`claude`, `codex`, `opencode`, `multica`). This is what
+ *    (`claude`, `codex`, `opencode`, `multica`, `grok`, `agy`). This is what
  *    `agent-start` dispatches on (`opts.runtimeProvider || opts.provider`).
  *  - "model provider": the `provider` field on a model definition. Adds the
  *    `remote-*` variants used for SSH-hosted Claude/Codex models.
  */
 
-/** Agent backends the main process knows how to launch. */
-export type RuntimeProviderId = "claude" | "codex" | "opencode" | "multica";
+/**
+ * Agent backends the main process knows how to launch.
+ *  - `grok`: xAI Grok Build CLI (`grok --output-format streaming-json`).
+ *  - `agy`:  Google Antigravity CLI (`agy --print --output-format stream-json`).
+ */
+export type RuntimeProviderId = "claude" | "codex" | "opencode" | "multica" | "grok" | "agy";
 
 /** Model-picker providers for SSH-hosted Claude / Codex. */
 export type RemoteModelProviderId = "remote-claude" | "remote-codex";
@@ -24,7 +28,7 @@ export type UpstreamProviderId = "claude" | "codex";
 /** Providers that can run over an SSH remote runtime. */
 export type RemoteRuntimeProviderId = "claude" | "codex";
 
-export const RUNTIME_PROVIDER_IDS: readonly RuntimeProviderId[] = ["claude", "codex", "opencode", "multica"];
+export const RUNTIME_PROVIDER_IDS: readonly RuntimeProviderId[] = ["claude", "codex", "opencode", "multica", "grok", "agy"];
 
 export const REMOTE_PROVIDER_BY_PROVIDER: Readonly<Record<RemoteModelProviderId, RemoteRuntimeProviderId>> = {
   "remote-claude": "claude",
@@ -32,7 +36,7 @@ export const REMOTE_PROVIDER_BY_PROVIDER: Readonly<Record<RemoteModelProviderId,
 };
 
 export function isRuntimeProviderId(value: unknown): value is RuntimeProviderId {
-  return value === "claude" || value === "codex" || value === "opencode" || value === "multica";
+  return typeof value === "string" && (RUNTIME_PROVIDER_IDS as readonly string[]).includes(value);
 }
 
 export function isRemoteModelProviderId(value: unknown): value is RemoteModelProviderId {
@@ -82,6 +86,10 @@ export interface CliInstalledSnapshot {
   claude: boolean;
   codex: boolean;
   opencode: boolean;
+  /** `grok` resolvable (`GROK_BIN` or PATH). */
+  grok: boolean;
+  /** `agy` resolvable (`AGY_BIN` or PATH). */
+  agy: boolean;
 }
 
 export interface CheckCliInstalledOptions {

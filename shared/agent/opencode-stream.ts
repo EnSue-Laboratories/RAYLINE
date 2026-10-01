@@ -8,7 +8,15 @@
  *
  * OpenCode's schema is not versioned; every field beyond `type` is optional
  * and consumers probe several spellings (see useAgent `extractOpenCode*`).
+ *
+ * The Grok and Antigravity adapters (electron/grok-agent-manager,
+ * electron/agy-agent-manager) normalize their CLIs' output into these same
+ * shapes and tag every event with `provider: "grok" | "agy"`. Native OpenCode
+ * events carry no `provider`. Adapters should omit (not null) absent fields.
  */
+
+/** Providers whose adapters emit OpenCode-shaped events (tagged via `provider`). */
+export type OpenCodeShapedProviderId = "grok" | "agy";
 
 export interface OpenCodePartTime {
   start?: number;
@@ -58,6 +66,8 @@ export interface OpenCodePart {
 }
 
 interface OpenCodeEventBase {
+  /** Set by the Grok / AGY adapters; absent on native OpenCode events. */
+  provider?: OpenCodeShapedProviderId;
   part?: OpenCodePart;
   sessionID?: string;
   session_id?: string;

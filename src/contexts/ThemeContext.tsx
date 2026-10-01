@@ -1,70 +1,70 @@
-// @ts-nocheck
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { ThemeMode } from "@shared/state/types";
+
+/** User preference; "auto" follows `prefers-color-scheme`. */
+export type ThemePreference = "auto" | ThemeMode;
+
+export interface ThemeContextValue {
+  mode: ThemePreference;
+  resolved: ThemeMode;
+  setMode: (mode: ThemePreference) => void;
+}
+
+export interface ThemeChangeDetail {
+  resolved: ThemeMode;
+}
 
 const THEME_STORAGE_KEY = "rayline.themeMode";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
-const MODES = new Set(["auto", "light", "dark"]);
 
-function normalizeMode(value) {
-  return MODES.has(value) ? value : "auto";
+export function normalizeThemePreference(value: unknown): ThemePreference {
+  return value === "auto" || value === "light" || value === "dark" ? value : "auto";
 }
 
-function getStoredMode() {
+function getStoredMode(): ThemePreference {
   try {
-    return normalizeMode(window.localStorage.getItem(THEME_STORAGE_KEY));
+    return normalizeThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY));
   } catch {
     return "auto";
   }
 }
 
-function getSystemResolved() {
-  if (window.matchMedia?.(DARK_QUERY)?.matches) {
-    return "dark";
-  }
-  return "light";
+function getSystemResolved(): ThemeMode {
+  return window.matchMedia?.(DARK_QUERY).matches ? "dark" : "light";
 }
 
-function resolveTheme(mode, systemResolved) {
+export function resolveTheme(mode: ThemePreference, systemResolved: ThemeMode): ThemeMode {
   return mode === "auto" ? systemResolved : mode;
 }
 
-const ThemeContext = createContext(null);
+const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-export function ThemeProvider({ children }) {
-  const [mode, setModeState] = useState(getStoredMode);
-  const [systemResolved, setSystemResolved] = useState(getSystemResolved);
+export interface ThemeProviderProps {
+  children?: ReactNode;
+}
+
+export function ThemeProvider({ children }: ThemeProviderProps) {
+  const [mode, setModeState] = useState<ThemePreference>(getStoredMode);
+  const [systemResolved, setSystemResolved] = useState<ThemeMode>(getSystemResolved);
   const resolved = resolveTheme(mode, systemResolved);
 
   useEffect(() => {
     const media = window.matchMedia?.(DARK_QUERY);
     if (!media) return undefined;
-
-    const handleChange = (event) => {
+    const handleChange = (event: MediaQueryListEvent) => {
       setSystemResolved(event.matches ? "dark" : "light");
     };
-
-    if (media.addEventListener) {
-      media.addEventListener("change", handleChange);
-    } else {
-      media.addListener?.(handleChange);
-    }
-    return () => {
-      if (media.removeEventListener) {
-        media.removeEventListener("change", handleChange);
-      } else {
-        media.removeListener?.(handleChange);
-      }
-    };
+    media.addEventListener("change", handleChange);
+    return () => media.removeEventListener("change", handleChange);
   }, []);
 
   useEffect(() => {
-    const handleStorage = (event) => {
+    const handleStorage = (event: StorageEvent) => {
       if (event.key === THEME_STORAGE_KEY) {
-        setModeState(normalizeMode(event.newValue));
+        setModeState(normalizeThemePreference(event.newValue));
       }
     };
-
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
@@ -74,11 +74,11 @@ export function ThemeProvider({ children }) {
     root.dataset.theme = resolved;
     root.style.background = "var(--bg-primary)";
     root.style.colorScheme = resolved;
-    window.dispatchEvent(new CustomEvent("rayline:theme-change", { detail: { resolved } }));
+    window.dispatchEvent(new CustomEvent<ThemeChangeDetail>("rayline:theme-change", { detail: { resolved } }));
   }, [resolved]);
 
-  const setMode = useCallback((nextMode) => {
-    const normalized = normalizeMode(nextMode);
+  const setMode = useCallback((nextMode: ThemePreference) => {
+    const normalized = normalizeThemePreference(nextMode);
     setModeState(normalized);
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, normalized);
@@ -87,16 +87,12 @@ export function ThemeProvider({ children }) {
     }
   }, []);
 
-  const value = useMemo(() => ({ mode, resolved, setMode }), [mode, resolved, setMode]);
+  const value = useMemo<ThemeContextValue>(() => ({ mode, resolved, setMode }), [mode, resolved, setMode]);
 
-  return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
-export function useTheme() {
+export function useTheme(): ThemeContextValue {
   const value = useContext(ThemeContext);
   if (!value) {
     throw new Error("useTheme must be used within ThemeProvider");
