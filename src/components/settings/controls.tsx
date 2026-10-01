@@ -3,8 +3,8 @@
  * take primitive / stable props so a parent re-render doesn't cascade.
  */
 
+import { MenuSelect } from "../ui/MenuSelect";
 import { memo, useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
 import { isValidHexColor, type FontOption, type FontScale } from "./deps";
 import { fieldRowStyle, getSettingsStyles, sliderStyle, toggleRowStyle, TEXT_MUTED } from "./styles";
 
@@ -361,39 +361,13 @@ function SelectFieldImpl<K extends string>({ fieldKey, label, value, options, on
   return (
     <div style={fieldRowStyle}>
       <span style={{ fontSize: s(12), color: "var(--text-secondary)", fontFamily: "var(--font-ui)" }}>{label}</span>
-      <div style={{ position: "relative", display: "flex", alignItems: "center", width: 210 }}>
-        <select
-          value={value}
-          aria-label={label}
-          onChange={(e) => onChange(fieldKey, e.target.value)}
-          style={{
-            width: "100%",
-            height: 30,
-            borderRadius: 8,
-            border: "1px solid var(--control-border)",
-            background: "var(--control-bg)",
-            color: "var(--text-primary)",
-            fontFamily: "var(--font-ui)",
-            fontSize: s(11),
-            padding: "0 28px 0 10px",
-            outline: "none",
-            appearance: "none",
-            WebkitAppearance: "none",
-            MozAppearance: "none",
-          }}
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          size={12}
-          strokeWidth={2}
-          style={{ position: "absolute", right: 10, color: "var(--text-muted)", pointerEvents: "none" }}
-        />
-      </div>
+      <MenuSelect
+        value={value}
+        options={options}
+        ariaLabel={label}
+        onChange={(next) => onChange(fieldKey, next)}
+        triggerStyle={{ width: 210 }}
+      />
     </div>
   );
 }

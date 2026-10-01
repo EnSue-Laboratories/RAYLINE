@@ -33,15 +33,6 @@ export const iconActionStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-export const selectChevronStyle: CSSProperties = {
-  position: "absolute",
-  right: 10,
-  top: "50%",
-  transform: "translateY(-50%)",
-  color: "color-mix(in srgb, var(--text-primary) 54%, transparent)",
-  pointerEvents: "none",
-};
-
 export const toggleRowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",

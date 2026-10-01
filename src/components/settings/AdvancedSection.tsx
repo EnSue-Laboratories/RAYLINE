@@ -1,8 +1,11 @@
+import { MenuSelect } from "../ui/MenuSelect";
 import { memo } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { Check } from "lucide-react";
 import { SectionLabel, SettingHeader, ToggleSetting } from "./controls";
 import { CHIME_SOUNDS, playChime, type FontScale, type Translator } from "./deps";
-import { getSettingsStyles, selectChevronStyle, TEXT_STRONG } from "./styles";
+import { getSettingsStyles, TEXT_STRONG } from "./styles";
+
+const CHIME_OPTIONS = CHIME_SOUNDS.map((sound) => ({ value: sound.id, label: sound.label }));
 
 const DIMMER_DESCRIPTION = "color-mix(in srgb, var(--text-primary) 30%, transparent)";
 
@@ -74,19 +77,15 @@ function DeveloperSettings({
       <div style={{ marginBottom: 20 }}>
         <SettingHeader s={s} title={t("settings.completionChime")} description={t("settings.completionChimeDescription")} spacing={10} />
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center" }}>
-            <select
+          <div style={{ flex: 1, display: "flex", minWidth: 0 }}>
+            <MenuSelect
               value={notificationSound}
-              aria-label={t("settings.completionChime")}
-              onChange={(e) => onNotificationSoundChange(e.target.value)}
+              options={CHIME_OPTIONS}
+              ariaLabel={t("settings.completionChime")}
+              onChange={onNotificationSoundChange}
               disabled={notificationsMuted}
-              style={{ ...styles.select, opacity: mutedOpacity }}
-            >
-              {CHIME_SOUNDS.map((sound) => (
-                <option key={sound.id} value={sound.id}>{sound.label}</option>
-              ))}
-            </select>
-            <ChevronDown size={12} strokeWidth={2} style={{ ...selectChevronStyle, opacity: mutedOpacity }} />
+              triggerStyle={{ width: "100%", height: 32 }}
+            />
           </div>
           <button
             type="button"
