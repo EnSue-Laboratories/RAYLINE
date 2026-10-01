@@ -551,6 +551,23 @@ export const enUS = {
   "chatArea.hintShellEmpty": "TYPE A COMMAND AFTER !  //  ENTER TO RUN",
   "chatArea.hintChat": "ENTER TO SEND  //  SHIFT+ENTER NEWLINE  //  PASTE IMAGES",
   "sidebar.running": "RUNNING",
+
+  // Model picker (effort selector, lifecycle badges)
+  "modelPicker.effort": "Reasoning effort",
+  "modelPicker.effortDefault": "Default ({effort})",
+  "modelPicker.effortLow": "Low",
+  "modelPicker.effortMedium": "Medium",
+  "modelPicker.effortHigh": "High",
+  "modelPicker.effortXhigh": "Extra high",
+  "modelPicker.effortMax": "Max",
+  "modelPicker.effortUltra": "Ultra",
+  "modelPicker.badgeLegacy": "Legacy",
+  "modelPicker.badgeRetiring": "Retires {date}",
+  "modelPicker.badgeRetired": "Retired",
+  "modelPicker.successorHint": "Use {model} instead.",
+  "modelPicker.badgeNeedsCli": "CLI ≥ {version}",
+  "modelPicker.needsCliHint": "Requires CLI {version} or newer.",
+  "modelPicker.cliOutdated": "Your CLI is older than {version}. Update it to use this model.",
 } satisfies Readonly<Record<string, string>>;
 
 export type MessageKey = keyof typeof enUS;

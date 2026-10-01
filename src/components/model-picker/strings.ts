@@ -1,35 +1,13 @@
-/**
- * Model-picker strings that are not in the locale files yet. They resolve
- * through the normal translator once data-i18n adds the keys; until then the
- * English fallback below is used. Keep in sync with the list in the PR body.
- */
+/** Model-picker string helpers over the typed locale files. */
 
 import type { EffortLevel } from "@shared/models";
 import type { DisabledReason, ModelBadge } from "./catalogView";
-import { interpolate, isMessageKey, type TranslationParams, type Translator } from "../../i18n";
+import type { MessageKey, TranslationParams, Translator } from "../../i18n";
 
-export const PICKER_FALLBACK_STRINGS = {
-  "modelPicker.effort": "Reasoning effort",
-  "modelPicker.effortDefault": "Default ({effort})",
-  "modelPicker.effortLow": "Low",
-  "modelPicker.effortMedium": "Medium",
-  "modelPicker.effortHigh": "High",
-  "modelPicker.effortXhigh": "Extra high",
-  "modelPicker.effortMax": "Max",
-  "modelPicker.effortUltra": "Ultra",
-  "modelPicker.badgeLegacy": "Legacy",
-  "modelPicker.badgeRetiring": "Retires {date}",
-  "modelPicker.badgeRetired": "Retired",
-  "modelPicker.successorHint": "Use {model} instead.",
-  "modelPicker.badgeNeedsCli": "CLI ≥ {version}",
-  "modelPicker.needsCliHint": "Requires CLI {version} or newer.",
-  "modelPicker.cliOutdated": "Your CLI is older than {version}. Update it to use this model.",
-} as const;
-
-export type PickerStringKey = keyof typeof PICKER_FALLBACK_STRINGS;
+export type PickerStringKey = Extract<MessageKey, `modelPicker.${string}`>;
 
 export function pickerText(t: Translator, key: PickerStringKey, params?: TranslationParams): string {
-  return isMessageKey(key) ? t(key, params) : interpolate(PICKER_FALLBACK_STRINGS[key], params);
+  return t(key, params);
 }
 
 const EFFORT_KEYS: Readonly<Record<EffortLevel, PickerStringKey>> = {
