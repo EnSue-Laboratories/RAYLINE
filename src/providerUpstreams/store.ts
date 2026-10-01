@@ -1,74 +1,105 @@
-// @ts-nocheck
+/**
+ * Per-CLI custom upstream (base URL / API key / model list), persisted in
+ * localStorage (`rayline.providerUpstreams.v1`). The `load*` / `save*`
+ * functions keep their original contract; `getProviderUpstreamsStore()`
+ * exposes the state as a shared store that every save keeps in sync.
+ *
+ * Model definitions come from @shared/models (`buildProviderUpstreamModels`),
+ * so ids and context windows match the registry.
+ */
+
+import { buildProviderUpstreamModels as buildUpstreamModels } from "@shared/models";
+import type { ClaudeModelDefinition, CodexModelDefinition } from "@shared/models";
+import type {
+  ProviderUpstreamConfig,
+  ProviderUpstreamSettings,
+  ProviderUpstreamsState,
+  UpstreamProviderId,
+} from "@shared/providers/types";
+import { createStore, type Store } from "../store/createStore";
+
+export type {
+  ProviderUpstreamConfig,
+  ProviderUpstreamSettings,
+  ProviderUpstreamsState,
+  UpstreamProviderId,
+} from "@shared/providers/types";
+
 const STORAGE_KEY = "rayline.providerUpstreams.v1";
 
-const SUPPORTED_PROVIDERS = ["claude", "codex"];
-const DEFAULT_CONFIG = {
+export const SUPPORTED_UPSTREAM_PROVIDERS: readonly UpstreamProviderId[] = ["claude", "codex"];
+
+const DEFAULT_CONFIG: Readonly<ProviderUpstreamSettings> = {
   enabled: false,
   baseURL: "",
   apiKey: "",
   modelListText: "",
 };
 
-const DEFAULT_STATE = {
-  providers: {
-    claude: { ...DEFAULT_CONFIG },
-    codex: { ...DEFAULT_CONFIG },
-  },
-};
+function defaultState(): ProviderUpstreamsState {
+  return {
+    providers: {
+      claude: { ...DEFAULT_CONFIG },
+      codex: { ...DEFAULT_CONFIG },
+    },
+  };
+}
 
-function safeString(value) {
+type UnknownRecord = Readonly<Record<string, unknown>>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null;
+}
+
+function safeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeProvider(provider) {
+export function normalizeUpstreamProvider(provider: unknown): UpstreamProviderId | "" {
   const value = safeString(provider).toLowerCase();
-  return SUPPORTED_PROVIDERS.includes(value) ? value : "";
+  return value === "claude" || value === "codex" ? value : "";
 }
 
-function parseModelList(value) {
+/** Split newline / comma separated model ids. */
+export function parseModelList(value: unknown): string[] {
   return safeString(value)
     .split(/[\n,]+/)
     .map((entry) => entry.trim())
     .filter(Boolean);
 }
 
-function normalizeProviderConfig(entry) {
-  if (!entry || typeof entry !== "object") return { ...DEFAULT_CONFIG };
-  const rawModelList = Array.isArray(entry.modelList)
+/** Accepts current settings and older shapes (`modelList`, `models`, `model`, `baseUrl`). */
+export function normalizeProviderConfig(entry: unknown): ProviderUpstreamSettings {
+  if (!isRecord(entry)) return { ...DEFAULT_CONFIG };
+  const rawModelList: unknown = Array.isArray(entry.modelList)
     ? entry.modelList
     : Array.isArray(entry.models)
       ? entry.models
       : null;
-  const modelListText = rawModelList
-    ? rawModelList.map((model) => safeString(model)).filter(Boolean).join("\n")
+  const modelListText = Array.isArray(rawModelList)
+    ? (rawModelList as readonly unknown[]).map((model) => safeString(model)).filter(Boolean).join("\n")
     : safeString(entry.modelListText || entry.modelsText || entry.models || entry.model);
   const baseURL = safeString(entry.baseURL || entry.baseUrl);
   const apiKey = safeString(entry.apiKey);
   const hasConfig = Boolean(baseURL || apiKey || modelListText);
   const enabled = typeof entry.enabled === "boolean" ? entry.enabled : hasConfig;
 
-  return {
-    enabled,
-    baseURL,
-    apiKey,
-    modelListText,
-  };
+  return { enabled, baseURL, apiKey, modelListText };
 }
 
-function migrateProfileState(state) {
-  const next = { ...DEFAULT_STATE.providers };
-  const profiles = Array.isArray(state?.profiles) ? state.profiles : [];
-  const activeByProvider = state?.activeByProvider && typeof state.activeByProvider === "object"
-    ? state.activeByProvider
-    : {};
+/** Pre-v1 `{ profiles, activeByProvider }` → one config per provider. */
+function migrateProfileState(state: unknown): Record<UpstreamProviderId, unknown> {
+  const next: Record<UpstreamProviderId, unknown> = defaultState().providers;
+  const source: UnknownRecord = isRecord(state) ? state : {};
+  const profiles: readonly unknown[] = Array.isArray(source.profiles) ? (source.profiles as readonly unknown[]) : [];
+  const activeByProvider: UnknownRecord = isRecord(source.activeByProvider) ? source.activeByProvider : {};
 
-  for (const provider of SUPPORTED_PROVIDERS) {
+  for (const provider of SUPPORTED_UPSTREAM_PROVIDERS) {
     const activeId = safeString(activeByProvider[provider]);
-    const profile = profiles.find((entry) => (
-      entry?.provider === provider &&
-      entry?.id === activeId &&
-      entry?.enabled !== false
-    )) || profiles.find((entry) => entry?.provider === provider && entry?.enabled !== false);
+    const candidates = profiles.filter(isRecord);
+    const profile =
+      candidates.find((entry) => entry.provider === provider && entry.id === activeId && entry.enabled !== false) ||
+      candidates.find((entry) => entry.provider === provider && entry.enabled !== false);
 
     if (profile) {
       next[provider] = normalizeProviderConfig({
@@ -83,50 +114,78 @@ function migrateProfileState(state) {
   return next;
 }
 
-function sanitizeState(state) {
-  const source = state?.providers && typeof state.providers === "object"
-    ? state.providers
-    : migrateProfileState(state);
-  const providers = {};
-
-  for (const provider of SUPPORTED_PROVIDERS) {
-    providers[provider] = normalizeProviderConfig(source[provider]);
-  }
-
-  return { providers };
+export function sanitizeProviderUpstreamsState(state: unknown): ProviderUpstreamsState {
+  const source: UnknownRecord =
+    isRecord(state) && isRecord(state.providers) ? state.providers : migrateProfileState(state);
+  return {
+    providers: {
+      claude: normalizeProviderConfig(source.claude),
+      codex: normalizeProviderConfig(source.codex),
+    },
+  };
 }
 
-export function loadProviderUpstreamsState() {
-  if (typeof window === "undefined" || !window.localStorage) return { ...DEFAULT_STATE };
+function getStorage(): Storage | null {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_STATE };
-    return sanitizeState(JSON.parse(raw));
+    return typeof window !== "undefined" ? window.localStorage : null;
   } catch {
-    return { ...DEFAULT_STATE };
+    return null;
   }
 }
 
-export function saveProviderUpstreamsState(patch) {
+/** Fresh read from localStorage (does not touch the shared store). */
+export function loadProviderUpstreamsState(): ProviderUpstreamsState {
+  const storage = getStorage();
+  if (!storage) return defaultState();
+  try {
+    const raw = storage.getItem(STORAGE_KEY);
+    if (!raw) return defaultState();
+    return sanitizeProviderUpstreamsState(JSON.parse(raw));
+  } catch {
+    return defaultState();
+  }
+}
+
+let store: Store<ProviderUpstreamsState> | null = null;
+
+/** Shared store, created from storage on first use. */
+export function getProviderUpstreamsStore(): Store<ProviderUpstreamsState> {
+  store ??= createStore(loadProviderUpstreamsState());
+  return store;
+}
+
+/** Re-read storage into the shared store (no notification when unchanged). */
+export function reloadProviderUpstreamsStore(): ProviderUpstreamsState {
+  const next = loadProviderUpstreamsState();
+  const current = getProviderUpstreamsStore();
+  if (JSON.stringify(current.getState()) !== JSON.stringify(next)) current.setState(next);
+  return current.getState();
+}
+
+export interface ProviderUpstreamsPatch {
+  providers?: Partial<Record<UpstreamProviderId, Partial<ProviderUpstreamSettings>>>;
+}
+
+export function saveProviderUpstreamsState(patch?: ProviderUpstreamsPatch | null): ProviderUpstreamsState {
   const current = loadProviderUpstreamsState();
-  const next = sanitizeState({
+  const next = sanitizeProviderUpstreamsState({
     ...current,
-    ...(patch || {}),
+    ...patch,
     providers: {
       ...current.providers,
-      ...(patch?.providers || {}),
+      ...patch?.providers,
     },
   });
-
-  if (typeof window !== "undefined" && window.localStorage) {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }
-
+  getStorage()?.setItem(STORAGE_KEY, JSON.stringify(next));
+  getProviderUpstreamsStore().setState(next);
   return next;
 }
 
-export function saveProviderUpstreamConfig(provider, patch) {
-  const normalizedProvider = normalizeProvider(provider);
+export function saveProviderUpstreamConfig(
+  provider: unknown,
+  patch?: Partial<ProviderUpstreamSettings> | null,
+): ProviderUpstreamsState {
+  const normalizedProvider = normalizeUpstreamProvider(provider);
   if (!normalizedProvider) return loadProviderUpstreamsState();
 
   const current = loadProviderUpstreamsState();
@@ -134,14 +193,14 @@ export function saveProviderUpstreamConfig(provider, patch) {
     providers: {
       [normalizedProvider]: {
         ...current.providers[normalizedProvider],
-        ...(patch || {}),
+        ...patch,
       },
     },
   });
 }
 
-export function clearProviderUpstreamConfig(provider) {
-  const normalizedProvider = normalizeProvider(provider);
+export function clearProviderUpstreamConfig(provider: unknown): ProviderUpstreamsState {
+  const normalizedProvider = normalizeUpstreamProvider(provider);
   if (!normalizedProvider) return loadProviderUpstreamsState();
   return saveProviderUpstreamsState({
     providers: {
@@ -150,10 +209,14 @@ export function clearProviderUpstreamConfig(provider) {
   });
 }
 
-export function getProviderUpstreamConfig(provider, state = loadProviderUpstreamsState()) {
-  const normalizedProvider = normalizeProvider(provider);
+/** Active config to send to the main process, or null when disabled / empty. */
+export function getProviderUpstreamConfig(
+  provider: unknown,
+  state: ProviderUpstreamsState = loadProviderUpstreamsState(),
+): ProviderUpstreamConfig | null {
+  const normalizedProvider = normalizeUpstreamProvider(provider);
   if (!normalizedProvider) return null;
-  const config = normalizeProviderConfig(state?.providers?.[normalizedProvider]);
+  const config = normalizeProviderConfig(state.providers[normalizedProvider]);
   const modelList = parseModelList(config.modelListText);
   if (!config.enabled) return null;
   if (!config.baseURL && !config.apiKey && modelList.length === 0) return null;
@@ -165,27 +228,13 @@ export function getProviderUpstreamConfig(provider, state = loadProviderUpstream
   };
 }
 
-function modelTag(modelId) {
-  const compact = safeString(modelId).split("/").pop() || modelId;
-  return compact.replace(/[^a-z0-9._-]+/gi, " ").trim().toUpperCase() || "MODEL";
-}
-
-export function buildProviderUpstreamModels(state = loadProviderUpstreamsState()) {
-  const models = [];
-  for (const provider of SUPPORTED_PROVIDERS) {
-    const config = getProviderUpstreamConfig(provider, state);
-    if (!config?.modelList?.length) continue;
-    for (const modelId of config.modelList) {
-      models.push({
-        id: `provider-upstream:${provider}:${modelId}`,
-        name: modelId,
-        tag: modelTag(modelId),
-        cliFlag: modelId,
-        provider,
-        providerOverride: true,
-        contextWindow: provider === "codex" ? 1_050_000 : 200_000,
-      });
-    }
-  }
-  return models;
+/**
+ * One model per id in each active upstream's model list (built by
+ * @shared/models, so the context window is the registry's
+ * `PROVIDER_UPSTREAM_*_CONTEXT_WINDOW`).
+ */
+export function buildProviderUpstreamModels(
+  state: ProviderUpstreamsState = loadProviderUpstreamsState(),
+): (ClaudeModelDefinition | CodexModelDefinition)[] {
+  return buildUpstreamModels(SUPPORTED_UPSTREAM_PROVIDERS.map((provider) => getProviderUpstreamConfig(provider, state)));
 }
