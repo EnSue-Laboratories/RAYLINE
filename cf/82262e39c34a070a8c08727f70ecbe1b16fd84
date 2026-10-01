@@ -1,0 +1,21 @@
+src/components/new-chat/useRepoData.ts
+  s_d0fb9aefa2e5fb::t_524f761e8e0d15 1-40,42-48,50-102
+src/components/new-chat/newChat.ts
+  s_d0fb9aefa2e5fb::t_9f93e0837b789f 1-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "cf82262e39c34a070a8c08727f70ecbe1b16fd84",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
