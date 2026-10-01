@@ -13,8 +13,8 @@
  * prefixed with "Error invoking remote method '<channel>': ").
  *
  * Adding a channel: declare it here → expose it in electron/preload (and the
- * matching interface in ./renderer-api) → implement the handler in
- * electron/main. See shared/README.md.
+ * matching interface in ./renderer-api) → register the handler in
+ * electron/ipc/<domain>.ts via electron/ipc/typed. See shared/README.md.
  */
 
 import type {
@@ -331,8 +331,13 @@ export interface InvokeChannels {
   };
   "gh-list-branches": { args: [repo: string]; result: GhBranch[] };
   "gh-linked-prs": { args: [repo: string, number: number]; result: GhLinkedPr[] };
-  /** Branch of the *main process* cwd (not a repo argument); null on failure. */
-  "gh-current-branch": { args: []; result: string | null };
+  /**
+   * Branch checked out in a local clone of `repo` (`owner/repo`, matched
+   * against known project dirs / conversation cwds by `origin` remote) or in
+   * the given absolute path; null when no checkout is found or on failure.
+   * Without an argument: the main process cwd (legacy behavior).
+   */
+  "gh-current-branch": { args: [repo?: string | null]; result: string | null };
   /** Falls back to "main". */
   "gh-repo-default-branch": { args: [repo: string]; result: string };
   /** Not implemented: always rejects. */
@@ -359,6 +364,12 @@ export interface SendChannels {
   "open-project-manager": { args: [] };
   /** Terminal window renderer finished mounting. */
   "terminal-window-ready": { args: [] };
+  /**
+   * The sender window starts (true) / stops (false) listening to
+   * `terminal-output`; sent by the preload's `onTerminalOutput` on the first
+   * subscribe / last unsubscribe. Output goes only to subscribed windows.
+   */
+  "terminal-output-subscribe": { args: [subscribed: boolean] };
 }
 
 // ── sendSync ────────────────────────────────────────────────────────────────
@@ -378,7 +389,7 @@ export interface EventChannels {
   "agent-error": AgentErrorPayload;
   "agent-permission-request": AgentPermissionRequest;
   "agent-permission-cancelled": AgentPermissionCancelled;
-  /** Broadcast to all windows. */
+  /** Windows that subscribed via `terminal-output-subscribe`; coalesced per session (~16 ms). */
   "terminal-output": TerminalOutputPayload;
   /** Broadcast to all windows. */
   "terminal-window-state": TerminalWindowStatePayload;
