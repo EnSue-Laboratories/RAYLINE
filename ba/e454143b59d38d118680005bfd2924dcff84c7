@@ -1,0 +1,23 @@
+src/components/new-chat/Dropdowns.tsx
+  s_d0fb9aefa2e5fb::t_ea8f5e7d23ee99 1-215
+src/components/new-chat/NewChatCard.tsx
+  s_d0fb9aefa2e5fb::t_ac73033cd0bf28 3-25,28-88,99-107,109-180,182-194,196-259,261-298,300-303,305,308-324,326-329,331,334-347,349-351,353-358,360,363-404,406-409
+src/components/new-chat/boundaries.ts
+  s_d0fb9aefa2e5fb::t_923efbe3e5e0cf 1-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "bae454143b59d38d118680005bfd2924dcff84c7",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
