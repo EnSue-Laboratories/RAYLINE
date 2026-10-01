@@ -1239,7 +1239,7 @@ function collapseRepeatedRemoteBackfill(existingMessages, remoteMessages) {
 export default function App() {
   const {
     conversations,
-    getConversation,
+    getConversation: readConversation,
     prepareMessage,
     appendLocalMessages,
     startPreparedMessage,
@@ -1249,6 +1249,12 @@ export default function App() {
     replaceMessages,
     markMulticaConnected,
   } = useAgent();
+  // TODO(app-shell): useAgent's getConversation is identity-stable now (reads the
+  // conversations store). Memos below still list it as a dependency to recompute
+  // on stream commits, so keep a per-commit identity until they move to the
+  // selectors in src/store/conversations (useMessageIds / useConversationStatus …).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const getConversation = useCallback((id) => readConversation(id), [readConversation, conversations]);
   const terminal = useTerminal();
   const { closeWindow: closeTerminalWindow, openWindow: openTerminalWindow, windowOpen: terminalWindowOpen } = terminal;
   const { createSession: createTerminalSession, sendInput: sendTerminalInput } = terminal;
