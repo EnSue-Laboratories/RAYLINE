@@ -1,16 +1,46 @@
-// @ts-nocheck
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, FileText } from "lucide-react";
+import { FileText, X } from "lucide-react";
+import { useLocaleTranslator } from "./sidebar/boundary";
+import {
+  backdropStyle,
+  bodyStyle,
+  cardStyle,
+  closeBtnStyle,
+  footerStyle,
+  headerStyle,
+  inputStyle,
+  isPlainEnter,
+  primaryBtnStyle,
+  secondaryBtnStyle,
+  titleRowStyle,
+  titleStyle,
+} from "./sidebar/modalStyles";
 
-export default function ProjectContextModal({ open, projectName, initialValue, onClose, onSave }) {
+export interface ProjectContextModalProps {
+  open: boolean;
+  projectName: string;
+  initialValue?: string;
+  onClose?: () => void;
+  onSave?: (value: string) => void;
+  locale?: string;
+}
+
+const textareaStyle = { ...inputStyle, resize: "vertical" } as const;
+const hintStyle = { fontSize: 11, color: "var(--text-muted)" } as const;
+
+/**
+ * Edits a project's extra system-prompt context. Lazy-loaded by ProjectGroup
+ * (keep the default export). The draft resets each time the dialog opens.
+ */
+export default function ProjectContextModal(props: ProjectContextModalProps) {
+  if (!props.open) return null;
+  return <ProjectContextDialog {...props} />;
+}
+
+function ProjectContextDialog({ projectName, initialValue, onClose, onSave, locale = "en-US" }: ProjectContextModalProps) {
+  const t = useLocaleTranslator(locale);
   const [value, setValue] = useState(initialValue || "");
-
-  useEffect(() => {
-    if (!open) return;
-    setValue(initialValue || "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
 
   const handleSave = useCallback(() => {
     onSave?.(value);
@@ -18,47 +48,42 @@ export default function ProjectContextModal({ open, projectName, initialValue, o
   }, [value, onSave, onClose]);
 
   useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.isComposing) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose?.();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
 
   return createPortal(
     <div style={backdropStyle} onPointerDown={() => onClose?.()}>
       <div
-        style={cardStyle}
+        style={cardStyle(560)}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={headerStyle}>
           <div style={titleRowStyle}>
             <FileText size={14} strokeWidth={1.8} />
-            <span style={titleStyle}>Project context — {projectName}</span>
+            <span style={titleStyle}>{t("project.context.title", { project: projectName })}</span>
           </div>
-          <button
-            type="button"
-            style={closeBtnStyle}
-            onClick={() => onClose?.()}
-            aria-label="Close"
-          >
+          <button type="button" style={closeBtnStyle} onClick={() => onClose?.()} aria-label={t("project.create.close")}>
             <X size={14} />
           </button>
         </div>
 
-        <div style={bodyStyle}>
-          <div style={hintStyle}>
-            Appended to the system prompt for every chat in this project.
-          </div>
+        <div style={bodyStyle(8)}>
+          <div style={hintStyle}>{t("project.context.hint")}</div>
           <textarea
             autoFocus
             rows={10}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
-              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              if ((e.metaKey || e.ctrlKey) && isPlainEnter(e)) {
                 e.preventDefault();
                 handleSave();
               }
@@ -70,14 +95,10 @@ export default function ProjectContextModal({ open, projectName, initialValue, o
 
         <div style={footerStyle}>
           <button type="button" style={secondaryBtnStyle} onClick={() => onClose?.()}>
-            Cancel
+            {t("common.cancel")}
           </button>
-          <button
-            type="button"
-            style={primaryBtnStyle(true)}
-            onClick={handleSave}
-          >
-            Save
+          <button type="button" style={primaryBtnStyle(true)} onClick={handleSave}>
+            {t("common.save")}
           </button>
         </div>
       </div>
@@ -85,58 +106,3 @@ export default function ProjectContextModal({ open, projectName, initialValue, o
     document.body,
   );
 }
-
-const backdropStyle = {
-  position: "fixed", inset: 0, background: "color-mix(in srgb, var(--bg-primary) 45%, transparent)",
-  display: "flex", alignItems: "center", justifyContent: "center",
-  zIndex: 1000, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
-};
-const cardStyle = {
-  width: 560, maxWidth: "90vw", maxHeight: "85vh",
-  background: "var(--surface-glass)",
-  backdropFilter: "blur(48px) saturate(1.2)",
-  WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-  border: "1px solid var(--border)",
-  borderRadius: 12, display: "flex", flexDirection: "column",
-  color: "var(--text-primary)", fontFamily: "var(--font-ui)", fontSize: 13,
-  boxShadow: "var(--shadow-md)",
-};
-const headerStyle = {
-  display: "flex", justifyContent: "space-between", alignItems: "center",
-  padding: "14px 18px", borderBottom: "1px solid var(--border)",
-};
-const titleRowStyle = { display: "flex", alignItems: "center", gap: 8, color: "var(--text-primary)" };
-const titleStyle = { fontSize: 13, fontWeight: 500 };
-const closeBtnStyle = {
-  background: "none", border: "none", color: "var(--text-secondary)",
-  cursor: "pointer", padding: 4, display: "flex",
-};
-const bodyStyle = { padding: 18, display: "flex", flexDirection: "column", gap: 8 };
-const footerStyle = {
-  display: "flex", justifyContent: "flex-end", gap: 8,
-  padding: "12px 18px", borderTop: "1px solid var(--border)",
-};
-const primaryBtnStyle = (enabled) => ({
-  padding: "8px 14px", borderRadius: 6, border: "none",
-  background: enabled ? "var(--text-primary)" : "var(--bg-tertiary)",
-  color: enabled ? "var(--bg-primary)" : "var(--text-muted)",
-  cursor: enabled ? "pointer" : "not-allowed",
-  fontSize: 12, fontWeight: 500,
-});
-const secondaryBtnStyle = {
-  padding: "8px 12px", borderRadius: 6,
-  background: "transparent",
-  border: "1px solid var(--border)",
-  color: "var(--text-secondary)",
-  cursor: "pointer", fontSize: 12,
-  display: "flex", alignItems: "center",
-};
-const textareaStyle = {
-  width: "100%", padding: "8px 10px", borderRadius: 6,
-  background: "var(--bg-tertiary)",
-  border: "1px solid var(--border)",
-  color: "var(--text-primary)", fontSize: 13, fontFamily: "var(--font-mono)",
-  outline: "none", boxSizing: "border-box",
-  resize: "vertical",
-};
-const hintStyle = { fontSize: 11, color: "var(--text-muted)" };
