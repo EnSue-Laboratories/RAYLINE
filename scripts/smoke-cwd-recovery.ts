@@ -1,19 +1,35 @@
 #!/usr/bin/env node
-// Smoke test for src/utils/cwdRecovery.js. No test runner is configured in
-// this repo, so this script asserts invariants directly. Run with:
-//   node scripts/smoke-cwd-recovery.mjs
+// Smoke test for src/utils/cwdRecovery.ts; asserts invariants directly.
+//   node scripts/smoke-cwd-recovery.ts
 //
-// Exits non-zero on any failure.
+// Exits non-zero on any failure. Runs directly on Node's type stripping
+// (erasable TypeScript only, explicit `.ts` import specifiers).
 
-import {
-  getMainRepoRoot,
-  resolveSafeCwd,
-  buildMissingCwdReminder,
-  decoratePromptWithReminder,
-} from "../src/utils/cwdRecovery.js";
+import * as cwdRecoveryModule from "../src/utils/cwdRecovery.ts";
+
+type RecoveryReason = "worktree-root" | "app-cwd" | "none";
+
+interface CwdRecovery {
+  readonly getMainRepoRoot: (dir: string | null | undefined) => string | null | undefined;
+  readonly resolveSafeCwd: (args: {
+    cwd: string | null;
+    appCwd: string | null;
+    exists: (p: string) => boolean;
+  }) => { cwd: string | null; wasMissing: boolean; originalCwd: string | null; recoveryReason: RecoveryReason };
+  readonly buildMissingCwdReminder: (args: {
+    originalCwd: string | null;
+    recoveredCwd: string | null;
+    recoveryReason: RecoveryReason;
+  }) => string | null;
+  readonly decoratePromptWithReminder: (prompt: string | null, reminder: string | null) => string;
+}
+
+// TODO(ts-boundary): drop once src/utils/cwdRecovery.ts is converted (app-shell)
+const { getMainRepoRoot, resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder } =
+  cwdRecoveryModule as unknown as CwdRecovery;
 
 let failures = 0;
-function check(name, cond, detail) {
+function check(name: string, cond: boolean | undefined, detail?: string): void {
   if (cond) {
     console.log(`  ok   ${name}`);
   } else {
@@ -21,7 +37,9 @@ function check(name, cond, detail) {
     console.log(`  FAIL ${name}${detail ? ` — ${detail}` : ""}`);
   }
 }
-function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+function eq(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 console.log("getMainRepoRoot:");
 check("returns input when no worktree segment", getMainRepoRoot("/repo/foo") === "/repo/foo");
@@ -33,7 +51,7 @@ check("handles empty string", getMainRepoRoot("") === "");
 console.log("\nresolveSafeCwd:");
 {
   const existing = new Set(["/repo/foo", "/repo/foo/.worktrees/wt-x", "/app/cwd"]);
-  const exists = (p) => existing.has(p);
+  const exists = (p: string): boolean => existing.has(p);
 
   check(
     "happy path — cwd exists, no recovery",
@@ -44,7 +62,7 @@ console.log("\nresolveSafeCwd:");
   );
 
   const gone = new Set(["/repo/foo", "/app/cwd"]); // worktree removed
-  const existsGone = (p) => gone.has(p);
+  const existsGone = (p: string): boolean => gone.has(p);
   check(
     "worktree gone — falls back to project root",
     eq(
@@ -54,7 +72,7 @@ console.log("\nresolveSafeCwd:");
   );
 
   const onlyApp = new Set(["/app/cwd"]);
-  const existsOnlyApp = (p) => onlyApp.has(p);
+  const existsOnlyApp = (p: string): boolean => onlyApp.has(p);
   check(
     "worktree + root both gone — falls back to app cwd",
     eq(
@@ -63,8 +81,8 @@ console.log("\nresolveSafeCwd:");
     )
   );
 
-  const nothing = new Set();
-  const existsNone = (p) => nothing.has(p);
+  const nothing = new Set<string>();
+  const existsNone = (p: string): boolean => nothing.has(p);
   check(
     "everything gone — returns null cwd",
     eq(
@@ -76,7 +94,7 @@ console.log("\nresolveSafeCwd:");
   check(
     "non-worktree path gone — skips to app cwd",
     eq(
-      resolveSafeCwd({ cwd: "/random/dir", appCwd: "/app/cwd", exists: (p) => p === "/app/cwd" }),
+      resolveSafeCwd({ cwd: "/random/dir", appCwd: "/app/cwd", exists: (p: string) => p === "/app/cwd" }),
       { cwd: "/app/cwd", wasMissing: true, originalCwd: "/random/dir", recoveryReason: "app-cwd" }
     )
   );
