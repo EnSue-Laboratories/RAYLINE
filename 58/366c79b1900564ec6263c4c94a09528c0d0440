@@ -1,0 +1,33 @@
+.github/workflows/ci.yml
+  ai_agent 14-15,19,22-23,25,27,29,31
+README.md
+  s_d0fb9aefa2e5fb::t_f9694d8b4169cc 58,70-71,79,84,87,96-109
+pnpm-workspace.yaml
+  ai_agent 1-23
+pnpm-lock.yaml
+  ai_agent 1-7771
+docs/architecture.md
+  s_d0fb9aefa2e5fb::t_f9694d8b4169cc 112,327-328
+.github/workflows/package.yml
+  ai_agent 43-45,50,53,56,83,105,159-161,166,171-172,175,198,261-265,268,271
+docs/refactor/CONVENTIONS.md
+  s_d0fb9aefa2e5fb::t_f9694d8b4169cc 9-10,57
+package.json
+  ai_agent 24-27,32,79-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "58366c79b1900564ec6263c4c94a09528c0d0440",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": null
+    }
+  }
+}
