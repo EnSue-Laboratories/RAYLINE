@@ -1,0 +1,26 @@
+src/components/new-chat/NewChatCard.tsx
+  s_d0fb9aefa2e5fb::t_575b10efb63f42 26,393,396
+src/components/new-chat/BackButton.tsx
+  s_d0fb9aefa2e5fb::t_f437fb925ab684 31
+  s_d0fb9aefa2e5fb::t_575b10efb63f42 14,18,23-27,30,32
+src/index.css
+  s_d0fb9aefa2e5fb::t_c8b76a2abd51e5 486-488
+src/components/new-chat/styles.ts
+  s_d0fb9aefa2e5fb::t_575b10efb63f42 116-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a034fe3ae7e545173b14445f249c753d5cf6fb73",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "unknown"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
