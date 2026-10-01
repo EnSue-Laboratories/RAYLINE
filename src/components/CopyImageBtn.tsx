@@ -1,41 +1,62 @@
-// @ts-nocheck
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState, type RefObject } from "react";
 import { Check, Image, Loader2, X } from "lucide-react";
-import { toBlob } from "html-to-image";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { CAPTURE_BG_SOLID, buildCaptureLayout, type CaptureWallpaper } from "./blocks/captureImage";
 
-const CAPTURE_BG_SOLID = "#0D0D10";
-const CAPTURE_BACKGROUND = "linear-gradient(180deg, #121622 0%, #0A0B10 100%)";
-const CAPTURE_PADDING_X = 24;
-const CAPTURE_PADDING_TOP = 20;
-const CAPTURE_PADDING_BOTTOM = 18;
+type CaptureStatus = "idle" | "loading" | "success" | "error";
 
-function blobToDataUrl(blob) {
+export interface CopyImageBtnProps {
+  targetRef: RefObject<HTMLElement | null> | null | undefined;
+  title?: string;
+  wallpaper?: CaptureWallpaper | null;
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
+    reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : "");
     reader.onerror = () => reject(new Error("Failed to read image data."));
     reader.readAsDataURL(blob);
   });
 }
 
-export default function CopyImageBtn({ targetRef, title = "Copy as image", wallpaper }) {
-  const [status, setStatus] = useState("idle");
-  const resetTimerRef = useRef(null);
+/** Content size of `target` without the `data-copy-image-ignore` chrome. */
+function measureCaptureContent(target: HTMLElement): { width: number; height: number } {
+  const measureHost = target.parentElement || document.body;
+  const measureClone = target.cloneNode(true) as HTMLElement;
+  measureClone.querySelectorAll('[data-copy-image-ignore="true"]').forEach((el) => el.remove());
+  measureClone.style.position = "absolute";
+  measureClone.style.top = "-99999px";
+  measureClone.style.left = "0";
+  measureClone.style.visibility = "hidden";
+  measureClone.style.pointerEvents = "none";
+  measureClone.style.width = `${target.getBoundingClientRect().width}px`;
+  measureHost.appendChild(measureClone);
+  try {
+    return { width: measureClone.scrollWidth, height: measureClone.scrollHeight };
+  } finally {
+    measureClone.remove();
+  }
+}
+
+const STATUS_COLOR: Record<CaptureStatus, string> = {
+  error: "var(--danger-text)",
+  success: "var(--success-text)",
+  loading: "var(--text-secondary)",
+  idle: "var(--text-muted)",
+};
+
+function CopyImageBtn({ targetRef, title = "Copy as image", wallpaper }: CopyImageBtnProps) {
+  const [status, setStatus] = useState<CaptureStatus>("idle");
+  const resetTimerRef = useRef<number | null>(null);
   const s = useFontScale();
 
-  useEffect(() => {
-    return () => {
-      if (resetTimerRef.current) {
-        window.clearTimeout(resetTimerRef.current);
-      }
-    };
+  useEffect(() => () => {
+    if (resetTimerRef.current !== null) window.clearTimeout(resetTimerRef.current);
   }, []);
 
   const queueReset = () => {
-    if (resetTimerRef.current) {
-      window.clearTimeout(resetTimerRef.current);
-    }
+    if (resetTimerRef.current !== null) window.clearTimeout(resetTimerRef.current);
     resetTimerRef.current = window.setTimeout(() => setStatus("idle"), 1600);
   };
 
@@ -47,102 +68,49 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
       return;
     }
 
-    if (resetTimerRef.current) {
+    if (resetTimerRef.current !== null) {
       window.clearTimeout(resetTimerRef.current);
       resetTimerRef.current = null;
     }
     setStatus("loading");
 
-    const measureHost = target.parentElement || document.body;
-    const measureClone = target.cloneNode(true);
-    measureClone
-      .querySelectorAll('[data-copy-image-ignore="true"]')
-      .forEach((el) => el.remove());
-    measureClone.style.position = "absolute";
-    measureClone.style.top = "-99999px";
-    measureClone.style.left = "0";
-    measureClone.style.visibility = "hidden";
-    measureClone.style.pointerEvents = "none";
-    measureClone.style.width = `${target.getBoundingClientRect().width}px`;
-    measureHost.appendChild(measureClone);
-
     try {
-      const contentWidth = measureClone.scrollWidth;
-      const contentHeight = measureClone.scrollHeight;
-      measureHost.removeChild(measureClone);
-      const totalWidth = contentWidth + CAPTURE_PADDING_X * 2;
-      const totalHeight = contentHeight + CAPTURE_PADDING_TOP + CAPTURE_PADDING_BOTTOM;
-
-      const hasWallpaper = Boolean(wallpaper?.dataUrl);
-      const wallpaperOpacity = Number.isFinite(wallpaper?.imgOpacity)
-        ? Math.min(1, Math.max(0, wallpaper.imgOpacity / 100))
-        : 1;
-      const overlayAlpha = 0.68 + (1 - wallpaperOpacity) * 0.25;
-      const captureStyle = {
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: "18px",
-        boxShadow: "0 20px 44px rgba(0,0,0,0.28)",
-        padding: `${CAPTURE_PADDING_TOP}px ${CAPTURE_PADDING_X}px ${CAPTURE_PADDING_BOTTOM}px`,
-        boxSizing: "content-box",
-        width: `${contentWidth}px`,
-      };
-
-      if (hasWallpaper) {
-        captureStyle.backgroundColor = CAPTURE_BG_SOLID;
-        captureStyle.backgroundImage = `linear-gradient(rgba(13,13,16,${overlayAlpha.toFixed(2)}), rgba(13,13,16,${(overlayAlpha + 0.1).toFixed(2)})), url(${wallpaper.dataUrl})`;
-        captureStyle.backgroundSize = "cover, cover";
-        captureStyle.backgroundPosition = "center, center";
-        captureStyle.backgroundRepeat = "no-repeat, no-repeat";
-      } else {
-        captureStyle.background = CAPTURE_BACKGROUND;
-      }
+      // html-to-image is only needed here; keep it out of the startup bundle.
+      const [{ toBlob }, content] = await Promise.all([
+        import("html-to-image"),
+        Promise.resolve().then(() => measureCaptureContent(target)),
+      ]);
+      const layout = buildCaptureLayout(content.width, content.height, wallpaper);
 
       const blob = await toBlob(target, {
         backgroundColor: CAPTURE_BG_SOLID,
         cacheBust: true,
         pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-        width: totalWidth,
-        height: totalHeight,
+        width: layout.width,
+        height: layout.height,
         filter: (node) => !(node instanceof HTMLElement && node.dataset.copyImageIgnore === "true"),
-        style: captureStyle,
+        style: layout.style,
       });
-
-      if (!blob) {
-        throw new Error("Image capture returned no data.");
-      }
+      if (!blob) throw new Error("Image capture returned no data.");
 
       const dataUrl = await blobToDataUrl(blob);
       const copied = await window.api?.writeClipboardImage?.(dataUrl);
-      if (!copied) {
-        throw new Error("Clipboard write failed.");
-      }
+      if (!copied) throw new Error("Clipboard write failed.");
 
       setStatus("success");
     } catch (error) {
       console.error("[CopyImageBtn] Failed to copy image", error);
       setStatus("error");
-    } finally {
-      if (measureClone.parentNode) {
-        measureClone.parentNode.removeChild(measureClone);
-      }
     }
 
     queueReset();
   };
 
-  const color = status === "error"
-    ? "rgba(255,160,160,0.7)"
-    : status === "success"
-      ? "rgba(255,255,255,0.55)"
-      : status === "loading"
-        ? "rgba(255,255,255,0.55)"
-        : "rgba(255,255,255,0.3)";
-
   const isBusy = status === "loading";
 
   return (
     <button
-      onClick={handleCopy}
+      onClick={() => { void handleCopy(); }}
       disabled={isBusy}
       title={
         status === "success"
@@ -157,7 +125,7 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
       style={{
         background: "none",
         border: "none",
-        color,
+        color: STATUS_COLOR[status],
         cursor: isBusy ? "progress" : "pointer",
         padding: "2px 4px",
         borderRadius: 3,
@@ -170,12 +138,14 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
       }}
       onMouseEnter={(e) => {
         if (status === "idle") {
-          e.currentTarget.style.color = "rgba(255,255,255,0.5)";
+          e.currentTarget.style.color = "var(--text-secondary)";
+          e.currentTarget.style.background = "var(--control-bg-soft)";
         }
       }}
       onMouseLeave={(e) => {
         if (status === "idle") {
-          e.currentTarget.style.color = "rgba(255,255,255,0.3)";
+          e.currentTarget.style.color = "var(--text-muted)";
+          e.currentTarget.style.background = "none";
         }
       }}
     >
@@ -196,3 +166,5 @@ export default function CopyImageBtn({ targetRef, title = "Copy as image", wallp
     </button>
   );
 }
+
+export default memo(CopyImageBtn);

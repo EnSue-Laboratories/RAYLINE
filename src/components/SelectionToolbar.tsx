@@ -1,51 +1,62 @@
-// @ts-nocheck
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, type RefObject } from "react";
 import { Loader2 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-function getContainerNode(node) {
+import { copyText } from "../utils/exportHelpers";
+
+const REMARK_PLUGINS = [remarkGfm];
+
+interface SelectionAnchor {
+  text: string;
+  x: number;
+  y: number;
+}
+
+interface Explanation {
+  text: string;
+  loading: boolean;
+}
+
+export interface SelectionToolbarProps {
+  onQuote?: (text: string) => void;
+  /** Model id passed to quick-explain. */
+  model: string;
+  /** Only selections inside this element show the toolbar. */
+  selectionRootRef: RefObject<HTMLElement | null> | null | undefined;
+}
+
+function getContainerNode(node: Node | null): Node | null {
   if (!node) return null;
   return node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
 }
 
-async function copyText(text) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  textarea.style.pointerEvents = "none";
-  document.body.appendChild(textarea);
-  textarea.focus();
-  textarea.select();
-  document.execCommand("copy");
-  document.body.removeChild(textarea);
+function containsNode(root: HTMLElement, node: Node | null): boolean {
+  return node !== null && root.contains(node);
 }
 
-export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
-  const [sel, setSel] = useState(null); // { text, x, y }
-  const [explanation, setExplanation] = useState(null); // { text, loading }
+function isInside(element: HTMLElement | null, target: EventTarget | null): boolean {
+  return Boolean(element && target instanceof Node && element.contains(target));
+}
+
+export default function SelectionToolbar({ onQuote, model, selectionRootRef }: SelectionToolbarProps) {
+  const [sel, setSel] = useState<SelectionAnchor | null>(null);
+  const [explanation, setExplanation] = useState<Explanation | null>(null);
   const [explaining, setExplaining] = useState(false);
-  const toolbarRef = useRef(null);
-  const selectionRangeRef = useRef(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const selectionRangeRef = useRef<Range | null>(null);
 
   const dismiss = useCallback(() => {
     setSel(null);
     setExplanation(null);
   }, []);
 
-  const isSelectionInRoot = useCallback((selection) => {
+  const isSelectionInRoot = useCallback((selection: Selection | null): selection is Selection => {
     const root = selectionRootRef?.current;
     if (!root || !selection || selection.rangeCount === 0) return false;
-    return root.contains(getContainerNode(selection.anchorNode))
-      && root.contains(getContainerNode(selection.focusNode));
+    return containsNode(root, getContainerNode(selection.anchorNode))
+      && containsNode(root, getContainerNode(selection.focusNode));
   }, [selectionRootRef]);
 
   const restoreSelection = useCallback(() => {
@@ -63,9 +74,9 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
     }
   }, []);
 
-  const handleMouseUp = useCallback((e) => {
+  const handleMouseUp = useCallback((e: MouseEvent) => {
     // Ignore clicks inside the toolbar itself
-    if (toolbarRef.current && toolbarRef.current.contains(e.target)) return;
+    if (isInside(toolbarRef.current, e.target)) return;
 
     requestAnimationFrame(() => {
       const selection = window.getSelection();
@@ -88,11 +99,11 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
   }, [dismiss, explaining, isSelectionInRoot]);
 
   useEffect(() => {
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") dismiss();
     };
-    const onClick = (e) => {
-      if (toolbarRef.current && !toolbarRef.current.contains(e.target)) {
+    const onClick = (e: MouseEvent) => {
+      if (toolbarRef.current && !isInside(toolbarRef.current, e.target)) {
         const selection = window.getSelection();
         const text = selection?.toString().trim();
         if (!text || !isSelectionInRoot(selection)) dismiss();
@@ -184,7 +195,7 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
         }}>
           <ToolbarBtn
             label={explaining ? "Thinking..." : "Explain"}
-            onClick={handleExplain}
+            onClick={() => { void handleExplain(); }}
             active={!!explanation}
           />
           <div style={{ width: 1, height: 14, background: "var(--border)" }} />
@@ -195,7 +206,7 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
           <div style={{ width: 1, height: 14, background: "var(--border)" }} />
           <ToolbarBtn
             label="Copy"
-            onClick={handleCopy}
+            onClick={() => { void handleCopy(); }}
           />
         </div>
 
@@ -217,7 +228,13 @@ export default function SelectionToolbar({ onQuote, model, selectionRootRef }) {
   );
 }
 
-function ToolbarBtn({ label, onClick, active }) {
+interface ToolbarBtnProps {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+}
+
+function ToolbarBtn({ label, onClick, active = false }: ToolbarBtnProps) {
   const s = useFontScale();
   const [hovered, setHovered] = useState(false);
   return (
@@ -249,7 +266,12 @@ function ToolbarBtn({ label, onClick, active }) {
   );
 }
 
-function ExplainPane({ explanation, position }) {
+interface ExplainPaneProps {
+  explanation: Explanation;
+  position: "above" | "below";
+}
+
+function ExplainPane({ explanation, position }: ExplainPaneProps) {
   const s = useFontScale();
   return (
     <div style={{
@@ -285,7 +307,7 @@ function ExplainPane({ explanation, position }) {
           fontFamily: "var(--font-content)",
           letterSpacing: "0.005em",
         }}>
-          <Markdown remarkPlugins={[remarkGfm]}>
+          <Markdown remarkPlugins={REMARK_PLUGINS}>
             {explanation.text}
           </Markdown>
         </div>
