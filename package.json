@@ -21,15 +21,15 @@
     "test": "vitest run",
     "build:renderer": "vite build",
     "build:main": "node scripts/build-electron.ts",
-    "build": "npm run build:renderer && npm run build:main",
-    "build:electron": "npm run build && electron-builder --config electron-builder.config.ts",
-    "build:electron:mac": "npm run build && electron-builder --config electron-builder.config.ts --mac",
-    "build:electron:win": "npm run build && electron-builder --config electron-builder.config.ts --win --config.npmRebuild=false",
+    "build": "pnpm run build:renderer && pnpm run build:main",
+    "build:electron": "pnpm run build && electron-builder --config electron-builder.config.ts",
+    "build:electron:mac": "pnpm run build && electron-builder --config electron-builder.config.ts --mac",
+    "build:electron:win": "pnpm run build && electron-builder --config electron-builder.config.ts --win --config.npmRebuild=false",
     "lint": "eslint . --max-warnings=0",
     "verify:theme-tokens": "node scripts/verify-theme-tokens.ts",
     "smoke:cwd-recovery": "node scripts/smoke-cwd-recovery.ts",
     "preview": "vite preview",
-    "rebuild": "electron-rebuild -f -w node-pty"
+    "rebuild:electron": "electron-rebuild -f -w node-pty"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -76,5 +76,6 @@
     "vite": "^8.0.4",
     "vitest": "^5.0.3",
     "wait-on": "^9.0.5"
-  }
+  },
+  "packageManager": "pnpm@12.8.1"
 }

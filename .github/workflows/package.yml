@@ -40,17 +40,20 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build renderer + main process
-        run: npm run build
+        run: pnpm run build
 
       # Pre-create the GitHub release so electron-builder can publish assets to it.
       # If the release already exists (e.g. re-triggered CI), the || true suppresses the error.
@@ -77,7 +80,7 @@ jobs:
           else
             PUBLISH_FLAG="never"
           fi
-          npx electron-builder --config electron-builder.config.ts --win \
+          pnpm exec electron-builder --config electron-builder.config.ts --win \
             --publish "$PUBLISH_FLAG" \
             --config.npmRebuild=false
 
@@ -99,7 +102,7 @@ jobs:
           else
             PUBLISH_FLAG="never"
           fi
-          npx electron-builder --config electron-builder.config.ts --mac \
+          pnpm exec electron-builder --config electron-builder.config.ts --mac \
             --publish "$PUBLISH_FLAG"
 
       - name: Collect packaged files
@@ -153,20 +156,23 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y rpm fakeroot
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build renderer + main process
-        run: npm run build
+        run: pnpm run build
 
       - name: Create GitHub release (tag push only)
         if: startsWith(github.ref, 'refs/tags/')
@@ -189,7 +195,7 @@ jobs:
           else
             PUBLISH_FLAG="never"
           fi
-          npx electron-builder --config electron-builder.config.ts --linux deb rpm AppImage tar.gz \
+          pnpm exec electron-builder --config electron-builder.config.ts --linux deb rpm AppImage tar.gz \
             --publish "$PUBLISH_FLAG"
 
       - name: Collect packaged files
@@ -252,14 +258,17 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Install pnpm (version pinned in package.json)
+        run: npm install -g "$(node -p "require('./package.json').packageManager")"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build renderer + main process
-        run: npm run build
+        run: pnpm run build
 
       - name: Build app (unpacked)
-        run: npx electron-builder --config electron-builder.config.ts --linux dir
+        run: pnpm exec electron-builder --config electron-builder.config.ts --linux dir
 
       - name: Prepare PKGBUILD sources
         shell: bash

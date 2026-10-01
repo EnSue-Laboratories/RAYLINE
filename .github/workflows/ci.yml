@@ -11,19 +11,21 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      # Version comes from package.json "packageManager".
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
       # Skip install scripts (no Electron binary download), then build only the
       # native module the terminal tests load under Node.
-      - run: npm ci --ignore-scripts
-      - run: npm rebuild node-pty
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm rebuild node-pty
       - name: Typecheck
-        run: npm run typecheck
+        run: pnpm run typecheck
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
       - name: Test
-        run: npm test
+        run: pnpm test
       - name: Build renderer + main process
-        run: npm run build
+        run: pnpm run build

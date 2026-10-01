@@ -55,7 +55,7 @@ RayLine runs Claude Code, Codex, Grok, Antigravity (`agy`), OpenCode, and connec
 
 ## Quick Start
 
-You'll need Node.js 22.18 or newer (the build scripts run TypeScript directly through Node's built-in type stripping). The rest depends on which RayLine features you plan to use:
+You'll need Node.js 22.18 or newer (the build scripts run TypeScript directly through Node's built-in type stripping) and [pnpm](https://pnpm.io). The pnpm version is pinned in `package.json` (`packageManager`), so any recent pnpm — or `corepack enable` — switches to it automatically. The rest depends on which RayLine features you plan to use:
 
 - `claude` on your `PATH` plus an authenticated Claude Code environment for Claude chats and Claude session history
 - `codex` on your `PATH` for Codex chats and Codex session history
@@ -67,8 +67,8 @@ You'll need Node.js 22.18 or newer (the build scripts run TypeScript directly th
 - on Windows, Python and the Visual Studio C++ build tools for the `node-pty` rebuild
 
 ```bash
-npm install
-npm run dev:electron
+pnpm install
+pnpm dev:electron
 ```
 
 That starts the Vite renderer on port `5199` and launches Electron against it.
@@ -76,15 +76,15 @@ That starts the Vite renderer on port `5199` and launches Electron against it.
 Verbose debug logging is quiet by default. To enable it while capturing a dev log:
 
 ```bash
-RAYLINE_VERBOSE_LOGS=1 VITE_RAYLINE_VERBOSE_LOGS=1 npm run dev:electron 2>&1 | tee dev1.log
+RAYLINE_VERBOSE_LOGS=1 VITE_RAYLINE_VERBOSE_LOGS=1 pnpm dev:electron 2>&1 | tee dev1.log
 ```
 
 Claude, Codex, Grok, and Antigravity are available as soon as their CLIs resolve on your `PATH`. Use **Settings** to connect Multica and configure OpenCode, and open **GitHub Projects** to finish `gh` authentication if you want the built-in repo/issue/PR tooling.
 
-If Electron or `node-pty` was updated, rebuild the native module first:
+`node-pty` ships N-API prebuilds for macOS and Windows that load in both Node and Electron. On Linux, or if Electron or `node-pty` was updated and terminals stop working, rebuild it for Electron:
 
 ```bash
-npm run rebuild
+pnpm rebuild:electron
 ```
 
 If you're only working on the main UI, you can skip the rebuild — terminal sessions will stay unavailable until it succeeds.
@@ -93,12 +93,20 @@ If you're only working on the main UI, you can skip the rebuild — terminal ses
 
 | Command | What it does |
 |---|---|
-| `npm run dev:electron` | Vite on `5199` + esbuild watch for the main process + Electron |
-| `npm run typecheck` | `tsc` for the renderer, electron, and node (scripts) projects |
-| `npm run lint` | ESLint with type-aware `typescript-eslint` rules |
-| `npm test` | Vitest |
-| `npm run build` | Renderer (`dist/`) + main process, preloads, and helpers (`dist-electron/`) |
-| `npm run build:electron` | Build and package for the current platform (`build:electron:mac`, `build:electron:win` for specific targets) |
+| `pnpm dev:electron` | Vite on `5199` + esbuild watch for the main process + Electron |
+| `pnpm typecheck` | `tsc` for the renderer, electron, and node (scripts) projects |
+| `pnpm lint` | ESLint with type-aware `typescript-eslint` rules |
+| `pnpm test` | Vitest |
+| `pnpm build` | Renderer (`dist/`) + main process, preloads, and helpers (`dist-electron/`) |
+| `pnpm build:electron` | Build and package for the current platform (`build:electron:mac`, `build:electron:win` for specific targets) |
+
+Dependencies are managed with pnpm (`pnpm-workspace.yaml`):
+
+- `nodeLinker: hoisted` — electron-builder packages a flat `node_modules`.
+- `allowBuilds` — dependency install scripts are blocked unless listed (Electron, esbuild, node-pty); `pnpm install` fails on any new, unreviewed build script.
+- `minimumReleaseAge: 1440` — versions published in the last 24 hours aren't resolved.
+
+Worktrees can each run `pnpm install`; packages come from pnpm's shared store, so it takes seconds.
 
 Set `RAYLINE_USER_DATA_DIR=<dir>` to run against a separate profile, for example to try a build without touching your real conversations. The codebase is strict TypeScript throughout; see [`docs/refactor/CONVENTIONS.md`](docs/refactor/CONVENTIONS.md) before contributing.
 

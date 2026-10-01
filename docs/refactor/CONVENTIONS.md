@@ -6,8 +6,8 @@ The strict-TypeScript migration is complete: every source file in `src/`,
 TypeScript, and `allowJs` is off. The rules below started as migration
 guidelines and are now permanent repo conventions.
 
-Every change must pass `npm run typecheck`, `npm run lint` (the whole repo,
-zero errors and zero warnings), `npm test` and `npm run build`. CI runs all
+Every change must pass `pnpm typecheck`, `pnpm lint` (the whole repo,
+zero errors and zero warnings), `pnpm test` and `pnpm build`. CI runs all
 four.
 
 ## Hard rules
@@ -54,7 +54,7 @@ types); a rename touches every runtime, so call it out in the PR.
 
 ## PR checklist
 
-1. `npm run typecheck`, `npm run lint`, `npm test` and `npm run build` all pass.
+1. `pnpm typecheck`, `pnpm lint`, `pnpm test` and `pnpm build` all pass.
 2. No `any` (`grep -nE "\bany\b"`), no unexplained `as unknown as` or
    `eslint-disable`.
 3. The description lists any splits made, any behavior changes, and any
