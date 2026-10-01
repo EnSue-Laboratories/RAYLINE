@@ -6,7 +6,7 @@
 import type { AddressInfo } from "node:net";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 import type { TerminalWsBroadcast } from "@shared/terminal/types";
-import { createLogger } from "./deps";
+import { createLogger } from "../../logger";
 import { handleTerminalWsMessage, type TerminalSessionApi } from "./ws-protocol";
 
 const log = createLogger("terminal-manager");

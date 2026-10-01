@@ -7,7 +7,7 @@
 import type { ChildProcess } from "node:child_process";
 import type { AgentStartRequest } from "@shared/chat/types";
 import type { AgentEventSink } from "../../agent-sink";
-import { spawnCli } from "../common/boundary";
+import { spawnCli } from "../../cli-bin-resolver";
 import { buildAgentCliPrompt } from "../common/agent-prompt";
 import { donePayload, emitLaunchFailure } from "../common/done";
 import { writeImagesToTemp } from "../common/images";

@@ -7,7 +7,7 @@
 
 import type { AgentStartRequest } from "@shared/chat/types";
 import type { AgentEventSink } from "../../agent-sink";
-import { spawnCli } from "../common/boundary";
+import { spawnCli } from "../../cli-bin-resolver";
 import { buildAgentCliPrompt } from "../common/agent-prompt";
 import { errorMessage, readString } from "../common/json";
 import { buildOpenCodeServeArgs, buildPromptParts, parseOpenCodeModel } from "./config";
