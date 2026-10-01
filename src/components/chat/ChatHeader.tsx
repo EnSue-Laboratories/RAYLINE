@@ -8,7 +8,6 @@ import { IS_MAC, SIDEBAR_CHROME_RAIL_LEFT, SIDEBAR_CHROME_RAIL_WIDTH } from "../
 import BranchSelector from "../BranchSelector";
 import ExportConversationBtn from "../ExportConversationBtn";
 import GitStatusPill from "../GitStatusPill";
-import { NO_DRAG } from "../sidebar/appRegion";
 import type { TabStripTab } from "../sidebar/tabStrip";
 import TabStrip from "../TabStrip";
 import ChatModelPicker from "./ChatModelPicker";
@@ -88,7 +87,7 @@ function ChatHeader(props: ChatHeaderProps) {
             alignItems: "center",
             minWidth: 0,
             pointerEvents: "none",
-            ...NO_DRAG,
+            WebkitAppRegion: "no-drag",
           }}
         >
           <div style={{ flex: 1, minWidth: 0, pointerEvents: "auto" }}>
@@ -107,7 +106,7 @@ function ChatHeader(props: ChatHeaderProps) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: "none" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1, ...NO_DRAG }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1, WebkitAppRegion: "no-drag" }}>
             {props.title !== null && !showNewChatCard && (
               <div style={{ animation: "dropIn .2s ease", minWidth: 0 }}>
                 <div
@@ -131,7 +130,7 @@ function ChatHeader(props: ChatHeaderProps) {
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, ...NO_DRAG }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
             {showGit && (
               <GitStatusPill cwd={props.cwd} defaultPrBranch={props.defaultPrBranch} coauthorEnabled={props.coauthorEnabled} coauthorTrailer={props.coauthorTrailer} locale={props.locale} />
             )}
