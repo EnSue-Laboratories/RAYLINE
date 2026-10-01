@@ -1,10 +1,10 @@
 import { CheckCircle2, GitMerge, RotateCcw } from "lucide-react";
-import type { Translate } from "../boundary";
+import type { Translator } from "../../i18n";
 import { smallButtonStyle } from "../styles";
 import type { PmItemType } from "../types";
 
 interface DetailActionsProps {
-  t: Translate;
+  t: Translator;
   type: PmItemType;
   isOpen: boolean;
   isMerged: boolean;

@@ -1,12 +1,12 @@
 import { memo } from "react";
 import type { GhComment } from "@shared/github/types";
-import type { Translate } from "../boundary";
+import type { Translator } from "../../i18n";
 import { timeAgo } from "../format";
 import { MONO_FONT, SYSTEM_FONT } from "../styles";
 import MarkdownBody from "./MarkdownBody";
 
 interface CommentListProps {
-  t: Translate;
+  t: Translator;
   comments: GhComment[];
 }
 

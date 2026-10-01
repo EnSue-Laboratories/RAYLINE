@@ -3,15 +3,12 @@ import type { Appearance } from "@shared/state/types";
 import type { HostPlatform } from "@shared/system/types";
 import TerminalDrawer from "./components/TerminalDrawer";
 import WindowControls from "./components/WindowControls";
-import {
-  applyAppearanceToDocument,
-  applyAppearanceWindowBackground,
-  getWallpaperImageFilter,
-  normalizeAppearance,
-  normalizeWallpaper,
-  useTheme,
-  type TerminalWallpaper,
-} from "./components/terminal/boundary";
+import type { TerminalWallpaper } from "./components/terminal/theme";
+import { LocaleProvider } from "./contexts/LocaleContext";
+import { useTheme } from "./contexts/ThemeContext";
+import { detectDefaultLocale, normalizeLocale, type Locale } from "./i18n";
+import { applyAppearanceToDocument, applyAppearanceWindowBackground, normalizeAppearance } from "./utils/appearance";
+import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 import useTerminal from "./hooks/useTerminal";
 
 function isSameJsonValue(a: unknown, b: unknown): boolean {
@@ -35,6 +32,7 @@ export default function TerminalWindow() {
   const [appearance, setAppearance] = useState<Appearance>(() => normalizeAppearance());
   const [hasLoadedWallpaper, setHasLoadedWallpaper] = useState(false);
   const [platform, setPlatform] = useState<HostPlatform | null>(null);
+  const [locale, setLocale] = useState<Locale>(() => detectDefaultLocale());
   const showWindowControls = platform === "win32";
 
   const nudgeActiveTerminalLayout = useCallback(() => {
@@ -51,7 +49,8 @@ export default function TerminalWindow() {
     try {
       const state = await window.api.loadState();
       setAppearance(keepIfSame(normalizeAppearance(state?.appearance)));
-      const nextWallpaper = normalizeWallpaper(state?.wallpaper);
+      if (state?.locale) setLocale(normalizeLocale(state.locale));
+      const nextWallpaper = normalizeWallpaper(state?.wallpaper ? { ...state.wallpaper } : null);
       if (!nextWallpaper) {
         setWallpaper(null);
         return;
@@ -138,60 +137,62 @@ export default function TerminalWindow() {
   const wallpaperUrl = wallpaper?.dataUrl;
 
   return (
-    <div
-      style={{
-        height: "100vh",
-        width: "100vw",
-        overflow: "hidden",
-        position: "relative",
-        backgroundColor: "var(--pane-background)",
-        backgroundImage: wallpaperUrl ? `url(${wallpaperUrl})` : "none",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        filter: "none",
-        display: "flex",
-      }}
-    >
-      {wallpaperUrl && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 0,
-            backgroundImage: `url(${wallpaperUrl})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
-            filter: getWallpaperImageFilter(wallpaper),
-            opacity: ((wallpaper?.imgOpacity ?? 100) / 100).toFixed(3),
-            transform: wallpaper?.imgBlur ? "scale(1.04)" : "none",
-          }}
-        />
-      )}
+    <LocaleProvider locale={locale} onLocaleChange={setLocale}>
+      <div
+        style={{
+          height: "100vh",
+          width: "100vw",
+          overflow: "hidden",
+          position: "relative",
+          backgroundColor: "var(--pane-background)",
+          backgroundImage: wallpaperUrl ? `url(${wallpaperUrl})` : "none",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          filter: "none",
+          display: "flex",
+        }}
+      >
+        {wallpaperUrl && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 0,
+              backgroundImage: `url(${wallpaperUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+              filter: getWallpaperImageFilter(wallpaper),
+              opacity: ((wallpaper?.imgOpacity ?? 100) / 100).toFixed(3),
+              transform: wallpaper?.imgBlur ? "scale(1.04)" : "none",
+            }}
+          />
+        )}
 
-      <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", minWidth: 0, isolation: "isolate" }}>
-        <TerminalDrawer
-          sessions={terminal.sessions}
-          activeSession={terminal.activeSession}
-          onSelectSession={terminal.setActiveSession}
-          onCreateSession={terminal.createSession}
-          onKillSession={terminal.killSession}
-          onSendInput={terminal.sendInput}
-          onResizeSession={terminal.resizeSession}
-          drawerOpen
-          registerTerminal={terminal.registerTerminal}
-          unregisterTerminal={terminal.unregisterTerminal}
-          wallpaper={wallpaper}
-          windowControlsVisible={showWindowControls}
-          windowMode
-          onRequestClose={closeCurrentWindow}
-        />
+        <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", minWidth: 0, isolation: "isolate" }}>
+          <TerminalDrawer
+            sessions={terminal.sessions}
+            activeSession={terminal.activeSession}
+            onSelectSession={terminal.setActiveSession}
+            onCreateSession={terminal.createSession}
+            onKillSession={terminal.killSession}
+            onSendInput={terminal.sendInput}
+            onResizeSession={terminal.resizeSession}
+            drawerOpen
+            registerTerminal={terminal.registerTerminal}
+            unregisterTerminal={terminal.unregisterTerminal}
+            wallpaper={wallpaper}
+            windowControlsVisible={showWindowControls}
+            windowMode
+            onRequestClose={closeCurrentWindow}
+          />
+        </div>
+
+        {/* Rendered last so its no-drag region overrides the TerminalDrawer header's
+            drag region in Electron's paint-order drag resolution. */}
+        <WindowControls visible={showWindowControls} />
       </div>
-
-      {/* Rendered last so its no-drag region overrides the TerminalDrawer header's
-          drag region in Electron's paint-order drag resolution. */}
-      <WindowControls visible={showWindowControls} />
-    </div>
+    </LocaleProvider>
   );
 }

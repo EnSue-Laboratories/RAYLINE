@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { X } from "lucide-react";
 import type { TerminalSessionInfo } from "@shared/terminal/types";
-import { useFontScale } from "./boundary";
+import { useFontScale } from "../../contexts/FontSizeContext";
 import { FONT_FAMILY } from "./theme";
 
 interface TabBarProps {

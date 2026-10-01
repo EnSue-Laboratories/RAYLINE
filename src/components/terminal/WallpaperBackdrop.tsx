@@ -1,5 +1,5 @@
-import { getWallpaperImageFilter, type TerminalWallpaper } from "./boundary";
-import { getTerminalWallpaperOverlayAlpha, getWallpaperOpacityValue } from "./theme";
+import { getWallpaperImageFilter } from "../../utils/wallpaper";
+import { getTerminalWallpaperOverlayAlpha, getWallpaperOpacityValue, type TerminalWallpaper } from "./theme";
 
 interface WallpaperBackdropProps {
   wallpaper: TerminalWallpaper & { dataUrl: string };

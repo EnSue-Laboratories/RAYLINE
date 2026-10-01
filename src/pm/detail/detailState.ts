@@ -1,5 +1,5 @@
 import type { GhComment, GhIssue, GhPullRequest } from "@shared/github/types";
-import type { Translate } from "../boundary";
+import type { Translator } from "../../i18n";
 import type { PmItemType } from "../types";
 
 export type DetailItem = GhIssue | GhPullRequest;
@@ -14,7 +14,7 @@ export interface StateBadge {
   color: string;
 }
 
-export function getStateBadge(type: PmItemType, item: DetailItem, t: Translate): StateBadge {
+export function getStateBadge(type: PmItemType, item: DetailItem, t: Translator): StateBadge {
   if (isMergedPr(type, item)) return { label: t("pm.mergedState"), bg: "var(--accent-bg)", color: "var(--accent-text)" };
   if (item.state === "closed") return { label: t("pm.closedState"), bg: "var(--accent-bg)", color: "var(--accent-text)" };
   return { label: t("pm.openState"), bg: "var(--success-bg)", color: "var(--success-text)" };

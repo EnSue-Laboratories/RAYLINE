@@ -1,11 +1,14 @@
 import type { CSSProperties } from "react";
 import type { ITheme, Terminal } from "@xterm/xterm";
-import type { TerminalWallpaper } from "./boundary";
+import type { Wallpaper } from "@shared/state/types";
 
 /** Electron's `-webkit-app-region`, which React's CSSProperties doesn't know. */
 export type AppRegionStyle = CSSProperties & { WebkitAppRegion?: "drag" | "no-drag" };
 
 export type TerminalThemeMode = "light" | "dark";
+
+/** Wallpaper as passed to the terminal surfaces (`normalizeWallpaper` output). */
+export type TerminalWallpaper = Partial<Wallpaper>;
 
 export const DEFAULT_FONT_FAMILY = "'JetBrains Mono','Fira Code',monospace";
 export const FONT_FAMILY = "var(--font-mono)";

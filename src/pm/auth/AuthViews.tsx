@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { AlertCircle, Check, Copy, ExternalLink, Loader2 } from "lucide-react";
-import type { Translate } from "../boundary";
+import type { Translator } from "../../i18n";
 import { MONO_FONT, SPIN_ANIMATION, SPIN_KEYFRAMES, SYSTEM_FONT } from "../styles";
 
 const primaryBtn: CSSProperties = {
@@ -43,7 +43,7 @@ function Label({ children, style }: { children: ReactNode; style?: CSSProperties
 }
 
 interface RetryActionsProps {
-  t: Translate;
+  t: Translator;
   retryLabel: string;
   onRetry: () => void;
   onClose: () => void;
@@ -58,7 +58,7 @@ function RetryActions({ t, retryLabel, onRetry, onClose }: RetryActionsProps) {
   );
 }
 
-export function StartingView({ t }: { t: Translate }) {
+export function StartingView({ t }: { t: Translator }) {
   return (
     <Center>
       <Loader2 size={22} style={{ animation: SPIN_ANIMATION, color: "var(--text-muted)" }} />
@@ -68,7 +68,7 @@ export function StartingView({ t }: { t: Translate }) {
   );
 }
 
-export function CodeView({ t, code }: { t: Translate; code: string }) {
+export function CodeView({ t, code }: { t: Translator; code: string }) {
   const [copied, setCopied] = useState(false);
 
   const copyCode = async () => {
@@ -132,7 +132,7 @@ export function CodeView({ t, code }: { t: Translate; code: string }) {
   );
 }
 
-export function SuccessView({ t, user }: { t: Translate; user: string | null }) {
+export function SuccessView({ t, user }: { t: Translator; user: string | null }) {
   return (
     <Center>
       <div
@@ -157,7 +157,7 @@ export function SuccessView({ t, user }: { t: Translate; user: string | null }) 
 }
 
 interface ErrorViewProps {
-  t: Translate;
+  t: Translator;
   error: string;
   output: string | null;
   onRetry: () => void;
@@ -228,7 +228,7 @@ export function ErrorView({ t, error, output, onRetry, onClose }: ErrorViewProps
   );
 }
 
-export function CancelledView({ t, onRetry, onClose }: { t: Translate; onRetry: () => void; onClose: () => void }) {
+export function CancelledView({ t, onRetry, onClose }: { t: Translator; onRetry: () => void; onClose: () => void }) {
   return (
     <Center>
       <Label>{t("pm.authCancelled")}</Label>

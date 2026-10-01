@@ -1,5 +1,4 @@
-import { useMemo } from "react";
-import { createTranslator, type Locale } from "../pm/boundary";
+import { useTranslator } from "../contexts/LocaleContext";
 import { CancelledView, CodeView, ErrorView, StartingView, SuccessView } from "../pm/auth/AuthViews";
 import type { AuthFlowState } from "../pm/auth/authFlow";
 import { useGhAuthFlow } from "../pm/auth/useGhAuthFlow";
@@ -13,12 +12,11 @@ interface AuthModalProps {
   currentUser?: string | null;
   onClose: () => void;
   onAuthSuccess?: (user: string | null) => void;
-  locale?: Locale;
 }
 
 /** GitHub device-flow sign-in (or "add another account"). */
-export default function AuthModal({ mode = "signin", currentUser, onClose, onAuthSuccess, locale = "en-US" }: AuthModalProps) {
-  const t = useMemo(() => createTranslator(locale), [locale]);
+export default function AuthModal({ mode = "signin", currentUser, onClose, onAuthSuccess }: AuthModalProps) {
+  const t = useTranslator();
   const isAddAccount = mode === "add" || mode === "switch";
   const { state, retry } = useGhAuthFlow(onAuthSuccess);
   const handleRetry = () => void retry();

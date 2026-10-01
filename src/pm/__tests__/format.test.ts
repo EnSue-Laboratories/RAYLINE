@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Translate } from "../boundary";
+import type { Translator } from "../../i18n";
 import {
   buildGithubNewItemUrl,
   checkoutCommand,
@@ -11,7 +11,7 @@ import {
   timeAgo,
 } from "../format";
 
-const t: Translate = (key, vars) => `${key}:${vars?.count ?? ""}`;
+const t: Translator = (key, vars) => `${key}:${vars?.count ?? ""}`;
 const NOW = Date.parse("2026-01-31T12:00:00Z");
 const ago = (ms: number) => new Date(NOW - ms).toISOString();
 

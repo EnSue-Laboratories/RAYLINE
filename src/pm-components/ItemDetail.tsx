@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ArrowLeft, Check, Copy } from "lucide-react";
 import CommentBox from "./CommentBox";
-import { createTranslator, type Locale } from "../pm/boundary";
+import { useTranslator } from "../contexts/LocaleContext";
 import AssigneePicker from "../pm/detail/AssigneePicker";
 import CommentList from "../pm/detail/CommentList";
 import DetailActions from "../pm/detail/DetailActions";
@@ -18,12 +18,11 @@ interface ItemDetailProps {
   number: number;
   type: PmItemType;
   onBack: () => void;
-  locale?: Locale;
 }
 
 /** Issue / PR detail: header, assignees, body, comments and actions. */
-export default function ItemDetail({ repo, number, type, onBack, locale }: ItemDetailProps) {
-  const t = useMemo(() => createTranslator(locale), [locale]);
+export default function ItemDetail({ repo, number, type, onBack }: ItemDetailProps) {
+  const t = useTranslator();
   const detail = useItemDetail(repo, number, type);
   const [copiedCheckout, setCopiedCheckout] = useState(false);
   const { item } = detail;
@@ -126,7 +125,6 @@ export default function ItemDetail({ repo, number, type, onBack, locale }: ItemD
         repo={repo}
         number={number}
         onCommentAdded={() => void detail.refreshComments()}
-        locale={locale}
         actions={
           <DetailActions
             t={t}

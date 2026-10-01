@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Check, ChevronDown, Loader2 } from "lucide-react";
 import type { GhAuthAccount } from "@shared/github/types";
-import type { Translate } from "../boundary";
+import type { Translator } from "../../i18n";
 import GitHubIcon from "../GitHubIcon";
 import { MONO_FONT, SPIN_ANIMATION } from "../styles";
 
 interface AccountSwitcherProps {
-  t: Translate;
+  t: Translator;
   accounts: GhAuthAccount[];
   activeUser: string | null;
   loadingAccounts: boolean;
@@ -16,7 +16,7 @@ interface AccountSwitcherProps {
 }
 
 interface AccountOptionProps {
-  t: Translate;
+  t: Translator;
   login: string;
   isActive: boolean;
   isSwitching: boolean;

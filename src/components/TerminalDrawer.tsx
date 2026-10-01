@@ -1,9 +1,10 @@
 import type { TerminalCreateOptions, TerminalCreateResult, TerminalSessionInfo } from "@shared/terminal/types";
 import { useStableCallback } from "../hooks/useStableCallback";
+import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
-import { getPaneSurfaceStyle, type TerminalWallpaper } from "./terminal/boundary";
 import EmptyState from "./terminal/EmptyState";
 import TerminalToolbar from "./terminal/TerminalToolbar";
+import type { TerminalWallpaper } from "./terminal/theme";
 import TerminalViewport from "./terminal/TerminalViewport";
 import type { TerminalHandle } from "./terminal/types";
 import { useDrawerResize } from "./terminal/useDrawerResize";

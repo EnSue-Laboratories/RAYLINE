@@ -1,9 +1,8 @@
-import { useMemo } from "react";
 import { Loader2, LogOut, Plus } from "lucide-react";
 import AccountSwitcher from "../pm/accounts/AccountSwitcher";
 import ActionRow from "../pm/accounts/ActionRow";
 import { useGhAccounts } from "../pm/accounts/useGhAccounts";
-import { createTranslator, type Locale } from "../pm/boundary";
+import { useTranslator } from "../contexts/LocaleContext";
 import ModalShell from "../pm/ModalShell";
 import { SPIN_ANIMATION, SPIN_KEYFRAMES, SYSTEM_FONT } from "../pm/styles";
 
@@ -13,12 +12,11 @@ interface AccountManagerProps {
   onAccountSwitched?: (login: string) => unknown;
   onSignedOut?: () => unknown;
   onClose: () => void;
-  locale?: Locale;
 }
 
 /** Switch between gh accounts, add one, or sign out. */
-export default function AccountManager({ currentUser, onAddAccount, onAccountSwitched, onSignedOut, onClose, locale }: AccountManagerProps) {
-  const t = useMemo(() => createTranslator(locale), [locale]);
+export default function AccountManager({ currentUser, onAddAccount, onAccountSwitched, onSignedOut, onClose }: AccountManagerProps) {
+  const t = useTranslator();
   const { accounts, activeUser, loadingAccounts, switchingUser, signingOut, error, switchAccount, signOut } = useGhAccounts({
     currentUser,
     onAccountSwitched,

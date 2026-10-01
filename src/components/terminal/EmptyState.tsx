@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Terminal as TerminalIcon } from "lucide-react";
-import { useFontScale } from "./boundary";
+import { useFontScale } from "../../contexts/FontSizeContext";
 import { FONT_FAMILY } from "./theme";
 import { useHoverStyle } from "./useHoverStyle";
 

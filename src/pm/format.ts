@@ -1,10 +1,10 @@
-import type { Translate } from "./boundary";
+import type { Translator } from "../i18n";
 import type { PmItemType } from "./types";
 
 const MINUTE_MS = 60_000;
 
 /** "5m ago" style relative time via the pm.time* strings. */
-export function timeAgo(dateStr: string, t: Translate, now: number = Date.now()): string {
+export function timeAgo(dateStr: string, t: Translator, now: number = Date.now()): string {
   const mins = Math.floor((now - new Date(dateStr).getTime()) / MINUTE_MS);
   if (mins < 60) return t("pm.timeMinutesAgo", { count: mins });
   const hrs = Math.floor(mins / 60);

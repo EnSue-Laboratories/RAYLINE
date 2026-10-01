@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Plus } from "lucide-react";
 import type { GhUser } from "@shared/github/types";
-import type { Translate } from "../boundary";
+import type { Translator } from "../../i18n";
 import { SYSTEM_FONT } from "../styles";
 
 interface AssigneePickerProps {
-  t: Translate;
+  t: Translator;
   assignees: GhUser[];
   collaborators: GhUser[];
   onToggle: (login: string) => void;

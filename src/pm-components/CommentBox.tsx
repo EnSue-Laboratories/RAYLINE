@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { createTranslator, type Locale } from "../pm/boundary";
+import { useState, type ReactNode } from "react";
+import { useTranslator } from "../contexts/LocaleContext";
 import { MONO_FONT, SYSTEM_FONT } from "../pm/styles";
 
 interface CommentBoxProps {
@@ -8,11 +8,10 @@ interface CommentBoxProps {
   onCommentAdded: () => void;
   /** Extra buttons rendered left of "Comment" (merge / close / reopen). */
   actions?: ReactNode;
-  locale?: Locale;
 }
 
-export default function CommentBox({ repo, number, onCommentAdded, actions, locale }: CommentBoxProps) {
-  const t = useMemo(() => createTranslator(locale), [locale]);
+export default function CommentBox({ repo, number, onCommentAdded, actions }: CommentBoxProps) {
+  const t = useTranslator();
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const hasText = Boolean(body.trim());

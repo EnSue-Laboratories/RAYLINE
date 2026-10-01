@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Plus, X, Terminal as TerminalIcon } from "lucide-react";
 import type { TerminalSessionInfo } from "@shared/terminal/types";
 import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../../windowChrome";
-import { useFontScale } from "./boundary";
+import { useFontScale } from "../../contexts/FontSizeContext";
 import IconButton from "./IconButton";
 import TabBar from "./TabBar";
 import { FONT_FAMILY, type AppRegionStyle } from "./theme";
