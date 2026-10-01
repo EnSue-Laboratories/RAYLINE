@@ -1,11 +1,17 @@
-// @ts-nocheck
-import { useState } from "react";
-import { ChevronRight, ChevronDown, Terminal, FileText, Pencil, Search, Code, Loader2 } from "lucide-react";
+import { memo, useMemo, useState, type CSSProperties } from "react";
+import { ChevronRight, ChevronDown, Terminal, FileText, Pencil, Search, Code, Loader2, type LucideIcon } from "lucide-react";
+import type { ToolPart } from "@shared/chat/types";
 import { useFontScale } from "../contexts/FontSizeContext";
+import {
+  BODY_PREVIEW_LIMIT,
+  buildToolBodyView,
+  getToolLabel,
+  getToolPreview,
+  nextVisibleLimit,
+  serializeToolValue,
+} from "./blocks/toolCallSummary";
 
-const BODY_PREVIEW_LIMIT = 2400;
-
-const TOOL_ICONS = {
+const TOOL_ICONS: Readonly<Record<string, LucideIcon>> = {
   Bash: Terminal,
   Read: FileText,
   Edit: Pencil,
@@ -14,61 +20,32 @@ const TOOL_ICONS = {
   Glob: Search,
 };
 
-function truncate(str, max) {
-  if (!str) return null;
-  return str.length > max ? str.slice(0, max) + "..." : str;
+type FontScale = (px: number) => number;
+
+interface ToolBodyProps {
+  label: "ARGS" | "RESULT";
+  value: unknown;
+  maxHeight: number;
+  fontScale: FontScale;
 }
 
-function getToolLabel(tool) {
-  if (!tool?.name) return "Tool";
-  if (tool.args?.command && tool.name === tool.args.command) return "Command";
-  if (tool.name.startsWith("/") || tool.name.includes(" -lc ") || tool.name.includes(" --")) {
-    return "Command";
-  }
-  return tool.name;
-}
+// TODO(i18n): data-i18n owns these strings (keys tool.arguments, tool.result,
+// tool.showMore, tool.showLess, tool.remaining, tool.done from #230).
+const BODY_LABELS = { ARGS: "ARGS", RESULT: "RESULT" } as const;
 
-function getPreview(tool) {
-  const args = tool.args;
-  if (!args || typeof args !== "object") return null;
-  if (tool.name === "Bash") {
-    let cmd = args.command?.replace(/\n/g, " ") || "";
-    // Replace absolute/home paths with just the binary name
-    cmd = cmd.replace(/(?:^|\s)[~/][\w.~/:-]+\/([\w.-]+)/g, (_, bin) => " " + bin);
-    return truncate(cmd.trim(), 30);
-  }
-  if (args.command) {
-    return truncate(args.command.replace(/\s+/g, " ").trim(), 48);
-  }
-  if (tool.name === "Read") return args.file_path?.split("/").pop();
-  if (tool.name === "Edit") return args.file_path?.split("/").pop();
-  if (tool.name === "Write") return args.file_path?.split("/").slice(-2).join("/");
-  if (tool.name === "Grep") return truncate(args.pattern || args.query, 25);
-  if (tool.name === "Glob") return truncate(args.pattern || args.glob, 25);
-  if (tool.name === "Search") return truncate(args.query || args.pattern, 25);
-  if (tool.name === "Agent") return truncate(args.description, 30);
-  if (tool.name === "WebSearch") return truncate(args.query, 30);
-  if (tool.name === "WebFetch") return truncate(args.url, 30);
-  if (tool.name === "Skill") return args.skill || args.name || null;
-  if (tool.name === "LSP") return truncate(args.method || args.action, 25);
-  if (tool.name === "NotebookEdit") return args.file_path?.split("/").pop();
-  return null;
-}
-
-function serializeValue(value) {
-  if (value == null) return null;
-  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
-}
-
-function ToolBody({ label, value, maxHeight, fontScale }) {
-  const [showFull, setShowFull] = useState(false);
-  const serialized = serializeValue(value);
-  if (!serialized) return null;
-
-  const isTrimmed = serialized.length > BODY_PREVIEW_LIMIT;
-  const displayValue = !showFull && isTrimmed
-    ? `${serialized.slice(0, BODY_PREVIEW_LIMIT)}\n\n... [truncated ${serialized.length - BODY_PREVIEW_LIMIT} chars]`
-    : serialized;
+function ToolBody({ label, value, maxHeight, fontScale }: ToolBodyProps) {
+  // Large outputs are revealed incrementally (never all at once) so a 5 MB
+  // result can't freeze the renderer; the stored value is untouched.
+  const [visibleLimit, setVisibleLimit] = useState(BODY_PREVIEW_LIMIT);
+  // Serialization + redaction are the expensive parts; redo them only when
+  // the value or the visible window changes.
+  const serialized = useMemo(() => serializeToolValue(value), [value]);
+  const view = useMemo(
+    () => (serialized ? buildToolBodyView(serialized, visibleLimit) : null),
+    [serialized, visibleLimit],
+  );
+  if (!serialized || !view) return null;
+  const hasMore = view.remaining > 0;
 
   return (
     <div style={{ marginBottom: label === "ARGS" ? 8 : 0 }}>
@@ -80,10 +57,10 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
         justifyContent: "space-between",
         gap: 8,
       }}>
-        <span>{label}</span>
-        {isTrimmed && (
+        <span>{BODY_LABELS[label]}</span>
+        {view.isTrimmed && (
           <button
-            onClick={() => setShowFull((prev) => !prev)}
+            onClick={() => setVisibleLimit((prev) => nextVisibleLimit(serialized.length, prev))}
             style={{
               border: "none",
               background: "none",
@@ -94,14 +71,16 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
               padding: 0,
             }}
           >
-            {showFull ? "show less" : "show full"}
+            {hasMore ? "show more" : "show less"}
           </button>
         )}
       </div>
       <pre style={{
         color: "var(--text-secondary)",
         whiteSpace: "pre-wrap",
-        wordBreak: "break-all",
+        overflowWrap: "anywhere",
+        wordBreak: "normal",
+        lineBreak: "strict",
         margin: 0,
         padding: 8,
         background: "var(--control-bg-contrast)",
@@ -110,30 +89,39 @@ function ToolBody({ label, value, maxHeight, fontScale }) {
         maxHeight,
         overflow: "auto",
       }}>
-        {displayValue}
+        {view.text}
+        {hasMore && `\n\n… [${view.remaining} more chars]`}
       </pre>
     </div>
   );
 }
 
-export default function ToolCallBlock({ tool }) {
+const ROOT_STYLE: CSSProperties = {
+  margin: "8px 0",
+  borderRadius: 8,
+  border: "1px solid var(--pane-border)",
+  background: "var(--control-bg-subtle)",
+  overflow: "hidden",
+};
+
+/** Fields of a tool part the block actually renders. */
+export type ToolCallBlockTool = Pick<ToolPart, "name" | "args" | "result" | "status">;
+
+export interface ToolCallBlockProps {
+  tool: ToolCallBlockTool;
+}
+
+function ToolCallBlock({ tool }: ToolCallBlockProps) {
   const [expanded, setExpanded] = useState(false);
   const s = useFontScale();
-  const Icon = TOOL_ICONS[tool.name] || Code;
+  const Icon = TOOL_ICONS[tool.name] ?? Code;
   const isRunning = tool.status === "running";
-  const preview = getPreview(tool);
+  const preview = useMemo(() => getToolPreview(tool), [tool]);
   const toolLabel = getToolLabel(tool);
+  const hasArgs = Boolean(tool.args) && Object.keys(tool.args).length > 0;
 
   return (
-    <div
-      style={{
-        margin: "8px 0",
-        borderRadius: 8,
-        border: "1px solid var(--pane-border)",
-        background: "var(--control-bg-subtle)",
-        overflow: "hidden",
-      }}
-    >
+    <div style={ROOT_STYLE}>
       <button
         onClick={() => setExpanded(!expanded)}
         style={{
@@ -187,10 +175,23 @@ export default function ToolCallBlock({ tool }) {
 
       {expanded && (
         <div style={{ padding: "0 12px 10px", fontSize: s(11), fontFamily: "var(--font-mono)" }}>
-          {tool.args && Object.keys(tool.args).length > 0 && <ToolBody label="ARGS" value={tool.args} maxHeight={200} fontScale={s} />}
+          {hasArgs && <ToolBody label="ARGS" value={tool.args} maxHeight={200} fontScale={s} />}
           {tool.result != null && <ToolBody label="RESULT" value={tool.result} maxHeight={300} fontScale={s} />}
         </div>
       )}
     </div>
   );
 }
+
+/**
+ * Stream flushes currently clone every part (`{ ...part }`), so the `tool`
+ * object identity changes even when nothing visible did. Compare the fields
+ * we render instead; `args` / `result` keep their identity across clones.
+ */
+function areToolCallPropsEqual(prev: ToolCallBlockProps, next: ToolCallBlockProps): boolean {
+  const a = prev.tool;
+  const b = next.tool;
+  return a === b || (a.name === b.name && a.status === b.status && a.args === b.args && a.result === b.result);
+}
+
+export default memo(ToolCallBlock, areToolCallPropsEqual);
