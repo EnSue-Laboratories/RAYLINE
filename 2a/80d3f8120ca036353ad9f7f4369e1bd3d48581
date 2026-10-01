@@ -1,0 +1,19 @@
+src/data/multicaModels.tsx
+  s_d0fb9aefa2e5fb::t_2587d1023ac523 2-6,8-45,48-62,67-76,78-115,118-119,122-123,125-126,129-149,152,155-158,163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "2a80d3f8120ca036353ad9f7f4369e1bd3d48581",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
