@@ -1,0 +1,228 @@
+src/components/new-chat/NewChatCard.tsx
+  s_d0fb9aefa2e5fb::t_ac73033cd0bf28 3-409
+src/components/settings/OpenCodeModelForm.tsx
+  s_d0fb9aefa2e5fb::t_8fceec5c078bdc 1-177
+shared/providers/types.ts
+  s_d0fb9aefa2e5fb::t_01e88224ffed76 93-98
+src/components/ProjectGroup.tsx
+  s_d0fb9aefa2e5fb::t_d0806990b5e76a 1-2,4-36,48-50,52-53,55-96,100,104-114,127-137,140-148,150-151
+src/components/settings/UpdatesSection.tsx
+  s_d0fb9aefa2e5fb::t_bde23565c5e381 1-198
+src/components/settings/__tests__/helpers.test.ts
+  s_d0fb9aefa2e5fb::t_48fd718bb99ae8 1-225
+src/components/SidebarWindowsHeader.tsx
+  s_d0fb9aefa2e5fb::t_f2239f1fe84db1 1,3,5,10-17,23,32-40,42,52-62,70-71,87,92,94-96,101-110,120-130,136,139-140,142-146,149-173
+electron/services/github/repos.ts
+  s_d0fb9aefa2e5fb::t_fcf8b6ea488b6d 1-198
+src/components/settings/styles.ts
+  s_d0fb9aefa2e5fb::t_0893af9647eab6 1-230
+electron/services/sessions/lines.ts
+  s_d0fb9aefa2e5fb::t_99d24f3da24ce7 1-74
+src/components/sidebar/__tests__/search.test.ts
+  s_d0fb9aefa2e5fb::t_5b59b19da1e378 1-102
+src/components/settings/updater.ts
+  s_d0fb9aefa2e5fb::t_43256b671efa14 1-48
+src/components/sidebar/modalStyles.ts
+  s_d0fb9aefa2e5fb::t_12ad526ad827d1 1-109
+vite.config.ts
+  s_d0fb9aefa2e5fb::t_bf7ca420e6c082 1
+  s_d0fb9aefa2e5fb::t_fb9e517a8b56df 11-14
+src/components/settings/RuntimeProviderRow.tsx
+  s_d0fb9aefa2e5fb::t_db45d092434585 2-145
+src/components/git/branchModel.ts
+  s_d0fb9aefa2e5fb::t_1dda6548fbc195 1-68
+src/components/CopyImageBtn.tsx
+  s_d0fb9aefa2e5fb::t_229b131c2c7807 1,4,6,8-14,17,23-51,54-55,59,71,78-83,89-90,92,94,98,113,128,141-142,147-148,169-170
+src/components/ValueControlBlock.tsx
+  s_d0fb9aefa2e5fb::t_31ea73c37e68e9 1,3-4,6-9,12,14-18,22-23,27-35,38,43,49-52,57-61,64,66-71,73-75,77-78,80-89,92-93
+src/components/git/IconActionButton.tsx
+  s_d0fb9aefa2e5fb::t_0e6a45b1baae86 1-112
+src/components/git/__tests__/gitModels.test.ts
+  s_d0fb9aefa2e5fb::t_c9fb909e8e8bbd 1-147
+src/components/git/useBranchData.ts
+  s_d0fb9aefa2e5fb::t_cb99917ddf079b 1-41
+src/components/settings/UpstreamsSection.tsx
+  s_d0fb9aefa2e5fb::t_73c2b4490dc013 1-211
+src/components/settings/helpers.ts
+  s_d0fb9aefa2e5fb::t_d3804bc8c0387b 1-306
+src/components/sidebar/dropdownPosition.ts
+  s_d0fb9aefa2e5fb::t_48bfd325211d80 1-92
+electron/services/terminal/metadata.ts
+  s_d0fb9aefa2e5fb::t_b3a7e192263d38 1-42
+src/components/git/WorktreeListPanel.tsx
+  s_d0fb9aefa2e5fb::t_c929e10c29a0fd 1-313
+src/components/HoverIconButton.tsx
+  s_d0fb9aefa2e5fb::t_c6163e76d7c96b 1,4-23,36-39,41-46,59-68,85
+src/components/GitStatusPill.tsx
+  s_d0fb9aefa2e5fb::t_5ae786ebb2892a 1-2,4-10,14-20,23-30,32,34-44,46-48,53-54,56,58-59,62-65,68-71,73-76,81,85,94-95,97-100,102-104,107,113-114,133,135-136,140-142,146-150,153-158
+electron/services/terminal/shell-env.ts
+  s_d0fb9aefa2e5fb::t_8c46bde80ee18b 1-144
+src/components/SidebarChromeRail.tsx
+  s_d0fb9aefa2e5fb::t_806155e6a12bdc 1,3,10,12-20,27-28,43-47,54,58,63-82,84-85,89-94,105-106,109,117,121,124,128-133
+src/components/settings/WallpaperSection.tsx
+  s_d0fb9aefa2e5fb::t_3cb7d4e2ce0c6f 1-154
+src/components/sidebar/SidebarMenu.tsx
+  s_d0fb9aefa2e5fb::t_abe3aea9dfab7a 1-205
+src/components/sidebar/searchRunner.ts
+  s_d0fb9aefa2e5fb::t_82c30e1a1f36c6 1-103
+electron/services/github/auth.ts
+  s_d0fb9aefa2e5fb::t_00e2b0ff3b4191 1-112
+src/components/Tab.tsx
+  s_d0fb9aefa2e5fb::t_a1dc947abcb41f 1,5-8,14-28,31,37,48,89,122-123
+src/components/model-picker/ModelMenu.tsx
+  s_d0fb9aefa2e5fb::t_64efa28d8b82ba 1-203
+src/components/sidebar/ProjectGroupHeader.tsx
+  s_d0fb9aefa2e5fb::t_b77c2945617e2c 1-179
+electron/services/terminal/output-coalescer.ts
+  s_d0fb9aefa2e5fb::t_8a16b84246e763 1-58
+src/components/git/GitFileSection.tsx
+  s_d0fb9aefa2e5fb::t_6e732d745870b1 1-142
+src/components/settings/controls.tsx
+  s_d0fb9aefa2e5fb::t_dbae275e0ddb34 1-401
+src/components/model-picker/ModelOptionRow.tsx
+  s_d0fb9aefa2e5fb::t_1e537ee68462ee 1-97
+src/components/sidebar/concurrency.ts
+  s_d0fb9aefa2e5fb::t_623c4e53642064 1-76
+src/components/sidebar/boundary.ts
+  s_d0fb9aefa2e5fb::t_d036e5a99dfcf9 1-9
+src/components/git/menuParts.tsx
+  s_d0fb9aefa2e5fb::t_5706a935fd5e95 1-100
+scripts/claudi-terminal.ts
+  s_d0fb9aefa2e5fb::t_f1bd931b8968c5 2-6,8-10,12,17,29,34-36,38-39,41-44,53,56-57,59-61,64-67,70,77,81-82,85,88,98-100,104-105,111-146,149,158,160-167,171-172
+electron/services/sessions/limiter.ts
+  s_d0fb9aefa2e5fb::t_6bbcf9e3b13393 1-39
+electron/services/checkpoint/metadata.ts
+  s_d0fb9aefa2e5fb::t_e52299978de938 1-84
+electron/services/terminal/ws-client.ts
+  s_d0fb9aefa2e5fb::t_5cb687b55fbb84 1-142
+electron/services/sessions/raw.ts
+  s_d0fb9aefa2e5fb::t_c0a105a646f1a1 1-51
+src/components/sidebar/DraftsSection.tsx
+  s_d0fb9aefa2e5fb::t_acc27df961ce13 1-291
+electron/services/terminal/__tests__/terminal.test.ts
+  s_d0fb9aefa2e5fb::t_b42d6738856afe 1-163
+src/components/git/BranchCreateRow.tsx
+  s_d0fb9aefa2e5fb::t_64ccbbd591d9b5 1-147
+src/components/settings/OpenCodeProviderCombobox.tsx
+  s_d0fb9aefa2e5fb::t_554f6710acbe51 1-188
+src/components/settings/MulticaSection.tsx
+  s_d0fb9aefa2e5fb::t_ae063749c3fcc7 1-138
+src/utils/exportHelpers.ts
+  s_d0fb9aefa2e5fb::t_2c50b933e69ea1 1-14,28,33,42,54-67,76-78,83-84,87-89,91-96,99-104,122-123,125,129,131,137-139,143-147,150,157,175-192,194,200-201,205-216,218,225,229-234
+electron/services/sessions/__tests__/primitives.test.ts
+  s_d0fb9aefa2e5fb::t_c286c38994089f 1-140
+src/i18n/locales/zh-CN.ts
+  s_d0fb9aefa2e5fb::t_7b2226fbc5d93b 551-567
+electron/terminal-manager.ts
+  s_d0fb9aefa2e5fb::t_9233c1ae7e593d 2-4,7-11,13,15-16,19-20,22-23,25-31,33-35,37-38,40-42,45-48,51-53,56-59
+src/components/sidebar/projectPaths.ts
+  s_d0fb9aefa2e5fb::t_4c381c5badd9ac 1-13
+src/components/sidebar/__tests__/memoHelpers.test.ts
+  s_d0fb9aefa2e5fb::t_1a6461c06a7177 1-142
+src/components/settings/useOpenCodeEditor.ts
+  s_d0fb9aefa2e5fb::t_9aa2d1af68220f 1-140
+src/components/dispatch/IssueDropdown.tsx
+  s_d0fb9aefa2e5fb::t_bc269e46b65006 1-212
+src/components/sidebar/useSidebarSearch.ts
+  s_d0fb9aefa2e5fb::t_e0fe450049e6d3 1-125
+electron/session-reader.ts
+  s_d0fb9aefa2e5fb::t_ffabef62f14cc3 1-39
+src/components/sidebar/types.ts
+  s_d0fb9aefa2e5fb::t_262ebfafaa9c7e 1-42
+src/components/ProjectContextModal.tsx
+  s_d0fb9aefa2e5fb::t_5d578b1bbe41f4 1,3-18,20-27,29-43,51-59,64,71,73,78-79,86,98,100-101
+electron/github-manager.ts
+  s_d0fb9aefa2e5fb::t_d4c5727182255e 2-3,6-8,16-18,20-28,30
+src/components/MulticaSetupModal.tsx
+  s_d0fb9aefa2e5fb::t_70314c46d8293d 4-21,23-30,35-36,40,42-51,54-55,58,62,69,73,75,77,83,85-86,100,112,118,123,130,137-144,147-152,154-180,183-186,189,191,193,195-219,223-226,231,234,236,238-292,294-296,298,303-305,311-312,316-317,324-371
+src/components/settings/__tests__/setup.test.ts
+  s_d0fb9aefa2e5fb::t_6ea4b90f59c534 1-43
+electron/services/checkpoint/git.ts
+  s_d0fb9aefa2e5fb::t_c041c3c44f3c83 1-67
+src/components/dispatch/plan.ts
+  s_d0fb9aefa2e5fb::t_19d6d3ad34444e 1-293
+electron/services/sessions/__tests__/reader.test.ts
+  s_d0fb9aefa2e5fb::t_3de0afef43fa2b 1-209
+src/components/RuntimeSetupCard.tsx
+  s_d0fb9aefa2e5fb::t_da354e34920aca 1-3,5,8-21,23,25-30,33-35,37-38,40-44,46,49,51-52,57,61-72,80-93,105,119,124,130,135-137,141,144,146-147,149,151,156,159,162,167,186-188,191,198-199,207,221,227,233,235,238,245,252-253,256
+src/components/ModelPicker.tsx
+  s_d0fb9aefa2e5fb::t_7c7c9480d2ff19 1,3,5-20,22,24-48,50-51,53-54,57-64,66-69,71-99,101-105,107-114,116-117,119-121,125-137,140-141,143-150,152-157,159-183,185,187-197,199-201,203-206,208-212,215,217-227,232-236,242,245-249,251-277
+src/components/sidebar/ConversationList.tsx
+  s_d0fb9aefa2e5fb::t_354d3a93997cd2 1-90
+electron/services/checkpoint/paths.ts
+  s_d0fb9aefa2e5fb::t_4c0c1c934b3c61 1-84
+src/components/settings/ThemeSection.tsx
+  s_d0fb9aefa2e5fb::t_bfd409f25cc64c 1-190
+electron/services/checkpoint/__tests__/checkpoint.test.ts
+  s_d0fb9aefa2e5fb::t_029c43870c0544 1-118
+src/components/git/GitConfirmDialog.tsx
+  s_d0fb9aefa2e5fb::t_2a4a592d14955f 1-122
+src/components/model-picker/EffortSelect.tsx
+  s_d0fb9aefa2e5fb::t_41a311ffa8d1c9 1-83
+electron/services/sessions/__tests__/fixtures.ts
+  s_d0fb9aefa2e5fb::t_815b5837c5a570 1-69
+src/components/TabStrip.tsx
+  s_d0fb9aefa2e5fb::t_64604380ed8c8f 1-2,4,6-32,35,50-51,55-56,58-63,67,71-72
+src/components/new-chat/Dropdowns.tsx
+  s_d0fb9aefa2e5fb::t_ea8f5e7d23ee99 1-215
+src/i18n/locales/en-US.ts
+  s_d0fb9aefa2e5fb::t_7b2226fbc5d93b 554-570
+src/components/sidebar/SidebarNotice.tsx
+  s_d0fb9aefa2e5fb::t_ca1d650344433c 1-32
+electron/services/terminal/node-pty.ts
+  s_d0fb9aefa2e5fb::t_d698a6a394c05b 1-48
+electron/checkpoint.ts
+  s_d0fb9aefa2e5fb::t_4e642d96ad8055 2-3,6-11
+src/components/settings/OpenCodeSection.tsx
+  s_d0fb9aefa2e5fb::t_9e8a247bab6196 1-265
+src/components/dispatch/DispatchCard.tsx
+  s_d0fb9aefa2e5fb::t_c8645dfce315f7 1-306
+src/components/git/BranchListPanel.tsx
+  s_d0fb9aefa2e5fb::t_26386f476f7eab 1-137
+src/components/sidebar/virtualWindow.ts
+  s_d0fb9aefa2e5fb::t_2da3a6134f7e4b 1-34
+src/components/git/gitStatusModel.ts
+  s_d0fb9aefa2e5fb::t_1def97a962ac60 1-172
+src/components/git/GitStatusPopover.tsx
+  s_d0fb9aefa2e5fb::t_a9b6105fcf94f1 1-341
+src/components/WindowControls.tsx
+  s_d0fb9aefa2e5fb::t_0e4e20fe2b5749 3,5-7,13,20,23-28,31-36,38-47,49,51-57,59-62,64-66,68-72,74-78,81-99
+electron/services/terminal/__tests__/mcp-e2e.test.ts
+  s_d0fb9aefa2e5fb::t_65b06a39d5ab94 1-74
+src/components/model-picker/__tests__/catalogView.test.ts
+  s_d0fb9aefa2e5fb::t_10ca19df1c35f0 1-169
+src/components/git/useGitPillController.ts
+  s_d0fb9aefa2e5fb::t_fcfb1ec6d3f90a 1-335
+src/components/ProjectPicker.tsx
+  s_d0fb9aefa2e5fb::t_5d6558877545d8 1,3-11,13,15-21,24-76,78-82,84,88,91-92,95-101,103-104,109-129,132,134-137,140,144,146,150,157,177,181-188,190-203,205,208-214,216,218-240,243-247,249,251-267
+electron/services/github/auth-output.ts
+  s_d0fb9aefa2e5fb::t_08837ddf7f7ea5 1-106
+src/components/NewProjectModal.tsx
+  s_d0fb9aefa2e5fb::t_b94f796be212a2 1,3-19,21-27,30-44,52-62,65-73,77,91,94,97,101,108,112,114,116-118,121,123-126,133,135,140,144,149,152,157,159,169,171,176,183,190,192,196,200,206,212,217,224-225,227-228,237-243,245-246,249-257,259-260,262-263
+src/components/Settings.tsx
+  s_d0fb9aefa2e5fb::t_4c7b8e24e84732 1-57,60-65,67-74,76-102,104-123,134,143,145-147,157,168,171,173-223
+src/components/BranchSelector.tsx
+  s_d0fb9aefa2e5fb::t_6058321f4354e9 1,3-6,8-34,37-38,40-41,43,46-48,50-51,54-56,71,73-76,79-81,84,89-114,123,125,133,135,143,145,149,153,156-157,162,164,166,168-169,174,178,180,182,184,188,190-192,196-199,201,204,207-240,244-257,259-263,268,288,292-321,323-329,334-373,375-405
+src/components/dispatch/DispatchModelPicker.tsx
+  s_d0fb9aefa2e5fb::t_69c1f9682a4427 1-32
+electron/mcp-terminal-server.ts
+  s_d0fb9aefa2e5fb::t_f5bb93bd126319 3-10,13-15,17-21,23-26,29-30
+src/components/Sidebar.tsx
+  s_d0fb9aefa2e5fb::t_6821a84f3159e1 1-2,5-65,68-92,94-95,98-101,103-105,107-117,120-143,145,148-151,155,161-176,180,183,185-186,188-189,191-196,199,201,204-215,219-224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ce86644f093d2fb0e0b8f3184f79142fe6264b64",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
