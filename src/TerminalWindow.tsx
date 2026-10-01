@@ -1,32 +1,40 @@
-// @ts-nocheck
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Appearance } from "@shared/state/types";
+import type { HostPlatform } from "@shared/system/types";
 import TerminalDrawer from "./components/TerminalDrawer";
 import WindowControls from "./components/WindowControls";
+import {
+  applyAppearanceToDocument,
+  applyAppearanceWindowBackground,
+  getWallpaperImageFilter,
+  normalizeAppearance,
+  normalizeWallpaper,
+  useTheme,
+  type TerminalWallpaper,
+} from "./components/terminal/boundary";
 import useTerminal from "./hooks/useTerminal";
-import { useTheme } from "./contexts/ThemeContext";
-import { applyAppearanceToDocument, applyAppearanceWindowBackground, normalizeAppearance } from "./utils/appearance";
-import { getWallpaperImageFilter, normalizeWallpaper } from "./utils/wallpaper";
 
-function isSameJsonValue(a, b) {
+function isSameJsonValue(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
+
+function keepIfSame<T>(next: T): (current: T) => T {
+  return (current) => (isSameJsonValue(current, next) ? current : next);
+}
+
+const closeCurrentWindow = () => {
+  void window.api?.closeCurrentWindow?.();
+};
 
 export default function TerminalWindow() {
   const terminal = useTerminal();
   const { resolved: resolvedTheme } = useTheme();
-  const {
-    sessions,
-    activeSession,
-    windowOpen,
-    focusActiveSession,
-    refitActiveSession,
-    hasLoadedSessions,
-  } = terminal;
+  const { sessions, activeSession, windowOpen, focusActiveSession, refitActiveSession, hasLoadedSessions } = terminal;
   const announcedReadyRef = useRef(false);
-  const [wallpaper, setWallpaper] = useState(null);
-  const [appearance, setAppearance] = useState(() => normalizeAppearance());
+  const [wallpaper, setWallpaper] = useState<TerminalWallpaper | null>(null);
+  const [appearance, setAppearance] = useState<Appearance>(() => normalizeAppearance());
   const [hasLoadedWallpaper, setHasLoadedWallpaper] = useState(false);
-  const [platform, setPlatform] = useState(null);
+  const [platform, setPlatform] = useState<HostPlatform | null>(null);
   const showWindowControls = platform === "win32";
 
   const nudgeActiveTerminalLayout = useCallback(() => {
@@ -42,26 +50,18 @@ export default function TerminalWindow() {
 
     try {
       const state = await window.api.loadState();
-      const nextAppearance = normalizeAppearance(state?.appearance);
-      setAppearance((current) => (
-        isSameJsonValue(current, nextAppearance) ? current : nextAppearance
-      ));
+      setAppearance(keepIfSame(normalizeAppearance(state?.appearance)));
       const nextWallpaper = normalizeWallpaper(state?.wallpaper);
       if (!nextWallpaper) {
-        setWallpaper((current) => (current === null ? current : null));
+        setWallpaper(null);
         return;
       }
 
       if (nextWallpaper.path && window.api?.readImage) {
         const dataUrl = await window.api.readImage(nextWallpaper.path);
-        const normalizedWallpaper = normalizeWallpaper({ ...nextWallpaper, dataUrl: dataUrl || null });
-        setWallpaper((current) => (
-          isSameJsonValue(current, normalizedWallpaper) ? current : normalizedWallpaper
-        ));
+        setWallpaper(keepIfSame<TerminalWallpaper | null>(normalizeWallpaper({ ...nextWallpaper, dataUrl: dataUrl || null })));
       } else {
-        setWallpaper((current) => (
-          isSameJsonValue(current, nextWallpaper) ? current : nextWallpaper
-        ));
+        setWallpaper(keepIfSame<TerminalWallpaper | null>(nextWallpaper));
       }
     } catch (error) {
       console.error("[TerminalWindow] failed to load visual state:", error);
@@ -80,7 +80,7 @@ export default function TerminalWindow() {
   useEffect(() => {
     const handleFocus = () => {
       nudgeActiveTerminalLayout();
-      loadVisualState();
+      void loadVisualState();
     };
 
     window.api?.getSystemInfo?.().then((info) => {
@@ -88,7 +88,7 @@ export default function TerminalWindow() {
     }).catch(() => {});
 
     const kickoff = window.setTimeout(() => {
-      loadVisualState();
+      void loadVisualState();
     }, 0);
     window.addEventListener("focus", handleFocus);
     return () => {
@@ -101,17 +101,14 @@ export default function TerminalWindow() {
     if (!windowOpen || !activeSession || sessions.length === 0) return;
 
     let cancelled = false;
-    const timers = [];
     const run = () => {
-      if (cancelled) return;
-      nudgeActiveTerminalLayout();
+      if (!cancelled) nudgeActiveTerminalLayout();
     };
 
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(run);
     });
-    timers.push(window.setTimeout(run, 60));
-    timers.push(window.setTimeout(run, 180));
+    const timers = [window.setTimeout(run, 60), window.setTimeout(run, 180)];
 
     return () => {
       cancelled = true;
@@ -138,6 +135,8 @@ export default function TerminalWindow() {
     };
   }, [hasLoadedSessions, hasLoadedWallpaper]);
 
+  const wallpaperUrl = wallpaper?.dataUrl;
+
   return (
     <div
       style={{
@@ -146,7 +145,7 @@ export default function TerminalWindow() {
         overflow: "hidden",
         position: "relative",
         backgroundColor: "var(--pane-background)",
-        backgroundImage: wallpaper?.dataUrl ? `url(${wallpaper.dataUrl})` : "none",
+        backgroundImage: wallpaperUrl ? `url(${wallpaperUrl})` : "none",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
@@ -154,33 +153,24 @@ export default function TerminalWindow() {
         display: "flex",
       }}
     >
-      {wallpaper?.dataUrl && (
+      {wallpaperUrl && (
         <div
           style={{
             position: "absolute",
             inset: 0,
             zIndex: 0,
-            backgroundImage: `url(${wallpaper.dataUrl})`,
+            backgroundImage: `url(${wallpaperUrl})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
             filter: getWallpaperImageFilter(wallpaper),
-            opacity: ((wallpaper.imgOpacity ?? 100) / 100).toFixed(3),
-            transform: wallpaper.imgBlur ? "scale(1.04)" : "none",
+            opacity: ((wallpaper?.imgOpacity ?? 100) / 100).toFixed(3),
+            transform: wallpaper?.imgBlur ? "scale(1.04)" : "none",
           }}
         />
       )}
 
-      <div
-        style={{
-          position: "relative",
-          zIndex: 1,
-          flex: 1,
-          display: "flex",
-          minWidth: 0,
-          isolation: "isolate",
-        }}
-      >
+      <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", minWidth: 0, isolation: "isolate" }}>
         <TerminalDrawer
           sessions={terminal.sessions}
           activeSession={terminal.activeSession}
@@ -195,7 +185,7 @@ export default function TerminalWindow() {
           wallpaper={wallpaper}
           windowControlsVisible={showWindowControls}
           windowMode
-          onRequestClose={() => window.api?.closeCurrentWindow?.()}
+          onRequestClose={closeCurrentWindow}
         />
       </div>
 
