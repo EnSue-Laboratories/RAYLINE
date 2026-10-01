@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import type { DispatchRowInput, DispatchRowResult } from "@shared/chat/types";
-import { getAvailableModels, type EffortLevel, type ModelDefinition } from "@shared/models";
+import {
+  defaultPlannerModel,
+  getAvailableModels,
+  isPlannerModel,
+  visibleModels,
+  type EffortLevel,
+  type ModelDefinition,
+} from "@shared/models";
+import { useTranslator } from "../../contexts/LocaleContext";
 import AutoTab from "./AutoTab";
 import CustomTab from "./CustomTab";
 import DispatchLoadingDots from "./DispatchLoadingDots";
@@ -10,9 +18,7 @@ import {
   buildDispatchPayload,
   buildModelPayload,
   cleanDispatchPlanError,
-  defaultPlannerModelId,
   dynamicModelsOf,
-  isPlannerModel,
   resolvePlannerModelId,
   rowsFromPlan,
   summarizeDispatch,
@@ -68,17 +74,17 @@ export default function DispatchCard({
   extraModels = NO_MODELS,
   locale,
 }: DispatchCardProps) {
-  const t = useMemo(() => createTranslator(locale), [locale]);
-  const models = useMemo(() => availableModels ?? getAvailableModels(extraModels), [availableModels, extraModels]);
+  const contextT = useTranslator();
+  const t = locale ? createTranslator(locale) : contextT;
+  const allModels = useMemo(() => availableModels ?? getAvailableModels(extraModels), [availableModels, extraModels]);
   const pickerModels = useMemo(() => (availableModels ? dynamicModelsOf(availableModels) : extraModels), [availableModels, extraModels]);
-  const plannerCount = useMemo(() => models.filter(isPlannerModel).length, [models]);
 
   const [tab, setTab] = useState<DispatchTab>("auto");
   const [globalModel, setGlobalModel] = useState(defaultModel);
   const [globalEffort, setGlobalEffort] = useState<EffortLevel | null>(defaultEffort);
   const [customRows, setCustomRows] = useState<DispatchRow[]>([]);
   const [autoBrief, setAutoBrief] = useState("");
-  const [plannerSelection, setPlannerSelection] = useState(() => defaultPlannerModelId(models, defaultModel));
+  const [plannerSelection, setPlannerSelection] = useState(() => defaultPlannerModel(allModels, defaultModel));
   const [plannerEffort, setPlannerEffort] = useState<EffortLevel | null>(null);
   const [autoLoading, setAutoLoading] = useState(false);
   const [autoError, setAutoError] = useState<string | null>(null);
@@ -86,6 +92,13 @@ export default function DispatchCard({
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [banner, setBanner] = useState<string | null>(null);
+
+  // Hidden / unavailable models stay listed only while something selects them.
+  const models = useMemo(
+    () => visibleModels(allModels, {}, [defaultModel, globalModel, plannerSelection, ...customRows.map((row) => row.model)]),
+    [allModels, defaultModel, globalModel, plannerSelection, customRows],
+  );
+  const plannerCount = useMemo(() => models.filter(isPlannerModel).length, [models]);
 
   // Derived instead of reset in an effect: a vanished / non-planner
   // selection falls back to the default planner (legacy ids normalize).

@@ -7,8 +7,9 @@
 import type { Attachment, DispatchPlanRow, DispatchRowInput, DispatchRowResult } from "@shared/chat/types";
 import type { GhIssue } from "@shared/github/types";
 import {
-  DEFAULT_MODEL_ID,
-  MODELS,
+  STATIC_MODELS,
+  defaultPlannerModel,
+  isPlannerModel,
   normalizeModelId,
   resolveEffort,
   type DispatchModelPayload,
@@ -16,14 +17,6 @@ import {
   type ModelDefinition,
 } from "@shared/models";
 import type { Translator } from "./translator";
-
-// TODO(shared-models): replace with PLANNER_PROVIDERS / isPlannerModel from
-// @shared/models once that lands (mirrors electron/planner-capabilities in #230).
-export const PLANNER_PROVIDERS: readonly string[] = ["claude", "codex", "opencode"];
-
-export function isPlannerModel(model: Pick<ModelDefinition, "provider"> | null | undefined): boolean {
-  return Boolean(model && PLANNER_PROVIDERS.includes(model.provider));
-}
 
 export type DispatchIssue = Pick<GhIssue, "number" | "title">;
 
@@ -64,20 +57,6 @@ export interface DispatchDropdownOption {
 
 const BRANCH_MAX = 48;
 
-/**
- * Default planner: `preferred` when it is a planner model (legacy ids
- * normalize, e.g. `gpt55-med` → `gpt-5.5`), else the app default model,
- * else the first planner model.
- */
-export function defaultPlannerModelId(models: readonly ModelDefinition[], preferred: string | null | undefined): string {
-  const planners = models.filter(isPlannerModel);
-  const normalized = normalizeModelId(preferred);
-  return planners.find((m) => m.id === normalized)?.id
-    ?? planners.find((m) => m.id === DEFAULT_MODEL_ID)?.id
-    ?? planners[0]?.id
-    ?? "";
-}
-
 /** The planner actually used: the selection if still available, else the default. */
 export function resolvePlannerModelId(
   models: readonly ModelDefinition[],
@@ -86,7 +65,7 @@ export function resolvePlannerModelId(
 ): string {
   const normalized = normalizeModelId(selected);
   if (models.some((m) => isPlannerModel(m) && m.id === normalized)) return normalized ?? "";
-  return defaultPlannerModelId(models, preferred);
+  return defaultPlannerModel(models, preferred);
 }
 
 function pad2(value: number): string {
@@ -309,6 +288,6 @@ export function groupOptions(options: readonly DispatchDropdownOption[], grouped
  * takes as `extraModels`; it adds the built-in catalogue itself).
  */
 export function dynamicModelsOf(models: readonly ModelDefinition[]): ModelDefinition[] {
-  const builtinIds = new Set<string>(MODELS.map((m) => m.id));
+  const builtinIds = new Set<string>(STATIC_MODELS.map((m) => m.id));
   return models.filter((m) => !builtinIds.has(m.id));
 }

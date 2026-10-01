@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { DispatchRowResult } from "@shared/chat/types";
-import { MODELS, getAvailableModels, type ModelDefinition } from "@shared/models";
+import { MODELS, defaultPlannerModel, getAvailableModels, isPlannerModel, type ModelDefinition } from "@shared/models";
 import {
   buildDispatchPayload,
   buildModelPayload,
   cleanDispatchPlanError,
   defaultCustomBranch,
-  defaultPlannerModelId,
   dynamicModelsOf,
   groupOptions,
-  isPlannerModel,
   issueOptions,
   makeCustomRow,
   resolvePlannerModelId,
@@ -23,7 +21,7 @@ import {
 } from "../plan";
 import { translateOr, type Translator } from "../translator";
 
-const t: Translator = (key, vars) => (vars ? `${key}:${JSON.stringify(vars)}` : key);
+const t: Translator = (key, params) => (params ? `${key}:${JSON.stringify(params)}` : key);
 const NOW = new Date(2026, 9, 1, 9, 5);
 
 const opencode: ModelDefinition = {
@@ -51,15 +49,15 @@ describe("planner model selection", () => {
   });
 
   it("prefers the default model, normalizing legacy ids", () => {
-    expect(defaultPlannerModelId(models, "opus")).toBe("opus");
-    expect(defaultPlannerModelId(models, "gpt55-med")).toBe("gpt-5.5");
-    expect(defaultPlannerModelId(models, "gpt54-high")).toBe("gpt-6-astra");
+    expect(defaultPlannerModel(models, "opus")).toBe("opus");
+    expect(defaultPlannerModel(models, "gpt55-med")).toBe("gpt-5.5");
+    expect(defaultPlannerModel(models, "gpt54-high")).toBe("gpt-6-astra");
   });
 
   it("falls back to the app default, then the first planner", () => {
-    expect(defaultPlannerModelId(models, "multica:agent")).toBe("sonnet");
-    expect(defaultPlannerModelId([multica, opencode], "nope")).toBe(opencode.id);
-    expect(defaultPlannerModelId([multica], "nope")).toBe("");
+    expect(defaultPlannerModel(models, "multica:agent")).toBe("sonnet");
+    expect(defaultPlannerModel([multica, opencode], "nope")).toBe(opencode.id);
+    expect(defaultPlannerModel([multica], "nope")).toBe("");
   });
 
   it("keeps a valid selection and replaces a vanished one", () => {
@@ -188,6 +186,6 @@ describe("options", () => {
   it("falls back to English for missing translation keys", () => {
     const echo: Translator = (key) => key;
     expect(translateOr(echo, "x.missing", "Use {value}", { value: "main" })).toBe("Use main");
-    expect(translateOr(() => "Zurück", "newChat.back", "Back")).toBe("Zurück");
+    expect(translateOr(() => "Dispatch!", "dispatch.title", "Fallback")).toBe("Dispatch!");
   });
 });

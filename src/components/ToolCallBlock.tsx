@@ -1,7 +1,9 @@
 import { memo, useMemo, useState, type CSSProperties } from "react";
 import { ChevronRight, ChevronDown, Terminal, FileText, Pencil, Search, Code, Loader2, type LucideIcon } from "lucide-react";
 import type { ToolPart } from "@shared/chat/types";
-import { useFontScale } from "../contexts/FontSizeContext";
+import { useFontScale, type FontScale } from "../contexts/FontSizeContext";
+import { useTranslator } from "../contexts/LocaleContext";
+import { translateOr } from "./blocks/translateOr";
 import {
   BODY_PREVIEW_LIMIT,
   buildToolBodyView,
@@ -20,8 +22,6 @@ const TOOL_ICONS: Readonly<Record<string, LucideIcon>> = {
   Glob: Search,
 };
 
-type FontScale = (px: number) => number;
-
 interface ToolBodyProps {
   label: "ARGS" | "RESULT";
   value: unknown;
@@ -29,11 +29,14 @@ interface ToolBodyProps {
   fontScale: FontScale;
 }
 
-// TODO(i18n): data-i18n owns these strings (keys tool.arguments, tool.result,
-// tool.showMore, tool.showLess, tool.remaining, tool.done from #230).
-const BODY_LABELS = { ARGS: "ARGS", RESULT: "RESULT" } as const;
+// Keys from #230; English fallbacks until data-i18n adds them.
+const BODY_LABEL_KEYS: Record<ToolBodyProps["label"], { key: string; fallback: string }> = {
+  ARGS: { key: "tool.arguments", fallback: "ARGS" },
+  RESULT: { key: "tool.result", fallback: "RESULT" },
+};
 
 function ToolBody({ label, value, maxHeight, fontScale }: ToolBodyProps) {
+  const t = useTranslator();
   // Large outputs are revealed incrementally (never all at once) so a 5 MB
   // result can't freeze the renderer; the stored value is untouched.
   const [visibleLimit, setVisibleLimit] = useState(BODY_PREVIEW_LIMIT);
@@ -57,7 +60,7 @@ function ToolBody({ label, value, maxHeight, fontScale }: ToolBodyProps) {
         justifyContent: "space-between",
         gap: 8,
       }}>
-        <span>{BODY_LABELS[label]}</span>
+        <span>{translateOr(t, BODY_LABEL_KEYS[label].key, BODY_LABEL_KEYS[label].fallback)}</span>
         {view.isTrimmed && (
           <button
             onClick={() => setVisibleLimit((prev) => nextVisibleLimit(serialized.length, prev))}
@@ -71,7 +74,7 @@ function ToolBody({ label, value, maxHeight, fontScale }: ToolBodyProps) {
               padding: 0,
             }}
           >
-            {hasMore ? "show more" : "show less"}
+            {hasMore ? translateOr(t, "tool.showMore", "show more") : translateOr(t, "tool.showLess", "show less")}
           </button>
         )}
       </div>
@@ -90,7 +93,7 @@ function ToolBody({ label, value, maxHeight, fontScale }: ToolBodyProps) {
         overflow: "auto",
       }}>
         {view.text}
-        {hasMore && `\n\n… [${view.remaining} more chars]`}
+        {hasMore && `\n\n${translateOr(t, "tool.remaining", "… [{count} more chars]", { count: view.remaining })}`}
       </pre>
     </div>
   );
@@ -112,6 +115,7 @@ export interface ToolCallBlockProps {
 }
 
 function ToolCallBlock({ tool }: ToolCallBlockProps) {
+  const t = useTranslator();
   const [expanded, setExpanded] = useState(false);
   const s = useFontScale();
   const Icon = TOOL_ICONS[tool.name] ?? Code;
@@ -167,7 +171,7 @@ function ToolCallBlock({ tool }: ToolCallBlockProps) {
             <Loader2 size={10} strokeWidth={2} style={{ color: "var(--text-muted)", animation: "spin 1s linear infinite" }} />
           )}
           {tool.status === "done" && (
-            <span style={{ color: "var(--text-disabled)", fontSize: s(10) }}>done</span>
+            <span style={{ color: "var(--text-disabled)", fontSize: s(10) }}>{translateOr(t, "tool.done", "done")}</span>
           )}
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
