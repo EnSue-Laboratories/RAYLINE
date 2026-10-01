@@ -22,3 +22,17 @@ export type UpdaterStatus =
   | { phase: "downloading"; percent: number }
   | { phase: "ready"; version: string }
   | { phase: "error"; error: string };
+
+/**
+ * `get-app-build` result: `app.getVersion()` / `app.isPackaged` plus the
+ * `raylineBuild` metadata electron-builder writes into the packaged
+ * package.json (`extraMetadata`). `commit` / `repository` are absent in dev.
+ */
+export interface AppBuildInfo {
+  version: string;
+  packaged: boolean;
+  /** Full git commit sha the package was built from. */
+  commit?: string;
+  /** `owner/repo` the release is published to. */
+  repository?: string;
+}
