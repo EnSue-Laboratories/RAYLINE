@@ -113,3 +113,28 @@ export function cardStyle(dragOver: boolean): CSSProperties {
     overflowY: "auto",
   };
 }
+
+/**
+ * Primary "create" action, styled like the model / project chips (mono,
+ * uppercase) so it reads as part of the same control row.
+ */
+export function createChipStyle(enabled: boolean, s: FontScale): CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: "auto",
+    padding: "4px 12px",
+    background: enabled ? "var(--control-bg-active, var(--control-bg))" : "var(--control-bg)",
+    border: "1px solid var(--control-border)",
+    borderRadius: 7,
+    color: enabled ? "var(--text-primary)" : "var(--text-muted)",
+    fontSize: s(10),
+    fontFamily: "var(--font-mono)",
+    letterSpacing: ".06em",
+    textTransform: "uppercase",
+    cursor: enabled ? "pointer" : "default",
+    opacity: enabled ? 1 : 0.6,
+    transition: "background .15s, color .15s, opacity .15s",
+  };
+}
