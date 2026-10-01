@@ -1,494 +1,72 @@
-// @ts-nocheck
-import { useEffect, useRef, useState } from "react";
-import { X, Loader2, Check, Copy, ExternalLink, AlertCircle } from "lucide-react";
-import { createTranslator } from "../i18n";
+import { useMemo } from "react";
+import { createTranslator, type Locale } from "../pm/boundary";
+import { CancelledView, CodeView, ErrorView, StartingView, SuccessView } from "../pm/auth/AuthViews";
+import type { AuthFlowState } from "../pm/auth/authFlow";
+import { useGhAuthFlow } from "../pm/auth/useGhAuthFlow";
+import GitHubIcon from "../pm/GitHubIcon";
+import ModalShell from "../pm/ModalShell";
+import { MONO_FONT, SYSTEM_FONT } from "../pm/styles";
+import type { AuthModalMode } from "../pm/types";
 
-function cleanError(msg) {
-  if (!msg) return "Unknown error";
-  return String(msg)
-    .replace(/^Error invoking remote method '[^']+':\s*/i, "")
-    .replace(/^Error:\s*/i, "")
-    .trim();
+interface AuthModalProps {
+  mode?: AuthModalMode;
+  currentUser?: string | null;
+  onClose: () => void;
+  onAuthSuccess?: (user: string | null) => void;
+  locale?: Locale;
 }
 
-function GitHubGlyph({ size = 28 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor">
-      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-    </svg>
-  );
-}
-
-// phases: idle | starting | code | success | error | cancelled
-export default function AuthModal({ mode = "signin", currentUser, onClose, onAuthSuccess, locale = "en-US" }) {
-  const t = createTranslator(locale);
+/** GitHub device-flow sign-in (or "add another account"). */
+export default function AuthModal({ mode = "signin", currentUser, onClose, onAuthSuccess, locale = "en-US" }: AuthModalProps) {
+  const t = useMemo(() => createTranslator(locale), [locale]);
   const isAddAccount = mode === "add" || mode === "switch";
-  const [phase, setPhase] = useState("idle");
-  const [code, setCode] = useState(null);
-  const [user, setUser] = useState(null);
-  const [error, setError] = useState(null);
-  const [errorOutput, setErrorOutput] = useState(null);
-  const [copied, setCopied] = useState(false);
-  const unsubRef = useRef(null);
-  const startTimerRef = useRef(null);
-  const flowStartedRef = useRef(false);
+  const { state, retry } = useGhAuthFlow(onAuthSuccess);
+  const handleRetry = () => void retry();
 
-  const clearAuthListener = () => {
-    if (unsubRef.current) {
-      unsubRef.current();
-      unsubRef.current = null;
-    }
-  };
-
-  const start = async () => {
-    clearAuthListener();
-    flowStartedRef.current = true;
-    setPhase("starting");
-    setCode(null);
-    setUser(null);
-    setError(null);
-    setErrorOutput(null);
-
-    const unsub = window.ghApi.onAuthEvent((event) => {
-      if (event.type === "code") {
-        setCode(event.code);
-        setPhase("code");
-      } else if (event.type === "success") {
-        flowStartedRef.current = false;
-        setUser(event.user || null);
-        setPhase("success");
-      } else if (event.type === "error") {
-        flowStartedRef.current = false;
-        setError(cleanError(event.error) || t("pm.authFailed"));
-        setErrorOutput(event.output || null);
-        setPhase("error");
-      } else if (event.type === "cancelled") {
-        flowStartedRef.current = false;
-        setPhase("cancelled");
+  const body = (flow: AuthFlowState) => {
+    switch (flow.phase) {
+      case "idle":
+        return null;
+      case "starting":
+        return <StartingView t={t} />;
+      case "code":
+        return flow.code ? <CodeView t={t} code={flow.code} /> : null;
+      case "success":
+        return <SuccessView t={t} user={flow.user} />;
+      case "error":
+        return <ErrorView t={t} error={flow.error} output={flow.output} onRetry={handleRetry} onClose={onClose} />;
+      case "cancelled":
+        return <CancelledView t={t} onRetry={handleRetry} onClose={onClose} />;
+      default: {
+        const unreachable: never = flow;
+        return unreachable;
       }
-    });
-    unsubRef.current = unsub;
-
-    try {
-      // `gh auth login --web` handles adding another account while already
-      // signed in by asking for re-auth confirmation, which github-manager
-      // auto-accepts when needed.
-      await window.ghApi.authStart();
-    } catch (err) {
-      flowStartedRef.current = false;
-      setError(cleanError(err && err.message) || t("pm.authStartFailed"));
-      setPhase("error");
     }
-  };
-
-  useEffect(() => {
-    // Defer startup one tick so React StrictMode's mount probe doesn't start
-    // and immediately cancel the interactive gh session in development.
-    startTimerRef.current = setTimeout(() => {
-      startTimerRef.current = null;
-      start();
-    }, 0);
-
-    return () => {
-      if (startTimerRef.current) {
-        clearTimeout(startTimerRef.current);
-        startTimerRef.current = null;
-      }
-      clearAuthListener();
-      // Best-effort: if the user closes the modal mid-flow, kill the gh process.
-      if (flowStartedRef.current) {
-        flowStartedRef.current = false;
-        window.ghApi.authCancel().catch(() => {});
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (phase === "success") {
-      const t = setTimeout(() => {
-        onAuthSuccess && onAuthSuccess(user);
-      }, 1200);
-      return () => clearTimeout(t);
-    }
-  }, [phase, user, onAuthSuccess]);
-
-  const copyCode = async () => {
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch { /* clipboard may be unavailable; user can copy manually */ }
-  };
-
-  const retry = async () => {
-    if (startTimerRef.current) {
-      clearTimeout(startTimerRef.current);
-      startTimerRef.current = null;
-    }
-    clearAuthListener();
-    if (flowStartedRef.current) {
-      flowStartedRef.current = false;
-      await window.ghApi.authCancel().catch(() => {});
-    }
-    start();
   };
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "var(--pm-modal-backdrop)",
-        backdropFilter: "blur(var(--pm-modal-backdrop-blur))",
-        WebkitBackdropFilter: "blur(var(--pm-modal-backdrop-blur))",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 200,
-      }}
+    <ModalShell
+      onClose={onClose}
+      width={420}
+      panelStyle={{ boxShadow: "0 20px 60px rgba(0,0,0,0.5)", fontFamily: SYSTEM_FONT }}
+      title={
+        <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-secondary)" }}>
+          <GitHubIcon size={18} />
+          <span style={{ fontSize: 14, fontWeight: 500 }}>
+            {isAddAccount ? t("pm.addGithubAccount") : t("pm.signInGithub")}
+          </span>
+        </div>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: 420,
-          background: "var(--pane-elevated)",
-          backdropFilter: "blur(48px) saturate(1.2)",
-          WebkitBackdropFilter: "blur(48px) saturate(1.2)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-          borderRadius: 12,
-          border: "1px solid var(--pane-border)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "16px 20px",
-            borderBottom: "1px solid var(--control-bg)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--text-secondary)" }}>
-            <GitHubGlyph size={18} />
-            <span style={{ fontSize: 14, fontWeight: 500 }}>
-              {isAddAccount ? t("pm.addGithubAccount") : t("pm.signInGithub")}
-            </span>
+      <div style={{ padding: "20px 22px", minHeight: 180 }}>
+        {isAddAccount && currentUser && state.phase !== "success" && (
+          <div style={{ fontSize: 12, color: "var(--text-subtle)", marginBottom: 14 }}>
+            {t("pm.currentlySignedIn")}{" "}
+            <span style={{ color: "var(--text-tertiary)", fontFamily: MONO_FONT }}>@{currentUser}</span>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: 7,
-              border: "1px solid var(--pane-border)",
-              background: "var(--pane-hover)",
-              color: "var(--text-muted)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            <X size={14} strokeWidth={1.5} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div style={{ padding: "20px 22px", minHeight: 180 }}>
-          {isAddAccount && currentUser && phase !== "success" && (
-            <div
-              style={{
-                fontSize: 12,
-                color: "var(--text-subtle)",
-                marginBottom: 14,
-              }}
-            >
-              {t("pm.currentlySignedIn")}{" "}
-              <span style={{ color: "var(--text-tertiary)", fontFamily: "'JetBrains Mono', monospace" }}>
-                @{currentUser}
-              </span>
-            </div>
-          )}
-
-          {phase === "starting" && (
-            <Center>
-              <Loader2 size={22} style={{ animation: "spin 1s linear infinite", color: "var(--text-muted)" }} />
-              <Label>{t("pm.startingAuth")}</Label>
-              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-            </Center>
-          )}
-
-          {phase === "code" && code && (
-            <>
-              <Label>
-                {t("pm.copyOneTimeCode")}
-              </Label>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  marginTop: 8,
-                  padding: "14px 16px",
-                  borderRadius: 8,
-                  border: "1px solid var(--pane-border)",
-                  background: "var(--pane-hover)",
-                }}
-              >
-                <div
-                  style={{
-                    flex: 1,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 22,
-                    letterSpacing: ".18em",
-                    color: "var(--text-primary)",
-                    textAlign: "center",
-                  }}
-                >
-                  {code}
-                </div>
-                <button
-                  onClick={copyCode}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: "var(--pane-interaction-hover-fill, var(--pane-hover))",
-                    border: "1px solid var(--pane-border)",
-                    borderRadius: 6,
-                    color: copied ? "var(--success-text)" : "var(--text-muted)",
-                    fontSize: 11,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    padding: "6px 10px",
-                    cursor: "pointer",
-                    letterSpacing: ".05em",
-                  }}
-                >
-                  {copied ? <Check size={12} /> : <Copy size={12} />}
-                  {copied ? t("pm.copied") : t("pm.copy")}
-                </button>
-              </div>
-              <Label style={{ marginTop: 16 }}>
-                {t("pm.pasteCodeInBrowser")}
-              </Label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-                <ExternalLink size={12} style={{ color: "var(--text-disabled)" }} />
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  github.com/login/device
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginTop: 16,
-                }}
-              >
-                <Label style={{ marginTop: 0 }}>
-                  {t("pm.waitingForAuthorization")}
-                </Label>
-                <Loader2
-                  size={16}
-                  style={{
-                    animation: "spin 1s linear infinite",
-                    color: "var(--text-disabled)",
-                    flexShrink: 0,
-                  }}
-                />
-              </div>
-              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-            </>
-          )}
-
-          {phase === "success" && (
-            <Center>
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: "50%",
-                  background: "var(--success-bg)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "var(--success-text)",
-                }}
-              >
-                <Check size={18} />
-              </div>
-              <div style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 10 }}>
-                {user ? <>{t("pm.signedInAs")} <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>@{user}</span></> : t("pm.signedIn")}
-              </div>
-            </Center>
-          )}
-
-          {phase === "error" && (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: "50%",
-                    background: "var(--danger-bg)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--danger-text)",
-                    flexShrink: 0,
-                  }}
-                >
-                  <AlertCircle size={15} strokeWidth={1.8} />
-                </div>
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  {t("pm.authFailed")}
-                </div>
-              </div>
-              <div
-                style={{
-                  marginTop: 10,
-                  padding: "10px 12px",
-                  borderRadius: 7,
-                  border: "1px solid var(--control-border-soft)",
-                  background: "var(--control-bg-soft)",
-                  fontSize: 12,
-                  fontFamily: "system-ui, sans-serif",
-                  color: "var(--text-muted)",
-                  lineHeight: 1.45,
-                  maxHeight: 140,
-                  overflow: "auto",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}
-              >
-                {error || "Unknown error"}
-              </div>
-              {errorOutput && (
-                <details
-                  style={{
-                    marginTop: 8,
-                    fontSize: 11,
-                    color: "var(--text-subtle)",
-                    fontFamily: "system-ui, sans-serif",
-                  }}
-                >
-                  <summary style={{ cursor: "pointer", userSelect: "none" }}>{t("pm.showGhOutput")}</summary>
-                  <pre
-                    style={{
-                      marginTop: 6,
-                      padding: "8px 10px",
-                      borderRadius: 6,
-                      border: "1px solid var(--control-border-soft)",
-                      background: "var(--code-bg)",
-                      fontSize: 11,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      color: "var(--text-muted)",
-                      maxHeight: 160,
-                      overflow: "auto",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {errorOutput}
-                  </pre>
-                </details>
-              )}
-              <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-                <button onClick={retry} style={primaryBtn}>{t("pm.tryAgain")}</button>
-                <button onClick={onClose} style={secondaryBtn}>{t("pm.cancel")}</button>
-              </div>
-            </>
-          )}
-
-          {phase === "cancelled" && (
-            <Center>
-              <Label>{t("pm.authCancelled")}</Label>
-              <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-                <button onClick={retry} style={primaryBtn}>{t("pm.startAgain")}</button>
-                <button onClick={onClose} style={secondaryBtn}>{t("pm.cancel")}</button>
-              </div>
-            </Center>
-          )}
-        </div>
+        )}
+        {body(state)}
       </div>
-    </div>
+    </ModalShell>
   );
 }
-
-function Center({ children }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 10,
-        padding: "20px 0",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function Label({ children, style }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontFamily: "'JetBrains Mono', monospace",
-        letterSpacing: ".06em",
-        color: "var(--text-muted)",
-        ...(style || {}),
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-const primaryBtn = {
-  background: "var(--control-bg-selected)",
-  border: "1px solid var(--control-border-strong)",
-  borderRadius: 6,
-  color: "var(--text-primary)",
-  fontSize: 12,
-  fontWeight: 500,
-  fontFamily: "system-ui, sans-serif",
-  padding: "7px 14px",
-  cursor: "pointer",
-};
-
-const secondaryBtn = {
-  background: "transparent",
-  border: "1px solid var(--pane-border)",
-  borderRadius: 6,
-  color: "var(--text-muted)",
-  fontSize: 12,
-  fontFamily: "system-ui, sans-serif",
-  padding: "7px 14px",
-  cursor: "pointer",
-};
