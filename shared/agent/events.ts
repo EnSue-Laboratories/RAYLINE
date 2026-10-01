@@ -70,17 +70,18 @@ export interface AgentStreamPayload {
 }
 
 /**
- * `agent-done`. Field presence varies by provider / path:
- *  - Claude: `{ conversationId, exitCode, signal }`
- *  - Codex / OpenCode / Grok / AGY: adds `provider` and `threadId` (native session id)
- *  - Multica: `{ conversationId, provider: "multica" }`
- *  - launch failures: `exitCode: -1`; cancellation: `exitCode: null, signal: "SIGTERM"`
+ * `agent-done`. Every provider sends `provider` and `exitCode`:
+ *  - process exit: the CLI's exit code (null when killed by a signal)
+ *  - launch failures: `exitCode: -1`
+ *  - cancellation: `exitCode: null, signal: "SIGTERM"`
+ *  - Multica (no process): 0 completed, 1 failed, null cancelled
+ * Codex / OpenCode / Grok / AGY also send `threadId` (their native session id).
  */
 export interface AgentDonePayload {
   conversationId: string;
-  exitCode?: number | null;
+  provider: RuntimeProviderId;
+  exitCode: number | null;
   signal?: string | null;
-  provider?: RuntimeProviderId;
   threadId?: string | null;
 }
 
