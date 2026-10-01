@@ -1,18 +1,28 @@
-// @ts-nocheck
-import { useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-export default function CopyBtn({ text, title = "Copy" }) {
+export interface CopyBtnProps {
+  text: string;
+  title?: string;
+}
+
+function CopyBtn({ text, title = "Copy" }: CopyBtnProps) {
   const [ok, set] = useState(false);
   const s = useFontScale();
+  const resetTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (resetTimerRef.current !== null) window.clearTimeout(resetTimerRef.current);
+  }, []);
 
   const handleCopy = () => {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
+      void navigator.clipboard.writeText(text);
     }
     set(true);
-    setTimeout(() => set(false), 1400);
+    if (resetTimerRef.current !== null) window.clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = window.setTimeout(() => set(false), 1400);
   };
 
   return (
@@ -42,3 +52,5 @@ export default function CopyBtn({ text, title = "Copy" }) {
     </button>
   );
 }
+
+export default memo(CopyBtn);

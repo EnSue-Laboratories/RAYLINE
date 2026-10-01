@@ -1,9 +1,23 @@
-// @ts-nocheck
-import { useState, useRef, useEffect } from "react";
+import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
 import { ChevronRight, Loader2, Check } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { formatThinkingDuration, resolveThinkingSeconds, thinkingSummary } from "./blocks/thinking";
 
-export default function ThinkingBlock({ text, isThinking, durationMs }) {
+export interface ThinkingBlockProps {
+  text?: string;
+  isThinking?: boolean;
+  /** Reported thinking duration (OpenCode); otherwise a live ticker is used. */
+  durationMs?: number;
+}
+
+const CARD_STYLE: CSSProperties = {
+  margin: "6px 0 10px",
+  borderRadius: 8,
+  border: "1px solid var(--control-border)",
+  background: "var(--control-bg-subtle)",
+};
+
+function ThinkingBlock({ text, isThinking = false, durationMs }: ThinkingBlockProps) {
   const [open, setOpen] = useState(false);
   const s = useFontScale();
   const hasText = Boolean(text && text.trim().length > 0);
@@ -20,31 +34,13 @@ export default function ThinkingBlock({ text, isThinking, durationMs }) {
     return () => clearInterval(interval);
   }, [isThinking]);
 
-  const explicitSeconds = Number.isFinite(durationMs)
-    ? Math.max(0, Math.round(durationMs / 1000))
-    : null;
-  const seconds = isThinking
-    ? elapsed
-    : (explicitSeconds ?? elapsed);
-
-  function formatDuration(s) {
-    if (s < 1) return "";
-    if (s < 60) return `${s}s`;
-    const m = Math.floor(s / 60);
-    const rem = s % 60;
-    return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
-  }
-
-  const duration = formatDuration(seconds);
+  const duration = formatThinkingDuration(resolveThinkingSeconds(isThinking, elapsed, durationMs));
 
   if (!hasText && !isThinking) {
     if (!duration) return null;
     return (
       <div style={{
-        margin: "6px 0 10px",
-        borderRadius: 8,
-        border: "1px solid var(--control-border)",
-        background: "var(--control-bg-subtle)",
+        ...CARD_STYLE,
         padding: "8px 10px",
         display: "flex",
         alignItems: "center",
@@ -59,18 +55,8 @@ export default function ThinkingBlock({ text, isThinking, durationMs }) {
     );
   }
 
-  const summary = isThinking
-    ? (duration ? `Thinking for ${duration}...` : "Thinking...")
-    : `Thought for ${duration || "a moment"}`;
-
   return (
-    <div style={{
-      margin: "6px 0 10px",
-      borderRadius: 8,
-      border: "1px solid var(--control-border)",
-      background: "var(--control-bg-subtle)",
-      overflow: "hidden",
-    }}>
+    <div style={{ ...CARD_STYLE, overflow: "hidden" }}>
       <button
         onClick={() => setOpen(!open)}
         style={{
@@ -96,7 +82,7 @@ export default function ThinkingBlock({ text, isThinking, durationMs }) {
         ) : (
           <Check size={12} strokeWidth={1.5} />
         )}
-        <span style={{ flex: 1, textAlign: "left" }}>{summary}</span>
+        <span style={{ flex: 1, textAlign: "left" }}>{thinkingSummary(isThinking, duration)}</span>
         <ChevronRight
           size={12}
           strokeWidth={1.5}
@@ -125,3 +111,5 @@ export default function ThinkingBlock({ text, isThinking, durationMs }) {
     </div>
   );
 }
+
+export default memo(ThinkingBlock);

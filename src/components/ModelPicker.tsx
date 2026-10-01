@@ -1,509 +1,280 @@
-// @ts-nocheck
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { ChevronDown } from "lucide-react";
-import { getAvailableModels, getMOrMulticaFallback } from "../data/models";
-import { useProviderUpstreams } from "../data/providerUpstreams";
+import { modelLabel, normalizeModelId, type EffortLevel, type ModelDefinition } from "@shared/models";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { useTranslator } from "../contexts/LocaleContext";
+import { CLOSE_MENUS_EVENT, useDismissibleLayer } from "../hooks/useDismissibleLayer";
+import { useStableCallback } from "../hooks/useStableCallback";
+import {
+  buildPickerOptions,
+  computeMenuPosition,
+  filterInheritOption,
+  moveActiveId,
+  optionDomId,
+  type MenuPosition,
+  type PickerOption,
+  type PickerPurpose,
+} from "./model-picker/catalogView";
+import { EffortSelect } from "./model-picker/EffortSelect";
+import { ModelMenu } from "./model-picker/ModelMenu";
+import { useModelCatalog, type ModelCatalog } from "./model-picker/useModelCatalog";
 
-const MENU_GAP = 6;
-const VIEWPORT_PADDING = 8;
-const MIN_MENU_WIDTH = 340;
-const PREFERRED_MAX_HEIGHT = 420;
-const CLI_RECHECK_INTERVAL_MS = 5000;
-const DEFAULT_CLI_INSTALL_STATUS = { claude: true, codex: true, opencode: false };
+export type { ModelCatalog } from "./model-picker/useModelCatalog";
 
-const PROVIDER_INSTALL_GUIDES = {
-  claude: { url: "https://docs.claude.com/en/docs/claude-code/setup", label: "Install Claude Code\u2026" },
-  codex:  { url: "https://developers.openai.com/codex/cli",           label: "Install Codex CLI\u2026"   },
-  opencode: { url: "https://opencode.ai/docs/cli/",                    label: "Install OpenCode\u2026"    },
-};
-
-const PROVIDER_ORDER = ["claude", "codex", "remote-claude", "remote-codex", "opencode", "multica"];
-const PROVIDER_LABELS = {
-  "remote-claude": "REMOTE SSH / CLAUDE",
-  "remote-codex": "REMOTE SSH / CODEX",
-};
-
-function extractMulticaErrorStatus(err) {
-  if (!err) return null;
-  if (typeof err.status === "number") return err.status;
-  const msg = err.message || String(err);
-  const m = msg.match(/multica \S+ \S+ (\d+):/);
-  return m ? Number(m[1]) : null;
+export interface ModelPickerProps {
+  /** Selected model id; "" selects the inherit option when `inheritModelId` is set. */
+  value: string;
+  onChange?: (modelId: string) => void;
+  /** OpenCode / Multica / remote models to list alongside the catalog. */
+  extraModels?: readonly ModelDefinition[];
+  /** Multica agents failed to load. */
+  extraError?: unknown;
+  extraLoading?: boolean;
+  /** Per-conversation reasoning effort; null = the model's default. */
+  effort?: EffortLevel | null;
+  /** Shows the effort selector (for models that have efforts) when provided. */
+  onEffortChange?: (effort: EffortLevel | null) => void;
+  /** Shared catalog (see `useModelCatalog`); a picker without one builds its own. */
+  catalog?: ModelCatalog;
+  compact?: boolean;
+  ariaLabel?: string;
+  /** Menu z-index; raise it inside modals (Dispatch is at 1000). */
+  menuZIndex?: number;
+  /** "planner" disables models the dispatch planner can't drive. */
+  purpose?: PickerPurpose;
+  /** Dispatch: offer an "inherit default" option (value "") resolving to this model. */
+  inheritModelId?: string;
+  disabled?: boolean;
 }
 
-export default function ModelPicker({ value, onChange, extraModels = [], extraError = null, extraLoading = false }) {
+const NO_MODELS: readonly ModelDefinition[] = [];
+const DEFAULT_MENU_Z_INDEX = 500;
+
+function isComposing(event: KeyboardEvent): boolean {
+  return event.nativeEvent.isComposing || event.keyCode === 229;
+}
+
+/**
+ * Model picker shared by the composer, new-chat card and dispatch: provider
+ * groups, fuzzy search, arrow/Enter navigation, layered Escape, badges for
+ * legacy / retiring / CLI-gated models, plus an optional effort selector.
+ */
+export default function ModelPicker(props: ModelPickerProps) {
+  return props.catalog ? <ModelPickerControl {...props} catalog={props.catalog} /> : <ConnectedModelPicker {...props} />;
+}
+
+function ConnectedModelPicker(props: ModelPickerProps) {
+  const catalog = useModelCatalog(props.extraModels ?? NO_MODELS);
+  return <ModelPickerControl {...props} catalog={catalog} />;
+}
+
+function ModelPickerControl({
+  value,
+  onChange,
+  catalog,
+  extraError = null,
+  extraLoading = false,
+  effort = null,
+  onEffortChange,
+  compact = false,
+  ariaLabel,
+  menuZIndex = DEFAULT_MENU_Z_INDEX,
+  purpose = "chat",
+  inheritModelId,
+  disabled = false,
+}: ModelPickerProps & { catalog: ModelCatalog }) {
   const s = useFontScale();
-  const [open, set] = useState(false);
-  const ref = useRef(null);
-  const menuRef = useRef(null);
-  const [menuStyle, setMenuStyle] = useState(null);
-  const [cliInstalled, setCliInstalled] = useState(null);
-  const cliCheckedAtRef = useRef(0);
-  const cliProbePromiseRef = useRef(null);
-  const { overrideModels } = useProviderUpstreams();
-  const mergedExtraModels = useMemo(() => (
-    [...overrideModels, ...extraModels]
-  ), [extraModels, overrideModels]);
-  const allModels = useMemo(() => getAvailableModels(mergedExtraModels), [mergedExtraModels]);
-  const m = getMOrMulticaFallback(value, mergedExtraModels);
+  const t = useTranslator();
+  const menuId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [position, setPosition] = useState<MenuPosition | null>(null);
+  /** Captured when the menu opens (retirement checks must not read the clock during render). */
+  const [nowMs, setNowMs] = useState(0);
+  const { models, installed, versions, getModel, refresh } = catalog;
 
-  const probeCliInstalled = useCallback(async ({ force = false } = {}) => {
-    if (cliProbePromiseRef.current) return cliProbePromiseRef.current;
+  const label = ariaLabel || t("models.choose");
+  const inherited = useMemo(() => (inheritModelId !== undefined ? getModel(inheritModelId) : null), [getModel, inheritModelId]);
+  const inheritLabel = inherited ? `${t("dispatch.modelDefault")} · ${inherited.name}` : "";
+  const selected = useMemo(() => (value === "" && inherited ? inherited : value ? getModel(value) : null), [getModel, inherited, value]);
+  const selectedId = value === "" && inherited ? "" : (normalizeModelId(value) ?? null);
 
-    if (!window.api?.checkCliInstalled) {
-      setCliInstalled(DEFAULT_CLI_INSTALL_STATUS);
-      cliCheckedAtRef.current = Date.now();
-      return DEFAULT_CLI_INSTALL_STATUS;
-    }
+  const options = useMemo<PickerOption[]>(() => {
+    if (!open) return [];
+    const list = buildPickerOptions(models, { installed, versions, retainedIds: [value], nowMs, query, purpose });
+    const inherit = inherited ? filterInheritOption(inherited, inheritLabel, query, purpose) : null;
+    return inherit ? [inherit, ...list] : list;
+  }, [open, models, installed, versions, value, nowMs, query, purpose, inherited, inheritLabel]);
+  const eligibleIds = useMemo(() => options.filter((option) => option.disabled === null).map((option) => option.id), [options]);
+  const active = activeId !== null && eligibleIds.includes(activeId) ? activeId : (eligibleIds[0] ?? null);
 
-    if (force) {
-      setCliInstalled(null);
-    }
+  const close = useCallback(() => setOpen(false), []);
+  useDismissibleLayer(open, rootRef, menuRef, close);
 
-    const probePromise = (async () => {
-      try {
-        const result = await window.api.checkCliInstalled({ force });
-        if (result) {
-          setCliInstalled(result);
-          cliCheckedAtRef.current = Date.now();
-          return result;
-        }
-      } catch {
-        setCliInstalled(DEFAULT_CLI_INSTALL_STATUS);
-        cliCheckedAtRef.current = Date.now();
-        return DEFAULT_CLI_INSTALL_STATUS;
-      }
-
-      return null;
-    })();
-
-    cliProbePromiseRef.current = probePromise;
-    try {
-      return await probePromise;
-    } finally {
-      if (cliProbePromiseRef.current === probePromise) {
-        cliProbePromiseRef.current = null;
-      }
-    }
+  const updatePosition = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) setPosition(computeMenuPosition(rect, window.innerWidth, window.innerHeight));
   }, []);
 
   useEffect(() => {
-    const timerId = window.setTimeout(() => {
-      void probeCliInstalled();
-    }, 0);
-    return () => window.clearTimeout(timerId);
-  }, [probeCliInstalled]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (!cliInstalled) {
-      const timerId = window.setTimeout(() => {
-        void probeCliInstalled();
-      }, 0);
-      return () => window.clearTimeout(timerId);
-    }
-    if ((Date.now() - cliCheckedAtRef.current) > CLI_RECHECK_INTERVAL_MS) {
-      const timerId = window.setTimeout(() => {
-        void probeCliInstalled({ force: true });
-      }, 0);
-      return () => window.clearTimeout(timerId);
-    }
-  }, [cliInstalled, open, probeCliInstalled]);
-
-  useEffect(() => {
-    if (!onChange) return;
-    if (!allModels.some((candidate) => candidate.id === value)) {
-      const replacement = allModels.find((candidate) => candidate.provider === m.provider) || allModels[0];
-      if (replacement && replacement.id !== value) {
-        onChange(replacement.id);
-      }
-    }
-  }, [allModels, m.provider, onChange, value]);
-
-  useEffect(() => {
-    if (!cliInstalled || !onChange) return;
-
-    const currentProvider = m.provider;
-    if (!PROVIDER_INSTALL_GUIDES[currentProvider] || cliInstalled[currentProvider] !== false) return;
-
-    const fallback = allModels.find((candidate) => {
-      if (candidate.id === value) return false;
-      const guide = PROVIDER_INSTALL_GUIDES[candidate.provider];
-      return !guide || cliInstalled[candidate.provider] !== false;
-    });
-
-    if (fallback && fallback.id !== value) {
-      onChange(fallback.id);
-    }
-  }, [allModels, cliInstalled, m.provider, onChange, value]);
-
-  const updateMenuPosition = useCallback(() => {
-    if (!ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const viewportWidth = window.innerWidth;
-    const availableWidth = Math.max(160, viewportWidth - VIEWPORT_PADDING * 2);
-    const menuWidth = Math.min(Math.max(MIN_MENU_WIDTH, rect.width), availableWidth);
-    const left = Math.max(
-      VIEWPORT_PADDING,
-      Math.min(rect.right - menuWidth, viewportWidth - menuWidth - VIEWPORT_PADDING)
-    );
-    const spaceBelow = viewportHeight - rect.bottom - MENU_GAP - VIEWPORT_PADDING;
-    const spaceAbove = rect.top - MENU_GAP - VIEWPORT_PADDING;
-    const placeAbove = spaceBelow < Math.min(PREFERRED_MAX_HEIGHT, 220) && spaceAbove > spaceBelow;
-    const maxHeight = Math.max(120, Math.min(PREFERRED_MAX_HEIGHT, placeAbove ? spaceAbove : spaceBelow));
-    setMenuStyle({
-      top: placeAbove ? rect.top - MENU_GAP - maxHeight : rect.bottom + MENU_GAP,
-      left,
-      width: menuWidth,
-      maxHeight,
-    });
-  }, []);
-
-  useEffect(() => {
-    const h = (e) => {
-      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
-      setMenuStyle(null);
-      set(false);
+    if (!open) return undefined;
+    void refresh();
+    inputRef.current?.focus();
+    const onScroll = (event: Event) => {
+      if (!(event.target instanceof Node) || !menuRef.current?.contains(event.target)) updatePosition();
     };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-
-  useEffect(() => {
-    if (!open || !ref.current) return;
-    const handleResize = () => updateMenuPosition();
-    window.addEventListener("resize", handleResize);
-    const ro = new ResizeObserver(handleResize);
-    ro.observe(ref.current);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
-      window.removeEventListener("resize", handleResize);
-      ro.disconnect();
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", onScroll, true);
     };
-  }, [open, updateMenuPosition]);
+  }, [open, refresh, updatePosition]);
+
+  useEffect(() => {
+    if (open && active !== null) document.getElementById(optionDomId(menuId, active))?.scrollIntoView({ block: "nearest" });
+  }, [open, active, menuId]);
+
+  const show = (initialQuery = "") => {
+    window.dispatchEvent(new Event(CLOSE_MENUS_EVENT));
+    setNowMs(Date.now());
+    setQuery(initialQuery);
+    setActiveId(selectedId);
+    updatePosition();
+    setOpen(true);
+  };
+
+  const choose = useStableCallback((option: PickerOption | undefined) => {
+    if (!option || option.disabled !== null) return;
+    onChange?.(option.id);
+    close();
+    triggerRef.current?.focus();
+  });
+
+  const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (isComposing(event)) return;
+    switch (event.key) {
+      case "Escape":
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+        triggerRef.current?.focus();
+        break;
+      case "ArrowDown":
+      case "ArrowUp":
+        event.preventDefault();
+        event.stopPropagation();
+        setActiveId(moveActiveId(eligibleIds, active, event.key === "ArrowDown" ? 1 : -1));
+        break;
+      case "Enter":
+        event.preventDefault();
+        event.stopPropagation();
+        choose(options.find((option) => option.id === active));
+        break;
+      case "Tab":
+        close();
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (open || isComposing(event)) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      show();
+    } else if (event.key.length === 1 && event.key !== " " && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      // Type-to-search straight from the closed trigger.
+      event.preventDefault();
+      show(event.key);
+    }
+  };
+
+  const handleQueryChange = useCallback((next: string) => {
+    setQuery(next);
+    setActiveId(null);
+  }, []);
+  const openGuide = useStableCallback((url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+    close();
+  });
+
+  const unavailable = Boolean(selected?.unavailable);
+  const triggerText = value === "" && inherited
+    ? `${t("dispatch.modelDefault")} · ${inherited.tag || inherited.name}`
+    : modelLabel(selected, { short: true, effort: null }) || label;
+  const showEffort = Boolean(onEffortChange && selected && (selected.efforts?.length ?? 0) > 0 && value !== "");
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
+    <div ref={rootRef} style={{ position: "relative", display: "flex", alignItems: "center", gap: 6, minWidth: 0, maxWidth: compact ? 250 : "100%" }}>
       <button
-        onClick={() => {
-          if (open) {
-            set(false);
-            setMenuStyle(null);
-            return;
-          }
-          updateMenuPosition();
-          set(true);
-        }}
+        ref={triggerRef}
+        type="button"
+        data-model-picker="true"
+        disabled={disabled}
+        aria-label={label}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        title={unavailable ? `${modelLabel(selected, { effort: null })} · ${t("models.runtimeUnavailable")}` : modelLabel(selected, { effort: null }) || label}
+        onClick={() => (open ? close() : show())}
+        onKeyDown={handleTriggerKeyDown}
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
           gap: 6,
-          padding: "4px 12px",
-          background: "color-mix(in srgb, var(--control-bg) 50%, transparent)",
-          border: "1px solid var(--control-bg)",
+          minWidth: 0,
+          maxWidth: "100%",
+          padding: compact ? "3px 6px" : "4px 12px",
+          background: "var(--control-bg)",
+          border: "1px solid var(--control-border)",
           borderRadius: 7,
           color: "var(--text-secondary)",
           fontSize: s(10),
           fontFamily: "var(--font-mono)",
-          cursor: "pointer",
-          transition: "all .2s",
           letterSpacing: ".06em",
+          cursor: disabled ? "default" : "pointer",
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--text-primary) 11%, transparent)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--control-bg)"; }}
       >
-        {m.tag} <ChevronDown size={11} strokeWidth={2} />
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {triggerText}
+          {unavailable ? ` · ${t("models.unavailable")}` : ""}
+        </span>
+        <ChevronDown size={11} strokeWidth={2} style={{ flexShrink: 0 }} />
       </button>
-
-      {open && menuStyle && createPortal(
-        <div
-          ref={menuRef}
-          style={{
-            position: "fixed",
-            top: menuStyle.top,
-            left: menuStyle.left,
-            zIndex: 400,
-            width: menuStyle.width,
-            maxHeight: menuStyle.maxHeight,
-            overflowY: "auto",
-            background: "var(--pane-elevated)",
-            backdropFilter: "blur(48px) saturate(1.2)",
-            border: "1px solid var(--pane-border)",
-            borderRadius: 10,
-            padding: 3,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-            animation: "dropIn .15s ease",
-            WebkitAppRegion: "no-drag",
-          }}
-        >
-          {(() => {
-            return PROVIDER_ORDER.map((provider, gi) => {
-              const entries = allModels.filter((mm) => mm.provider === provider);
-              const isMulticaEmpty = provider === "multica" && entries.length === 0;
-              const isOpenCodeEmpty = provider === "opencode" && entries.length === 0;
-              const guide = PROVIDER_INSTALL_GUIDES[provider];
-              const cliKnown = !guide || Object.prototype.hasOwnProperty.call(cliInstalled || {}, provider);
-              const cliUnknown = Boolean(guide) && !cliKnown;
-              const cliMissing = Boolean(guide) && cliKnown && cliInstalled[provider] === false;
-              const visibleEntries = entries.filter((mm) => !cliMissing || mm.remoteRuntime);
-              const isRemoteEmpty = provider.startsWith("remote-") && entries.length === 0;
-              if (isOpenCodeEmpty && m.provider !== "opencode") return null;
-              if (isRemoteEmpty) return null;
-              return (
-                <div key={provider}>
-                  {gi > 0 && <div style={{ height: 1, background: "var(--control-bg)", margin: "4px 8px" }} />}
-                  <div style={{ padding: gi === 0 ? "6px 10px 2px" : "4px 10px 2px", fontSize: s(8), color: "color-mix(in srgb, var(--text-primary) 22%, transparent)", letterSpacing: ".12em", fontFamily: "var(--font-mono)" }}>
-                    {PROVIDER_LABELS[provider] || provider.toUpperCase()}
-                  </div>
-                  {cliUnknown && (
-                    <button
-                      key={`${provider}-checking`}
-                      disabled
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "flex-start",
-                        width: "100%",
-                        padding: "9px 13px",
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: 7,
-                        color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-                        fontSize: s(11),
-                        fontFamily: "var(--font-mono)",
-                        cursor: "default",
-                        textAlign: "left",
-                        opacity: 0.5,
-                      }}
-                    >
-                      {`Checking ${provider.toUpperCase()} CLI\u2026`}
-                    </button>
-                  )}
-                  {cliMissing && (
-                    <button
-                      key={`${provider}-install`}
-                      onClick={() => {
-                        window.open(guide.url, "_blank", "noopener,noreferrer");
-                        setMenuStyle(null);
-                        set(false);
-                      }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "flex-start",
-                        width: "100%",
-                        padding: "9px 13px",
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: 7,
-                        color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-                        fontSize: s(11),
-                        fontFamily: "var(--font-mono)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all .12s",
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                    >
-                      {guide.label}
-                    </button>
-                  )}
-                  {isMulticaEmpty && (() => {
-                    const status = extractMulticaErrorStatus(extraError);
-                    if (extraLoading && !extraError) {
-                      return (
-                        <button
-                          key="multica-loading"
-                          disabled
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "flex-start",
-                            width: "100%",
-                            padding: "9px 13px",
-                            background: "transparent",
-                            border: "none",
-                            borderRadius: 7,
-                            color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-                            fontSize: s(11),
-                            fontFamily: "var(--font-mono)",
-                            cursor: "default",
-                            textAlign: "left",
-                            opacity: 0.5,
-                          }}
-                        >
-                          {"Loading agents\u2026"}
-                        </button>
-                      );
-                    }
-                    if (extraError && status === 401) {
-                      return (
-                        <button
-                          key="multica-reconnect"
-                          onClick={() => {
-                            window.dispatchEvent(new CustomEvent("open-multica-setup"));
-                            setMenuStyle(null);
-                            set(false);
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            width: "100%",
-                            padding: "9px 13px",
-                            background: "transparent",
-                            border: "none",
-                            borderRadius: 7,
-                            color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-                            fontSize: s(11),
-                            fontFamily: "var(--font-mono)",
-                            cursor: "pointer",
-                            textAlign: "left",
-                            transition: "all .12s",
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                        >
-                          {"Session expired \u2014 reconnect"}
-                        </button>
-                      );
-                    }
-                    if (extraError && (status === 403 || status === 404)) {
-                      const raw = (extraError.message || String(extraError)).split("\n")[0];
-                      const text = raw.length > 80 ? raw.slice(0, 79) + "\u2026" : raw;
-                      return (
-                        <button
-                          key="multica-error-verbatim"
-                          disabled
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "flex-start",
-                            width: "100%",
-                            padding: "9px 13px",
-                            background: "transparent",
-                            border: "none",
-                            borderRadius: 7,
-                            color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-                            fontSize: s(11),
-                            fontFamily: "var(--font-mono)",
-                            cursor: "not-allowed",
-                            textAlign: "left",
-                            opacity: 0.4,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                          title={extraError.message || String(extraError)}
-                        >
-                          {text}
-                        </button>
-                      );
-                    }
-                    if (extraError) {
-                      const raw = (extraError.message || String(extraError)).split("\n")[0];
-                      const text = raw.length > 80 ? raw.slice(0, 79) + "\u2026" : raw;
-                      return (
-                        <button
-                          key="multica-error"
-                          disabled
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "flex-start",
-                            width: "100%",
-                            padding: "9px 13px",
-                            background: "transparent",
-                            border: "none",
-                            borderRadius: 7,
-                            color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-                            fontSize: s(11),
-                            fontFamily: "var(--font-mono)",
-                            cursor: "not-allowed",
-                            textAlign: "left",
-                            opacity: 0.4,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                          title={extraError.message || String(extraError)}
-                        >
-                          {text}
-                        </button>
-                      );
-                    }
-                    return (
-                      <button
-                        key="multica-connect"
-                        onClick={() => {
-                          window.dispatchEvent(new CustomEvent("open-multica-setup"));
-                          setMenuStyle(null);
-                          set(false);
-                        }}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          width: "100%",
-                          padding: "9px 13px",
-                          background: "transparent",
-                          border: "none",
-                          borderRadius: 7,
-                          color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-                          fontSize: s(11),
-                          fontFamily: "var(--font-mono)",
-                          cursor: "pointer",
-                          textAlign: "left",
-                          transition: "all .12s",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                      >
-                        {"Connect Multica\u2026"}
-                      </button>
-                    );
-                  })()}
-                  {!cliUnknown && visibleEntries.map((mm) => (
-                    <button
-                      key={mm.id}
-                      onClick={() => { onChange(mm.id); setMenuStyle(null); set(false); }}
-                      title={`${mm.name} ${mm.tag}`}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 16,
-                        width: "100%",
-                        padding: "9px 13px",
-                        background: mm.id === value ? "var(--control-bg)" : "transparent",
-                        border: "none",
-                        borderRadius: 7,
-                        color: mm.id === value ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-                        fontSize: s(11),
-                        fontFamily: "var(--font-mono)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all .12s",
-                      }}
-                      onMouseEnter={(e) => { if (mm.id !== value) e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
-                      onMouseLeave={(e) => { if (mm.id !== value) e.currentTarget.style.background = "transparent"; }}
-                    >
-                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {mm.name}
-                      </span>
-                      <span style={{ flexShrink: 0, fontSize: s(9), opacity: 0.4, letterSpacing: ".1em", whiteSpace: "nowrap" }}>{mm.tag}</span>
-                    </button>
-                  ))}
-                </div>
-              );
-            });
-          })()}
-        </div>,
-        document.body
+      {showEffort && selected && onEffortChange && (
+        <EffortSelect s={s} t={t} model={selected} effort={effort} onEffortChange={onEffortChange} compact={compact} disabled={disabled} />
+      )}
+      {open && position && (
+        <ModelMenu
+          s={s}
+          t={t}
+          menuId={menuId}
+          menuRef={menuRef}
+          inputRef={inputRef}
+          label={label}
+          position={position}
+          zIndex={menuZIndex}
+          query={query}
+          options={options}
+          selectedId={selectedId}
+          activeId={active}
+          purpose={purpose}
+          installed={installed}
+          extraError={Boolean(extraError)}
+          extraLoading={extraLoading}
+          onQueryChange={handleQueryChange}
+          onKeyDown={handleMenuKeyDown}
+          onHover={setActiveId}
+          onChoose={choose}
+          onOpenGuide={openGuide}
+        />
       )}
     </div>
   );

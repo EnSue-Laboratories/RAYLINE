@@ -1,8 +1,13 @@
-// @ts-nocheck
 import { X, FileText } from "lucide-react";
+import type { Attachment } from "@shared/chat/types";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-export default function ImagePreview({ items, onRemove }) {
+export interface ImagePreviewProps {
+  items: readonly Attachment[] | null | undefined;
+  onRemove: (index: number) => void;
+}
+
+export default function ImagePreview({ items, onRemove }: ImagePreviewProps) {
   const s = useFontScale();
   if (!items || items.length === 0) return null;
 

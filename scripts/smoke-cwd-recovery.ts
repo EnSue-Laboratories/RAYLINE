@@ -1,0 +1,145 @@
+#!/usr/bin/env node
+// Smoke test for src/utils/cwdRecovery.ts; asserts invariants directly.
+//   node scripts/smoke-cwd-recovery.ts
+//
+// Exits non-zero on any failure. Runs directly on Node's type stripping
+// (erasable TypeScript only, explicit `.ts` import specifiers).
+
+import * as cwdRecoveryModule from "../src/utils/cwdRecovery.ts";
+
+type RecoveryReason = "worktree-root" | "app-cwd" | "none";
+
+interface CwdRecovery {
+  readonly getMainRepoRoot: (dir: string | null | undefined) => string | null | undefined;
+  readonly resolveSafeCwd: (args: {
+    cwd: string | null;
+    appCwd: string | null;
+    exists: (p: string) => boolean;
+  }) => { cwd: string | null; wasMissing: boolean; originalCwd: string | null; recoveryReason: RecoveryReason };
+  readonly buildMissingCwdReminder: (args: {
+    originalCwd: string | null;
+    recoveredCwd: string | null;
+    recoveryReason: RecoveryReason;
+  }) => string | null;
+  readonly decoratePromptWithReminder: (prompt: string | null, reminder: string | null) => string;
+}
+
+// TODO(ts-boundary): drop once src/utils/cwdRecovery.ts is converted (app-shell)
+const { getMainRepoRoot, resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder } =
+  cwdRecoveryModule as unknown as CwdRecovery;
+
+let failures = 0;
+function check(name: string, cond: boolean | undefined, detail?: string): void {
+  if (cond) {
+    console.log(`  ok   ${name}`);
+  } else {
+    failures += 1;
+    console.log(`  FAIL ${name}${detail ? ` — ${detail}` : ""}`);
+  }
+}
+function eq(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+console.log("getMainRepoRoot:");
+check("returns input when no worktree segment", getMainRepoRoot("/repo/foo") === "/repo/foo");
+check("strips /.worktrees/<name> suffix", getMainRepoRoot("/repo/foo/.worktrees/wt-x") === "/repo/foo");
+check("handles null", getMainRepoRoot(null) === null);
+check("handles undefined", getMainRepoRoot(undefined) === undefined);
+check("handles empty string", getMainRepoRoot("") === "");
+
+console.log("\nresolveSafeCwd:");
+{
+  const existing = new Set(["/repo/foo", "/repo/foo/.worktrees/wt-x", "/app/cwd"]);
+  const exists = (p: string): boolean => existing.has(p);
+
+  check(
+    "happy path — cwd exists, no recovery",
+    eq(
+      resolveSafeCwd({ cwd: "/repo/foo/.worktrees/wt-x", appCwd: "/app/cwd", exists }),
+      { cwd: "/repo/foo/.worktrees/wt-x", wasMissing: false, originalCwd: "/repo/foo/.worktrees/wt-x", recoveryReason: "none" }
+    )
+  );
+
+  const gone = new Set(["/repo/foo", "/app/cwd"]); // worktree removed
+  const existsGone = (p: string): boolean => gone.has(p);
+  check(
+    "worktree gone — falls back to project root",
+    eq(
+      resolveSafeCwd({ cwd: "/repo/foo/.worktrees/wt-x", appCwd: "/app/cwd", exists: existsGone }),
+      { cwd: "/repo/foo", wasMissing: true, originalCwd: "/repo/foo/.worktrees/wt-x", recoveryReason: "worktree-root" }
+    )
+  );
+
+  const onlyApp = new Set(["/app/cwd"]);
+  const existsOnlyApp = (p: string): boolean => onlyApp.has(p);
+  check(
+    "worktree + root both gone — falls back to app cwd",
+    eq(
+      resolveSafeCwd({ cwd: "/repo/foo/.worktrees/wt-x", appCwd: "/app/cwd", exists: existsOnlyApp }),
+      { cwd: "/app/cwd", wasMissing: true, originalCwd: "/repo/foo/.worktrees/wt-x", recoveryReason: "app-cwd" }
+    )
+  );
+
+  const nothing = new Set<string>();
+  const existsNone = (p: string): boolean => nothing.has(p);
+  check(
+    "everything gone — returns null cwd",
+    eq(
+      resolveSafeCwd({ cwd: "/repo/foo/.worktrees/wt-x", appCwd: "/app/cwd", exists: existsNone }),
+      { cwd: null, wasMissing: true, originalCwd: "/repo/foo/.worktrees/wt-x", recoveryReason: "none" }
+    )
+  );
+
+  check(
+    "non-worktree path gone — skips to app cwd",
+    eq(
+      resolveSafeCwd({ cwd: "/random/dir", appCwd: "/app/cwd", exists: (p: string) => p === "/app/cwd" }),
+      { cwd: "/app/cwd", wasMissing: true, originalCwd: "/random/dir", recoveryReason: "app-cwd" }
+    )
+  );
+
+  check(
+    "null cwd — returns unchanged, not flagged missing",
+    eq(
+      resolveSafeCwd({ cwd: null, appCwd: "/app/cwd", exists }),
+      { cwd: null, wasMissing: false, originalCwd: null, recoveryReason: "none" }
+    )
+  );
+
+  check(
+    "same appCwd and cwd (non-worktree) that's missing — null",
+    eq(
+      resolveSafeCwd({ cwd: "/gone", appCwd: "/gone", exists: () => false }),
+      { cwd: null, wasMissing: true, originalCwd: "/gone", recoveryReason: "none" }
+    )
+  );
+}
+
+console.log("\nbuildMissingCwdReminder:");
+{
+  const r1 = buildMissingCwdReminder({ originalCwd: "/a/.worktrees/x", recoveredCwd: "/a", recoveryReason: "worktree-root" });
+  check("worktree-root reminder includes <system-reminder> wrapper", r1?.startsWith("<system-reminder>"));
+  check("worktree-root reminder names original + recovered paths", r1?.includes("/a/.worktrees/x") && r1?.includes("/a"));
+  check("worktree-root reminder has cwd-recovery tag", r1?.includes("[cwd-recovery]"));
+
+  const r2 = buildMissingCwdReminder({ originalCwd: "/gone", recoveredCwd: "/app", recoveryReason: "app-cwd" });
+  check("app-cwd reminder mentions fallback", r2?.includes("app-level working directory"));
+
+  const r3 = buildMissingCwdReminder({ originalCwd: "/gone", recoveredCwd: null, recoveryReason: "none" });
+  check("no-fallback reminder is still generated", typeof r3 === "string" && r3.includes("no usable fallback"));
+
+  const r4 = buildMissingCwdReminder({ originalCwd: null, recoveredCwd: "/a", recoveryReason: "worktree-root" });
+  check("null original cwd returns null reminder", r4 === null);
+}
+
+console.log("\ndecoratePromptWithReminder:");
+{
+  check("null reminder returns prompt unchanged", decoratePromptWithReminder("hello", null) === "hello");
+  const wrapped = decoratePromptWithReminder("hello", "<system-reminder>X</system-reminder>");
+  check("prepends reminder above prompt", wrapped.startsWith("<system-reminder>") && wrapped.endsWith("hello"));
+  check("handles null prompt", decoratePromptWithReminder(null, "<system-reminder>X</system-reminder>").endsWith("\n\n"));
+}
+
+console.log(`\n${failures === 0 ? "ALL OK" : `${failures} FAILURE(S)`}`);
+process.exit(failures === 0 ? 0 : 1);

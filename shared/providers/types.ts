@@ -90,6 +90,12 @@ export interface CliInstalledSnapshot {
   grok: boolean;
   /** `agy` resolvable (`AGY_BIN` or PATH). */
   agy: boolean;
+  /**
+   * Optional `--version` output per CLI (semver, no "v"). Not populated by
+   * main yet; when present the model picker gates models on
+   * `ModelDefinition.minCliVersion`, otherwise it only shows a hint.
+   */
+  versions?: Partial<Record<"claude" | "codex" | "opencode" | "grok" | "agy", string>>;
 }
 
 export interface CheckCliInstalledOptions {
