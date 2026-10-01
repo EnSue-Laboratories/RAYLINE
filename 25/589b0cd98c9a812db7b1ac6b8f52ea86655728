@@ -1,0 +1,339 @@
+shared/providers/types.ts
+  s_d0fb9aefa2e5fb::t_a03e62441477fc 1-343
+shared/README.md
+  s_d0fb9aefa2e5fb::t_a672131782293a 1-48
+src/data/remoteModels.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/models/types.ts
+  s_d0fb9aefa2e5fb::t_6661f757eeebbc 83-84
+  s_d0fb9aefa2e5fb::t_c6b5e35213e468 1-49,51-79,81-82,85-123,126-194
+  s_d0fb9aefa2e5fb::t_55e5abc3252e06 50,80,124-125
+shared/github/types.ts
+  s_d0fb9aefa2e5fb::t_aff2369f3bf7b6 1-7,10-161,163
+  s_d0fb9aefa2e5fb::t_016169ac166d9f 8-9,162
+electron/paths.ts
+  s_d0fb9aefa2e5fb::t_b4d11f9f0144a1 1-23
+src/components/CopyImageBtn.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/TerminalDrawer.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/models/registry.ts
+  s_d0fb9aefa2e5fb::t_5a9184f33901aa 1-424
+src/contexts/ThemeContext.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/agent/opencode-stream.ts
+  s_d0fb9aefa2e5fb::t_0359bc167e16e5 1-130
+src/data/models.ts
+  s_d0fb9aefa2e5fb::t_2fec0add28db1a 1-11
+src/components/BranchSelector.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/updater/types.ts
+  s_d0fb9aefa2e5fb::t_7606a5f3cad2c2 1-24
+tsconfig.node.json
+  s_d0fb9aefa2e5fb::t_1f2af9754ce6a9 1-6,8
+  s_d0fb9aefa2e5fb::t_711cdf1572b0bf 7
+src/components/AuroraCanvas.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/data/providerUpstreams.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/utils/wallpaper.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/types/window.d.ts
+  s_d0fb9aefa2e5fb::t_1b6c9ae5e494b3 1-4,10-15,18-21
+  s_d0fb9aefa2e5fb::t_53a119637cbae0 5-9,16-17
+src/utils/chime.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/SidebarChromeRail.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/cli-bin-resolver.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/Settings.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,5,12-13
+src/components/ThinkingBlock.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/terminal-manager.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,23,27,125-126
+shared/agent/events.ts
+  s_d0fb9aefa2e5fb::t_511c60c5c77f02 1-112
+src/components/RuntimeSetupCard.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/i18n/index.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/SidebarWindowsHeader.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/store/__tests__/createStore.test.ts
+  s_d0fb9aefa2e5fb::t_54524519215dd1 1-32
+src/data/conversations.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/remote-attachments.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,8-9
+electron/checkpoint.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,10
+src/components/NewProjectModal.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron-builder.config.cjs
+  s_d0fb9aefa2e5fb::t_3fc843046c6488 91-92,94-97,99
+src/components/WindowControls.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/utils/themeBootstrap.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+index.html
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 27
+src/components/DispatchCard.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/mcp-terminal-server.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 2
+src/pm-components/githubState.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+tsconfig.renderer.json
+  s_d0fb9aefa2e5fb::t_1f2af9754ce6a9 1-10
+src/utils/appearance.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/ProjectGroup.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/contexts/LanguageContext.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/remote-runtime.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+scripts/ts-migration.ts
+  s_d0fb9aefa2e5fb::t_6bbf6075bd9fec 1-40
+shared/git/types.ts
+  s_d0fb9aefa2e5fb::t_e3428185da4da5 1-140
+shared/state/types.ts
+  s_d0fb9aefa2e5fb::t_1b64b27e2cfd49 1-86,89-122,124
+  s_d0fb9aefa2e5fb::t_030c129d2e4ae7 87-88
+  s_d0fb9aefa2e5fb::t_c80054206d3b7c 123
+scripts/claudi-terminal.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 2
+docs/refactor/cli-models-research.md
+  s_d0fb9aefa2e5fb::t_1d2e9415232c02 1-99
+src/pm-components/CreateForm.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/ChatArea.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,10
+src/components/HoverIconButton.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/ProjectContextModal.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/auto-updater.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/utils/attachments.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/MermaidBlock.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/agent/usage.ts
+  s_d0fb9aefa2e5fb::t_71e1c91fb137ca 1-41
+src/ProjectManager.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,20
+src/components/CopyBtn.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/utils/crossProviderPrime.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/windowChrome.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/pm-components/CommentBox.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/system/types.ts
+  s_d0fb9aefa2e5fb::t_d9ee9cfec78e32 1-58
+src/utils/exportHelpers.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/pm-components/PRList.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/utils/paneSurface.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/TerminalWindow.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,6
+src/components/Grain.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/opencode/store.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/pm-main.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1-2,9
+src/terminal-main.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1-2,8
+tsconfig.electron.json
+  s_d0fb9aefa2e5fb::t_1f2af9754ce6a9 1-10
+shared/ipc/contract.ts
+  s_d0fb9aefa2e5fb::t_697860979570ae 1-229,231-408
+  s_d0fb9aefa2e5fb::t_eb4927dcb49976 230
+shared/agent/multica-stream.ts
+  s_d0fb9aefa2e5fb::t_14b7960f9b5e68 1-70
+scripts/build-electron.mjs
+  s_d0fb9aefa2e5fb::t_23bc2d17743eff 1-18,21-54,56-59,61-76,78-99
+  s_d0fb9aefa2e5fb::t_3fc843046c6488 19-20,55,60
+  s_d0fb9aefa2e5fb::t_3abb9e24b5beca 77
+src/store/createStore.ts
+  s_d0fb9aefa2e5fb::t_03ccd2886127be 13-63
+src/data/openCodeModels.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/codex-agent-manager.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,5-7,12-15,18-19
+src/components/ImagePreview.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/models/dynamic-models.ts
+  s_d0fb9aefa2e5fb::t_9d66d376807412 1-206
+src/components/EmptyState.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/multica-manager.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/hooks/useAgent.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/pm-components/SearchableSelect.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/SelectionToolbar.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/opencode-agent-manager.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,6-7,10-11
+src/hooks/useGitStatus.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/pm-components/ItemDetail.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/providerUpstreams/store.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+tsconfig.base.json
+  s_d0fb9aefa2e5fb::t_1f2af9754ce6a9 1-28,30-32
+src/components/InteractiveBlock.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/project-manager.html
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 26
+src/components/GitStatusPill.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/terminal-window.html
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 26
+src/components/AskUserQuestionBlock.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/session-reader.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/github-manager.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,3-4
+src/multica/store.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/data/multicaModels.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,5
+docs/refactor/PERF.md
+  s_d0fb9aefa2e5fb::t_5b32a233dc85a8 1-28,32-61,63-89,91-110,112-128,131-208,213-216
+  s_d0fb9aefa2e5fb::t_3f9dd643fdc1fd 209-212
+  s_d0fb9aefa2e5fb::t_78a181c8ca7dbd 90
+  s_d0fb9aefa2e5fb::t_297b2eda101042 29-31,62,111,129-130
+shared/ipc/index.ts
+  s_d0fb9aefa2e5fb::t_53a119637cbae0 1-2
+src/components/WindowDragSpacer.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/ValueControlBlock.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/agent/claude-stream.ts
+  s_d0fb9aefa2e5fb::t_b03b3c0bb9569a 1-293
+src/components/TabStrip.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/icons/index.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/provider-upstreams.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/main.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,3,8-9,17,29-38,448,484,501,521,543,563,593,606
+src/hooks/useWindowActivity.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/agent-manager.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,5-12
+electron/claude-usage-fetcher.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,19
+tsconfig.json
+  s_d0fb9aefa2e5fb::t_1f2af9754ce6a9 1-8
+src/data/runtimeSetup.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/NewChatCard.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,5
+src/pm-components/IssueList.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+eslint.config.js
+  s_d0fb9aefa2e5fb::t_711cdf1572b0bf 5,8-21,23-25,28,30,32,34-70,72
+src/components/LoadingStatus.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/hooks/useTerminal.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+docs/refactor/CONVENTIONS.md
+  s_d0fb9aefa2e5fb::t_c8782b766fc1d3 1-62
+src/utils/tabs.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/terminal/types.ts
+  s_d0fb9aefa2e5fb::t_b3fddaa3167cb5 1-138
+shared/models/ids.ts
+  s_d0fb9aefa2e5fb::t_550b6f76f3030c 1-31,34-35,38,40,49-52,55-56,59-60,62,65-75,77,87-105
+  s_d0fb9aefa2e5fb::t_030c129d2e4ae7 61
+electron/logger.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/pm-components/AccountManager.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/ProjectPicker.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/pm-components/AuthModal.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/utils/time.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/MulticaSetupModal.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/ToolCallBlock.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+package-lock.json
+  ai_agent 35-36,39-40,45,50-51,53,825-1266,1708-1710,2285-2295,2558-2564,2651-2653,2657,2693-2954,2957-2960,2964-2967,2970-2984,2986-2997,2999-3002,3005-3021,3023-3026,3030-3051,3096-3133,3596-3605,4125-4134,5715-5731,5816-5822,5859-5900,6114-6123,6164-6173,8224-8233,9752-9765,10077-10079,11284-11290,11553-11562,11564-11566,11573-11575,11658-11670,11753-11790,11798-11800,12177-12259,12364-12374
+src/main.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1-2,8-9
+electron/preload-pm.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/App.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,6,18-21
+src/utils/cwdRecovery.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+.gitignore
+  s_d0fb9aefa2e5fb::t_3fc843046c6488 3
+src/components/Sidebar.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/contexts/FontSizeContext.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/Message.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/utils/logger.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/remote-channel.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/pm-components/RepoManager.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+electron/preload.ts
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/agent/codex-stream.ts
+  s_d0fb9aefa2e5fb::t_2d4266123dcf64 1-215
+shared/models/index.ts
+  s_d0fb9aefa2e5fb::t_6661f757eeebbc 1-4
+src/components/ExportConversationBtn.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+src/components/Tab.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1
+shared/chat/types.ts
+  s_d0fb9aefa2e5fb::t_90b2c461f3b1d1 1-538,543
+  s_d0fb9aefa2e5fb::t_45537c8addf2d9 539-542
+package.json
+  s_d0fb9aefa2e5fb::t_54524519215dd1 18,75
+  s_d0fb9aefa2e5fb::t_3fc843046c6488 4,13,16-17,19-24
+  s_d0fb9aefa2e5fb::t_6bbf6075bd9fec 26,29-30
+src/components/ModelPicker.tsx
+  s_d0fb9aefa2e5fb::t_8908ced8276ea4 1,6
+shared/ipc/renderer-api.ts
+  s_d0fb9aefa2e5fb::t_86891476722fa9 1-21,24-229
+  s_d0fb9aefa2e5fb::t_1b6c9ae5e494b3 22-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "25589b0cd98c9a812db7b1ac6b8f52ea86655728",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
