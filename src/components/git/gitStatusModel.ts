@@ -10,9 +10,11 @@ export function letterFor(code: GitStatusCode): StatusLetter {
     case "?":
       return "U";
     case "A":
+      return "A";
     case "D":
+      return "D";
     case "R":
-      return code;
+      return "R";
     default:
       return "M";
   }

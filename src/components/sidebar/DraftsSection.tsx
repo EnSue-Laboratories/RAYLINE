@@ -1,7 +1,7 @@
 import { memo, useCallback, useState, type MouseEvent } from "react";
 import { ChevronRight, Plus, Trash2 } from "lucide-react";
 import { getMOrMulticaFallback } from "../../data/models";
-import { applyPaneInteractionStyle, getPaneInteractionStyle } from "./boundary";
+import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../../utils/paneSurface";
 import type {
   DeleteConversation,
   ExtraModels,

@@ -3,12 +3,8 @@ import type { Conversation, ConversationSession } from "@shared/chat/types";
 import type { ModelDefinition } from "@shared/models";
 import type { ProjectMeta } from "@shared/state/types";
 
-/** `useFontScale()` result: scales a px value by the user's font size. */
-export type FontScale = (px: number) => number;
-
-export type TranslateVars = Readonly<Record<string, string | number | null | undefined>>;
-/** `createTranslator(locale)` result. */
-export type Translator = (key: string, vars?: TranslateVars) => string;
+export type { FontScale } from "../../contexts/FontSizeContext";
+export type { Translator } from "../../i18n";
 
 /**
  * The slice of a conversation row the sidebar reads. App passes richer rows

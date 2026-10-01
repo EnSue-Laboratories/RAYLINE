@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { FolderOpen, FolderPlus, GitBranch, X } from "lucide-react";
-import { useLocaleTranslator } from "./sidebar/boundary";
+import { useLocaleTranslator } from "./sidebar/useLocaleTranslator";
 import {
   backdropStyle,
   bodyStyle,

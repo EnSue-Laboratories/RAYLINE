@@ -1,6 +1,7 @@
 import { lazy, memo, Suspense, useCallback, useRef, useState } from "react";
 import { useDismissibleLayer } from "../hooks/useDismissibleLayer";
-import { useFontScale, useLocaleTranslator } from "./sidebar/boundary";
+import { useFontScale } from "../contexts/FontSizeContext";
+import { useLocaleTranslator } from "./sidebar/useLocaleTranslator";
 import ConversationList from "./sidebar/ConversationList";
 import { getProjectMenuPosition, getViewport, type MenuPosition } from "./sidebar/dropdownPosition";
 import { closeOtherMenus } from "./sidebar/menuEvents";

@@ -3,7 +3,8 @@ import { useStableCallback } from "../hooks/useStableCallback";
 import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
 import ProjectGroup from "./ProjectGroup";
 import WindowDragSpacer from "./WindowDragSpacer";
-import { useFontScale, useLocaleTranslator } from "./sidebar/boundary";
+import { useFontScale } from "../contexts/FontSizeContext";
+import { useLocaleTranslator } from "./sidebar/useLocaleTranslator";
 import DraftsSection from "./sidebar/DraftsSection";
 import {
   applyCollapsedOverrides,

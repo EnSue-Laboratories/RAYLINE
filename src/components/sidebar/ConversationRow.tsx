@@ -1,7 +1,7 @@
 import { memo, useCallback, type MouseEvent } from "react";
 import { Trash2 } from "lucide-react";
 import { getMOrMulticaFallback } from "../../data/models";
-import { applyPaneInteractionStyle, getPaneInteractionStyle } from "./boundary";
+import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../../utils/paneSurface";
 import { areConversationRowsEqual } from "./projectGroupEquality";
 import type { DeleteConversation, ExtraModels, FontScale, SelectConversation, SidebarConversation } from "./types";
 

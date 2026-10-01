@@ -1,7 +1,7 @@
 import { memo, useState, type ReactNode } from "react";
 import { FolderPlus, Plus, Search, Workflow } from "lucide-react";
 import { NO_DRAG } from "./appRegion";
-import { applyPaneInteractionStyle, getPaneInteractionStyle } from "./boundary";
+import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../../utils/paneSurface";
 import type { FontScale, Translator } from "./types";
 
 function GitHubIcon({ size = 12 }: { size?: number }) {

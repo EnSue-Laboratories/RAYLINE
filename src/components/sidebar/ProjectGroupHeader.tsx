@@ -1,6 +1,6 @@
 import { useState, type ReactNode, type Ref } from "react";
 import { ChevronRight, FolderClosed, MoreHorizontal, Plus } from "lucide-react";
-import { getPaneInteractionStyle } from "./boundary";
+import { getPaneInteractionStyle } from "../../utils/paneSurface";
 import type { FontScale, Translator } from "./types";
 
 export interface ProjectGroupHeaderProps {
