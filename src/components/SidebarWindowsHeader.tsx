@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen, Plus, Settings } from "lucide-react";
 import { useTranslator } from "../contexts/LocaleContext";
 import { WINDOW_DRAG_HEIGHT } from "../windowChrome";
-import { DRAG, NO_DRAG } from "./sidebar/appRegion";
+import { DRAG, NO_DRAG } from "../utils/appRegion";
 
 const BTN_SIZE = 28;
 const SIDEBAR_WIDTH = 220;

@@ -7,7 +7,6 @@ import type { FontScale } from "../../contexts/FontSizeContext";
 import type { Translator } from "../../i18n";
 import { groupByProvider, optionDomId, providerGroupLabel, type MenuPosition, type PickerOption, type PickerPurpose } from "./catalogView";
 import { ModelOptionRow } from "./ModelOptionRow";
-import type { AppRegionStyle } from "../settings/styles";
 
 const INSTALL_GUIDE_NAMES: Readonly<Partial<Record<RuntimeProviderId, string>>> = {
   claude: "Claude Code",
@@ -86,7 +85,7 @@ export function ModelMenu({
     fontSize: s(11),
   };
   // Solid surface: a backdrop blur here would re-run on every streamed frame underneath.
-  const style: AppRegionStyle = {
+  const style: CSSProperties = {
     ...position,
     position: "fixed",
     zIndex,

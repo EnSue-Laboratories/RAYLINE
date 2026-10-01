@@ -20,7 +20,7 @@ const FloatingSheet = forwardRef<HTMLDivElement, FloatingSheetProps>(function Fl
   { layout, anchorRef, onClose, limitHeight = true, children },
   ref,
 ) {
-  const style: CSSProperties & { WebkitAppRegion: string } = {
+  const style: CSSProperties = {
     position: "fixed",
     top: layout.top,
     left: layout.left,

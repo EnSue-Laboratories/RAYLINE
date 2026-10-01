@@ -7,7 +7,7 @@ import {
   SIDEBAR_CHROME_RAIL_TOP,
   SIDEBAR_CHROME_RAIL_WIDTH,
 } from "../windowChrome";
-import { NO_DRAG } from "./sidebar/appRegion";
+import { NO_DRAG } from "../utils/appRegion";
 
 interface RailButtonProps {
   label: string;

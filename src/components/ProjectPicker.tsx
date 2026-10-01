@@ -4,7 +4,7 @@ import { Check, ChevronDown, FolderClosed, FolderOpen } from "lucide-react";
 import { useFontScale, type FontScale } from "../contexts/FontSizeContext";
 import { useTranslator } from "../contexts/LocaleContext";
 import { useDismissibleLayer } from "../hooks/useDismissibleLayer";
-import { NO_DRAG } from "./sidebar/appRegion";
+import { NO_DRAG } from "../utils/appRegion";
 import { getProjectPickerPosition, getViewport, type PickerMenuPosition } from "./sidebar/dropdownPosition";
 import { closeOtherMenus } from "./sidebar/menuEvents";
 import { getProjectDisplayName, listPickerProjectRoots } from "./sidebar/projectGrouping";
