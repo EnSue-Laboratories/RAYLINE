@@ -1,0 +1,43 @@
+electron/services/sessions/search.ts
+  s_d0fb9aefa2e5fb::t_a30bd616c99d0a 1-14,16-97
+electron/services/sessions/codex.ts
+  s_d0fb9aefa2e5fb::t_31c10581fe9865 1-217
+electron/session-reader.ts
+  s_d0fb9aefa2e5fb::t_ffabef62f14cc3 1-35
+electron/services/sessions/__tests__/fixtures.ts
+  s_d0fb9aefa2e5fb::t_815b5837c5a570 1-69
+electron/services/sessions/lines.ts
+  s_d0fb9aefa2e5fb::t_99d24f3da24ce7 1-74
+electron/services/sessions/raw.ts
+  s_d0fb9aefa2e5fb::t_c0a105a646f1a1 1-51
+electron/services/sessions/session-index.ts
+  s_d0fb9aefa2e5fb::t_29c47d05c5a5e0 1-8,10-47,49-134,140-142,146-210,212-262
+electron/services/sessions/claude.ts
+  s_d0fb9aefa2e5fb::t_1725337997ff49 1-185
+electron/services/sessions/__tests__/primitives.test.ts
+  s_d0fb9aefa2e5fb::t_c286c38994089f 1-140
+electron/services/sessions/reader.ts
+  s_d0fb9aefa2e5fb::t_379ce258d1067f 1-65,69,72,75,77-90,92-94,96-99,101-158,160,162-199,202-203,205-208,211-212,216-219,221-223,225-292,294-295,298-301,303-307,309-311,314-317,319-331
+electron/services/sessions/__tests__/reader.test.ts
+  s_d0fb9aefa2e5fb::t_3de0afef43fa2b 1-205,208-209
+electron/services/sessions/project-dir.ts
+  s_d0fb9aefa2e5fb::t_a6cf8fe810d3ab 1-114
+electron/services/sessions/limiter.ts
+  s_d0fb9aefa2e5fb::t_6bbcf9e3b13393 1-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e95973b8614868781d89ace725ae053547c611e7",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
