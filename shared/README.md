@@ -20,7 +20,7 @@ guard at boundaries (see `isPersistedAppState`, `isAgentStreamPayload`).
 | `ipc/renderer-api.ts` | `RaylineApi` (`window.api`, electron/preload) and `GithubApi` (`window.ghApi`, electron/preload-pm). The `Window` augmentation is in `src/types/window.d.ts` |
 | `agent/` | `events.ts` — `agent-stream` / `agent-done` / `agent-error` payloads and the `AgentStreamEvent` union; raw Claude / Codex / OpenCode / Multica event shapes; token usage and rate limits |
 | `chat/types.ts` | Messages and parts, conversations, the session ledger, attachments, agent start/edit/cancel requests, permission prompts, dispatch |
-| `models/` | Model registry: `ModelDefinition` union, built-in catalogue, legacy id aliases, effort resolution, dynamic (OpenCode / Multica / upstream / SSH) model builders |
+| `models/` | Model registry: `ModelDefinition` union, static catalogue (`catalog.ts`: Claude, Codex, Grok, AGY), legacy ids incl. PR #230 formats (`legacy-ids.ts`), effort resolution (`registry.ts`), runtime discovery (`runtime-catalog.ts`: `buildRuntimeModels`, `mergeModelCatalog`, CLI output parsers), picker helpers (`options.ts`: `visibleModels`, `modelLabel`, `filterModels`, planner capability), dynamic (OpenCode / Multica / upstream / SSH) model builders |
 | `git/`, `github/`, `terminal/`, `providers/`, `state/`, `updater/`, `system/` | Domain types for the corresponding IPC channels |
 
 ## Adding an IPC channel
@@ -43,6 +43,14 @@ The renderer then calls `window.api.<method>` and gets the typed result.
 
 Model ids no longer encode reasoning effort; effort is a per-conversation
 setting validated by `resolveEffort()`. Old persisted ids (`gpt55-high`,
-`gpt54-med`, …) keep resolving through `LEGACY_MODEL_ALIASES` — use
-`normalizeModelSelection()` when migrating state so the encoded effort is kept.
-Details are in the header of `models/registry.ts`.
+`gpt54-med`, and PR #230's `gpt61-sol-high`, `codex-model:<slug>:<effort>`,
+`grok-47`, `grok-46-continue`, `sonnet-1m`, …) keep resolving through
+`getLegacyModelAlias()` — use `normalizeModelSelection()` when migrating state
+so the encoded effort (and Grok `grokContinue`) is kept. Details are in the
+headers of `models/registry.ts` and `models/legacy-ids.ts`.
+
+Runtime discovery: main answers `model-catalog` with a `RuntimeModelCatalog`
+(built with `parseCodexModelsCache` / `parseGrokModelsOutput` /
+`parseAgyModelsOutput`); the renderer runs `normalizeRuntimeModelCatalog` →
+`buildRuntimeModels` and passes the result (plus upstream / SSH / OpenCode /
+Multica extras) to `getAvailableModels`, then `visibleModels` for pickers.
