@@ -2,6 +2,7 @@ import { memo, useState } from "react";
 import { ChevronDown, ChevronRight, Layers, Loader2 } from "lucide-react";
 import type { MessagePart } from "@shared/chat/types";
 import { useFontScale } from "../../contexts/FontSizeContext";
+import { useTranslator } from "../../contexts/LocaleContext";
 import { shallowEqual } from "../../store/createStore";
 import { ToolCallBlock } from "./blocks";
 import { summarizeToolNames } from "./partGroups";
@@ -13,10 +14,10 @@ interface ToolCallGroupProps {
 
 /**
  * "N tool calls" — collapsed by default; children mount only when expanded.
- * TODO(i18n): "{count} tool calls" → `chat.toolCallsGroup` once data-i18n adds it.
  */
 function ToolCallGroup({ parts }: ToolCallGroupProps) {
   const s = useFontScale();
+  const t = useTranslator();
   const [expanded, setExpanded] = useState(false);
   const running = parts.some((part) => part.type === "tool" && part.status === "running");
   const { names, more } = summarizeToolNames(parts);
@@ -44,7 +45,7 @@ function ToolCallGroup({ parts }: ToolCallGroupProps) {
         }}
       >
         <Layers size={13} strokeWidth={1.5} />
-        <span style={{ color: "var(--text-primary)", flexShrink: 0 }}>{parts.length} tool calls</span>
+        <span style={{ color: "var(--text-primary)", flexShrink: 0 }}>{t("chat.toolCallsGroup", { count: parts.length })}</span>
         <span style={{ color: "var(--text-muted)", fontSize: s(10), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
           {summary}
         </span>
