@@ -548,4 +548,21 @@ export const zhCN = {
   "chatArea.hintShellEmpty": "在 ! 后输入命令 // 回车运行",
   "chatArea.hintChat": "回车发送 // Shift+回车换行 // 可粘贴图片",
   "sidebar.running": "运行中",
+
+  // Model picker (effort selector, lifecycle badges)
+  "modelPicker.effort": "推理强度",
+  "modelPicker.effortDefault": "默认（{effort}）",
+  "modelPicker.effortLow": "低",
+  "modelPicker.effortMedium": "中",
+  "modelPicker.effortHigh": "高",
+  "modelPicker.effortXhigh": "超高",
+  "modelPicker.effortMax": "最高",
+  "modelPicker.effortUltra": "极限",
+  "modelPicker.badgeLegacy": "旧版",
+  "modelPicker.badgeRetiring": "{date} 停用",
+  "modelPicker.badgeRetired": "已停用",
+  "modelPicker.successorHint": "请改用 {model}。",
+  "modelPicker.badgeNeedsCli": "CLI ≥ {version}",
+  "modelPicker.needsCliHint": "需要 CLI {version} 或更新版本。",
+  "modelPicker.cliOutdated": "当前 CLI 低于 {version}，请更新后使用此模型。",
 } satisfies Readonly<Record<MessageKey, string>>;

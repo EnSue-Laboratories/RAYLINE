@@ -544,6 +544,8 @@ export interface DispatchRowInput {
   prompt: string;
   attachments?: Attachment[];
   model: string;
+  /** Reasoning effort for `model`; null/absent = the model's default. */
+  effort?: EffortLevel | null;
   cwd: string;
   branch: string;
   issueContext?: string;
