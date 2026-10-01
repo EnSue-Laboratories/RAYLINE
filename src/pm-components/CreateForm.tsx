@@ -1,3 +1,4 @@
+import { MenuSelect } from "../components/ui/MenuSelect";
 import { useEffect, useState, type CSSProperties } from "react";
 import { ExternalLink, X } from "lucide-react";
 import SearchableSelect from "./SearchableSelect";
@@ -18,15 +19,6 @@ interface CreateFormProps {
   onClose: () => void;
   onCreated: (created: CreatedItem) => void;
 }
-
-const selectStyle: CSSProperties = {
-  ...formInputStyle,
-  marginTop: 4,
-  cursor: "pointer",
-  WebkitAppearance: "none",
-  appearance: "none",
-  paddingRight: 30,
-};
 
 const labelStyle: CSSProperties = { fontSize: 11, color: "var(--text-muted)", fontFamily: "var(--font-mono)", letterSpacing: ".04em" };
 
@@ -86,9 +78,14 @@ export default function CreateForm({ repos, type, onClose, onCreated }: CreateFo
 
         <div style={{ marginBottom: 10 }}>
           <label style={labelStyle}>{t("pm.repo")}</label>
-          <select value={repo} onChange={(e) => setRepo(e.target.value)} style={selectStyle}>
-            {repos.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
+          <MenuSelect
+            value={repo}
+            options={repos.map((r) => ({ value: r, label: r }))}
+            ariaLabel={t("pm.repo")}
+            onChange={setRepo}
+            menuZIndex={1100}
+            triggerStyle={{ width: "100%" }}
+          />
         </div>
 
         {type === "pr" && (

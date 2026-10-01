@@ -1,15 +1,8 @@
 import { memo, type CSSProperties } from "react";
-import { Check } from "lucide-react";
 import type { FontScale } from "../../contexts/FontSizeContext";
 import type { Translator } from "../../i18n";
 import type { PickerOption } from "./catalogView";
-import { badgeView, disabledReasonText, type BadgeView } from "./strings";
-
-const TONE_COLORS: Readonly<Record<BadgeView["tone"], string>> = {
-  muted: "var(--text-muted)",
-  warning: "var(--warning-text)",
-  danger: "var(--danger-text)",
-};
+import { badgeView, disabledReasonText } from "./strings";
 
 interface ModelOptionRowProps {
   s: FontScale;
@@ -38,20 +31,33 @@ export const ModelOptionRow = memo(function ModelOptionRow({
   const badges = option.badges.map((badge) => badgeView(t, badge));
   const reason = option.disabled ? disabledReasonText(t, option.disabled, option.model.minCliVersion) : "";
   const title = [label, ...badges.map((badge) => badge.hint), reason].filter(Boolean).join(" — ");
+  // Typography matches the original picker: mono rows, uppercase tag on the right.
   const style: CSSProperties = {
     display: "flex",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "space-between",
+    gap: 16,
     width: "100%",
-    padding: "9px 12px",
+    padding: "9px 13px",
     border: 0,
-    borderRadius: 6,
-    background: active ? "var(--pane-hover)" : "transparent",
-    color: disabled ? "var(--text-muted)" : "var(--text-primary)",
+    borderRadius: 7,
+    background: selected
+      ? "var(--control-bg)"
+      : active
+        ? "color-mix(in srgb, var(--control-bg) 63%, transparent)"
+        : "transparent",
+    color: disabled
+      ? "var(--text-muted)"
+      : selected
+        ? "var(--text-primary)"
+        : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
     textAlign: "left",
     cursor: disabled ? "not-allowed" : "pointer",
     fontSize: s(11),
+    fontFamily: "var(--font-mono)",
+    transition: "background .12s, color .12s",
   };
+  const tag = option.model.tag && option.model.tag.toUpperCase() !== label.toUpperCase() ? option.model.tag : "";
 
   return (
     <button
@@ -73,25 +79,11 @@ export const ModelOptionRow = memo(function ModelOptionRow({
         {option.model.grokContinue ? ` · ${t("models.continue")}` : ""}
         {reason && <small style={{ display: "block", marginTop: 2, whiteSpace: "normal" }}>{reason}</small>}
       </span>
-      {badges.map((badge) => (
-        <span
-          key={badge.key}
-          style={{
-            flexShrink: 0,
-            padding: "1px 5px",
-            borderRadius: 4,
-            border: "1px solid var(--control-border)",
-            color: TONE_COLORS[badge.tone],
-            fontFamily: "var(--font-mono)",
-            fontSize: s(9),
-            letterSpacing: ".04em",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {badge.text}
+      {tag && (
+        <span style={{ flexShrink: 0, fontSize: s(9), opacity: 0.4, letterSpacing: ".1em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+          {tag}
         </span>
-      ))}
-      {selected && <Check size={12} style={{ flexShrink: 0 }} />}
+      )}
     </button>
   );
 });
