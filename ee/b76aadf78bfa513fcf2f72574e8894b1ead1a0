@@ -1,0 +1,27 @@
+src/components/git/GitFileSection.tsx
+  s_d0fb9aefa2e5fb::t_6e732d745870b1 1-142
+src/components/git/GitStatusPopover.tsx
+  s_d0fb9aefa2e5fb::t_a9b6105fcf94f1 1-341
+src/components/git/GitConfirmDialog.tsx
+  s_d0fb9aefa2e5fb::t_2a4a592d14955f 1-122
+src/components/git/__tests__/gitModels.test.ts
+  s_d0fb9aefa2e5fb::t_c9fb909e8e8bbd 1-147
+src/components/GitStatusPill.tsx
+  s_d0fb9aefa2e5fb::t_5ae786ebb2892a 1-2,4-10,14-20,23-30,32,34-44,46-48,53-54,56,58-59,62-65,68-71,73-76,81,85,94-95,97-100,102-104,107,113-114,133,135-136,140-142,146-150,153-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "eeb76aadf78bfa513fcf2f72574e8894b1ead1a0",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
