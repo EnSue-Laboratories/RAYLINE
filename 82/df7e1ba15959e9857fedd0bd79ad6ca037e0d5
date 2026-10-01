@@ -1,0 +1,51 @@
+src/components/chat/useOptionalStableCallback.ts
+  s_d0fb9aefa2e5fb::t_5b1d2a0ddfbb34 1-11
+src/components/chat/types.ts
+  s_d0fb9aefa2e5fb::t_e37e5328d807af 1-80
+src/components/chat/SlashCommandPalette.tsx
+  s_d0fb9aefa2e5fb::t_ac5d43be0fe77e 1-53
+src/components/chat/ScrollToBottomButton.tsx
+  s_d0fb9aefa2e5fb::t_b96cb3133721a7 1-33,35-49,51-60
+src/utils/attachments.ts
+  s_d0fb9aefa2e5fb::t_15951e180683f4 1-4,10-11,14,17-18,23,30-31,33,38-42,45-46,49,51,54-55,64,66,69-70,73,76-85
+src/components/chat/ChatTranscript.tsx
+  s_d0fb9aefa2e5fb::t_c460e7b84c7c66 1-120
+src/components/ChatArea.tsx
+  s_d0fb9aefa2e5fb::t_f069fd2da23a8d 1-12,14-27,32-37,39-61,63-71,74-94,97,99,101,110-156,161-163,165,169-173,175-177,179-180,184-194,196-213,217-218,220,225,229-230,232,234,239-240,242,245-247,249,251-252
+src/components/chat/useScrollManager.ts
+  s_d0fb9aefa2e5fb::t_a31d6e45152306 1-135
+src/components/chat/composerDraft.ts
+  s_d0fb9aefa2e5fb::t_c712ab4078eacd 1-42
+src/components/chat/logic.ts
+  s_d0fb9aefa2e5fb::t_e0718a4e87e755 1-67
+src/components/chat/ChatHeader.tsx
+  s_d0fb9aefa2e5fb::t_1bf7cb3c6df8d2 1-90,93-109,111-133,135-169
+src/components/chat/boundary.ts
+  s_d0fb9aefa2e5fb::t_2c3161ae5b5606 1-12
+src/components/chat/PermissionRequests.tsx
+  s_d0fb9aefa2e5fb::t_c8f93c3f83995b 1-104
+src/components/chat/QueuedMessages.tsx
+  s_d0fb9aefa2e5fb::t_b5bd3bf4e6dbfb 1-195
+src/components/chat/ChatComposer.tsx
+  s_d0fb9aefa2e5fb::t_863e3105d6ecb7 1-329
+src/components/chat/ChatModelPicker.tsx
+  s_d0fb9aefa2e5fb::t_02e04a514bcc09 1-39
+src/components/chat/useComposerAttachments.ts
+  s_d0fb9aefa2e5fb::t_92edf0de69e5bf 1-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "82df7e1ba15959e9857fedd0bd79ad6ca037e0d5",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
