@@ -1,0 +1,19 @@
+src/utils/paneSurface.ts
+  s_d0fb9aefa2e5fb::t_165b68aca19a05 1-21,27,31,49-50,53-62,69,103-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "92a1f2cb9b252eb88c67dbe4ae6ea9e5677c388d",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
