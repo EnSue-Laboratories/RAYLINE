@@ -42,8 +42,8 @@ describe("codex execution flags", () => {
   });
 
   it("uses --sandbox for new sandboxed runs and config overrides when resuming", () => {
-    expect(codexExecutionFlags("workspace-write", false)).toEqual(["--sandbox", "workspace-write", "-c", 'approval_policy="never"']);
-    expect(codexExecutionFlags("workspace-write", true)).toEqual(["-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"']);
+    expect(codexExecutionFlags("workspace-write", false)).toEqual(["--sandbox", "workspace-write", "-c", 'approval_policy="never"', "--skip-git-repo-check"]);
+    expect(codexExecutionFlags("workspace-write", true)).toEqual(["-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"', "--skip-git-repo-check"]);
     expect(codexExecutionFlags("bypass", true)).toEqual(["--dangerously-bypass-approvals-and-sandbox"]);
   });
 

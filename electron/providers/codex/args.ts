@@ -28,10 +28,13 @@ export function codexExecutionFlags(mode: CodexSandboxMode, resuming: boolean): 
   switch (mode) {
     case "bypass":
       return ["--dangerously-bypass-approvals-and-sandbox"];
+    // `--skip-git-repo-check`: without it Codex refuses sandboxed runs in
+    // folders that are not trusted git repos ("Not inside a trusted
+    // directory"); the bypass mode never had that restriction.
     case "workspace-write":
       return resuming
-        ? ["-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"']
-        : ["--sandbox", "workspace-write", "-c", 'approval_policy="never"'];
+        ? ["-c", 'sandbox_mode="workspace-write"', "-c", 'approval_policy="never"', "--skip-git-repo-check"]
+        : ["--sandbox", "workspace-write", "-c", 'approval_policy="never"', "--skip-git-repo-check"];
     default: {
       const exhaustive: never = mode;
       return exhaustive;
