@@ -1,9 +1,20 @@
-// @ts-nocheck
-/* eslint-disable no-unused-vars */
-// Shape of conversation.tab:
-//   { pinned: boolean, pinnedAt: number, lastSeenAt: number, runEndedAt: number|null }
+import type { ConversationTabMeta } from "@shared/chat/types";
 
-export function getTabMeta(conversation) {
+/** Anything carrying an optional `tab` (a Conversation or a sidebar row). */
+export interface TabbedConversation {
+  tab?: ConversationTabMeta;
+}
+
+export interface NormalizedTabMeta {
+  pinned: boolean;
+  pinnedAt: number;
+  lastSeenAt: number;
+  runEndedAt: number | null;
+}
+
+export type TabState = "streaming" | "done" | "seen";
+
+export function getTabMeta(conversation: TabbedConversation | null | undefined): NormalizedTabMeta {
   const t = conversation?.tab;
   return {
     pinned: Boolean(t?.pinned),
@@ -13,52 +24,57 @@ export function getTabMeta(conversation) {
   };
 }
 
-export function computeTabState(conversation, { isStreaming }) {
+export function computeTabState(
+  conversation: TabbedConversation | null | undefined,
+  { isStreaming }: { isStreaming: boolean },
+): TabState {
   const { runEndedAt, lastSeenAt } = getTabMeta(conversation);
   if (isStreaming) return "streaming";
   if (runEndedAt != null && runEndedAt > lastSeenAt) return "done";
   return "seen";
 }
 
-export function withTabPatch(conversation, patch) {
-  const prev = conversation?.tab || {};
+export function withTabPatch<T extends TabbedConversation>(conversation: T, patch: ConversationTabMeta): T {
+  const prev = conversation.tab ?? {};
   return { ...conversation, tab: { ...prev, ...patch } };
 }
 
-export function countPinnedTabs(conversations = []) {
+export function countPinnedTabs(conversations: readonly TabbedConversation[] = []): number {
   return conversations.reduce(
-    (count, conversation) => count + (conversation?.tab?.pinned ? 1 : 0),
-    0
+    (count, conversation) => count + (conversation.tab?.pinned ? 1 : 0),
+    0,
   );
 }
 
-export function pinTabPatch(now = Date.now()) {
+export function pinTabPatch(now: number = Date.now()): ConversationTabMeta {
   return { pinned: true, pinnedAt: now, runEndedAt: null };
 }
 
-export function runEndedPatch(now = Date.now()) {
+export function runEndedPatch(now: number = Date.now()): ConversationTabMeta {
   return { runEndedAt: now };
 }
 
-export function markSeenPatch(now = Date.now()) {
+export function markSeenPatch(now: number = Date.now()): ConversationTabMeta {
   return { lastSeenAt: now, runEndedAt: null };
 }
 
-export function unpinTabPatch() {
+export function unpinTabPatch(): ConversationTabMeta {
   return { pinned: false, runEndedAt: null };
 }
 
-export function clearPinnedTabs(conversations = []) {
+/** Unpins every pinned conversation; returns the input array when nothing was pinned. */
+export function clearPinnedTabs<T extends TabbedConversation>(conversations: T[] = []): T[] {
   let changed = false;
   const next = conversations.map((conversation) => {
-    if (!conversation?.tab?.pinned) return conversation;
+    if (!conversation.tab?.pinned) return conversation;
     changed = true;
     return withTabPatch(conversation, unpinTabPatch());
   });
   return changed ? next : conversations;
 }
 
-export function resetPinnedTabs(conversations = [], minimum = 2) {
+/** A tab strip needs at least `minimum` tabs; below that, unpin everything. */
+export function resetPinnedTabs<T extends TabbedConversation>(conversations: T[] = [], minimum = 2): T[] {
   const pinnedCount = countPinnedTabs(conversations);
   if (pinnedCount === 0 || pinnedCount >= minimum) return conversations;
   return clearPinnedTabs(conversations);

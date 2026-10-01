@@ -1,6 +1,6 @@
-// @ts-nocheck
-export function relativeTime(ts) {
-  const diff = Date.now() - ts;
+/** Compact "time ago" label for an epoch-ms timestamp ("now", "5m", "3h", "2d", "1w", "4mo"). */
+export function relativeTime(ts: number, now: number = Date.now()): string {
+  const diff = now - ts;
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "now";
   if (mins < 60) return `${mins}m`;

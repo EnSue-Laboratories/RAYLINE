@@ -1,7 +1,6 @@
-// @ts-nocheck
 export const WINDOW_DRAG_HEIGHT = 52;
 
-export const IS_MAC =
+export const IS_MAC: boolean =
   typeof navigator !== "undefined" && /Mac/i.test(navigator.platform || "");
 
 const TRAFFIC_LIGHT_LEFT = 16;
