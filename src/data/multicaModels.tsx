@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useEffect, useMemo } from "react";
-import { multicaAgentToModel, type ModelDefinition, type MulticaModelDefinition } from "@shared/models";
+import { memo, useEffect, useMemo } from "react";
+import { multicaAgentToModel, type EffortLevel, type ModelDefinition, type MulticaModelDefinition } from "@shared/models";
 import type { MulticaStoreState } from "@shared/providers/types";
 import { createStore, useStore, type Store } from "../store/createStore";
 import { getMulticaStore, isMulticaConfigured, loadMulticaState, normalizeMulticaAgents, saveMulticaState } from "../multica/store";
@@ -135,9 +135,23 @@ export interface ModelPickerWithMulticaProps {
   value: string;
   onChange: (modelId: string) => void;
   extraModels?: readonly ModelDefinition[];
+  /** Per-conversation reasoning effort; null = the model's default. */
+  effort?: EffortLevel | null;
+  /** Shows the effort selector (for models that have efforts) when provided. */
+  onEffortChange?: (effort: EffortLevel | null) => void;
+  /** Menu z-index; raise it inside modals. */
+  menuZIndex?: number;
 }
 
-export function ModelPickerWithMultica({ value, onChange, extraModels = NO_MODELS }: ModelPickerWithMulticaProps) {
+/** The shared ModelPicker with Multica agents and OpenCode models listed alongside the catalog. */
+export const ModelPickerWithMultica = memo(function ModelPickerWithMultica({
+  value,
+  onChange,
+  extraModels = NO_MODELS,
+  effort,
+  onEffortChange,
+  menuZIndex,
+}: ModelPickerWithMulticaProps) {
   const { models, error, loading } = useMulticaModels();
   const { models: openCodeModels } = useOpenCodeModels();
   const allExtraModels = useMemo(
@@ -151,6 +165,9 @@ export function ModelPickerWithMultica({ value, onChange, extraModels = NO_MODEL
       extraModels={allExtraModels}
       extraError={error}
       extraLoading={loading}
+      effort={effort}
+      onEffortChange={onEffortChange}
+      menuZIndex={menuZIndex}
     />
   );
-}
+});

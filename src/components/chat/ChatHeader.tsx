@@ -10,7 +10,7 @@ import ExportConversationBtn from "../ExportConversationBtn";
 import GitStatusPill from "../GitStatusPill";
 import type { TabStripTab } from "../sidebar/tabStrip";
 import TabStrip from "../TabStrip";
-import ChatModelPicker from "./ChatModelPicker";
+import { ModelPickerWithMultica } from "../../data/multicaModels";
 
 const NO_TABS: readonly TabStripTab[] = [];
 const noop = (): void => {};
@@ -138,7 +138,7 @@ function ChatHeader(props: ChatHeaderProps) {
               <BranchSelector cwd={props.cwd} onCwdChange={props.onCwdChange} hasMessages={props.messageCount > 0} onRefocusTerminal={props.onRefocusTerminal} locale={props.locale} />
             )}
             {!showNewChatCard && (
-              <ChatModelPicker value={props.modelId} onChange={props.onModelChange} extraModels={props.extraModels} effort={props.effort} onEffortChange={props.onEffortChange} />
+              <ModelPickerWithMultica value={props.modelId} onChange={props.onModelChange} extraModels={props.extraModels} effort={props.effort} onEffortChange={props.onEffortChange} />
             )}
             {!showNewChatCard && props.exportable && props.messageCount > 0 && <ExportConversationBtn convo={props.exportable} />}
             {!showNewChatCard && developerMode && props.onToggleTerminal && (
