@@ -11,7 +11,7 @@ import { clearDraft, readDraft, writeDraft } from "../../utils/composerDrafts";
 import ComposerChips from "./ComposerChips";
 import { BranchSearchDropdown, IssueSearchDropdown, WorktreeInputDropdown } from "./Dropdowns";
 import ProjectPicker from "../ProjectPicker";
-import { ModelPickerWithMultica } from "../../data/multicaModels";
+import ModelPickerWithMultica from "../ModelPickerWithMultica";
 import { clipboardItemsToAttachments, fileListToAttachments } from "../../utils/attachments";
 import {
   filterBranches,

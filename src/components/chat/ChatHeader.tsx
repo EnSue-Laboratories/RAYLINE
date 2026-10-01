@@ -10,7 +10,7 @@ import ExportConversationBtn from "../ExportConversationBtn";
 import GitStatusPill from "../GitStatusPill";
 import type { TabStripTab } from "../sidebar/tabStrip";
 import TabStrip from "../TabStrip";
-import { ModelPickerWithMultica } from "../../data/multicaModels";
+import ModelPickerWithMultica from "../ModelPickerWithMultica";
 
 const NO_TABS: readonly TabStripTab[] = [];
 const noop = (): void => {};

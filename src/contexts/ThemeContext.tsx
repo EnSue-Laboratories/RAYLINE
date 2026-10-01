@@ -1,4 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-refresh/only-export-components -- context module: the provider ships with its hooks/context objects; Fast Refresh falls back to a full reload here by design */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ThemeMode } from "@shared/state/types";
 
