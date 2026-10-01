@@ -1,16 +1,20 @@
 #!/usr/bin/env node
-// @ts-nocheck
-"use strict";
+/**
+ * `rayline-terminal` CLI: drives RayLine's terminal sessions over the
+ * terminal manager's local WebSocket. Bundled by scripts/build-electron to
+ * dist-electron/scripts/claudi-terminal.cjs and handed to Codex / OpenCode.
+ */
 
-const fs = require("fs");
-const WebSocket = require("ws");
+import { existsSync, readFileSync } from "node:fs";
+import type { TerminalWsAction } from "@shared/terminal/types";
+import { TerminalWsClient } from "../electron/services/terminal/ws-client";
 
-function usage() {
+function usage(): void {
   process.stderr.write(`RayLine terminal CLI
 
 Usage:
   rayline-terminal list [--json]
-  rayline-terminal create <name> [--cwd <path>] [--command <executable>] [--json]
+  rayline-terminal create <name> [--cwd <path>] [--command <command line>] [--json]
   rayline-terminal send <name> <text> [--json]
   rayline-terminal read <name> [--lines <n>] [--json]
   rayline-terminal kill <name> [--json]
@@ -22,17 +26,22 @@ Environment:
 `);
 }
 
-function fail(message, code = 1) {
+function fail(message: string, code = 1): never {
   process.stderr.write(`${message}\n`);
   process.exit(code);
 }
 
-function readPortFromMcpConfig(configPath) {
-  if (!configPath || !fs.existsSync(configPath)) return null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
+function readPortFromMcpConfig(configPath: string | undefined): number | null {
+  if (!configPath || !existsSync(configPath)) return null;
   try {
-    const parsed = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    const args = parsed?.mcpServers?.["terminal-sessions"]?.args;
+    const parsed: unknown = JSON.parse(readFileSync(configPath, "utf8"));
+    const servers = isRecord(parsed) && isRecord(parsed.mcpServers) ? parsed.mcpServers : null;
+    const terminal = servers && isRecord(servers["terminal-sessions"]) ? servers["terminal-sessions"] : null;
+    const args: unknown = terminal?.args;
     if (!Array.isArray(args) || args.length < 2) return null;
     const maybePort = Number(args[args.length - 1]);
     return Number.isFinite(maybePort) && maybePort > 0 ? maybePort : null;
@@ -41,119 +50,103 @@ function readPortFromMcpConfig(configPath) {
   }
 }
 
-function resolvePort() {
+function resolvePort(): number | null {
   const direct = Number(process.env.CLAUDI_TERMINAL_PORT);
   if (Number.isFinite(direct) && direct > 0) return direct;
-
-  const fromConfig = readPortFromMcpConfig(process.env.CLAUDI_TERMINAL_MCP_CONFIG);
-  if (fromConfig) return fromConfig;
-
-  return null;
+  return readPortFromMcpConfig(process.env.CLAUDI_TERMINAL_MCP_CONFIG);
 }
 
-function parseArgs(argv) {
-  const positionals = [];
-  const options = {};
+interface ParsedArgs {
+  positionals: string[];
+  options: { json: boolean; values: Map<string, string> };
+}
+
+function parseArgs(argv: readonly string[]): ParsedArgs {
+  const positionals: string[] = [];
+  const values = new Map<string, string>();
+  let json = false;
 
   for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
+    const arg = argv[i] ?? "";
     if (!arg.startsWith("--")) {
       positionals.push(arg);
       continue;
     }
-
     const key = arg.slice(2);
     if (key === "json") {
-      options.json = true;
+      json = true;
       continue;
     }
-
     const value = argv[i + 1];
-    if (value == null || value.startsWith("--")) {
-      fail(`Missing value for --${key}`);
-    }
-    options[key] = value;
+    if (value == null || value.startsWith("--")) fail(`Missing value for --${key}`);
+    values.set(key, value);
     i += 1;
   }
-
-  return { positionals, options };
+  return { positionals, options: { json, values } };
 }
 
-function printResult(result, asJson) {
+function printResult(result: unknown, asJson: boolean): void {
   if (asJson) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }
-
   if (Array.isArray(result)) {
     if (result.length === 0) {
       process.stdout.write("No terminal sessions.\n");
       return;
     }
-    for (const session of result) {
-      process.stdout.write(`${session.name}\t${session.cwd}\tpid=${session.pid}\n`);
+    for (const session of result as unknown[]) {
+      const s = isRecord(session) ? session : {};
+      process.stdout.write(`${String(s.name)}\t${String(s.cwd)}\tpid=${String(s.pid)}\n`);
     }
     return;
   }
-
-  if (result?.lines) {
-    process.stdout.write(`${result.lines.join("\n")}\n`);
+  if (isRecord(result) && Array.isArray(result.lines)) {
+    process.stdout.write(`${result.lines.map(String).join("\n")}\n`);
     return;
   }
-
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
-function callManager(port, action, params) {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
-    const id = Date.now();
-    let settled = false;
-
-    const finish = (fn, value) => {
-      if (settled) return;
-      settled = true;
-      try {
-        ws.close();
-      } catch {}
-      fn(value);
-    };
-
-    const timer = setTimeout(() => {
-      finish(reject, new Error(`Timed out calling ${action}`));
-    }, 10000);
-
-    ws.on("open", () => {
-      ws.send(JSON.stringify({ id, action, params }));
-    });
-
-    ws.on("message", (data) => {
-      let msg;
-      try {
-        msg = JSON.parse(data.toString());
-      } catch {
-        return;
-      }
-      if (msg.id !== id) return;
-      clearTimeout(timer);
-      finish(resolve, msg.result);
-    });
-
-    ws.on("error", (error) => {
-      clearTimeout(timer);
-      finish(reject, error);
-    });
-
-    ws.on("close", () => {
-      clearTimeout(timer);
-      if (!settled) {
-        finish(reject, new Error("Connection closed before response"));
-      }
-    });
-  });
+interface Request {
+  action: TerminalWsAction;
+  params: Record<string, unknown>;
 }
 
-async function main() {
+function buildRequest(command: string, rest: readonly string[], values: ReadonlyMap<string, string>): Request {
+  const [name, ...more] = rest;
+  switch (command) {
+    case "list":
+      return { action: "list_sessions", params: {} };
+    case "create":
+      if (!name) fail("create requires <name>");
+      return { action: "create_session", params: { name, cwd: values.get("cwd"), command: values.get("command") } };
+    case "send":
+      if (!name || more[0] == null) fail("send requires <name> <text>");
+      return { action: "send_input", params: { name, text: more.join(" ") } };
+    case "read": {
+      if (!name) fail("read requires <name>");
+      const rawLines = values.get("lines");
+      const lines = rawLines ? Number(rawLines) : undefined;
+      if (lines !== undefined && !Number.isFinite(lines)) fail("--lines must be a number");
+      return { action: "read_output", params: { name, lines } };
+    }
+    case "kill":
+      if (!name) fail("kill requires <name>");
+      return { action: "kill_session", params: { name } };
+    case "resize": {
+      if (!name || !more[0] || !more[1]) fail("resize requires <name> <cols> <rows>");
+      const cols = Number(more[0]);
+      const rows = Number(more[1]);
+      if (!Number.isFinite(cols) || !Number.isFinite(rows)) fail("resize expects numeric <cols> and <rows>");
+      return { action: "resize", params: { name, cols, rows } };
+    }
+    default:
+      return fail(`Unknown command: ${command}`);
+  }
+}
+
+async function main(): Promise<void> {
   const { positionals, options } = parseArgs(process.argv.slice(2));
   const [command, ...rest] = positionals;
   if (!command || command === "help" || command === "--help" || command === "-h") {
@@ -162,74 +155,19 @@ async function main() {
   }
 
   const port = resolvePort();
-  if (!port) {
-    fail("RayLine terminal server is not available. Missing CLAUDI_TERMINAL_PORT / CLAUDI_TERMINAL_MCP_CONFIG.");
-  }
+  if (!port) fail("RayLine terminal server is not available. Missing CLAUDI_TERMINAL_PORT / CLAUDI_TERMINAL_MCP_CONFIG.");
 
-  let action;
-  let params;
-
-  switch (command) {
-    case "list":
-      action = "list_sessions";
-      params = {};
-      break;
-    case "create":
-      if (!rest[0]) fail("create requires <name>");
-      action = "create_session";
-      params = {
-        name: rest[0],
-        cwd: options.cwd,
-        command: options.command,
-      };
-      break;
-    case "send":
-      if (!rest[0] || rest[1] == null) fail("send requires <name> <text>");
-      action = "send_input";
-      params = {
-        name: rest[0],
-        text: rest.slice(1).join(" "),
-      };
-      break;
-    case "read":
-      if (!rest[0]) fail("read requires <name>");
-      action = "read_output";
-      params = {
-        name: rest[0],
-        lines: options.lines ? Number(options.lines) : undefined,
-      };
-      if (params.lines !== undefined && !Number.isFinite(params.lines)) {
-        fail("--lines must be a number");
-      }
-      break;
-    case "kill":
-      if (!rest[0]) fail("kill requires <name>");
-      action = "kill_session";
-      params = { name: rest[0] };
-      break;
-    case "resize":
-      if (!rest[0] || !rest[1] || !rest[2]) fail("resize requires <name> <cols> <rows>");
-      params = {
-        name: rest[0],
-        cols: Number(rest[1]),
-        rows: Number(rest[2]),
-      };
-      if (!Number.isFinite(params.cols) || !Number.isFinite(params.rows)) {
-        fail("resize expects numeric <cols> and <rows>");
-      }
-      action = "resize";
-      break;
-    default:
-      fail(`Unknown command: ${command}`);
+  const { action, params } = buildRequest(command, rest, options.values);
+  const client = new TerminalWsClient(port);
+  try {
+    const result = await client.call(action, params);
+    if (isRecord(result) && typeof result.error === "string" && result.error) fail(result.error);
+    printResult(result, options.json);
+  } finally {
+    client.close();
   }
-
-  const result = await callManager(port, action, params);
-  if (result && typeof result === "object" && result.error) {
-    fail(result.error);
-  }
-  printResult(result, options.json);
 }
 
-main().catch((error) => {
-  fail(error.message || String(error));
+main().catch((error: unknown) => {
+  fail(error instanceof Error ? error.message : String(error));
 });
