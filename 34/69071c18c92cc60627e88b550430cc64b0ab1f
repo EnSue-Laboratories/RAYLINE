@@ -1,0 +1,72 @@
+src/store/conversations.ts
+  s_d0fb9aefa2e5fb::t_3888610a82654a 1-41
+src/store/chat/agentBridge.ts
+  s_d0fb9aefa2e5fb::t_6071e4da17675a 1-10,12-75,78-87,89-149
+src/store/chat/__tests__/helpers.ts
+  s_d0fb9aefa2e5fb::t_6cbadae908a0e3 1-3,5-38
+src/store/chat/__tests__/actions.test.ts
+  s_d0fb9aefa2e5fb::t_417c47339e7e02 1-29,32-125,127-161
+src/store/chat/types.ts
+  s_d0fb9aefa2e5fb::t_2913539ee9ebd2 1-19
+src/store/chat/selectors.ts
+  s_d0fb9aefa2e5fb::t_40cabc936d79b8 1-99
+src/store/chat/__tests__/claudeEvents.test.ts
+  s_d0fb9aefa2e5fb::t_6d868023ebe74f 1-166
+src/store/chat/multicaEvents.ts
+  s_d0fb9aefa2e5fb::t_3f7b6f2f6aeaf8 1-2,5-85,87-95,97-106
+src/store/chat/openCodeParse.ts
+  s_d0fb9aefa2e5fb::t_4547d0ff459fbe 1-160
+src/store/chat/actions.ts
+  s_d0fb9aefa2e5fb::t_4de65b9322ece3 1-77,81-169,172-203,205-240
+src/store/chat/openCodeEvents.ts
+  s_d0fb9aefa2e5fb::t_cb69542609437e 23-25
+  s_d0fb9aefa2e5fb::t_253518ab8614ae 1-22,26-89
+src/store/chat/codexEvents.ts
+  s_d0fb9aefa2e5fb::t_93728a3bfbb1ae 28-33
+  s_d0fb9aefa2e5fb::t_e99e07aebe4f3e 1-27,34-202
+src/store/chat/__tests__/draft.test.ts
+  s_d0fb9aefa2e5fb::t_05ba5f85387bd9 1-113
+src/store/chat/usage.ts
+  s_d0fb9aefa2e5fb::t_8b94aa79a176e7 1-115
+src/store/chat/__tests__/streamBuffer.test.ts
+  s_d0fb9aefa2e5fb::t_b2ecb18200b0d8 1-84
+src/store/chat/applyStreamEvent.ts
+  s_d0fb9aefa2e5fb::t_19abefc75d4772 1-7,9-98,100-148
+src/store/chat/claudeEvents.ts
+  s_d0fb9aefa2e5fb::t_feec67e27bb5f1 72
+  s_d0fb9aefa2e5fb::t_7aa22c0f383714 58-59
+  s_d0fb9aefa2e5fb::t_c5acb61280d1c2 7
+  s_d0fb9aefa2e5fb::t_93dbe94c735929 1-6,8-57,60-71,73-284
+src/store/chat/assistant.ts
+  s_d0fb9aefa2e5fb::t_9d96dc0ed887dd 1-161
+src/store/chat/ids.ts
+  s_d0fb9aefa2e5fb::t_e17e29061b496b 1-7
+src/store/chat/store.ts
+  s_d0fb9aefa2e5fb::t_846ddb5020d2fb 1-67
+src/store/chat/__tests__/codexEvents.test.ts
+  s_d0fb9aefa2e5fb::t_a3bef566613e7f 1-101
+src/hooks/useAgent.ts
+  s_d0fb9aefa2e5fb::t_d6259f603e1eda 1-52,54-57,59-63,65-66,68-71
+src/store/chat/__tests__/openCodeMulticaEvents.test.ts
+  s_d0fb9aefa2e5fb::t_a882a26793e991 1-20,22-126
+src/store/chat/streamBuffer.ts
+  s_d0fb9aefa2e5fb::t_fe6e066d576eb7 1-85
+src/store/chat/draft.ts
+  s_d0fb9aefa2e5fb::t_0ab322dc0078e4 1-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3469071c18c92cc60627e88b550430cc64b0ab1f",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
