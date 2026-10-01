@@ -1,0 +1,23 @@
+src/components/terminal/types.ts
+  s_d0fb9aefa2e5fb::t_7eadba0dbbc380 1-22
+src/hooks/useTerminal.ts
+  s_d0fb9aefa2e5fb::t_5d4ded798834b6 1-41,43-54,58-59,65-69,71,77,102,109,113,116-117,127,143-146,150,152,155-156,158-164,166-167,169,174,179,185-187,191,195,197,200,211,213,216,218-219,222,229,231-232,235,242-243,245-246,249-251,255-260,265,280,282-285,287-302
+src/components/terminal/sessionSnapshot.ts
+  s_d0fb9aefa2e5fb::t_21509af24bc1d8 1-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c37b60a6a34607c2c579853dcbd744b3c48d7ed3",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
