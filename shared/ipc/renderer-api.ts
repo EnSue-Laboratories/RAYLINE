@@ -72,6 +72,10 @@ export interface RaylineApi {
   saveState: Invoker<"save-state">;
   saveStateSync: (...args: SyncArgs<"save-state-sync">) => SyncResult<"save-state-sync">;
   loadState: Invoker<"load-state">;
+  stateLoad: Invoker<"state:load">;
+  stateLoadConversation: Invoker<"state:load-conversation">;
+  stateSave: Invoker<"state:save">;
+  stateSaveSync: (...args: SyncArgs<"state:save-sync">) => SyncResult<"state:save-sync">;
   /**
    * `webUtils.getPathForFile`; null when the file has no backing path
    * (e.g. pasted from the clipboard). Method syntax on purpose so the preload

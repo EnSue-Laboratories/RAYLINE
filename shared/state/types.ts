@@ -122,3 +122,46 @@ export function isPersistedAppState(value: unknown): value is PersistedAppState 
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   return !("convos" in value) || value.convos === undefined || Array.isArray(value.convos);
 }
+
+// ── v2 split storage ────────────────────────────────────────────────────────
+//
+// userData/state-v2/
+//   index.json                 PersistedAppIndex (settings + conversation metadata, no transcripts)
+//   conversations/<id>.json    PersistedConversationFile (one transcript each)
+//
+// Migration: on first `state:load` with no index.json, main splits the legacy
+// claudi-state.json into the v2 layout. The legacy file is left untouched so
+// older builds keep working (downgrade-safe; they just won't see newer edits).
+// All writes are async, atomic (temp file + rename) and serialized per path.
+
+export const STATE_STORE_VERSION = 2;
+
+/** Archived tool results/args larger than this are truncated on save. */
+export const ARCHIVED_TOOL_PAYLOAD_LIMIT = 16 * 1024;
+
+/** A conversation without its transcript, as stored in index.json. */
+export type ConversationMeta = Omit<Conversation, "archivedMessages">;
+
+export interface PersistedAppIndex extends Omit<PersistedAppState, "convos"> {
+  version: typeof STATE_STORE_VERSION;
+  convos: ConversationMeta[];
+}
+
+export interface PersistedConversationFile {
+  version: typeof STATE_STORE_VERSION;
+  id: string;
+  archivedMessages: Conversation["archivedMessages"];
+}
+
+/** Delta write: only conversations whose transcript changed since the last save. */
+export interface ConversationTranscriptDelta {
+  upserts: Array<{ id: string; archivedMessages: Conversation["archivedMessages"] }>;
+  /** Conversation ids whose transcript files should be removed. */
+  deletes: string[];
+}
+
+/** Payload of `state:save` — index is optional so transcript-only flushes stay cheap. */
+export interface StateSaveRequest {
+  index?: PersistedAppIndex;
+  transcripts?: ConversationTranscriptDelta;
+}

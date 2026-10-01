@@ -28,6 +28,7 @@ import type {
   AgentPermissionCancelled,
   AgentPermissionRequest,
   AgentPermissionResponse,
+  Conversation,
   AgentStartRequest,
   DispatchPlan,
   DispatchPlanRequest,
@@ -104,7 +105,7 @@ import type {
   RemoteRuntimeCheckResult,
   UpstreamProviderId,
 } from "../providers/types";
-import type { PersistedAppState } from "../state/types";
+import type { PersistedAppIndex, PersistedAppState, StateSaveRequest } from "../state/types";
 import type { ShellRunRequest, ShellRunResult, SystemInfo } from "../system/types";
 import type {
   TerminalCreateOptions,
@@ -169,6 +170,16 @@ export interface InvokeChannels {
   "save-state": { args: [state: PersistedAppState]; result: boolean };
   /** Raw JSON from disk (may be from an older version) or null. Validate with `isPersistedAppState`. */
   "load-state": { args: []; result: PersistedAppState | null };
+
+  // v2 split persistence (see shared/state/types.ts). Replaces save-state /
+  // load-state for the main window; the legacy channels stay for the Project
+  // Manager window until it migrates.
+  /** Index only (no transcripts); migrates the legacy file on first call. null = fresh install. */
+  "state:load": { args: []; result: PersistedAppIndex | null };
+  /** Lazy transcript load when a conversation is opened. [] if none on disk. */
+  "state:load-conversation": { args: [conversationId: string]; result: Conversation["archivedMessages"] };
+  /** Async atomic write of the index and/or changed transcripts. */
+  "state:save": { args: [request: StateSaveRequest]; result: boolean };
 
   // One-shot agent helpers
   /** Resolves to markdown, "Error: …", or "Timed out". Never rejects. */
@@ -345,6 +356,8 @@ export interface SendChannels {
 export interface SyncChannels {
   /** Used from `beforeunload`; returns whether the write succeeded. */
   "save-state-sync": { args: [state: PersistedAppState]; result: boolean };
+  /** beforeunload: flush only pending (dirty) data synchronously. Keep payloads small. */
+  "state:save-sync": { args: [request: StateSaveRequest]; result: boolean };
 }
 
 // ── main → renderer events ──────────────────────────────────────────────────
