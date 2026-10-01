@@ -1,0 +1,23 @@
+electron/services/github/deps.ts
+  s_d0fb9aefa2e5fb::t_b523179fbfd64b 1-26
+electron/services/github/guards.ts
+  s_d0fb9aefa2e5fb::t_3501f5fc057e80 1-59
+electron/services/github/gh-cli.ts
+  s_d0fb9aefa2e5fb::t_5724678faa38ac 1-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "436184d0453ee82a440b9af7b9d8d54328e02014",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
