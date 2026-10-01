@@ -1,9 +1,10 @@
-// @ts-nocheck
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import type { RateLimits, RateLimitWindow, TokenUsage } from "@shared/agent/usage";
+import { getMOrMulticaFallback, isOpenCodeModelId } from "@shared/models";
 import { useFontScale } from "../contexts/FontSizeContext";
-import { getM, isOpenCodeModelId } from "../data/models";
+import { deriveUsageStats, formatCompact, formatCost, formatDuration, formatPercent, formatResetIn, hasQuota, remoteBaseModelId } from "./message/usageStats";
 
-// Hard-coded rotating status phrases — cycles while the agent is working.
+// Rotating status phrases while the agent works.
 const PHRASES = [
   "Thinking",
   "Pondering",
@@ -17,70 +18,20 @@ const PHRASES = [
   "Synthesizing",
 ];
 
-// Fallback context window when no model is known. Claude Sonnet/Opus defaults.
-const DEFAULT_CONTEXT_WINDOW = 200_000;
-
 const PHRASE_INTERVAL_MS = 2400;
+// The elapsed label has 1 s resolution; ticking faster only re-rendered.
+const TICK_MS = 1000;
 
 // Muted spinner ink — keeps the logo's slash+dot geometry but drops the red
 // accent so the indicator stays quiet in the message vibe.
 const SPINNER_INK = "var(--text-secondary)";
 
-function formatCompact(n) {
-  if (!n && n !== 0) return "0";
-  if (n < 1000) return String(n);
-  if (n < 1_000_000) {
-    const v = n / 1000;
-    return (v >= 100 ? v.toFixed(0) : v.toFixed(1)) + "k";
-  }
-  const v = n / 1_000_000;
-  return (v >= 100 ? v.toFixed(0) : v.toFixed(1)) + "M";
+function finiteWindow(window: RateLimitWindow | undefined): RateLimitWindow | null {
+  return window && Number.isFinite(window.used_percent) ? window : null;
 }
 
-function formatDuration(ms) {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${String(r).padStart(2, "0")}`;
-}
-
-function formatCost(cost) {
-  if (!Number.isFinite(cost)) return "$0";
-  if (cost <= 0) return "$0";
-  if (cost < 0.0001) return "<$0.0001";
-  if (cost < 0.01) return `$${cost.toFixed(4)}`;
-  if (cost < 1) return `$${cost.toFixed(3)}`;
-  return `$${cost.toFixed(2)}`;
-}
-
-function nonNegativeNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? number : 0;
-}
-
-// Coarse "resets in" label for plan-quota windows (5h / 7d).
-// resetsAtSec is unix epoch seconds; nowMs is wall clock (param so the
-// component can re-render against its existing `now` tick).
-function formatResetIn(resetsAtSec, nowMs) {
-  if (!Number.isFinite(resetsAtSec)) return null;
-  const remaining = resetsAtSec * 1000 - nowMs;
-  if (remaining <= 0) return "now";
-  const min = Math.floor(remaining / 60000);
-  if (min < 60) return `${min}m`;
-  const h = Math.floor(min / 60);
-  if (h < 24) {
-    const m = min % 60;
-    return m ? `${h}h ${m}m` : `${h}h`;
-  }
-  const d = Math.floor(h / 24);
-  const r = h % 24;
-  return r ? `${d}d ${r}h` : `${d}d`;
-}
-
-// Slash+dot spinner — keeps the RayLine logo's "/•" geometry but in a muted
-// whitish ink so it doesn't clash with the message ambiance. Both elements
-// pulse out of phase to keep a live feel while staying quiet.
+// Slash+dot spinner — keeps the RayLine logo's "/•" geometry in a muted ink;
+// both elements pulse out of phase.
 function SlashSpinner() {
   return (
     <span
@@ -127,95 +78,55 @@ function SlashSpinner() {
   );
 }
 
-export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, usage, rateLimits, isStreaming, modelId, compacting }) {
+export interface LoadingStatusProps {
+  startedAt?: number;
+  /** Frozen duration once the turn ended (survives reloads). */
+  elapsedMs?: number;
+  usage?: TokenUsage | null;
+  rateLimits?: RateLimits | null;
+  isStreaming: boolean;
+  modelId?: string | null;
+  compacting?: boolean;
+}
+
+export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, usage, rateLimits, isStreaming, modelId, compacting }: LoadingStatusProps) {
   const s = useFontScale();
   const [now, setNow] = useState(() => Date.now());
   const [phraseIdx, setPhraseIdx] = useState(0);
-  const phraseRef = useRef(0);
 
   useEffect(() => {
-    if (!isStreaming) return;
-    const tick = setInterval(() => setNow(Date.now()), 250);
-    const cycle = setInterval(() => {
-      phraseRef.current = (phraseRef.current + 1) % PHRASES.length;
-      setPhraseIdx(phraseRef.current);
-    }, PHRASE_INTERVAL_MS);
+    if (!isStreaming) return undefined;
+    const tick = window.setInterval(() => setNow(Date.now()), TICK_MS);
+    const cycle = window.setInterval(() => setPhraseIdx((index) => (index + 1) % PHRASES.length), PHRASE_INTERVAL_MS);
     return () => {
-      clearInterval(tick);
-      clearInterval(cycle);
+      window.clearInterval(tick);
+      window.clearInterval(cycle);
     };
   }, [isStreaming]);
 
-  // Prefer a persisted elapsed value from the message itself — this survives
-  // reloads, whereas `Date.now() - _startedAt` would drift across sessions.
-  const elapsedMs = isStreaming
-    ? (startedAt ? now - startedAt : 0)
-    : (frozenElapsedMs ?? (startedAt ? now - startedAt : 0));
+  // A persisted elapsed value wins after the turn (Date.now() - _startedAt drifts across sessions).
+  const elapsedMs = isStreaming ? (startedAt ? now - startedAt : 0) : (frozenElapsedMs ?? (startedAt ? now - startedAt : 0));
 
-  const isOpenCode = isOpenCodeModelId(modelId);
-  const model = modelId && !isOpenCode ? getM(modelId) : null;
-  const isCodex = model?.provider === "codex";
-  const isClaude = model?.provider === "claude";
-  const rawInputTokens = nonNegativeNumber(usage?.input_tokens);
-  const outputTokens = nonNegativeNumber(usage?.output_tokens);
-  const reasoningTokens = nonNegativeNumber(usage?.reasoning_tokens);
-  const cacheRead = nonNegativeNumber(usage?.cache_read_input_tokens);
-  const cacheCreate = nonNegativeNumber(usage?.cache_creation_input_tokens);
-  // Claude's `input_tokens` field excludes cached portions; users read "in" as
-  // the total prompt size, so fold cache read/create into it. `cached` still
-  // shows the breakdown of how much of that was served from cache.
-  const inputTokens = isClaude
-    ? rawInputTokens + cacheRead + cacheCreate
-    : rawInputTokens;
-  const derivedContextUsed = inputTokens + outputTokens + reasoningTokens;
-  const contextUsed = Number.isFinite(usage?.total_tokens) && usage.total_tokens > 0
-    ? usage.total_tokens
-    : derivedContextUsed;
-  const configuredContextWindow = model?.contextWindow || (isOpenCode ? null : DEFAULT_CONTEXT_WINDOW);
-  const sourceContextWindow = Number.isFinite(usage?.context_window) && usage.context_window > 0
-    ? usage.context_window
-    : null;
-  const contextWindow = sourceContextWindow || configuredContextWindow;
-  const hasContextWindow = Number.isFinite(contextWindow) && contextWindow > 0;
-  const hasExplicitContextWindow = Boolean(sourceContextWindow);
-  const isLikelyCumulativeCodexUsage =
-    isCodex &&
-    !hasExplicitContextWindow &&
-    contextUsed > configuredContextWindow * 1.2;
-  const costUsd = Number(usage?.cost_usd);
-  const hasCost = Number.isFinite(costUsd) && costUsd > 0;
-  const contextPct = contextUsed && hasContextWindow
-    ? Math.max(0, Math.min(100, (contextUsed / contextWindow) * 100))
-    : 0;
+  // TODO(ts-boundary): resolve through settings' useModelCatalog().getModel (runtime
+  // catalog) once it lands; built-in + fallback models until then.
+  const remoteId = remoteBaseModelId(modelId);
+  const model = modelId && !isOpenCodeModelId(modelId) ? getMOrMulticaFallback(remoteId || modelId) : null;
+  const stats = deriveUsageStats(usage, model);
+  const hasUsage = stats.hasTokenUsage || stats.hasCost;
+  const fiveHour = finiteWindow(rateLimits?.five_hour);
+  const sevenDay = finiteWindow(rateLimits?.seven_day);
+  const hasRateLimits = hasQuota(rateLimits);
 
-  const hasTokenUsage = contextUsed > 0 && !isLikelyCumulativeCodexUsage;
-  const hasUsage = hasTokenUsage || hasCost;
-
-  const fiveHour = rateLimits?.five_hour;
-  const sevenDay = rateLimits?.seven_day;
-  const hasRateLimits =
-    Number.isFinite(fiveHour?.used_percent) || Number.isFinite(sevenDay?.used_percent);
-
-  // Nothing to say after completion if we never captured any stats.
+  // Nothing to say after completion if no stats were ever captured.
   if (!isStreaming && !hasUsage && !hasRateLimits && !startedAt && frozenElapsedMs == null) return null;
 
   const elapsedLabel = formatDuration(elapsedMs);
-  const pctLabel = contextPct.toFixed(contextPct >= 10 || contextPct === 0 ? 0 : 1) + "%";
-
+  const pctLabel = formatPercent(stats.contextPct);
   const primary = isStreaming ? PHRASES[phraseIdx] : "Done";
   const primaryColor = isStreaming ? "var(--text-primary)" : "var(--text-muted)";
   const secondaryColor = "var(--text-muted)";
-  // Stat separator — subtle skewed slash glyph in neutral dim.
   const sep = (
-    <span
-      aria-hidden="true"
-      style={{
-        color: "var(--text-muted)",
-        margin: "0 6px",
-        transform: "skewX(-18deg)",
-        display: "inline-block",
-      }}
-    >
+    <span aria-hidden="true" style={{ color: "var(--text-muted)", margin: "0 6px", transform: "skewX(-18deg)", display: "inline-block" }}>
       /
     </span>
   );
@@ -275,53 +186,53 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
       {/* Line 2: token breakdown + context */}
       {hasUsage && (
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", color: secondaryColor, fontVariantNumeric: "tabular-nums" }}>
-          {hasTokenUsage && (
+          {stats.hasTokenUsage && (
             <>
               <span>
                 <span style={{ color: "var(--text-muted)" }}>in </span>
-                {formatCompact(inputTokens)}
+                {formatCompact(stats.inputTokens)}
               </span>
               {sep}
               <span>
                 <span style={{ color: "var(--text-muted)" }}>out </span>
-                {formatCompact(outputTokens)}
+                {formatCompact(stats.outputTokens)}
               </span>
-              {reasoningTokens > 0 && (
+              {stats.reasoningTokens > 0 && (
                 <>
                   {sep}
                   <span>
                     <span style={{ color: "var(--text-muted)" }}>think </span>
-                    {formatCompact(reasoningTokens)}
+                    {formatCompact(stats.reasoningTokens)}
                   </span>
                 </>
               )}
-              {(cacheRead + cacheCreate) > 0 && (
+              {stats.cachedTokens > 0 && (
                 <>
                   {sep}
                   <span>
                     <span style={{ color: "var(--text-muted)" }}>cached </span>
-                    {formatCompact(cacheRead + cacheCreate)}
+                    {formatCompact(stats.cachedTokens)}
                   </span>
                 </>
               )}
               {sep}
               <span>
                 <span style={{ color: "var(--text-muted)" }}>ctx </span>
-                {formatCompact(contextUsed)}
-                {hasContextWindow && (
+                {formatCompact(stats.contextUsed)}
+                {stats.contextWindow !== null && (
                   <>
-                    <span style={{ color: "var(--text-muted)" }}>/{formatCompact(contextWindow)}</span>
+                    <span style={{ color: "var(--text-muted)" }}>/{formatCompact(stats.contextWindow)}</span>
                     <span style={{ marginLeft: 5, color: "var(--text-secondary)" }}>{pctLabel}</span>
                   </>
                 )}
               </span>
             </>
           )}
-          {hasTokenUsage && hasCost && sep}
-          {hasCost && (
+          {stats.hasTokenUsage && stats.hasCost && sep}
+          {stats.hasCost && (
             <span>
               <span style={{ color: "var(--text-muted)" }}>cost </span>
-              {formatCost(costUsd)}
+              {formatCost(stats.costUsd)}
             </span>
           )}
         </div>
@@ -333,26 +244,22 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
           API-key users have no token, so the line silently hides). */}
       {hasRateLimits && (
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", color: secondaryColor, fontVariantNumeric: "tabular-nums" }}>
-          {Number.isFinite(fiveHour?.used_percent) && (
-            <PlanQuota label="5h" pct={fiveHour.used_percent} resetIn={formatResetIn(fiveHour.resets_at, now)} />
-          )}
-          {Number.isFinite(fiveHour?.used_percent) && Number.isFinite(sevenDay?.used_percent) && sep}
-          {Number.isFinite(sevenDay?.used_percent) && (
-            <PlanQuota label="7d" pct={sevenDay.used_percent} resetIn={formatResetIn(sevenDay.resets_at, now)} />
-          )}
+          {fiveHour && <PlanQuota label="5h" pct={fiveHour.used_percent} resetIn={formatResetIn(fiveHour.resets_at, now)} />}
+          {fiveHour && sevenDay && sep}
+          {sevenDay && <PlanQuota label="7d" pct={sevenDay.used_percent} resetIn={formatResetIn(sevenDay.resets_at, now)} />}
         </div>
       )}
     </div>
   );
 }
 
-// Single plan-quota chip: "5h 100% · resets 4h 12m"
-// Saturated quota (≥95%) gets a warmer ink so it reads at a glance, but stays
-// within the existing muted palette — no full red.
-function PlanQuota({ label, pct, resetIn }) {
+
+// Single plan-quota chip: "5h 100% · resets 4h 12m". Saturated quota (≥95%)
+// gets a warmer ink without going full red.
+function PlanQuota({ label, pct, resetIn }: { label: string; pct: number; resetIn: string | null }) {
   const saturated = pct >= 95;
   const pctInk = saturated ? "var(--accent)" : "var(--text-secondary)";
-  const pctLabel = pct.toFixed(pct >= 10 || pct === 0 ? 0 : 1) + "%";
+  const pctLabel = formatPercent(pct);
   return (
     <span>
       <span style={{ color: "var(--text-muted)" }}>{label} </span>
