@@ -1,0 +1,27 @@
+shared/state/types.ts
+  s_d0fb9aefa2e5fb::t_bf6d2f7b94f30d 125-167
+vite.config.ts
+  s_d0fb9aefa2e5fb::t_719cf4e11a895f 18-19,25-35
+shared/ipc/renderer-api.ts
+  s_d0fb9aefa2e5fb::t_7555f0f87371cb 75-78
+shared/ipc/contract.ts
+  s_d0fb9aefa2e5fb::t_4fbc442ceaf2f6 31
+  s_d0fb9aefa2e5fb::t_2c54e664e11aa9 108
+  s_d0fb9aefa2e5fb::t_bf6d2f7b94f30d 174-183,359-360
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "92065c4a005ff79fa1f936e1bc69edc01a3fc298",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
