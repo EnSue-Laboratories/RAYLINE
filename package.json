@@ -1,7 +1,7 @@
 {
   "name": "ensue",
   "productName": "RayLine",
-  "description": "RayLine — a desktop client for Claude Code",
+  "description": "RayLine \u2014 a desktop client for Claude Code",
   "author": {
     "name": "Ensue Laboratories",
     "email": "contact@ensue.dev"
@@ -11,6 +11,9 @@
   "version": "0.1.8",
   "type": "module",
   "main": "dist-electron/electron/main.cjs",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "dev": "vite",
     "dev:electron": "concurrently -k \"vite --port 5199 --strictPort\" \"node scripts/build-electron.ts --watch\" \"wait-on http://localhost:5199 dist-electron/electron/main.cjs && node scripts/dev-electron.ts 5199\"",
