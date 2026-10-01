@@ -1,83 +1,90 @@
-// @ts-nocheck
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
-function readWindowActivity() {
-  const isVisible = typeof document === "undefined" ? true : !document.hidden;
-  const isFocused = typeof document === "undefined" ? true : (document.hasFocus?.() ?? true);
-  const prefersReducedMotion = typeof window !== "undefined" && typeof window.matchMedia === "function"
-    ? window.matchMedia(REDUCED_MOTION_QUERY).matches
-    : false;
+export interface WindowActivity {
+  isVisible: boolean;
+  isFocused: boolean;
+  prefersReducedMotion: boolean;
+}
 
-  return {
-    isVisible,
-    isFocused,
-    prefersReducedMotion,
+function getReducedMotionQuery(): MediaQueryList | null {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(REDUCED_MOTION_QUERY)
+    : null;
+}
+
+function readWindowActivity(): WindowActivity {
+  const isVisible = typeof document === "undefined" ? true : !document.hidden;
+  const isFocused = typeof document === "undefined" ? true : document.hasFocus();
+  const prefersReducedMotion = getReducedMotionQuery()?.matches ?? false;
+  return { isVisible, isFocused, prefersReducedMotion };
+}
+
+// One shared snapshot + one set of DOM listeners for every consumer.
+let snapshot: WindowActivity | null = null;
+const listeners = new Set<() => void>();
+let detach: (() => void) | null = null;
+
+function getSnapshot(): WindowActivity {
+  snapshot ??= readWindowActivity();
+  return snapshot;
+}
+
+function sync(): void {
+  const next = readWindowActivity();
+  const prev = snapshot;
+  if (
+    prev &&
+    prev.isVisible === next.isVisible &&
+    prev.isFocused === next.isFocused &&
+    prev.prefersReducedMotion === next.prefersReducedMotion
+  ) {
+    return;
+  }
+  snapshot = next;
+  for (const listener of listeners) listener();
+}
+
+function attach(): () => void {
+  const media = getReducedMotionQuery();
+  document.addEventListener("visibilitychange", sync);
+  window.addEventListener("focus", sync);
+  window.addEventListener("blur", sync);
+  media?.addEventListener("change", sync);
+  return () => {
+    document.removeEventListener("visibilitychange", sync);
+    window.removeEventListener("focus", sync);
+    window.removeEventListener("blur", sync);
+    media?.removeEventListener("change", sync);
   };
 }
 
-export default function useWindowActivity() {
-  const [activity, setActivity] = useState(readWindowActivity);
-
-  useEffect(() => {
-    const media = typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia(REDUCED_MOTION_QUERY)
-      : null;
-    const sync = () => setActivity(readWindowActivity());
-
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  if (!detach && typeof window !== "undefined") {
+    detach = attach();
     sync();
-    document.addEventListener("visibilitychange", sync);
-    window.addEventListener("focus", sync);
-    window.addEventListener("blur", sync);
-
-    if (media?.addEventListener) {
-      media.addEventListener("change", sync);
-    } else if (media?.addListener) {
-      media.addListener(sync);
+  }
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0 && detach) {
+      detach();
+      detach = null;
+      snapshot = null;
     }
-
-    return () => {
-      document.removeEventListener("visibilitychange", sync);
-      window.removeEventListener("focus", sync);
-      window.removeEventListener("blur", sync);
-
-      if (media?.removeEventListener) {
-        media.removeEventListener("change", sync);
-      } else if (media?.removeListener) {
-        media.removeListener(sync);
-      }
-    };
-  }, []);
-
-  return activity;
+  };
 }
 
-export function usePrefersReducedMotion() {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
-    () => readWindowActivity().prefersReducedMotion
-  );
+/** Window visibility / focus / reduced-motion, shared across all subscribers. */
+export default function useWindowActivity(): WindowActivity {
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
 
-  useEffect(() => {
-    const media = typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia(REDUCED_MOTION_QUERY)
-      : null;
-    if (!media) return undefined;
+function getReducedMotionSnapshot(): boolean {
+  return getSnapshot().prefersReducedMotion;
+}
 
-    const sync = () => setPrefersReducedMotion(media.matches);
-
-    if (media.addEventListener) {
-      media.addEventListener("change", sync);
-      return () => media.removeEventListener("change", sync);
-    }
-
-    if (media.addListener) {
-      media.addListener(sync);
-      return () => media.removeListener(sync);
-    }
-
-    return undefined;
-  }, []);
-
-  return prefersReducedMotion;
+export function usePrefersReducedMotion(): boolean {
+  return useSyncExternalStore(subscribe, getReducedMotionSnapshot, getReducedMotionSnapshot);
 }
