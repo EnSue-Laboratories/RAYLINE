@@ -14,7 +14,7 @@ import { RemoteSshSection } from "./settings/RemoteSshSection";
 import type { AppRegionStyle } from "./settings/styles";
 import { ThemeSection } from "./settings/ThemeSection";
 import { AppVersionInfo, UpdatesSection } from "./settings/UpdatesSection";
-import { useAppVersion } from "./settings/useAppVersion";
+import { useAppBuild } from "./settings/useAppBuild";
 import { UpstreamsSection } from "./settings/UpstreamsSection";
 import { WallpaperSection } from "./settings/WallpaperSection";
 
@@ -99,7 +99,7 @@ export default function Settings(props: SettingsProps) {
   } = props;
   const s = useFontScale();
   const t = useMemo(() => createTranslator(locale), [locale]);
-  const appVersion = useAppVersion();
+  const appBuild = useAppBuild();
   const [backHover, setBackHover] = useState(false);
   const hasWallpaper = Boolean(wallpaper?.dataUrl);
 
@@ -170,7 +170,7 @@ export default function Settings(props: SettingsProps) {
 
       <div style={SCROLL_STYLE}>
         <div style={{ width: "100%", maxWidth: 520, margin: "0 auto" }}>
-          <AppVersionInfo s={s} t={t} version={appVersion} />
+          <AppVersionInfo s={s} t={t} build={appBuild} />
           <ThemeSection s={s} t={t} appearance={appearance} onAppearanceChange={onAppearanceChange} />
           <LanguageSection s={s} t={t} locale={locale} onLocaleChange={onLocaleChange} />
           <ToggleSetting
@@ -221,7 +221,7 @@ export default function Settings(props: SettingsProps) {
             onCoauthorEnabledChange={onCoauthorEnabledChange}
           />
 
-          {platform === "win32" && <UpdatesSection s={s} t={t} version={appVersion} />}
+          {platform === "win32" && <UpdatesSection s={s} t={t} version={appBuild?.version ?? null} />}
         </div>
       </div>
     </div>

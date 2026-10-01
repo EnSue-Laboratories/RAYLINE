@@ -157,7 +157,7 @@ describe("OpenCode form", () => {
     expect(moveHighlight(4, 1, 0)).toBe(0);
   });
 
-  it("is ready when configured or any model carries credentials", () => {
+  it("is ready when configured or a model carries credentials", () => {
     expect(isOpenCodeReady(false, [])).toBe(false);
     expect(isOpenCodeReady(false, [{ apiKey: "", baseURL: "https://x" }])).toBe(true);
     expect(isOpenCodeReady(true, [])).toBe(true);

@@ -1,120 +1,47 @@
 /**
- * Pure view-model for the model picker: which models are visible, how they
- * are grouped, searched, badged and gated. No React, no DOM.
- *
- * TODO(shared-models): `MODEL_INSTALL_GUIDES`, `MODEL_PROVIDER_ORDER`,
- * `filterModels` and `isPlannerModel` mirror #230's src/utils/modelOptions /
- * modelSearch, which are moving into @shared/models; import them from there
- * once that lands and delete the local copies.
+ * Picker-specific view logic layered on @shared/models' `visibleModels` /
+ * `filterModels`: retirement + CLI-version gating, badges, grouping, effort
+ * display, keyboard movement and menu placement. No React, no DOM.
  */
 
 import {
   getBuiltinModel,
   isModelRetired,
+  filterModels,
   isModelSupportedByCli,
+  isPlannerModel,
+  MODEL_PROVIDER_ORDER,
   normalizeModelId,
   resolveEffort,
+  visibleModels,
   type EffortLevel,
+  type InstalledProviders,
   type ModelDefinition,
+  type ModelProviderGroupId,
 } from "@shared/models";
 import type { CliInstalledSnapshot } from "@shared/providers/types";
 
-/** Providers whose local CLI can be missing (keys of `check-cli-installed`). */
-export type InstallableProvider = "claude" | "codex" | "opencode";
-export type InstalledMap = Partial<Pick<CliInstalledSnapshot, InstallableProvider>>;
 export type CliVersions = NonNullable<CliInstalledSnapshot["versions"]>;
+type VersionedProvider = keyof CliVersions;
 
-export const MODEL_INSTALL_GUIDES: Readonly<Record<InstallableProvider, string>> = {
-  claude: "https://code.claude.com/docs/en/setup",
-  codex: "https://developers.openai.com/codex/cli",
-  opencode: "https://opencode.ai/docs/cli/",
-};
-
-export const INSTALL_GUIDE_NAMES: Readonly<Record<InstallableProvider, string>> = {
-  claude: "Claude Code",
-  codex: "Codex CLI",
-  opencode: "OpenCode",
-};
-
-/** Synthetic group for Dispatch's "inherit the default model" option. */
-export const INHERIT_GROUP = "inherit";
-
-export const MODEL_PROVIDER_ORDER: readonly string[] = [
-  INHERIT_GROUP,
-  "claude",
-  "codex",
-  "grok",
-  "agy",
-  "remote-claude",
-  "remote-codex",
-  "opencode",
-  "multica",
-];
-
-/** Local runtimes the dispatch planner can drive. */
-const PLANNER_PROVIDERS: ReadonlySet<string> = new Set(["claude", "codex", "opencode"]);
-
-export function isInstallableProvider(provider: string): provider is InstallableProvider {
-  return provider === "claude" || provider === "codex" || provider === "opencode";
+function isVersionedProvider(provider: string): provider is VersionedProvider {
+  return provider === "claude" || provider === "codex" || provider === "opencode" || provider === "grok" || provider === "agy";
 }
 
-export function isPlannerModel(model: ModelDefinition | null | undefined): boolean {
-  return Boolean(model && !("remoteRuntime" in model) && PLANNER_PROVIDERS.has(model.provider));
-}
-
-/** Version of the local CLI that runs `model`, when main reported one. */
+/** Version of the local CLI that runs `model`, when main reported one (never for SSH remotes). */
 export function cliVersionFor(model: ModelDefinition, versions: CliVersions | undefined): string | null {
-  if (!versions || !isInstallableProvider(model.provider)) return null;
+  if (!versions || !isVersionedProvider(model.provider)) return null;
   return versions[model.provider] ?? null;
 }
 
-export interface VisibilityContext {
-  installed: InstalledMap;
-  /** Saved choices stay listed even when retired or their CLI is missing. */
-  retainedIds: readonly string[];
-  nowMs: number;
-}
-
 /**
- * Hides retired models and models whose local CLI is known to be missing,
- * unless they are a retained (saved) choice. SSH-remote models never depend
- * on the local install.
+ * Drops models whose `retiresOn` has passed unless they are a saved choice.
+ * Applied on top of `visibleModels` (hidden / unavailable / not installed).
  */
-export function visibleModels(models: readonly ModelDefinition[], ctx: VisibilityContext): ModelDefinition[] {
-  const retained = new Set(ctx.retainedIds.map((id) => normalizeModelId(id)));
-  return models.filter((model) => {
-    if (retained.has(model.id)) return true;
-    if (isModelRetired(model, ctx.nowMs)) return false;
-    if (isInstallableProvider(model.provider) && ctx.installed[model.provider] === false) return false;
-    return true;
-  });
-}
-
-const normalizeSearch = (value: string): string => value.normalize("NFKC").toLocaleLowerCase();
-const compact = (value: string): string => value.replace(/[^\p{L}\p{N}]/gu, "");
-
-function searchText(model: ModelDefinition): string {
-  return normalizeSearch(
-    [model.name, model.tag, model.provider, model.cliFlag ?? "", (model.efforts ?? []).join(" "), model.description ?? ""].join(" "),
-  );
-}
-
-/**
- * Every whitespace-separated word must match, either literally or with
- * punctuation removed (so "gpt6astra" finds "GPT-6 Astra" and "luna max" finds
- * Luna because it supports `max`).
- */
-export function filterModels<M extends ModelDefinition>(models: readonly M[], query: string): M[] {
-  const words = normalizeSearch(query).trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [...models];
-  return models.filter((model) => {
-    const text = searchText(model);
-    const squashed = compact(text);
-    return words.every((word) => {
-      const bare = compact(word);
-      return text.includes(word) || (bare.length > 0 && squashed.includes(bare));
-    });
-  });
+export function dropRetired<M extends ModelDefinition>(models: readonly M[], retainedIds: readonly (string | null | undefined)[], nowMs: number): M[] {
+  const retained = new Set<string>();
+  for (const id of retainedIds) if (id) retained.add(normalizeModelId(id));
+  return models.filter((model) => retained.has(model.id) || !isModelRetired(model, nowMs));
 }
 
 // ── Badges / gating ─────────────────────────────────────────────────────────
@@ -153,16 +80,71 @@ export function getModelBadges(model: ModelDefinition, ctx: BadgeContext): Model
   return badges;
 }
 
-export type DisabledReason = "cli-outdated" | "planner";
+export type DisabledReason = "unavailable" | "cli-outdated" | "planner";
 
 export function getDisabledReason(
   model: ModelDefinition,
-  purpose: "chat" | "planner",
+  purpose: PickerPurpose,
   cliVersion: string | null,
 ): DisabledReason | null {
+  if (model.unavailable) return "unavailable";
   if (model.minCliVersion && cliVersion && !isModelSupportedByCli(model, cliVersion)) return "cli-outdated";
   if (purpose === "planner" && !isPlannerModel(model)) return "planner";
   return null;
+}
+
+// ── Options ─────────────────────────────────────────────────────────────────
+
+export type PickerPurpose = "chat" | "planner";
+
+export interface PickerOption {
+  /** Model id ("" for Dispatch's inherit option). */
+  id: string;
+  /** Group key: the model provider, or INHERIT_GROUP. */
+  provider: string;
+  model: ModelDefinition;
+  badges: ModelBadge[];
+  disabled: DisabledReason | null;
+}
+
+export interface PickerOptionsContext {
+  installed: InstalledProviders;
+  versions: CliVersions | undefined;
+  /** Saved choices stay listed (and keep their identity) even when hidden, retired or unavailable. */
+  retainedIds: readonly (string | null | undefined)[];
+  nowMs: number;
+  query: string;
+  purpose: PickerPurpose;
+}
+
+/** visibleModels → drop retired → fuzzy filter → badges / disabled state. */
+export function buildPickerOptions(models: readonly ModelDefinition[], ctx: PickerOptionsContext): PickerOption[] {
+  const visible = dropRetired(visibleModels(models, ctx.installed, ctx.retainedIds), ctx.retainedIds, ctx.nowMs);
+  return filterModels(visible, ctx.query).map((model) => {
+    const cliVersion = cliVersionFor(model, ctx.versions);
+    return {
+      id: model.id,
+      provider: model.provider,
+      model,
+      badges: getModelBadges(model, { nowMs: ctx.nowMs, cliVersion }),
+      disabled: getDisabledReason(model, ctx.purpose, cliVersion),
+    };
+  });
+}
+
+/**
+ * Dispatch's "inherit the default model" option (id ""), or null when the
+ * query filters it out.
+ */
+export function filterInheritOption(
+  inherited: ModelDefinition,
+  label: string,
+  query: string,
+  purpose: PickerPurpose = "chat",
+): PickerOption | null {
+  const model: ModelDefinition = { ...inherited, id: "", name: label };
+  if (filterModels([model], query).length === 0) return null;
+  return { id: "", provider: INHERIT_GROUP, model, badges: [], disabled: getDisabledReason(inherited, purpose, null) };
 }
 
 // ── Grouping ────────────────────────────────────────────────────────────────
@@ -174,11 +156,14 @@ export interface ModelGroup<M> {
 
 /** Groups by provider in MODEL_PROVIDER_ORDER, unknown providers last (stable). */
 export function groupByProvider<M extends { provider: string }>(models: readonly M[]): ModelGroup<M>[] {
-  const order = [...new Set([...MODEL_PROVIDER_ORDER, ...models.map((model) => model.provider)])];
+  const order = [...new Set<string>([...MODEL_PROVIDER_ORDER, ...models.map((model) => model.provider)])];
   return order
     .map((provider) => ({ provider, models: models.filter((model) => model.provider === provider) }))
     .filter((group) => group.models.length > 0);
 }
+
+/** Synthetic group for Dispatch's "inherit the default model" option. */
+export const INHERIT_GROUP: ModelProviderGroupId = "inherit";
 
 export function providerGroupLabel(provider: string, inheritLabel: string): string {
   if (provider === INHERIT_GROUP) return inheritLabel;
@@ -208,6 +193,11 @@ export function moveActiveId(ids: readonly string[], activeId: string | null, de
   const index = activeId === null ? -1 : ids.indexOf(activeId);
   if (index === -1) return delta === 1 ? (ids[0] ?? null) : (ids[ids.length - 1] ?? null);
   return ids[(index + delta + ids.length) % ids.length] ?? null;
+}
+
+/** DOM id of an option row (aria-activedescendant / scrollIntoView). */
+export function optionDomId(menuId: string, optionId: string): string {
+  return `${menuId}-opt-${optionId || "inherit"}`;
 }
 
 // ── Menu placement ──────────────────────────────────────────────────────────

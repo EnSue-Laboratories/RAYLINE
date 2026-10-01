@@ -1,6 +1,7 @@
 import { memo, useEffect, useState, type CSSProperties } from "react";
 import { SectionLabel } from "./controls";
 import type { FontScale, Translator } from "./deps";
+import type { AppBuild } from "./useAppBuild";
 import {
   applyUpdaterStatus,
   beginUpdateCheck,
@@ -12,15 +13,17 @@ import {
 interface AppVersionInfoProps {
   s: FontScale;
   t: Translator;
-  version: string | null;
+  build: AppBuild | null;
 }
 
-/** Version line at the top of Settings (#230 shows it on every platform). */
-export const AppVersionInfo = memo(function AppVersionInfo({ s, t, version }: AppVersionInfoProps) {
-  if (!version) return null;
+/** Version + build source at the top of Settings (#230 shows it on every platform). */
+export const AppVersionInfo = memo(function AppVersionInfo({ s, t, build }: AppVersionInfoProps) {
+  if (!build) return null;
   return (
     <div data-testid="app-build" style={{ marginBottom: 20, color: "var(--text-muted)", fontSize: s(11), fontFamily: "var(--font-mono)" }}>
-      {t("settings.currentVersion")} v{version}
+      {t("settings.currentVersion")} v{build.version}
+      {build.commit && ` · ${build.commit.slice(0, 7)}`}
+      {build.repository && <div style={{ marginTop: 4 }}>{build.repository}</div>}
     </div>
   );
 });
