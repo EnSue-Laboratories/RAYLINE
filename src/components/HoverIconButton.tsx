@@ -1,7 +1,26 @@
-// @ts-nocheck
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+export interface HoverIconButtonProps {
+  tooltip?: string;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+  className?: string;
+  style?: CSSProperties;
+  children?: ReactNode;
+  baseColor?: string;
+  hoverColor?: string;
+  ariaLabel?: string;
+  disabled?: boolean;
+  onMouseEnter?: (event: MouseEvent<HTMLButtonElement>) => void;
+  onMouseLeave?: (event: MouseEvent<HTMLButtonElement>) => void;
+}
+
+interface TooltipPosition {
+  left: number;
+  top: number;
+}
+
+/** Icon button with a portal tooltip shown on hover and keyboard focus. */
 export default function HoverIconButton({
   tooltip,
   onClick,
@@ -14,16 +33,17 @@ export default function HoverIconButton({
   disabled = false,
   onMouseEnter,
   onMouseLeave,
-}) {
-  const btnRef = useRef(null);
-  const [hovered, setHovered] = useState(false);
-  const [tipPos, setTipPos] = useState(null);
+}: HoverIconButtonProps) {
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [tipPos, setTipPos] = useState<TooltipPosition | null>(null);
+  const hovered = tipPos !== null;
 
-  useEffect(() => {
-    if (!hovered || disabled || !btnRef.current) { setTipPos(null); return; }
-    const r = btnRef.current.getBoundingClientRect();
-    setTipPos({ left: r.left + r.width / 2, top: r.top });
-  }, [hovered, disabled]);
+  const showTooltip = () => {
+    if (disabled || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    setTipPos({ left: rect.left + rect.width / 2, top: rect.top });
+  };
+  const hideTooltip = () => setTipPos(null);
 
   return (
     <>
@@ -36,8 +56,16 @@ export default function HoverIconButton({
         onClick={(e) => {
           if (!disabled) onClick?.(e);
         }}
-        onMouseEnter={(e) => { if (!disabled) setHovered(true); onMouseEnter?.(e); }}
-        onMouseLeave={(e) => { setHovered(false); onMouseLeave?.(e); }}
+        onMouseEnter={(e) => {
+          showTooltip();
+          onMouseEnter?.(e);
+        }}
+        onMouseLeave={(e) => {
+          hideTooltip();
+          onMouseLeave?.(e);
+        }}
+        onFocus={showTooltip}
+        onBlur={hideTooltip}
         style={{
           display: "flex",
           alignItems: "center",
@@ -54,7 +82,7 @@ export default function HoverIconButton({
       >
         {children}
       </button>
-      {hovered && !disabled && tipPos && tooltip && createPortal(
+      {!disabled && tipPos && tooltip && createPortal(
         <div
           role="tooltip"
           style={{
