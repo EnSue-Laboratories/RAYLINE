@@ -1,0 +1,59 @@
+src/components/settings/LanguageSection.tsx
+  s_d0fb9aefa2e5fb::t_9ba03dc68848e0 1-63
+src/components/settings/WallpaperSection.tsx
+  s_d0fb9aefa2e5fb::t_3cb7d4e2ce0c6f 1-154
+src/components/settings/RemoteSshSection.tsx
+  s_d0fb9aefa2e5fb::t_6be64281a6d8b0 1-86
+src/components/settings/styles.ts
+  s_d0fb9aefa2e5fb::t_0893af9647eab6 1-230
+src/components/settings/updater.ts
+  s_d0fb9aefa2e5fb::t_43256b671efa14 1-48
+src/components/settings/deps.ts
+  s_d0fb9aefa2e5fb::t_2575ab810a9ccb 1-183
+src/components/settings/__tests__/helpers.test.ts
+  s_d0fb9aefa2e5fb::t_48fd718bb99ae8 1-225
+src/components/settings/ThemeSection.tsx
+  s_d0fb9aefa2e5fb::t_bfd409f25cc64c 1-189
+src/components/settings/OpenCodeProviderCombobox.tsx
+  s_d0fb9aefa2e5fb::t_554f6710acbe51 1-188
+src/components/settings/AppearancePreview.tsx
+  s_d0fb9aefa2e5fb::t_ab76aef0e29a92 1-204
+src/components/settings/MulticaSection.tsx
+  s_d0fb9aefa2e5fb::t_ae063749c3fcc7 1-138
+src/components/settings/controls.tsx
+  s_d0fb9aefa2e5fb::t_dbae275e0ddb34 1-401
+src/components/settings/helpers.ts
+  s_d0fb9aefa2e5fb::t_d3804bc8c0387b 1-307
+src/components/settings/OpenCodeSection.tsx
+  s_d0fb9aefa2e5fb::t_9e8a247bab6196 1-265
+src/components/settings/OpenCodeModelForm.tsx
+  s_d0fb9aefa2e5fb::t_8fceec5c078bdc 1-177
+src/components/settings/DisplaySection.tsx
+  s_d0fb9aefa2e5fb::t_bc6ac7a3234229 1-64
+src/components/settings/UpdatesSection.tsx
+  s_d0fb9aefa2e5fb::t_bde23565c5e381 1-195
+src/components/settings/useOpenCodeEditor.ts
+  s_d0fb9aefa2e5fb::t_9aa2d1af68220f 1-140
+src/components/settings/UpstreamsSection.tsx
+  s_d0fb9aefa2e5fb::t_73c2b4490dc013 1-211
+src/components/settings/AdvancedSection.tsx
+  s_d0fb9aefa2e5fb::t_221826a359987d 1-175
+src/components/Settings.tsx
+  s_d0fb9aefa2e5fb::t_4c7b8e24e84732 1-57,60-65,67-74,76-102,104-123,134,143,145-147,157,168,171,173-224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8b32a7f3434929c90e52802b6534cee93e3f1bba",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
