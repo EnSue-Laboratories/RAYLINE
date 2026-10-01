@@ -25,7 +25,7 @@ import {
   type BranchMode,
   type NewChatRequest,
 } from "./newChat";
-import { cardStyle, chipIconStyle, chipLabelStyle, inputBase, isPlainEnter, toolBtnStyle } from "./styles";
+import { cardStyle, chipIconStyle, chipLabelStyle, inputBase, isPlainEnter, toolBtnStyle, createChipStyle } from "./styles";
 import BackButton from "./BackButton";
 import { useFileDrop } from "./useFileDrop";
 import { useBranches, useRepoIssues } from "./useRepoData";
@@ -392,10 +392,10 @@ export default function NewChatCard({
             disabled={!canCreate}
             onClick={() => { void handleCreate(); }}
             aria-label={t("newChat.create")}
-            style={{ ...toolBtnStyle(true, s), marginLeft: "auto", opacity: canCreate ? 1 : 0.5 }}
+            style={createChipStyle(canCreate, s)}
           >
             {creatingChat ? t("newChat.creating") : t("newChat.create")}
-            <ArrowRight size={13} />
+            <ArrowRight size={11} strokeWidth={2} />
           </button>
         </div>
 

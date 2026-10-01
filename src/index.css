@@ -483,3 +483,6 @@ input[type="range"]::-webkit-slider-thumb {
     animation: none !important;
   }
 }
+
+/* New-chat sheet: quiet mono "Back" hint brightens on hover */
+.newchat-back:not(:disabled):hover { color: var(--text-secondary) !important; }
