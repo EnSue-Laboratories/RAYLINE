@@ -6,7 +6,7 @@
 
 import { promises as fsp } from "node:fs";
 import path from "node:path";
-import { toUnpackedPath } from "../../paths";
+import { toUnpackedPath } from "../../unpacked-path";
 import { buildSpawnPath, isExecutable, resolveCliBin } from "../../cli-bin-resolver";
 import { getTerminalBridgeInfo } from "./terminal-bridge-info";
 

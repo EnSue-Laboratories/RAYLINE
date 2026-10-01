@@ -5,7 +5,7 @@
  */
 
 import path from "node:path";
-import { toUnpackedPath } from "./paths";
+import { toUnpackedPath } from "./unpacked-path";
 import { PtySessionRegistry } from "./services/terminal/pty-sessions";
 import type { SupportPaths } from "./services/terminal/shell-env";
 import { TerminalWsServer } from "./services/terminal/ws-server";
