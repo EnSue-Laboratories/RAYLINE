@@ -13,11 +13,4 @@ export function resolveAppPath(...segments: string[]): string {
   return path.join(getAppRoot(), ...segments);
 }
 
-/**
- * Files that are executed by an external process (system `node`, shells) or
- * read via plain fs APIs outside Electron must come from app.asar.unpacked.
- * In dev this is a no-op.
- */
-export function toUnpackedPath(filePath: string): string {
-  return filePath.replace(/app\.asar(?=[\\/])/, "app.asar.unpacked");
-}
+export { toUnpackedPath } from "./unpacked-path";
