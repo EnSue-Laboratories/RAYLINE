@@ -1,33 +1,38 @@
-// @ts-nocheck
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { filterByQuery } from "../pm/listing";
+import { formInputStyle } from "../pm/styles";
 
-const inputStyle = {
-  width: "100%",
-  background: "var(--control-bg)",
-  border: "1px solid var(--control-border)",
-  borderRadius: 6,
-  padding: "8px 10px",
-  color: "var(--text-primary)",
-  fontSize: 13,
-  fontFamily: "var(--font-ui)",
-  boxSizing: "border-box",
-};
+interface SearchableSelectProps {
+  options: readonly string[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}
 
-export default function SearchableSelect({ options, value, onChange, placeholder }) {
+const identity = (option: string) => option;
+
+/** Text input that filters a dropdown of options (keyboard navigable). */
+export default function SearchableSelect({ options, value, onChange, placeholder }: SearchableSelectProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(0);
-  const containerRef = useRef(null);
-  const listRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
-  const filtered = query
-    ? options.filter((o) => o.toLowerCase().includes(query.toLowerCase()))
-    : options;
+  const filtered = useMemo(() => filterByQuery(options, query, identity), [options, query]);
+
+  // Reset the highlight whenever the filtered list changes size (adjusted
+  // during render rather than in an effect).
+  const [highlightForLength, setHighlightForLength] = useState(filtered.length);
+  if (highlightForLength !== filtered.length) {
+    setHighlightForLength(filtered.length);
+    setHighlightIdx(0);
+  }
 
   // Close on outside click
   useEffect(() => {
-    const handler = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+    const handler = (event: MouseEvent) => {
+      if (containerRef.current && event.target instanceof Node && !containerRef.current.contains(event.target)) {
         setOpen(false);
         setQuery("");
       }
@@ -36,36 +41,30 @@ export default function SearchableSelect({ options, value, onChange, placeholder
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Reset highlight when filtered list changes
-  useEffect(() => {
-    setHighlightIdx(0);
-  }, [filtered.length]);
-
   // Scroll highlighted item into view
   useEffect(() => {
-    if (open && listRef.current) {
-      const el = listRef.current.children[highlightIdx];
-      if (el) el.scrollIntoView({ block: "nearest" });
-    }
+    if (!open || !listRef.current) return;
+    listRef.current.children[highlightIdx]?.scrollIntoView({ block: "nearest" });
   }, [highlightIdx, open]);
 
-  const select = (val) => {
-    onChange(val);
+  const select = (option: string) => {
+    onChange(option);
     setQuery("");
     setOpen(false);
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
       setHighlightIdx((i) => Math.min(i + 1, filtered.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
       setHighlightIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (filtered[highlightIdx]) select(filtered[highlightIdx]);
-    } else if (e.key === "Escape") {
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const option = filtered[highlightIdx];
+      if (option) select(option);
+    } else if (event.key === "Escape") {
       setOpen(false);
       setQuery("");
     }
@@ -83,7 +82,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
         onFocus={() => setOpen(true)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder || "Search..."}
-        style={inputStyle}
+        style={formInputStyle}
       />
       {open && filtered.length > 0 && (
         <div
@@ -105,21 +104,24 @@ export default function SearchableSelect({ options, value, onChange, placeholder
             zIndex: 50,
           }}
         >
-          {filtered.map((opt, i) => (
+          {filtered.map((option, i) => (
             <div
-              key={opt}
-              onMouseDown={(e) => { e.preventDefault(); select(opt); }}
+              key={option}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                select(option);
+              }}
               onMouseEnter={() => setHighlightIdx(i)}
               style={{
                 padding: "6px 10px",
                 fontSize: 13,
                 fontFamily: "var(--font-ui)",
-                color: opt === value ? "var(--accent-text)" : "var(--text-secondary)",
+                color: option === value ? "var(--accent-text)" : "var(--text-secondary)",
                 background: i === highlightIdx ? "var(--pane-hover)" : "transparent",
                 cursor: "pointer",
               }}
             >
-              {opt}
+              {option}
             </div>
           ))}
         </div>
