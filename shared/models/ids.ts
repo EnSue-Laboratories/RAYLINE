@@ -9,6 +9,12 @@
  *  - OpenCode:           `opencode:<providerId>/<modelId>`
  *  - Multica:            `multica:<agentId>`
  *  - SSH remote:         `remote-ssh:<claude|codex>:<builtinId>`
+ *  - Grok:               `<slug>` (`grok-4.7`), `grok-default` = CLI default
+ *  - Antigravity:        `agy:<slug>`, `agy:default` = CLI default
+ *  - Codex (discovered): `codex-model:<encodeURIComponent(slug)>` for slugs
+ *                        that are not in the static catalogue (static Codex
+ *                        ids equal the slug). PR #230's
+ *                        `codex-model:<slug>:<effort>` is a legacy form.
  */
 
 import type { OpenCodeModelRef, ProviderUpstreamModelRef, RemoteModelRef } from "./types";
@@ -103,4 +109,96 @@ export function parseRemoteModelId(id: unknown): RemoteModelRef | null {
   const baseModelId = value.slice(splitIndex + 1);
   if (provider !== "claude" && provider !== "codex") return null;
   return { provider, baseModelId };
+}
+
+// ── Grok ────────────────────────────────────────────────────────────────────
+
+/** Grok entry that omits `--model` and lets the CLI pick its default. */
+export const GROK_DEFAULT_MODEL_ID = "grok-default";
+
+const GROK_SLUG_PATTERN = /^grok-[a-z0-9._-]+$/i;
+
+/** Valid `grok models` slug (`grok-4.7`, `grok-build-0.1`). */
+export function isGrokSlug(value: unknown): value is string {
+  return typeof value === "string" && GROK_SLUG_PATTERN.test(value);
+}
+
+/** Grok ids are the slug itself (plus `grok-default`). */
+export function isGrokModelId(id: unknown): id is string {
+  return isGrokSlug(id);
+}
+
+// ── Antigravity (agy) ───────────────────────────────────────────────────────
+
+export const AGY_PREFIX = "agy:";
+/** AGY entry that omits `--model` and lets the CLI pick its default. */
+export const AGY_DEFAULT_MODEL_ID = "agy:default";
+
+const AGY_SLUG_PATTERN = /^[a-z0-9][a-z0-9._-]*$/i;
+
+/** Valid `agy models` slug. */
+export function isAgySlug(value: unknown): value is string {
+  return typeof value === "string" && AGY_SLUG_PATTERN.test(value);
+}
+
+export function isAgyModelId(id: unknown): id is string {
+  return typeof id === "string" && id.startsWith(AGY_PREFIX) && isAgySlug(id.slice(AGY_PREFIX.length));
+}
+
+export function buildAgyModelId(slug: string): string {
+  return `${AGY_PREFIX}${slug}`;
+}
+
+/** Parsed `agy:<slug>`; `cliFlag` is "" for `agy:default`. */
+export interface AgyModelRef {
+  slug: string;
+  cliFlag: string;
+}
+
+export function parseAgyModelId(id: unknown): AgyModelRef | null {
+  if (!isAgyModelId(id)) return null;
+  const slug = id.slice(AGY_PREFIX.length);
+  return { slug, cliFlag: id === AGY_DEFAULT_MODEL_ID ? "" : slug };
+}
+
+// ── Codex runtime-catalog models ────────────────────────────────────────────
+
+export const CODEX_MODEL_PREFIX = "codex-model:";
+
+/** Plausible Codex slug: non-empty, ≤ 200 chars, no whitespace / control chars. */
+export function isCodexSlug(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 200 && !/[\s\u0000-\u001f\u007f]/.test(value);
+}
+
+export function isCodexRuntimeModelId(id: unknown): id is string {
+  return typeof id === "string" && id.startsWith(CODEX_MODEL_PREFIX);
+}
+
+/** Id for a discovered Codex slug that has no static catalogue entry. */
+export function buildCodexRuntimeModelId(slug: string): string {
+  return `${CODEX_MODEL_PREFIX}${encodeURIComponent(slug)}`;
+}
+
+/**
+ * Parsed `codex-model:<slug>` or legacy `codex-model:<slug>:<effort>`.
+ * `effort` is the raw (unvalidated) PR #230 suffix, or null.
+ */
+export interface CodexRuntimeModelRef {
+  slug: string;
+  effort: string | null;
+}
+
+export function parseCodexRuntimeModelId(id: unknown): CodexRuntimeModelRef | null {
+  if (!isCodexRuntimeModelId(id)) return null;
+  const parts = id.slice(CODEX_MODEL_PREFIX.length).split(":");
+  if (parts.length < 1 || parts.length > 2) return null;
+  const [encoded = "", effort] = parts;
+  let slug: string;
+  try {
+    slug = decodeURIComponent(encoded);
+  } catch {
+    return null;
+  }
+  if (!isCodexSlug(slug)) return null;
+  return { slug, effort: effort ? effort : null };
 }
