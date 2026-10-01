@@ -1,0 +1,21 @@
+electron/ipc/agent.ts
+  s_d0fb9aefa2e5fb::t_8fb3aba384814a 1-60,62-82
+electron/app/agent-runtimes.ts
+  s_d0fb9aefa2e5fb::t_847f38dae128e8 1-21,23,26,28-102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "13b64a751847525bc2008c628ce6fc9507c29ae5",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
