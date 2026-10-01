@@ -29,13 +29,18 @@ guard at boundaries (see `isPersistedAppState`, `isAgentStreamPayload`).
    (named-tuple `args` in the order the preload passes them, and the exact
    `result` the handler resolves to). Put new domain types in the matching
    `shared/<domain>/types.ts`.
-2. **Preload** — expose it in `electron/preload.ts` (or `preload-pm.ts`) and
-   add the method to `RaylineApi` / `GithubApi` in `ipc/renderer-api.ts`.
-   Prefer `Invoker<"channel">` / `Sender<"channel">` /
-   `EventSubscriber<"channel">` so the signature follows the contract.
-3. **Handler** — implement it in `electron/main.ts` with `ipcMain.handle`
-   (or `ipcMain.on` / `webContents.send`), typed with `InvokeHandler<"channel">`
-   or `InvokeArgs` / `InvokeResult`.
+2. **Preload** — add the method to `RaylineApi` / `GithubApi` in
+   `ipc/renderer-api.ts` (prefer `Invoker<"channel">` / `Sender<"channel">` /
+   `EventSubscriber<"channel">`) and expose it in `electron/preload.ts` (or
+   `preload-pm.ts`) with the `invoker` / `sender` / `subscriber` helpers from
+   `electron/preload/ipc.ts`; the exposed object is checked with
+   `satisfies RaylineApi` / `satisfies GithubApi`.
+3. **Handler** — register it in the domain module under `electron/ipc/`
+   with the typed helpers from `electron/ipc/typed.ts` (`handle`, `on`,
+   `onSync`, `sendTo`, `broadcast`), which check names, argument tuples and
+   results against the contract. Return literal results with `as const`
+   (`{ success: true as const }`) — TypeScript widens them in generic
+   handler callbacks.
 
 The renderer then calls `window.api.<method>` and gets the typed result.
 
