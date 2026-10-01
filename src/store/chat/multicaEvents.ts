@@ -1,7 +1,7 @@
 /** Multica WebSocket frames (`multica:<ws type>`) applied to a draft. */
 import { getMulticaInnerType, type MulticaStreamEvent, type MulticaWsPayload } from "@shared/agent/events";
 import type { AssistantMessage, MessagePart, ToolPart } from "@shared/chat/types";
-import { editLastAssistant, freezeElapsed } from "./assistant";
+import { buildErrorPart, editLastAssistant, freezeElapsed } from "./assistant";
 import type { ConversationDraft } from "./draft";
 import { uid } from "./ids";
 
@@ -15,7 +15,7 @@ export function mapMulticaTaskMessage(payload: MulticaWsPayload): MessagePart | 
     case "tool_result":
       return { type: "tool", id: `mt${uid()}`, name: payload.tool ?? "tool", args: {}, result: payload.output || "", status: "done" };
     case "error":
-      return { type: "text", text: `_${payload.content || "error"}_` };
+      return buildErrorPart(payload.content || "error", "Multica error");
     default:
       return null;
   }
@@ -92,7 +92,7 @@ export function applyMulticaEvent(draft: ConversationDraft, event: MulticaStream
     case "task:failed":
     case "error": {
       const message = editLastAssistant(draft);
-      draft.editParts(message).push(draft.own({ type: "text", text: `_Multica ${inner}: ${payload.message || payload.reason || ""}_` }));
+      draft.editParts(message).push(draft.own(buildErrorPart(payload.message || payload.reason || inner, `Multica ${inner}`)));
       stopAssistant(message);
       markConnected();
       draft.set("isStreaming", false);

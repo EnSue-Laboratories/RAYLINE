@@ -1,5 +1,5 @@
 import type { ClaudeContentBlock, CodexResponseContentItem } from "@shared/agent/events";
-import type { AssistantMessage, ChatMessage, ImagePart, MessagePart, StreamState, TextPart, ToolPart } from "@shared/chat/types";
+import type { AssistantMessage, ChatMessage, ErrorPart, ImagePart, MessagePart, StreamState, ToolPart } from "@shared/chat/types";
 import { type ConversationDraft, createStreamState } from "./draft";
 import { uid } from "./ids";
 
@@ -94,12 +94,34 @@ export function finalizedCopy(message: ChatMessage): ChatMessage {
   return copy;
 }
 
-export function errorTextPart(error: string): TextPart {
-  return { type: "text", text: `**Error:** ${error}` };
+/** Collapsible error part; the summary is the first non-empty line (PR #230). */
+export function buildErrorPart(error: string, title = "Error"): ErrorPart {
+  const text = error || "An error occurred.";
+  const summary = text.split("\n").map((line) => line.trim()).find(Boolean) || title;
+  return { type: "error", title, summary, text };
 }
 
 export function partStreamKey(part: MessagePart): string | undefined {
-  return part.type === "status" ? undefined : part._streamKey;
+  return part.type === "status" || part.type === "error" ? undefined : part._streamKey;
+}
+
+/**
+ * Delta streams (Grok / AGY) may split words across events: append to the
+ * last part when it has the same kind, otherwise start a new part. A tool or
+ * reasoning boundary is never crossed. Mutates the owned message (PR #230).
+ */
+export function appendAdjacentText(draft: ConversationDraft, message: AssistantMessage, type: "text" | "thinking", text: string): void {
+  if (!text) return;
+  const parts = message.parts ?? [];
+  const lastIndex = parts.length - 1;
+  if (parts[lastIndex]?.type === type) {
+    const last = draft.editPart(message, lastIndex);
+    if (last && (last.type === "text" || last.type === "thinking")) {
+      last.text += text;
+      return;
+    }
+  }
+  draft.editParts(message).push(draft.own({ type, text }));
 }
 
 /** Index of the part with `streamKey` and `type`; searched from the end (active blocks are recent). */

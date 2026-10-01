@@ -5,7 +5,7 @@
  */
 import type { AgentDonePayload, AgentErrorPayload, AgentStreamPayload, RateLimits, TokenUsage } from "@shared/agent/events";
 import type { ChatMessage, LoadedSession } from "@shared/chat/types";
-import { editTrailingAssistant, errorTextPart, finalizeAssistant, findLatestAssistantIndex } from "./assistant";
+import { buildErrorPart, editTrailingAssistant, finalizeAssistant, findLatestAssistantIndex } from "./assistant";
 import { applyStreamPayloads, clearPendingStart, finalizeAll } from "./actions";
 import { isImmediateFlushEvent } from "./applyStreamEvent";
 import { conversationsStore, updateConversations } from "./store";
@@ -83,6 +83,12 @@ export function handleAgentDone(buffer: StreamBuffer<AgentStreamPayload> | null,
     const latest = entry.messages[findLatestAssistantIndex(entry.messages)];
     if (latest?.role === "assistant" && codexThreadId && (!latest._usage || !latest._rateLimits)) needsUsageHydration = true;
     if (codexThreadId) entry.set("_codexThreadId", codexThreadId);
+    // Grok / AGY / OpenCode report their native session id on exit (PR #230).
+    if (typeof threadId === "string" && threadId) {
+      if (provider === "grok") entry.set("_grokSessionId", threadId);
+      else if (provider === "agy") entry.set("_agySessionId", threadId);
+      else if (provider === "opencode") entry.set("_opencodeSessionId", threadId);
+    }
     entry.set("isStreaming", false);
   });
   if (needsUsageHydration && codexThreadId && typeof window.api?.loadSession === "function") scheduleUsageHydration(conversationId, codexThreadId);
@@ -100,7 +106,7 @@ export function handleAgentError(buffer: StreamBuffer<AgentStreamPayload> | null
     const convo = draft.conversation(conversationId, () => ({ messages: [], isStreaming: false, error: null }));
     const message = editTrailingAssistant(convo);
     if (message) {
-      convo.editParts(message).push(convo.own(errorTextPart(error)));
+      convo.editParts(message).push(convo.own(buildErrorPart(error)));
       finalizeAssistant(message);
     }
     convo.set("error", error);

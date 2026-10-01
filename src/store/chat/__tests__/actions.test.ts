@@ -151,7 +151,23 @@ describe("agent-done / agent-error", () => {
     handleAgentError(null, { conversationId: "c1", error: "crashed" });
     const data = getConversation("c1");
     expect(data).toMatchObject({ error: "crashed", isStreaming: false, _codexThreadId: "th", _claudeSessionId: "s", multicaConnected: true });
-    expect(data.messages[1]).toMatchObject({ isStreaming: false, parts: [{ type: "text", text: "**Error:** crashed" }] });
+    expect(data.messages[1]).toMatchObject({ isStreaming: false, parts: [{ type: "error", title: "Error", summary: "crashed", text: "crashed" }] });
+  });
+
+  it("done stores Grok / AGY / OpenCode native ids from threadId", () => {
+    resetConversationsStoreForTests(new Map([["c1", convo([user, assistant()])]]));
+    handleAgentDone(null, { conversationId: "c1", provider: "grok", threadId: "g-9" });
+    expect(getConversation("c1")._grokSessionId).toBe("g-9");
+    handleAgentDone(null, { conversationId: "c1", provider: "agy", threadId: "a-9" });
+    expect(getConversation("c1")._agySessionId).toBe("a-9");
+    handleAgentDone(null, { conversationId: "c1", provider: "opencode", threadId: "o-9" });
+    expect(getConversation("c1")._opencodeSessionId).toBe("o-9");
+  });
+
+  it("startPreparedMessage forwards grokContinue", () => {
+    const pendingId = prepareMessage({ conversationId: "c1", prompt: "x" });
+    startPreparedMessage({ conversationId: "c1", pendingId, prompt: "x", provider: "grok", grokContinue: true });
+    expect(api.agentStart).toHaveBeenCalledWith(expect.objectContaining({ provider: "grok", grokContinue: true }));
   });
 
   it("error on an unknown conversation creates an idle entry with the error", () => {

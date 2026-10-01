@@ -19,7 +19,7 @@ import {
   cloneStreamState,
   editLastAssistant,
   editTrailingAssistant,
-  errorTextPart,
+  buildErrorPart,
   finalizeAssistant,
   findPartIndexByStreamKey,
   findToolPartIndex,
@@ -264,7 +264,7 @@ export function applyClaudeResult(draft: ConversationDraft, event: ClaudeResultE
     // window fullness — so `_usage` is left alone.
     if (event.is_error || event.subtype === "error_during_execution") {
       const errorText = event.result || event.error || (event.errors && event.errors.length > 0 ? event.errors.join("\n") : null) || "An error occurred.";
-      draft.editParts(message).push(draft.own(errorTextPart(errorText)));
+      draft.editParts(message).push(draft.own(buildErrorPart(errorText)));
     } else if (event.terminal_reason === "hook_stopped") {
       const parts = draft.editParts(message);
       if (!parts.some((part) => part.type === "status" && part.kind === "paused")) {

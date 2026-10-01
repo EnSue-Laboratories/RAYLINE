@@ -131,7 +131,7 @@ describe("Claude assistant / user / result / system", () => {
 
   it("error results append an error part", () => {
     const { result } = run(convo([user, assistant()]), { type: "result", subtype: "error_during_execution", is_error: true, errors: ["a", "b"] });
-    expect(parts(result)).toEqual([{ type: "text", text: "**Error:** a\nb" }]);
+    expect(parts(result)).toEqual([{ type: "error", title: "Error", summary: "a", text: "a\nb" }]);
   });
 
   it("hook_stopped adds a single paused status", () => {

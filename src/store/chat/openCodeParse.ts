@@ -138,7 +138,7 @@ export function splitOpenCodeTextAndThinkingParts(event: OpenCodeTextEvent | Ope
 }
 
 function partTime(part: MessagePart): number {
-  const time = part.type === "status" ? undefined : part._opencodeTime;
+  const time = part.type === "status" || part.type === "error" ? undefined : part._opencodeTime;
   return isFiniteNumber(time) ? time : Number.POSITIVE_INFINITY;
 }
 

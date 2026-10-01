@@ -138,7 +138,18 @@ export interface StatusPart {
   text?: string;
 }
 
-export type MessagePart = TextPart | ThinkingPart | ToolPart | ImagePart | StatusPart;
+/**
+ * Run / provider error shown as a collapsible block (PR #230). `summary` is
+ * the first non-empty line of `text`.
+ */
+export interface ErrorPart {
+  type: "error";
+  title: string;
+  summary: string;
+  text: string;
+}
+
+export type MessagePart = TextPart | ThinkingPart | ToolPart | ImagePart | StatusPart | ErrorPart;
 export type MessagePartType = MessagePart["type"];
 
 // ── AskUserQuestion (rendered from a ToolPart named "AskUserQuestion") ──────

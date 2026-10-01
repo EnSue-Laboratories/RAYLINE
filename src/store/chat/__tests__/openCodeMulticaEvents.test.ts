@@ -54,10 +54,45 @@ describe("OpenCode events", () => {
 
   it("error (OpenCode and Codex share the type) appends an error and stops", () => {
     const { result } = run(convo([user]), { type: "error", error: { data: { message: "quota" } } });
-    expect(parts(result)).toEqual([{ type: "text", text: "**Error:** quota" }]);
+    expect(parts(result)).toEqual([{ type: "error", title: "OpenCode error", summary: "quota", text: "quota" }]);
     expect(result?.isStreaming).toBe(false);
     const codex = run(convo([user]), { type: "error", message: "auth failed" }).result;
-    expect(parts(codex)).toEqual([{ type: "text", text: "**Error:** auth failed" }]);
+    expect(parts(codex)).toEqual([{ type: "error", title: "OpenCode error", summary: "auth failed", text: "auth failed" }]);
+  });
+});
+
+describe("Grok / AGY (OpenCode-shaped, provider-tagged) events", () => {
+  it("merges adjacent text / reasoning deltas without crossing tool or reasoning boundaries", () => {
+    const base = convo([user, assistant([{ type: "text", text: "你" }])]);
+    const baseParts = lastAssistant(base).parts;
+    const { result } = run(
+      base,
+      { type: "text", provider: "grok", text: "好" },
+      { type: "tool_use", provider: "grok", callID: "t1", tool: "read", input: { filePath: "/a" } },
+      { type: "text", provider: "grok", text: "after " },
+      { type: "text", provider: "grok", text: "tool" },
+      { type: "reasoning", provider: "grok", reasoning: "reason" },
+      { type: "reasoning", provider: "grok", reasoning: "ing" },
+      { type: "text", provider: "grok", text: "" },
+    );
+    expect(parts(result).map((p) => [p.type, p.type === "text" || p.type === "thinking" ? p.text : p.type === "tool" ? p.name : ""])).toEqual([
+      ["text", "你好"],
+      ["tool", "Read"],
+      ["text", "after tool"],
+      ["thinking", "reasoning"],
+    ]);
+    expect(lastAssistant(result).isThinking).toBe(true);
+    // The committed base part is untouched (copy-on-write).
+    expect(baseParts).toEqual([{ type: "text", text: "你" }]);
+  });
+
+  it("stores the native session id under the provider's key and labels errors", () => {
+    const grok = run(convo([user]), { type: "step_start", provider: "grok", sessionId: "g-1" }).result;
+    expect(grok?._grokSessionId).toBe("g-1");
+    expect(grok?._opencodeSessionId).toBeUndefined();
+    const agy = run(convo([user]), { type: "error", provider: "agy", session_id: "a-1", message: "first line\nsecond" }).result;
+    expect(agy?._agySessionId).toBe("a-1");
+    expect(parts(agy)).toEqual([{ type: "error", title: "Antigravity error", summary: "first line", text: "first line\nsecond" }]);
   });
 });
 
@@ -84,11 +119,13 @@ describe("Multica events", () => {
       { type: "multica:task:message", payload: { type: "tool_result", tool: "Read", output: "body" } },
       { type: "multica:task:message", payload: { type: "tool_result", tool: "Grep", output: "orphan" } },
       { type: "multica:task:message", payload: { type: "unknown" } },
+      { type: "multica:task:message", payload: { type: "error", content: "tool crashed" } },
     );
     expect(parts(result)).toEqual([
       { type: "text", text: "hello" },
       expect.objectContaining({ type: "tool", name: "Read", args: { path: "a" }, result: "body", status: "done" }),
       expect.objectContaining({ type: "tool", name: "Grep", result: "orphan", status: "done" }),
+      { type: "error", title: "Multica error", summary: "tool crashed", text: "tool crashed" },
     ]);
     expect(result?.isStreaming).toBe(true);
   });
@@ -101,7 +138,7 @@ describe("Multica events", () => {
     expect(cancelled).toMatchObject({ isStreaming: false, error: null });
     const failed = run(base, { type: "multica:task:failed", payload: { reason: "boom" } }).result;
     expect(failed).toMatchObject({ isStreaming: false, error: "task:failed" });
-    expect(parts(failed)).toEqual([{ type: "text", text: "_Multica task:failed: boom_" }]);
+    expect(parts(failed)).toEqual([{ type: "error", title: "Multica task:failed", summary: "boom", text: "boom" }]);
   });
 });
 
