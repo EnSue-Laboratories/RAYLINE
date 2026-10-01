@@ -1,12 +1,9 @@
-/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useMemo } from "react";
-import { multicaAgentToModel, type ModelDefinition, type MulticaModelDefinition } from "@shared/models";
+import { multicaAgentToModel, type MulticaModelDefinition } from "@shared/models";
 import type { MulticaStoreState } from "@shared/providers/types";
 import { createStore, useStore, type Store } from "../store/createStore";
 import { getMulticaStore, isMulticaConfigured, loadMulticaState, normalizeMulticaAgents, saveMulticaState } from "../multica/store";
-import { useOpenCodeModels } from "./openCodeModels";
 import { createRefresher } from "./createRefresher";
-import ModelPicker from "../components/ModelPicker";
 
 export { multicaAgentToModel } from "@shared/models";
 
@@ -125,32 +122,5 @@ export function useMulticaModels(): UseMulticaModelsResult {
   return useMemo(
     () => ({ models, loading, error, refresh: refreshMulticaModels, state }),
     [models, loading, error, state],
-  );
-}
-
-const NO_MODELS: readonly ModelDefinition[] = [];
-
-export interface ModelPickerWithMulticaProps {
-  /** Selected model id. */
-  value: string;
-  onChange: (modelId: string) => void;
-  extraModels?: readonly ModelDefinition[];
-}
-
-export function ModelPickerWithMultica({ value, onChange, extraModels = NO_MODELS }: ModelPickerWithMulticaProps) {
-  const { models, error, loading } = useMulticaModels();
-  const { models: openCodeModels } = useOpenCodeModels();
-  const allExtraModels = useMemo(
-    () => [...extraModels, ...openCodeModels, ...models],
-    [extraModels, openCodeModels, models],
-  );
-  return (
-    <ModelPicker
-      value={value}
-      onChange={onChange}
-      extraModels={allExtraModels}
-      extraError={error}
-      extraLoading={loading}
-    />
   );
 }

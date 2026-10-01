@@ -5,7 +5,7 @@
  * Codex exec --json, OpenCode run/serve JSON, Multica WS frames), Grok / AGY
  * events normalized into the OpenCode shapes (`provider: "grok" | "agy"`), plus a few
  * RayLine-synthesized events. `AgentStreamEvent` is the discriminated union of
- * all of them, keyed by `type`; the renderer reducer (src/hooks/useAgent)
+ * all of them, keyed by `type`; the renderer reducer (src/store/chat)
  * switches on it.
  *
  * Note: Codex and OpenCode both emit `{ type: "error" }`; narrowing on

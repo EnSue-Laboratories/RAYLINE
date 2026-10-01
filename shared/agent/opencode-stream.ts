@@ -7,7 +7,7 @@
  * Non-JSON stdout lines become a synthetic `opencode_stdout` event.
  *
  * OpenCode's schema is not versioned; every field beyond `type` is optional
- * and consumers probe several spellings (see useAgent `extractOpenCode*`).
+ * and consumers probe several spellings (see src/store/chat/openCodeParse `extractOpenCode*`).
  *
  * The Grok and Antigravity adapters (electron/grok-agent-manager,
  * electron/agy-agent-manager) normalize their CLIs' output into these same

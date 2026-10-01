@@ -8,6 +8,7 @@ import { useLocaleTranslator } from "./sidebar/useLocaleTranslator";
 import DraftsSection from "./sidebar/DraftsSection";
 import {
   applyCollapsedOverrides,
+  excludeHiddenProjectRows,
   formatCwdShort,
   groupConvosByProject,
   isProjectGroupListed,
@@ -100,7 +101,13 @@ function Sidebar({
   const [stabilizeRows] = useState(() => createArrayStabilizer<SidebarConversation>());
   const rows = useMemo(() => stabilizeRows(convos), [convos, stabilizeRows]);
 
-  const searchState = useSidebarSearch(rows, search);
+  // Hidden projects never render, so keep them out of search (hit count and
+  // transcript loading) entirely.
+  const searchableRows = useMemo(
+    () => excludeHiddenProjectRows(rows, projects, draftsPath),
+    [draftsPath, projects, rows],
+  );
+  const searchState = useSidebarSearch(searchableRows, search);
   const searchActive = searchState.active;
   const visibleConvos = searchActive ? searchState.results : rows;
 

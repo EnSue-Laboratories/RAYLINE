@@ -77,7 +77,7 @@ jobs:
           else
             PUBLISH_FLAG="never"
           fi
-          npx electron-builder --config electron-builder.config.cjs --win \
+          npx electron-builder --config electron-builder.config.ts --win \
             --publish "$PUBLISH_FLAG" \
             --config.npmRebuild=false
 
@@ -99,7 +99,7 @@ jobs:
           else
             PUBLISH_FLAG="never"
           fi
-          npx electron-builder --config electron-builder.config.cjs --mac \
+          npx electron-builder --config electron-builder.config.ts --mac \
             --publish "$PUBLISH_FLAG"
 
       - name: Collect packaged files
@@ -189,7 +189,7 @@ jobs:
           else
             PUBLISH_FLAG="never"
           fi
-          npx electron-builder --config electron-builder.config.cjs --linux deb rpm AppImage tar.gz \
+          npx electron-builder --config electron-builder.config.ts --linux deb rpm AppImage tar.gz \
             --publish "$PUBLISH_FLAG"
 
       - name: Collect packaged files
@@ -259,7 +259,7 @@ jobs:
         run: npm run build
 
       - name: Build app (unpacked)
-        run: npx electron-builder --config electron-builder.config.cjs --linux dir
+        run: npx electron-builder --config electron-builder.config.ts --linux dir
 
       - name: Prepare PKGBUILD sources
         shell: bash

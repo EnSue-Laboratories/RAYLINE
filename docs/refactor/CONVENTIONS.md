@@ -1,16 +1,21 @@
-# TypeScript migration conventions
+# TypeScript conventions
 
-The `refactor/typescript` branch is the integration branch. Every source file
-already has its final extension (`.ts` / `.tsx`) and starts with
-`// @ts-nocheck`. A file is **converted** when that header is gone and the file
-passes `npm run typecheck` and `npm run lint:ts` with zero errors and zero warnings.
+The strict-TypeScript migration is complete: every source file in `src/`,
+`electron/`, `shared/` and `scripts/`, plus the tool configs
+(`vite.config.ts`, `eslint.config.ts`, `electron-builder.config.ts`), is
+TypeScript, and `allowJs` is off. The rules below started as migration
+guidelines and are now permanent repo conventions.
 
-Progress: `npm run ts:progress`.
+Every change must pass `npm run typecheck`, `npm run lint` (the whole repo,
+zero errors and zero warnings), `npm test` and `npm run build`. CI runs all
+four.
 
 ## Hard rules
 
-- No `any`, `as any`, `@ts-ignore`, or new `@ts-nocheck`. `@ts-expect-error` only
+- No `any`, `as any`, or `@ts-ignore`, and no file-wide type-check opt-outs. `@ts-expect-error` only
   with a description, and only for genuine upstream typing bugs.
+- No new JavaScript files. `as unknown as` and `eslint-disable` need a
+  comment saying why.
 - Every IPC boundary goes through `shared/ipc/contract.ts`. Don't hand-write
   channel names or payload shapes anywhere else. To add or change a channel, edit
   the contract first, then the preload, then the handler.
@@ -21,18 +26,17 @@ Progress: `npm run ts:progress`.
   `.ts` files. In Electron code, import Node built-ins as `node:fs`, `node:path`,
   and so on.
 - Import specifiers are extensionless (`./foo`, not `./foo.ts`). Use the
-  `@shared/...` alias for shared code.
-- Don't change runtime behavior unless you're fixing a clear bug, and list every
-  behavior change in your PR description.
+  `@shared/...` alias for shared code. Exception: `scripts/` run directly on
+  Node's type stripping and import each other with explicit `.ts` extensions.
+- Refactors don't change runtime behavior. List every behavior change (bug
+  fixes included) in the PR description.
 
 ## Splitting & decoupling
 
 - Aim for files under ~400 lines. A file over 600 lines needs a reason.
-- Keep the original file path as the module's **public entry**. Other packages
-  import it, and moving entries happens in a later pass. Put extracted pieces in
-  a sibling folder you own, for example
-  `src/components/settings/AppearanceSection.tsx` or
-  `electron/ipc/git.ts`.
+- When splitting a module, keep its file path as the **public entry** and put
+  the extracted pieces in a sibling folder, for example
+  `src/components/settings/AppearanceSection.tsx` or `electron/ipc/git.ts`.
 - Separate concerns:
   - pure logic (parsers, reducers, formatters) goes into `*.ts` modules with no React and no Electron
   - side effects go into hooks or services
@@ -42,21 +46,16 @@ Progress: `npm run ts:progress`.
 - Prefer discriminated unions with exhaustive `switch` statements (a `never`
   check at the end) over stringly-typed `if` chains.
 
-## Ownership
+## Shared types
 
-You own only the files listed in your work package. If you must touch a file
-you don't own (for example, a one-line import fix), keep it minimal and call it
-out in the PR. Never convert or reformat files outside your package.
+If a type in `shared/` is wrong or missing, fix it in `shared/` rather than
+working around it locally. Prefer additive changes (optional fields, new
+types); a rename touches every runtime, so call it out in the PR.
 
-If a shared type in `shared/` is wrong or missing, fix it in `shared/` with a
-minimal additive change: add optional fields or new types, and don't rename
-existing ones. Mention it in the PR.
+## PR checklist
 
-## Done checklist (per PR)
-
-1. `npm run typecheck`, `npm run lint:ts`, and `npm run build` all pass.
-2. None of your files contains `@ts-nocheck`, and none contains `any`
-   (`grep -nE "\bany\b"`).
-3. The PR targets `refactor/typescript`. The description lists the files
-   converted, the splits made, any behavior changes, and any edits outside your
-   ownership.
+1. `npm run typecheck`, `npm run lint`, `npm test` and `npm run build` all pass.
+2. No `any` (`grep -nE "\bany\b"`), no unexplained `as unknown as` or
+   `eslint-disable`.
+3. The description lists any splits made, any behavior changes, and any
+   change to `shared/` types or the IPC contract.

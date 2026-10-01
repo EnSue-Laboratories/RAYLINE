@@ -15,6 +15,8 @@ import type { ConversationDraft } from "./draft";
 import { uid } from "./ids";
 
 export const CODEX_NOTICE_KIND = "notice";
+/** Stored title of a Codex notice; the renderer shows `chat.noticeTitle` instead. */
+export const CODEX_NOTICE_TITLE = "Notice";
 
 type ItemPhase = "started" | "updated" | "completed";
 
@@ -111,7 +113,7 @@ function applyItem(draft: ConversationDraft, message: AssistantMessage, item: Co
       if (!item.message) return;
       const parts = draft.editParts(message);
       const duplicate = parts.some((part) => part.type === "status" && part.kind === CODEX_NOTICE_KIND && part.text === item.message);
-      if (!duplicate) parts.push(draft.own({ type: "status", kind: CODEX_NOTICE_KIND, title: "Notice", text: item.message }));
+      if (!duplicate) parts.push(draft.own({ type: "status", kind: CODEX_NOTICE_KIND, title: CODEX_NOTICE_TITLE, text: item.message }));
       return;
     }
     default: {

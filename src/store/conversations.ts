@@ -1,7 +1,7 @@
 /**
  * Conversations store — live per-conversation chat state (messages, stream
  * status, captured native session ids), replacing the `useState(Map)` that
- * used to live inside `useAgent()` at the App root.
+ * used to live inside a `useAgent()` hook at the App root.
  *
  * State: `{ byId: ReadonlyMap<conversationId, ConversationRuntime> }`.
  * Updates are copy-on-write: untouched conversations, messages and parts keep
@@ -10,9 +10,9 @@
  * Reading (components): `useMessageIds`, `useMessage`, `useConversationStatus`,
  * `useStreamingIds`, `useConversation`. Reading (handlers): `getConversation`.
  * Writing: the action functions below (stable identity, call from anywhere).
- * IPC: `connectAgentEvents()` (ref-counted; `useAgent()` calls it).
+ * IPC: `connectAgentEvents()` (ref-counted; `<AgentProvider>` calls it).
  */
-export { conversationsStore, getConversation, getLastCommitPriority, type CommitPriority } from "./chat/store";
+export { conversationsStore, getConversation } from "./chat/store";
 export { EMPTY_CONVERSATION, type ConversationRuntime, type ConversationsState } from "./chat/types";
 export {
   appendLocalMessages,
@@ -33,7 +33,6 @@ export { connectAgentEvents } from "./chat/agentBridge";
 export {
   useConversation,
   useConversationStatus,
-  useConversationsMap,
   useMessage,
   useMessageIds,
   useStreamingIds,

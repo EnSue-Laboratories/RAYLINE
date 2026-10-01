@@ -3,7 +3,7 @@
  * entries, persisted in app state), live per-conversation stream state, and
  * the request payloads the renderer sends to start / edit / cancel agent runs.
  *
- * Shapes are derived from src/hooks/useAgent, src/App (persistence +
+ * Shapes are derived from src/store/chat (the conversations store), src/App (persistence +
  * normalizeConversationState), src/components/Message & friends,
  * electron/session-reader and electron/agent-manager.
  */
@@ -190,7 +190,7 @@ export function getAskUserQuestionArgs(part: ToolPart): AskUserQuestionArgs | nu
 
 // ── Messages ────────────────────────────────────────────────────────────────
 
-/** Per-assistant-message Claude stream bookkeeping (useAgent). */
+/** Per-assistant-message Claude stream bookkeeping (conversations store). */
 export interface StreamState {
   currentTurn: number;
   seenIndexes: Record<number, boolean>;
@@ -254,7 +254,7 @@ export interface SystemMessage extends ChatMessageBase {
 export type ChatMessage = UserMessage | AssistantMessage | SystemMessage;
 export type ChatRole = ChatMessage["role"];
 
-// ── Live conversation state (useAgent) ──────────────────────────────────────
+// ── Live conversation state (conversations store) ───────────────────────────
 
 export interface ConversationData {
   messages: ChatMessage[];
@@ -389,7 +389,7 @@ export interface QueuedMessage {
 
 // ── Agent run requests (renderer → main) ────────────────────────────────────
 
-/** Payload of `agent-start` (useAgent `startPreparedMessage`). */
+/** Payload of `agent-start` (conversations store `startPreparedMessage`). */
 export interface AgentStartRequest {
   conversationId: string;
   prompt: string;

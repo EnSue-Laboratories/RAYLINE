@@ -8,7 +8,7 @@ export const queueStore = createStore<QueuedMessage[]>([]);
 
 /** Conversations whose run we already asked to stop so the queue can proceed. */
 export const queueInterruptRequested = new Set<string>();
-/** Guards the async preflight gap before useAgent flips `isStreaming`. */
+/** Guards the async preflight gap before the conversations store flips `isStreaming`. */
 export const sendInFlight = new Set<string>();
 
 export function getQueue(): QueuedMessage[] {

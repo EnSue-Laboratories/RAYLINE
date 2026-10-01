@@ -15,10 +15,10 @@ import { finalizedCopy, newAssistantMessage } from "./assistant";
 import { applyStreamEvent } from "./applyStreamEvent";
 import { uid } from "./ids";
 import { createLogger } from "../../utils/logger";
-import { type CommitPriority, getConversation, updateConversations } from "./store";
+import { getConversation, updateConversations } from "./store";
 import type { ConversationRuntime } from "./types";
 
-const log = createLogger("useAgent");
+const log = createLogger("useAgent"); // debug scope name kept for existing `rayline:debug` settings
 
 /** A message without an id yet (one is assigned on insert). */
 export type ChatMessageInput = ChatMessage extends infer M ? (M extends ChatMessage ? Omit<M, "id"> & { id?: string } : never) : never;
@@ -52,11 +52,11 @@ export function clearPendingStart(conversationId: string): void {
 // ── Stream ──────────────────────────────────────────────────────────────────
 
 /** Fold a batch of stream payloads into the store with ONE draft and ONE commit. */
-export function applyStreamPayloads(items: readonly AgentStreamPayload[], priority: CommitPriority = "urgent"): void {
+export function applyStreamPayloads(items: readonly AgentStreamPayload[]): void {
   if (items.length === 0) return;
   updateConversations((draft) => {
     for (const { conversationId, event } of items) applyStreamEvent(draft.conversation(conversationId), event);
-  }, priority);
+  });
 }
 
 // ── Sending ─────────────────────────────────────────────────────────────────

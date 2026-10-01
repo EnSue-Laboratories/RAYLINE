@@ -1,14 +1,20 @@
-const { execFileSync } = require("node:child_process");
+// electron-builder configuration. electron-builder (26+) loads `.ts` configs
+// through jiti, so this file is plain ESM TypeScript.
+import { execFileSync } from "node:child_process";
+import type { Configuration, MacConfiguration } from "electron-builder";
+
+const projectDir = import.meta.dirname;
 
 // Forks can publish to their own repository; packaged builds record where they
 // came from (surfaced to the renderer through the get-app-build IPC).
 const releaseRepository = process.env.RAYLINE_RELEASE_REPOSITORY || process.env.GITHUB_REPOSITORY || "EnSue-Laboratories/RAYLINE";
-if (!/^[\w.-]+\/[\w.-]+$/.test(releaseRepository)) throw new Error(`Invalid release repository: ${releaseRepository}`);
-const [releaseOwner, releaseRepo] = releaseRepository.split("/");
+const releaseMatch = /^([\w.-]+)\/([\w.-]+)$/.exec(releaseRepository);
+if (!releaseMatch) throw new Error(`Invalid release repository: ${releaseRepository}`);
+const [, releaseOwner = "", releaseRepo = ""] = releaseMatch;
 
-function readBuildCommit() {
+function readBuildCommit(): string | null {
   try {
-    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: __dirname, encoding: "utf8" }).trim();
+    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: projectDir, encoding: "utf8" }).trim();
   } catch {
     return null;
   }
@@ -16,16 +22,12 @@ function readBuildCommit() {
 
 const isCi = String(process.env.CI || "").toLowerCase() === "true";
 
-function normalizeMacIdentity(identity) {
+function normalizeMacIdentity(identity: string | null | undefined): string | null {
   if (!identity) return null;
-  return String(identity)
-    .replace(/^Developer ID Application:\s*/i, "")
-    .trim();
+  return identity.replace(/^Developer ID Application:\s*/i, "").trim();
 }
 
-const explicitCiMacIdentity = normalizeMacIdentity(
-  process.env.APPLE_SIGNING_IDENTITY || process.env.CSC_NAME || null
-);
+const explicitCiMacIdentity = normalizeMacIdentity(process.env.APPLE_SIGNING_IDENTITY || process.env.CSC_NAME || null);
 const hasCiMacCodesign = Boolean(process.env.CSC_LINK || explicitCiMacIdentity);
 const hasCiMacNotary =
   Boolean(process.env.APPLE_ID) &&
@@ -35,29 +37,27 @@ const hasCiMacNotary =
 const enableMacCodesign = !isCi || hasCiMacCodesign;
 const enableMacNotarize = !isCi || (hasCiMacCodesign && hasCiMacNotary);
 
-const mac = {
+function macSigning(): Partial<MacConfiguration> {
+  if (!enableMacCodesign) return { identity: null, hardenedRuntime: false };
+  return {
+    hardenedRuntime: true,
+    entitlements: "build/entitlements.mac.plist",
+    entitlementsInherit: "build/entitlements.mac.plist",
+    // CI can auto-discover the signing identity from CSC_LINK when present.
+    ...(!isCi || explicitCiMacIdentity ? { identity: explicitCiMacIdentity || "Yanfei Ding (55VR37C6LP)" } : {}),
+  };
+}
+
+const mac: MacConfiguration = {
   category: "public.app-category.developer-tools",
   icon: "public/icon.png",
   target: "dmg",
   gatekeeperAssess: false,
   notarize: enableMacNotarize,
+  ...macSigning(),
 };
 
-if (enableMacCodesign) {
-  mac.hardenedRuntime = true;
-  mac.entitlements = "build/entitlements.mac.plist";
-  mac.entitlementsInherit = "build/entitlements.mac.plist";
-
-  // CI can auto-discover the signing identity from CSC_LINK when present.
-  if (!isCi || explicitCiMacIdentity) {
-    mac.identity = explicitCiMacIdentity || "Yanfei Ding (55VR37C6LP)";
-  }
-} else {
-  mac.identity = null;
-  mac.hardenedRuntime = false;
-}
-
-module.exports = {
+const config: Configuration = {
   appId: "com.ensue.rayline",
   productName: "RayLine",
   extraMetadata: {
@@ -121,3 +121,5 @@ module.exports = {
     output: "release",
   },
 };
+
+export default config;
