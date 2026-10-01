@@ -1,0 +1,27 @@
+src/components/dispatch/DispatchModelPicker.tsx
+  s_d0fb9aefa2e5fb::t_69c1f9682a4427 1-32
+src/components/dispatch/DispatchCard.tsx
+  s_d0fb9aefa2e5fb::t_c8645dfce315f7 1-104,108-293
+src/components/dispatch/IssueDropdown.tsx
+  s_d0fb9aefa2e5fb::t_bc269e46b65006 1-212
+src/components/dispatch/CustomRow.tsx
+  s_d0fb9aefa2e5fb::t_c80b1487497c5f 1-7,9-27,29-39,41-172
+src/components/dispatch/plan.ts
+  s_d0fb9aefa2e5fb::t_19d6d3ad34444e 1-196,198-260,262-314
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e1670c894b0959ef008044e6fd76ea8617119295",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
