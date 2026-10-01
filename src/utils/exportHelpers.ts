@@ -56,7 +56,8 @@ export type SerializedPart =
   | { type: "thinking"; text: string }
   | { type: "image"; src: string; alt: string; mime?: string; storagePath?: string; originalPath?: string }
   | { type: "status"; kind: string | null; title: string | null; text: string }
-  | { type: "tool"; id: string | null; name: string | null; input: unknown; output: unknown; status: string | null };
+  | { type: "tool"; id: string | null; name: string | null; input: unknown; output: unknown; status: string | null }
+  | { type: "error"; title: string; summary: string; text: string };
 
 function serializePart(part: MessagePart): SerializedPart {
   switch (part.type) {
@@ -84,6 +85,8 @@ function serializePart(part: MessagePart): SerializedPart {
         output: part.result ?? null,
         status: part.status || null,
       };
+    case "error":
+      return { type: "error", title: part.title, summary: part.summary, text: part.text };
     default: {
       const exhaustive: never = part;
       return exhaustive;
