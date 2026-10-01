@@ -1,0 +1,31 @@
+electron/services/checkpoint/__tests__/checkpoint.test.ts
+  s_d0fb9aefa2e5fb::t_029c43870c0544 1-66,68-114,116-118
+electron/services/checkpoint/paths.ts
+  s_d0fb9aefa2e5fb::t_4c0c1c934b3c61 1-84
+electron/services/checkpoint/worktree.ts
+  s_d0fb9aefa2e5fb::t_08606e839ebedb 1-141
+electron/services/checkpoint/checkpoints.ts
+  s_d0fb9aefa2e5fb::t_95ded139a4ea1e 1-159
+electron/checkpoint.ts
+  s_d0fb9aefa2e5fb::t_4e642d96ad8055 2-3,6-11
+electron/services/checkpoint/git.ts
+  s_d0fb9aefa2e5fb::t_c041c3c44f3c83 1-67
+electron/services/checkpoint/metadata.ts
+  s_d0fb9aefa2e5fb::t_e52299978de938 1-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6a7b9fe7fdfbd36a286980a64b5978b2c13bfe1a",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
