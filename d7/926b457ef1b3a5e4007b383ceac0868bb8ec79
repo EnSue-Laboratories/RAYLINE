@@ -1,0 +1,21 @@
+src/i18n/index.ts
+  s_d0fb9aefa2e5fb::t_ebdafd1caee52f 1-8,10-12,14-29,32-40,45,50-59,61-78
+src/contexts/ThemeContext.tsx
+  s_d0fb9aefa2e5fb::t_21d2c52511baaa 2-16,21-22,25,27,33-34,37,41-45,47-49,55,58-59,63,65,77,80-81,90,92,95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d7926b457ef1b3a5e4007b383ceac0868bb8ec79",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
