@@ -1,0 +1,19 @@
+src/components/chat/__tests__/chatLogic.test.ts
+  s_d0fb9aefa2e5fb::t_280d9fd9939a66 1-50,53-96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "db329db48fd6f524adc2a568c2122626bd77b7c0",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
