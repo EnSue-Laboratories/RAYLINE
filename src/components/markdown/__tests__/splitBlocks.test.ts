@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { hasHtml, hasMath, sanitizeText, splitControlBlocks, splitMarkdownBlocks } from "../splitBlocks";
 import { languageFromClassName, normalizeLanguage } from "../languages";
 import { selectPlugins } from "../plugins";
-import type { MathPlugins } from "../lazyModules";
+import type { HtmlPlugins, MathPlugins } from "../lazyModules";
 
 describe("splitMarkdownBlocks", () => {
   it("splits top-level blocks at blank lines", () => {
@@ -110,24 +110,25 @@ describe("text helpers", () => {
 });
 
 describe("selectPlugins", () => {
-  const math: MathPlugins = { remarkPlugins: [() => undefined], rehypePlugins: [() => undefined], rehypePluginsWithHtml: [() => undefined] };
+  const math: MathPlugins = { remarkPlugins: [() => undefined], rehypePlugins: [() => undefined] };
+  const html: HtmlPlugins = { rehypePlugins: [() => undefined] };
 
-  it("returns module-constant plugin sets per combination", () => {
-    expect(selectPlugins("assistant", false, null)).toBe(selectPlugins("assistant", false, null));
-    expect(selectPlugins("assistant", true, null)).toBe(selectPlugins("assistant", true, null));
-    expect(selectPlugins("assistant", true, math)).toBe(selectPlugins("assistant", true, math));
-    expect(selectPlugins("assistant", false, null)).not.toBe(selectPlugins("assistant", true, null));
-    expect(selectPlugins("assistant", false, null).rehypePlugins).toHaveLength(0);
+  it("returns one cached plugin set per combination", () => {
+    const plain = selectPlugins("assistant", null, null);
+    expect(plain.rehypePlugins).toHaveLength(0);
+    expect(selectPlugins("assistant", html, null)).toBe(selectPlugins("assistant", html, null));
+    expect(selectPlugins("assistant", null, math)).toBe(selectPlugins("assistant", null, math));
+    expect(selectPlugins("assistant", html, math)).toBe(selectPlugins("assistant", html, math));
+    expect(selectPlugins("assistant", html, null)).not.toBe(plain);
   });
 
   it("user bubbles only use GFM", () => {
-    expect(selectPlugins("user", true, math)).toBe(selectPlugins("assistant", false, null));
+    expect(selectPlugins("user", html, math)).toBe(selectPlugins("assistant", null, null));
   });
 
-  it("math sets append remark-math and KaTeX", () => {
-    const set = selectPlugins("assistant", false, math);
+  it("orders sanitize before KaTeX and appends remark-math", () => {
+    const set = selectPlugins("assistant", html, math);
     expect(set.remarkPlugins).toHaveLength(2);
-    expect(set.rehypePlugins).toBe(math.rehypePlugins);
-    expect(selectPlugins("assistant", true, math).rehypePlugins).toBe(math.rehypePluginsWithHtml);
+    expect(set.rehypePlugins).toEqual([...html.rehypePlugins, ...math.rehypePlugins]);
   });
 });

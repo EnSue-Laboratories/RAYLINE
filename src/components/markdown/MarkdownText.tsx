@@ -14,7 +14,7 @@ import { ValueControlBlock } from "../message/blocks";
 import type { MessageCallbacks } from "../message/types";
 import { MARKDOWN_COMPONENTS } from "./components";
 import { MarkdownRenderContext, type MarkdownRenderState } from "./context";
-import { mathModule, useLazyModule } from "./lazyModules";
+import { htmlModule, mathModule, useLazyModule } from "./lazyModules";
 import { type MarkdownVariant, selectPlugins } from "./plugins";
 import { hasHtml, hasMath, sanitizeText, splitControlBlocks, splitMarkdownBlocks } from "./splitBlocks";
 import { LARGE_TAIL_CHARS, useThrottledText } from "./useThrottledText";
@@ -26,9 +26,9 @@ interface MarkdownBlockProps extends MessageCallbacks {
 }
 
 const MarkdownBlock = memo(function MarkdownBlock({ text, variant, isStreaming, onAnswer, onControlChange, canControlTarget }: MarkdownBlockProps) {
-  const needsMath = variant === "assistant" && hasMath(text);
-  const math = useLazyModule(mathModule, needsMath);
-  const plugins = selectPlugins(variant, variant === "assistant" && hasHtml(text), math);
+  const math = useLazyModule(mathModule, variant === "assistant" && hasMath(text));
+  const html = useLazyModule(htmlModule, variant === "assistant" && hasHtml(text));
+  const plugins = selectPlugins(variant, html, math);
   const context = useMemo<MarkdownRenderState>(
     () => ({ isStreaming, onAnswer, onControlChange, canControlTarget }),
     [isStreaming, onAnswer, onControlChange, canControlTarget],

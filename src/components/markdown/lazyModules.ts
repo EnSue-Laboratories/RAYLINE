@@ -1,10 +1,10 @@
 /**
  * Heavy markdown dependencies loaded on first use (memoized import promises),
- * so neither Prism nor KaTeX is part of the startup bundle (PERF #7).
+ * so Prism, KaTeX and rehype-raw/parse5 stay out of the startup bundle
+ * (PERF #7). Until a module arrives the text renders without it.
  */
 import { useEffect, useSyncExternalStore } from "react";
 import type { PluggableList } from "unified";
-import { htmlRehypePlugins } from "./htmlPlugins";
 import type * as PrismLight from "./prismLight";
 
 export type PrismModule = typeof PrismLight;
@@ -12,8 +12,11 @@ export type PrismModule = typeof PrismLight;
 export interface MathPlugins {
   remarkPlugins: PluggableList;
   rehypePlugins: PluggableList;
-  /** Same, with rehype-raw + rehype-sanitize before KaTeX. */
-  rehypePluginsWithHtml: PluggableList;
+}
+
+/** rehype-raw (parse5) + rehype-sanitize, only needed when the text has HTML. */
+export interface HtmlPlugins {
+  rehypePlugins: PluggableList;
 }
 
 interface LazyModule<T> {
@@ -53,11 +56,12 @@ export const mathModule = lazyModule<MathPlugins>(async () => {
     import("rehype-katex"),
     import("katex/dist/katex.min.css"),
   ]);
-  return {
-    remarkPlugins: [remarkMath],
-    rehypePlugins: [rehypeKatex],
-    rehypePluginsWithHtml: [...htmlRehypePlugins, rehypeKatex],
-  };
+  return { remarkPlugins: [remarkMath], rehypePlugins: [rehypeKatex] };
+});
+
+export const htmlModule = lazyModule<HtmlPlugins>(async () => {
+  const { htmlRehypePlugins } = await import("./htmlPlugins");
+  return { rehypePlugins: htmlRehypePlugins };
 });
 
 /** The loaded module, or null while `needed` triggers (or awaits) its load. */

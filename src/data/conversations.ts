@@ -1,5 +1,16 @@
-// @ts-nocheck
-export const CONVOS_INIT = [
+import type { ChatMessage } from "@shared/chat/types";
+
+/** Static demo conversation (legacy dev fixture; not used by the app at runtime). */
+export interface DemoConversation {
+  id: string;
+  title: string;
+  model: string;
+  /** Display label ("2m", "Yesterday"), not an epoch. */
+  ts: string;
+  msgs: ChatMessage[];
+}
+
+export const CONVOS_INIT: DemoConversation[] = [
   {
     id: "1",
     title: "Refactoring the orchestration layer",
