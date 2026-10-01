@@ -1,38 +1,38 @@
-// @ts-nocheck
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Check, Download, X } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 import {
+  buildExportBaseFileName as buildBaseFileName,
   conversationToJson,
   conversationToMarkdown,
   copyText,
   downloadText,
-  sanitizeFileNamePart,
+  type ExportableConversation,
 } from "../utils/exportHelpers";
 
-function buildBaseFileName(convo) {
-  const title = sanitizeFileNamePart(convo?.title, "conversation").slice(0, 40);
-  const idPart = sanitizeFileNamePart(convo?.id, "export").slice(0, 12);
-  return `${title}-${idPart}`;
+type ExportStatus = "idle" | "success" | "error";
+
+export interface ExportConversationBtnProps {
+  convo: ExportableConversation | null | undefined;
+  title?: string;
 }
 
-export default function ExportConversationBtn({ convo, title = "Export conversation" }) {
+function ExportConversationBtn({ convo, title = "Export conversation" }: ExportConversationBtnProps) {
   const [open, setOpen] = useState(false);
-  const [status, setStatus] = useState("idle");
-  const rootRef = useRef(null);
-  const resetTimerRef = useRef(null);
-  useFontScale();
+  const [status, setStatus] = useState<ExportStatus>("idle");
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const resetTimerRef = useRef<number | null>(null);
 
   const messageCount = convo?.msgs?.length || 0;
   const canExport = messageCount > 0;
 
   useEffect(() => {
-    const handlePointerDown = (event) => {
-      if (rootRef.current && !rootRef.current.contains(event.target)) {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (rootRef.current && !(event.target instanceof Node && rootRef.current.contains(event.target))) {
         setOpen(false);
       }
     };
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
     document.addEventListener("mousedown", handlePointerDown);
@@ -171,7 +171,7 @@ export default function ExportConversationBtn({ convo, title = "Export conversat
             zIndex: 30,
           }}
         >
-          <MenuButton label="Clipboard" onClick={handleCopy} />
+          <MenuButton label="Clipboard" onClick={() => { void handleCopy(); }} />
           <MenuButton label="Markdown" onClick={handleDownloadMarkdown} />
           <MenuButton label="JSON" onClick={handleDownloadJson} />
         </div>
@@ -180,7 +180,13 @@ export default function ExportConversationBtn({ convo, title = "Export conversat
   );
 }
 
-function MenuButton({ label, onClick, disabled = false }) {
+interface MenuButtonProps {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}
+
+function MenuButton({ label, onClick, disabled = false }: MenuButtonProps) {
   const s = useFontScale();
   const [hovered, setHovered] = useState(false);
 
@@ -217,3 +223,5 @@ function MenuButton({ label, onClick, disabled = false }) {
     </button>
   );
 }
+
+export default memo(ExportConversationBtn);
