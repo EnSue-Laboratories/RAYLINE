@@ -1,1068 +1,104 @@
-// @ts-nocheck
-import { memo, useState, useRef, useCallback, useEffect, useMemo, useImperativeHandle } from "react";
-import { flushSync } from "react-dom";
+/**
+ * Chat pane (public entry). Pieces live in ./chat/: header, windowed
+ * transcript (store selectors), composer, scroll manager.
+ *
+ * Every handler from App is wrapped in a stable proxy before it reaches a
+ * memoized child, and the transcript reads messages from the conversations
+ * store by id, so a stream flush re-renders only the streaming message.
+ */
+import { type DragEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef } from "react";
+import { useTranslator } from "../contexts/LocaleContext";
+import { useStableCallback } from "../hooks/useStableCallback";
+import { isMulticaModelId } from "../data/models";
 import { createTranslator } from "../i18n";
-import { ArrowRight, ArrowDown, Square, Terminal as TerminalIcon } from "lucide-react";
-import Message from "./Message";
+import { useConversationStatus, useMessageIds } from "../store/conversations";
+import { getPaneSurfaceStyle } from "../utils/paneSurface";
+import type { ExportableConversation } from "../utils/exportHelpers";
+import { useGitStatus } from "./chat/boundary";
+import ChatComposer, { type ComposerHandle } from "./chat/ChatComposer";
+import ChatHeader from "./chat/ChatHeader";
+import ChatTranscript from "./chat/ChatTranscript";
+import { composerDraftScope } from "./chat/composerDraft";
+import { branchAttention, isDraftContext, shellLocationLabel } from "./chat/logic";
+import ScrollToBottomButton from "./chat/ScrollToBottomButton";
+import type { ChatAreaProps } from "./chat/types";
+import type { TabStripTab } from "./sidebar/tabStrip";
+import { useOptionalStableCallback } from "./chat/useOptionalStableCallback";
+import { useScrollManager } from "./chat/useScrollManager";
 import EmptyState from "./EmptyState";
-import NewChatCard from "./NewChatCard";
-import RuntimeSetupCard from "./RuntimeSetupCard";
-import { ModelPickerWithMultica } from "../data/multicaModels";
-import BranchSelector from "./BranchSelector";
-import GitStatusPill from "./GitStatusPill";
-import ImagePreview from "./ImagePreview";
 import SelectionToolbar from "./SelectionToolbar";
 import WindowDragSpacer from "./WindowDragSpacer";
-import ExportConversationBtn from "./ExportConversationBtn";
-import { useFontScale } from "../contexts/FontSizeContext";
-import { IS_MAC, SIDEBAR_CHROME_RAIL_LEFT, SIDEBAR_CHROME_RAIL_WIDTH } from "../windowChrome";
-import { getPaneSurfaceStyle } from "../utils/paneSurface";
-import { clipboardItemsToAttachments, dataTransferHasFiles, fileListToAttachments } from "../utils/attachments";
-import TabStrip from "./TabStrip";
-import useGitStatus from "../hooks/useGitStatus";
-import { isMulticaModelId } from "../data/models";
 
-const EMPTY_MESSAGES = [];
-const MemoBranchSelector = memo(BranchSelector);
-const MemoExportConversationBtn = memo(ExportConversationBtn);
-const MemoGitStatusPill = memo(GitStatusPill);
-const MemoImagePreview = memo(ImagePreview);
-const MemoModelPickerWithMultica = memo(ModelPickerWithMultica);
-const MemoSelectionToolbar = memo(SelectionToolbar);
-const MemoTabStrip = memo(TabStrip);
+export type { ChatAreaConversation, ChatAreaProps, ChatRuntimeSetup, PermissionResponseInput, SendHandler } from "./chat/types";
 
-function getMainRepoRoot(dir) {
-  if (!dir) return dir;
-  const wtIdx = dir.indexOf("/.worktrees/");
-  return wtIdx !== -1 ? dir.slice(0, wtIdx) : dir;
-}
+// Only shown on first run / for a new chat: keep them out of the startup bundle.
+const NewChatCard = lazy(() => import("./NewChatCard"));
+const RuntimeSetupCard = lazy(() => import("./RuntimeSetupCard"));
 
-function isDraftConversation(convo, draftsPath) {
-  if (!convo) return false;
-  if (convo.cwd == null) return true;
-  if (!draftsPath) return false;
-  return getMainRepoRoot(convo.cwd) === getMainRepoRoot(draftsPath);
-}
+const NO_TABS: readonly TabStripTab[] = [];
 
-const ChatTranscript = memo(function ChatTranscript({
-  showNewChatCard,
-  convo,
-  defaultModel,
-  defaultPrBranch,
-  newChatDefaultCwd,
-  allCwdRoots,
-  projects,
-  onPickFolder,
-  onCreateChat,
-  onCancelNewChat,
-  developerMode,
-  onEdit,
-  onAnswer,
-  onControlChange,
-  canControlTarget,
-  wallpaper,
-  messageBodyRef,
-  endRef,
-  runtimeSetup,
-  extraModels = [],
-}) {
-  const messages = convo?.msgs || EMPTY_MESSAGES;
-
-  if (runtimeSetup?.required) {
-    return (
-      <RuntimeSetupCard
-        state={runtimeSetup}
-        platform={runtimeSetup.platform}
-        onRunCommand={runtimeSetup.onRunCommand}
-        onRefresh={runtimeSetup.onRefresh}
-        onConfigureOpenCode={runtimeSetup.onConfigureOpenCode}
-      />
-    );
-  }
-
-  if (showNewChatCard) {
-    return (
-      <NewChatCard
-        defaultCwd={newChatDefaultCwd}
-        defaultModel={convo?.model || defaultModel}
-        defaultBranch={defaultPrBranch}
-        allCwdRoots={allCwdRoots}
-        projects={projects}
-        onPickFolder={onPickFolder}
-        onCreateChat={onCreateChat}
-        onCancel={onCancelNewChat}
-        developerMode={developerMode}
-        extraModels={extraModels}
-      />
-    );
-  }
-
-  if (!convo || messages.length === 0) {
-    return <EmptyState model={convo?.model || "sonnet"} />;
-  }
-
-  return (
-    <div ref={messageBodyRef} style={{ maxWidth: 640, width: "100%", margin: "0 auto", flex: 1 }}>
-      {messages.map((msg, index) => (
-        <Message
-          key={msg.id}
-          msg={msg}
-          messageIndex={index}
-          modelId={convo?.model || defaultModel}
-          canEdit={msg.role === "user" && msg.mode !== "shell-command"}
-          onEdit={onEdit}
-          onAnswer={onAnswer}
-          onControlChange={onControlChange}
-          canControlTarget={canControlTarget}
-          wallpaper={wallpaper}
-        />
-      ))}
-      <div ref={endRef} />
-    </div>
-  );
-});
-
-// Composer subtree (permission banners, queued messages, slash palette, image
-// preview, hints, the input box + send/cancel button, and the hint footer).
-//
-// This owns ALL the URGENT, keystroke-driven local state — `input`,
-// `attachments`, `inputFocused`, slash-command palette selection, drag-over,
-// and queued-message edit drafts — plus the textarea ref and autosize.
-//
-// It is wrapped in `memo` and takes only primitives / stable callbacks (NOT the
-// whole `convo`/`msgs`), so streaming-driven re-renders of the ChatArea body do
-// NOT re-render it. Conversely, typing only re-renders this component, never the
-// transcript, header, or scroll machinery in ChatArea.
-const ChatComposer = memo(function ChatComposer({
-  composerRef,
-  onSend,
-  onCancel,
-  isStreaming,
-  setupRequired,
-  shellLocation,
-  permissionRequests,
-  onRespondPermission,
-  queuedMessages,
-  onUpdateQueuedMessage,
-  onRemoveQueuedMessage,
-  isMulticaModel,
-  showNewChatCard,
-  branchNeedsAttention,
-  branchHintText,
-  convoId,
-  hasWallpaper,
-  t,
-  s,
-}) {
-  const [input, setInput] = useState("");
-  const [inputFocused, setInputFocused] = useState(false);
-  const [attachments, setAttachments] = useState([]);
-  const [editingQueueId, setEditingQueueId] = useState(null);
-  const [queueDraft, setQueueDraft] = useState("");
-  const [selectedCmd, setSelectedCmd] = useState(0);
-  const [dragOver, setDragOver] = useState(false);
-  const [branchHintDismissedFor, setBranchHintDismissedFor] = useState(null);
-
-  const inRef = useRef(null);
-  const queueEditRef = useRef(null);
-  const dragDepthRef = useRef(0);
-  const composingRef = useRef(false);
-
-  // Slash command suggestions (memoized so streaming/keystrokes don't rebuild
-  // the array; depends only on the translator).
-  const COMMANDS = useMemo(() => [
-    { cmd: "/clear", desc: t("chatArea.cmdClearDesc") },
-    { cmd: "/new", desc: t("chatArea.cmdClearDesc") },
-    { cmd: "/compact", desc: t("chatArea.cmdCompactDesc") },
-  ], [t]);
-
-  const showCommands = input.startsWith("/") && !input.includes(" ");
-  const filteredCommands = showCommands
-    ? COMMANDS.filter(c => c.cmd.startsWith(input.toLowerCase()))
-    : [];
-
-  const trimmedInput = input.trim();
-  const shellMode = trimmedInput.startsWith("!");
-  const canRunShell = shellMode && trimmedInput.length > 1;
-  const canSend = shellMode ? canRunShell : !setupRequired && (Boolean(trimmedInput) || attachments.length > 0);
-
-  const branchHintDismissed = Boolean(convoId && branchHintDismissedFor === convoId);
-  const showBranchHint = isMulticaModel && !showNewChatCard && branchNeedsAttention && !branchHintDismissed && !shellMode;
-
-  const send = useCallback(() => {
-    if (!canSend) return;
-    const nextInput = trimmedInput;
-    const nextAttachments = shellMode ? undefined : (attachments.length > 0 ? attachments : undefined);
-    flushSync(() => {
-      setInput("");
-      setAttachments([]);
-      setSelectedCmd(0);
-    });
-    if (inRef.current) inRef.current.style.height = "20px";
-    if (isMulticaModel && !shellMode) setBranchHintDismissedFor(convoId);
-    onSend(nextInput, nextAttachments);
-  }, [attachments, canSend, convoId, isMulticaModel, onSend, shellMode, trimmedInput]);
-
-  const handleInput = (e) => {
-    setInput(e.target.value);
-    const el = e.target;
-    el.style.height = "20px";
-    el.style.height = Math.min(el.scrollHeight, 120) + "px";
-  };
-
-  const handleKeyDown = (e) => {
-    const isComposing =
-      composingRef.current
-      || e.nativeEvent?.isComposing
-      || e.isComposing
-      || e.keyCode === 229;
-    if (isComposing) return;
-
-    // Command palette navigation
-    if (filteredCommands.length > 0) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedCmd((p) => Math.min(p + 1, filteredCommands.length - 1));
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedCmd((p) => Math.max(p - 1, 0));
-        return;
-      }
-      if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
-        e.preventDefault();
-        setInput(filteredCommands[selectedCmd].cmd + " ");
-        setSelectedCmd(0);
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setInput("");
-        setSelectedCmd(0);
-        return;
-      }
-    }
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
-  };
-
-  const handlePaste = useCallback((e) => {
-    const items = Array.from(e.clipboardData?.items || []);
-    if (!items.some((item) => item?.kind === "file")) return;
-
-    e.preventDefault();
-    void clipboardItemsToAttachments(items).then((nextAttachments) => {
-      if (nextAttachments.length === 0) return;
-      setAttachments((prev) => [...prev, ...nextAttachments]);
-    });
-  }, []);
-
-  const resetDragState = useCallback(() => {
-    dragDepthRef.current = 0;
-    setDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback((e) => {
-    if (!dataTransferHasFiles(e.dataTransfer)) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    resetDragState();
-
-    void fileListToAttachments(e.dataTransfer?.files).then((nextAttachments) => {
-      if (nextAttachments.length === 0) return;
-      setAttachments((prev) => [...prev, ...nextAttachments]);
-    });
-  }, [resetDragState]);
-
-  const handleDragEnter = useCallback((e) => {
-    if (!dataTransferHasFiles(e.dataTransfer)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    dragDepthRef.current += 1;
-    setDragOver(true);
-  }, []);
-
-  const handleDragOver = useCallback((e) => {
-    if (!dataTransferHasFiles(e.dataTransfer)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (!dragOver) setDragOver(true);
-  }, [dragOver]);
-
-  const handleDragLeave = useCallback((e) => {
-    if (!dataTransferHasFiles(e.dataTransfer)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-    if (dragDepthRef.current === 0) setDragOver(false);
-  }, []);
-
-  useEffect(() => {
-    const handleWindowDrop = () => resetDragState();
-    const handleWindowDragEnd = () => resetDragState();
-
-    window.addEventListener("drop", handleWindowDrop);
-    window.addEventListener("dragend", handleWindowDragEnd);
-
-    return () => {
-      window.removeEventListener("drop", handleWindowDrop);
-      window.removeEventListener("dragend", handleWindowDragEnd);
-    };
-  }, [resetDragState]);
-
-  const removeAttachment = useCallback((index) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const startQueuedEdit = useCallback((item) => {
-    if (!item?.id) return;
-    setEditingQueueId(item.id);
-    setQueueDraft(item.text || "");
-  }, []);
-
-  const cancelQueuedEdit = useCallback(() => {
-    setEditingQueueId(null);
-    setQueueDraft("");
-  }, []);
-
-  const saveQueuedEdit = useCallback((queueId) => {
-    const trimmed = queueDraft.trim();
-    if (!trimmed) {
-      onRemoveQueuedMessage?.(queueId);
-    } else {
-      onUpdateQueuedMessage?.(queueId, trimmed);
-    }
-    setEditingQueueId(null);
-    setQueueDraft("");
-  }, [onRemoveQueuedMessage, onUpdateQueuedMessage, queueDraft]);
-
-  const removeQueuedItem = useCallback((queueId) => {
-    if (editingQueueId === queueId) {
-      setEditingQueueId(null);
-      setQueueDraft("");
-    }
-    onRemoveQueuedMessage?.(queueId);
-  }, [editingQueueId, onRemoveQueuedMessage]);
-
-  const handleQueuedDraftKeyDown = useCallback((event, queueId) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      cancelQueuedEdit();
-      return;
-    }
-
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      saveQueuedEdit(queueId);
-    }
-  }, [cancelQueuedEdit, saveQueuedEdit]);
-
-  useEffect(() => {
-    if (editingQueueId === null) return;
-    queueEditRef.current?.focus();
-  }, [editingQueueId]);
-
-  useEffect(() => {
-    const el = queueEditRef.current;
-    if (!el) return;
-    el.style.height = "0px";
-    el.style.height = `${Math.min(Math.max(el.scrollHeight, 24), 52)}px`;
-  }, [editingQueueId, queueDraft]);
-
-  // Imperative handle so ChatArea (which owns the full-pane drag region and the
-  // SelectionToolbar) can drive the composer's OWN local state without lifting
-  // `input`/`attachments`/`dragOver` back up — that lift would re-couple typing
-  // with streaming re-renders. Quoting appends to the composer input; the drag
-  // handlers keep the whole-pane drop zone + drag-over highlight working exactly
-  // as before.
-  useImperativeHandle(composerRef, () => ({
-    quote(text) {
-      const quoted = text.split("\n").map(l => `> ${l}`).join("\n");
-      setInput((prev) => prev ? `${prev}\n\n${quoted}\n\n` : `${quoted}\n\n`);
-      // Expand textarea to fit
-      setTimeout(() => {
-        if (inRef.current) {
-          inRef.current.style.height = "20px";
-          inRef.current.style.height = Math.min(inRef.current.scrollHeight, 120) + "px";
-          inRef.current.focus();
-        }
-      }, 0);
-    },
-    handleDrop,
-    handleDragEnter,
-    handleDragOver,
-    handleDragLeave,
-    resetDragState,
-  }), [handleDrop, handleDragEnter, handleDragOver, handleDragLeave, resetDragState]);
-
-  return (
-    <div
-      style={{ padding: "12px 28px 24px", display: "flex", justifyContent: "center" }}
-    >
-      <div style={{ width: "100%", maxWidth: 560 }}>
-        {permissionRequests && permissionRequests.length > 0 && (
-          <div style={{ marginBottom: 8 }}>
-            {permissionRequests.map((req) => {
-              const actionButtonStyle = {
-                height: 24,
-                padding: "0 9px",
-                borderRadius: 7,
-                border: "1px solid var(--control-border)",
-                background: "transparent",
-                color: "var(--text-disabled)",
-                cursor: "pointer",
-                fontSize: s(9),
-                fontFamily: "var(--font-mono)",
-                letterSpacing: ".05em",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-              };
-              const labelText = req.isSensitiveFile ? "SENSITIVE" : "PERMISSION";
-              const tool = req.toolName || "Tool";
-              const summary = req.summary || "";
-              return (
-                <div
-                  key={req.requestId}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "6px 8px",
-                    marginBottom: 4,
-                    background: "var(--control-bg-subtle)",
-                    border: "1px solid var(--control-border-soft)",
-                    borderRadius: 12,
-                    fontSize: s(12),
-                    color: "var(--text-subtle)",
-                    fontFamily: "var(--font-ui)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                      <span style={{
-                        fontSize: s(9),
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-faint)",
-                        letterSpacing: ".06em",
-                        flexShrink: 0,
-                      }}>
-                        {labelText}
-                      </span>
-                      <span style={{
-                        fontSize: s(9),
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-disabled)",
-                        letterSpacing: ".06em",
-                      }}>
-                        {String(tool).toUpperCase()}
-                      </span>
-                    </div>
-                    <div style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: "2px 8px",
-                      transform: "translateY(-1.5px)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      lineHeight: "18px",
-                      color: "var(--text-secondary)",
-                    }}
-                      title={summary}
-                    >
-                      {summary}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                    <button
-                      onClick={() => onRespondPermission?.({ requestId: req.requestId, behavior: "allow", scope: "once" })}
-                      style={{
-                        ...actionButtonStyle,
-                        background: "var(--control-bg)",
-                        color: "var(--text-secondary)",
-                      }}
-                      title="Allow this request once"
-                    >
-                      ALLOW ONCE
-                    </button>
-                    <button
-                      onClick={() => onRespondPermission?.({ requestId: req.requestId, behavior: "allow", scope: "session" })}
-                      style={actionButtonStyle}
-                      title="Allow this tool + target for the rest of the session"
-                    >
-                      ALLOW SESSION
-                    </button>
-                    <button
-                      onClick={() => onRespondPermission?.({ requestId: req.requestId, behavior: "deny" })}
-                      style={actionButtonStyle}
-                      title="Deny this request"
-                    >
-                      DENY
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {queuedMessages && queuedMessages.length > 0 && (
-          <div style={{ marginBottom: 8 }}>
-            {queuedMessages.map((q, i) => {
-              const isEditingQueueItem = editingQueueId === q.id;
-              const attachmentCount = Array.isArray(q.attachments) ? q.attachments.length : 0;
-              const queueActionButtonStyle = {
-                height: 24,
-                padding: "0 9px",
-                borderRadius: 7,
-                border: "1px solid var(--control-border)",
-                background: "transparent",
-                color: "var(--text-disabled)",
-                cursor: "pointer",
-                fontSize: s(9),
-                fontFamily: "var(--font-mono)",
-                letterSpacing: ".05em",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-              };
-              return (
-                <div
-                  key={q.id || i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "6px 8px",
-                    marginBottom: 4,
-                    background: "var(--control-bg-subtle)",
-                    border: "1px solid var(--control-border-soft)",
-                    borderRadius: 12,
-                    fontSize: s(12),
-                    color: "var(--text-subtle)",
-                    fontFamily: "var(--font-ui)",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                      <span style={{
-                        fontSize: s(9),
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--text-faint)",
-                        letterSpacing: ".06em",
-                        flexShrink: 0,
-                      }}>
-                        {i === 0 ? t("chatArea.queuedNext") : t("chatArea.queued")}
-                      </span>
-                      {attachmentCount > 0 && (
-                        <span style={{
-                          fontSize: s(9),
-                          fontFamily: "var(--font-mono)",
-                          color: "var(--text-faint)",
-                          letterSpacing: ".06em",
-                        }}>
-                          {t("chatArea.attachmentsCount", { value: attachmentCount, suffix: attachmentCount === 1 ? "" : "S" })}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      {isEditingQueueItem ? (
-                        <textarea
-                          ref={queueEditRef}
-                          value={queueDraft}
-                          onChange={(event) => setQueueDraft(event.target.value)}
-                          onKeyDown={(event) => handleQueuedDraftKeyDown(event, q.id)}
-                          rows={1}
-                          style={{
-                            width: "100%",
-                            background: "var(--control-bg-subtle)",
-                            border: "1px solid var(--control-border-soft)",
-                            borderRadius: 7,
-                            padding: "2px 8px",
-                            color: "var(--text-primary)",
-                            fontSize: s(12),
-                            lineHeight: "18px",
-                            fontFamily: "inherit",
-                            resize: "none",
-                            minHeight: 24,
-                            maxHeight: 52,
-                            overflowY: "auto",
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          minHeight: 24,
-                          display: "flex",
-                          alignItems: "center",
-                          padding: "2px 8px",
-                          transform: "translateY(-1.5px)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          lineHeight: "18px",
-                          color: "var(--text-secondary)",
-                        }}>
-                          {q.text}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {isEditingQueueItem ? (
-                      <>
-                        <button
-                          onClick={() => saveQueuedEdit(q.id)}
-                          style={{
-                            ...queueActionButtonStyle,
-                            background: "var(--control-bg)",
-                            color: "var(--text-secondary)",
-                          }}
-                        >
-                          {t("common.save")}
-                        </button>
-                        <button
-                          onClick={cancelQueuedEdit}
-                          style={queueActionButtonStyle}
-                        >
-                          {t("common.cancel")}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => startQueuedEdit(q)}
-                          style={queueActionButtonStyle}
-                        >
-                          {t("common.edit")}
-                        </button>
-                        <button
-                          onClick={() => removeQueuedItem(q.id)}
-                          style={queueActionButtonStyle}
-                        >
-                          {t("common.delete")}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {/* Slash command palette */}
-        {filteredCommands.length > 0 && (
-          <div style={{
-            marginBottom: 6,
-            background: hasWallpaper ? "var(--pane-elevated)" : "var(--overlay-surface)",
-            border: "1px solid var(--control-border)",
-            borderRadius: 10,
-            padding: "4px",
-            backdropFilter: "blur(20px)",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-          }}>
-            {filteredCommands.map((c, i) => (
-              <div
-                key={c.cmd}
-                onClick={() => { setInput(c.cmd); setSelectedCmd(0); }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "6px 10px",
-                  borderRadius: 7,
-                  cursor: "pointer",
-                  background: i === selectedCmd ? "var(--control-bg)" : "transparent",
-                  transition: "background .1s",
-                }}
-                onMouseEnter={() => setSelectedCmd(i)}
-              >
-                <span style={{
-                  fontSize: s(12),
-                  fontFamily: "var(--font-mono)",
-                  color: "var(--text-secondary)",
-                }}>{c.cmd}</span>
-                <span style={{
-                  fontSize: s(11),
-                  color: "var(--text-disabled)",
-                  fontFamily: "var(--font-ui)",
-                }}>{c.desc}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        <MemoImagePreview items={attachments} onRemove={removeAttachment} />
-        {shellMode && (
-          <div
-            style={{
-              marginBottom: 6,
-              fontSize: s(10),
-              fontFamily: "var(--font-mono)",
-              letterSpacing: ".1em",
-              color: "var(--text-muted)",
-            }}
-          >
-            {canRunShell
-              ? t("chatArea.shellModeReady", { loc: shellLocation })
-              : t("chatArea.shellModeEmpty")}
-          </div>
-        )}
-        {showBranchHint && (
-          <div
-            style={{
-              marginBottom: 6,
-              fontSize: s(10),
-              fontFamily: "var(--font-mono)",
-              letterSpacing: ".1em",
-              color: "var(--warning-text)",
-            }}
-          >
-            {branchHintText}
-          </div>
-        )}
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            background: dragOver
-              ? "var(--accent-bg)"
-              : (inputFocused ? "var(--control-bg)" : "var(--control-bg-subtle)"),
-            border: (shellMode ? "2px solid " : "1px solid ") + (
-              dragOver
-                ? "var(--accent-border)"
-                : (inputFocused ? "var(--control-border-strong)" : "var(--control-border)")
-            ),
-            borderRadius: 12,
-            padding: shellMode ? "8px 13px" : "9px 14px",
-            backdropFilter: "blur(20px)",
-            boxShadow: dragOver ? "0 0 0 1px rgba(153,214,255,0.08)" : "none",
-            transition: "border-color .25s, background .25s, box-shadow .25s",
-          }}
-        >
-          <textarea
-            ref={inRef}
-            value={input}
-            onChange={handleInput}
-            onKeyDown={handleKeyDown}
-            onCompositionStart={() => { composingRef.current = true; }}
-            onCompositionEnd={() => { composingRef.current = false; }}
-            onPaste={handlePaste}
-            onFocus={() => setInputFocused(true)}
-            onBlur={() => {
-              composingRef.current = false;
-              setInputFocused(false);
-            }}
-            placeholder={setupRequired && !shellMode ? "Install a runtime to start chatting" : (shellMode ? t("chatArea.placeholderShell") : t("chatArea.placeholderAsk"))}
-            rows={1}
-            style={{
-              flex: 1,
-              background: "transparent",
-              border: "none",
-              resize: "none",
-              color: "var(--text-primary)",
-              fontSize: s(13),
-              lineHeight: 1.5,
-              fontFamily: "var(--font-ui)",
-              maxHeight: 120,
-              height: "auto",
-              display: "block",
-              overflow: "auto",
-            }}
-          />
-          {isStreaming && !input.trim() ? (
-            <button
-              onClick={onCancel}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 30,
-                height: 30,
-                borderRadius: 8,
-                flexShrink: 0,
-                background: "var(--control-bg-strong)",
-                border: "1px solid var(--control-border-strong)",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                transition: "all .2s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--control-bg-active)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "var(--control-bg-strong)"; }}
-            >
-              <Square size={10} fill="currentColor" />
-            </button>
-          ) : (
-            <button
-              onClick={send}
-              disabled={!canSend}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: shellMode ? 6 : 0,
-                width: shellMode ? "auto" : 30,
-                height: 30,
-                padding: shellMode ? "0 12px" : 0,
-                borderRadius: 8,
-                flexShrink: 0,
-                background: canSend ? "var(--text-primary)" : "var(--control-bg-subtle)",
-                border: "none",
-                color: canSend ? "var(--text-inverse)" : "var(--text-faint)",
-                cursor: canSend ? "pointer" : "default",
-                transition: "all .3s cubic-bezier(.16,1,.3,1)",
-                transform: canSend ? "scale(1)" : "scale(0.88)",
-              }}
-            >
-              {shellMode ? (
-                <>
-                  <TerminalIcon size={14} strokeWidth={1.6} />
-                  <span
-                    style={{
-                      fontSize: s(10),
-                      fontFamily: "var(--font-mono)",
-                      letterSpacing: ".1em",
-                    }}
-                  >
-                    {t("chatArea.run")}
-                  </span>
-                </>
-              ) : (
-                <ArrowRight size={16} strokeWidth={1.5} />
-              )}
-            </button>
-          )}
-        </div>
-
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: 8,
-            fontSize: s(8),
-            fontFamily: "var(--font-mono)",
-            color: "var(--text-muted)",
-            letterSpacing: ".1em",
-          }}
-        >
-          {shellMode
-            ? (canRunShell
-                ? t("chatArea.hintShellRun")
-                : t("chatArea.hintShellEmpty"))
-            : t("chatArea.hintChat")}
-        </div>
-      </div>
-    </div>
-  );
-});
-
-export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen, onModelChange, defaultModel, queuedMessages, onUpdateQueuedMessage, onRemoveQueuedMessage, permissionRequests, onRespondPermission, onToggleTerminal, terminalOpen, terminalCount, wallpaper, cwd, draftsPath, onCwdChange, onRefocusTerminal, showNewChatCard, onCreateChat, onCancelNewChat, allCwdRoots, projects, defaultPrBranch, newChatDefaultCwd, coauthorEnabled = false, coauthorTrailer = "", onControlChange, canControlTarget, developerMode = true, tabs = [], activeTabId = null, onSelectTab, onCloseTab, windowControlsVisible = false, locale, runtimeSetup = null, extraModels = [] }) {
-  const s = useFontScale();
-  const t = useMemo(() => createTranslator(locale), [locale]);
-  const isDraftContext = showNewChatCard ? newChatDefaultCwd == null : isDraftConversation(convo, draftsPath);
-  const endRef  = useRef(null);
-  const composerApiRef = useRef(null);
-  // Callback ref so the ResizeObserver re-attaches when the message body
-  // re-mounts (e.g. showNewChatCard toggling). Keep the ref object too so
-  // SelectionToolbar can still read .current.
-  const messageBodyRef = useRef(null);
-  const [messageBodyEl, setMessageBodyEl] = useState(null);
-  const setMessageBodyNode = useCallback((node) => {
-    messageBodyRef.current = node;
-    setMessageBodyEl(node);
-  }, []);
-
-  // Scroll to bottom on new messages and during streaming
-  const scrollRef = useRef(null);
-  const msgCount = convo?.msgs?.length || 0;
-  const lastMsg = convo?.msgs?.[msgCount - 1];
-  const lastParts = lastMsg?.parts;
-  const lastPartText = lastParts?.[lastParts.length - 1]?.text || lastMsg?.text;
-  const prevMsgCount = useRef(0);
-  // Sticky follow-mode: true until the user actively scrolls up, flips back
-  // on when they return to the bottom. Ref (not state) so rapid streaming
-  // updates don't trigger re-renders and stay in sync with scroll events.
-  const followingRef = useRef(true);
-
-  // Coalesce all "pin to bottom" layout writes (streaming chunks + late
-  // image/katex/mermaid/tool resizes) into a single requestAnimationFrame so we
-  // never do multiple synchronous scrollTop writes per frame. Follow-mode and
-  // intent detection are untouched — this only batches the WRITE.
-  const scrollPinFrameRef = useRef(null);
-  const schedulePinToBottom = useCallback(() => {
-    if (scrollPinFrameRef.current != null) return;
-    scrollPinFrameRef.current = requestAnimationFrame(() => {
-      scrollPinFrameRef.current = null;
-      const el = scrollRef.current;
-      if (followingRef.current && el) el.scrollTop = el.scrollHeight;
-    });
-  }, []);
-
-  const cancelPinFrame = useCallback(() => {
-    if (scrollPinFrameRef.current != null) {
-      cancelAnimationFrame(scrollPinFrameRef.current);
-      scrollPinFrameRef.current = null;
-    }
-  }, []);
-
-  // Reset follow state on conversation switch so chat B doesn't inherit
-  // chat A's "user scrolled up" state.
-  useEffect(() => {
-    followingRef.current = true;
-    prevMsgCount.current = 0;
-    cancelPinFrame();
-  }, [convo?.id, cancelPinFrame]);
-
-  // Cancel any pending pin frame on unmount.
-  useEffect(() => cancelPinFrame, [cancelPinFrame]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    // New message (count INCREASED) → force follow on and smooth-scroll to bottom
-    if (msgCount > prevMsgCount.current) {
-      prevMsgCount.current = msgCount;
-      followingRef.current = true;
-      endRef.current?.scrollIntoView({ behavior: "smooth" });
-      return;
-    }
-
-    // Count decreased (edit rewind, /clear, /compact) → track the new count
-    // but don't hijack the user's scroll position.
-    if (msgCount < prevMsgCount.current) {
-      prevMsgCount.current = msgCount;
-      return;
-    }
-
-    // Streaming update → pin to bottom (batched into one rAF) so chunks can't
-    // outrun us without doing a synchronous layout write per commit.
-    if (followingRef.current) {
-      schedulePinToBottom();
-    }
-  }, [msgCount, convo?.isStreaming, lastPartText, schedulePinToBottom]);
-
-  // Pin to bottom whenever content height changes while following. Catches
-  // renders that don't trigger the text-diff effect above — LoadingStatus
-  // growing an extra line when usage arrives, thinking blocks expanding,
-  // mermaid/katex rendering in late, etc.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || !messageBodyEl || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => {
-      if (followingRef.current) {
-        schedulePinToBottom();
-      }
-    });
-    ro.observe(messageBodyEl);
-    return () => ro.disconnect();
-  }, [messageBodyEl, schedulePinToBottom]);
-
-  // Track whether the user is near the bottom to toggle the scroll-to-bottom
-  // button, and maintain follow-mode based on user scroll direction.
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const showScrollToBottomRef = useRef(false);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    let lastScrollTop = el.scrollTop;
-    // Gate "user scrolled up" detection behind recent real user input.
-    // Otherwise content shrink (thinking block collapses, images clamping
-    // scrollTop) and trackpad momentum bounce silently kill follow-mode.
-    let userIntentUntil = 0;
-    const markIntent = () => { userIntentUntil = Date.now() + 500; };
-
-    const handleScroll = () => {
-      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      // Require both a meaningful delta and recent user input to disable follow.
-      if (el.scrollTop < lastScrollTop - 8 && Date.now() < userIntentUntil) {
-        followingRef.current = false;
-      }
-      // Reached the bottom again → resume following
-      if (distanceFromBottom < 40) {
-        followingRef.current = true;
-      }
-      lastScrollTop = el.scrollTop;
-      const nextShowScrollToBottom = distanceFromBottom > 120;
-      if (showScrollToBottomRef.current !== nextShowScrollToBottom) {
-        showScrollToBottomRef.current = nextShowScrollToBottom;
-        setShowScrollToBottom(nextShowScrollToBottom);
-      }
-    };
-    handleScroll();
-    el.addEventListener("scroll", handleScroll, { passive: true });
-    el.addEventListener("wheel", markIntent, { passive: true });
-    el.addEventListener("touchstart", markIntent, { passive: true });
-    el.addEventListener("pointerdown", markIntent, { passive: true });
-    el.addEventListener("keydown", markIntent);
-    return () => {
-      el.removeEventListener("scroll", handleScroll);
-      el.removeEventListener("wheel", markIntent);
-      el.removeEventListener("touchstart", markIntent);
-      el.removeEventListener("pointerdown", markIntent);
-      el.removeEventListener("keydown", markIntent);
-    };
-  }, [convo?.id, msgCount]);
-
-  const scrollToBottom = useCallback(() => {
-    followingRef.current = true;
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
-  const isStreaming = convo?.isStreaming;
-
-  const setupRequired = Boolean(runtimeSetup?.required);
-  const shellLocation = cwd ? (() => {
-    const parts = cwd.split("/");
-    const wtIdx = parts.indexOf(".worktrees");
-    if (wtIdx >= 0 && wtIdx + 1 < parts.length) {
-      return `${parts[wtIdx - 1]} / ${parts[wtIdx + 1]}`;
-    }
-    return parts.slice(-2).join("/") || parts[parts.length - 1] || cwd;
-  })() : "current workspace";
-
-  // Branch / git-status hint inputs are computed HERE (parent) so the composer
-  // never recomputes git-derived flags on each keystroke. The composer receives
-  // the resolved values and only decides whether to SHOW the hint (which also
-  // depends on shellMode, an input-derived flag the composer owns).
-  const activeModelId = convo?.model || defaultModel;
-  const isMulticaModel = isMulticaModelId(activeModelId);
-  const { status: gitStatus } = useGitStatus(cwd);
-  const hasDirtyWorktree = (gitStatus?.files?.length || 0) > 0;
-  const hasNoUpstream = Boolean(gitStatus?.branch) && !gitStatus?.upstream && !gitStatus?.detached;
-  const branchNeedsAttention = hasDirtyWorktree || hasNoUpstream;
+export default function ChatArea(props: ChatAreaProps) {
+  const {
+    convo,
+    sidebarOpen,
+    defaultModel,
+    wallpaper,
+    cwd = null,
+    draftsPath = null,
+    showNewChatCard = false,
+    newChatDefaultCwd = null,
+    developerMode = true,
+    windowControlsVisible = false,
+    locale,
+    runtimeSetup = null,
+  } = props;
+  const contextT = useTranslator();
+  // An explicit locale prop wins (App passes it; translators are cached per locale).
+  const t = locale ? createTranslator(locale) : contextT;
+  const hasWallpaper = Boolean(wallpaper?.dataUrl);
   const convoId = convo?.id ?? null;
-  const branchHintText = (() => {
-    if (hasDirtyWorktree && hasNoUpstream) return t("chatArea.branchWarnBoth");
-    if (hasDirtyWorktree) return t("chatArea.branchWarnDirty");
-    return t("chatArea.branchWarnNoUpstream");
-  })();
+  const messageIds = useMessageIds(convoId);
+  const { isStreaming } = useConversationStatus(convoId);
+  const { scrollRef, endRef, followingRef, setMessageBodyNode, messageBodyRef, showScrollToBottom, scrollToBottom } = useScrollManager(convoId, messageIds.length);
+  const composerApiRef = useRef<ComposerHandle>(null);
 
-  const showHeaderTabs = tabs.length > 0 && !showNewChatCard;
-  const showConversationTitle = Boolean(convo && !showNewChatCard);
-  const topTabsLeft = sidebarOpen
-    ? 18
-    : IS_MAC
-      ? SIDEBAR_CHROME_RAIL_LEFT + SIDEBAR_CHROME_RAIL_WIDTH + 16
-      : 18;
-  const topTabsRight = windowControlsVisible ? 126 : 24;
-  const headerContentOffset = showHeaderTabs ? 8 : 0;
-  const headerLeftPadding = sidebarOpen ? 24 : IS_MAC ? 50 : 24;
+  // Stable proxies: App re-creates most of these on every render.
+  const onSend = useStableCallback(props.onSend);
+  const onCancel = useStableCallback(props.onCancel);
+  const onModelChange = useStableCallback(props.onModelChange);
+  const onCreateChat = useStableCallback(props.onCreateChat);
+  const onEdit = useOptionalStableCallback(props.onEdit);
+  const onControlChange = useOptionalStableCallback(props.onControlChange);
+  const canControlTargetProxy = useStableCallback((target: string) => Boolean(props.canControlTarget?.(target)));
+  const canControlTarget = props.canControlTarget ? canControlTargetProxy : undefined;
+  const onEffortChange = useOptionalStableCallback(props.onEffortChange);
+  const onCwdChange = useOptionalStableCallback(props.onCwdChange);
+  const onRefocusTerminal = useOptionalStableCallback(props.onRefocusTerminal);
+  const onToggleTerminal = useOptionalStableCallback(props.onToggleTerminal);
+  const onSelectTab = useOptionalStableCallback(props.onSelectTab);
+  const onCloseTab = useOptionalStableCallback(props.onCloseTab);
+  const onCancelNewChat = useOptionalStableCallback(props.onCancelNewChat);
+  const onRespondPermission = useOptionalStableCallback(props.onRespondPermission);
+  const onUpdateQueuedMessage = useOptionalStableCallback(props.onUpdateQueuedMessage);
+  const onRemoveQueuedMessage = useOptionalStableCallback(props.onRemoveQueuedMessage);
+  const handleAnswer = useCallback((text: string) => void onSend(text), [onSend]);
+  const handlePickFolder = useCallback(async () => (await window.api?.pickFolder?.()) ?? null, []);
+  const handleQuote = useCallback((text: string) => composerApiRef.current?.quote(text), []);
 
-  // Window-level drag guards stay in ChatArea: they only prevent the browser
-  // from navigating when a file is dropped outside the composer's drop zone.
+  const modelId = convo?.model || defaultModel || "sonnet";
+  const draftContext = showNewChatCard ? newChatDefaultCwd == null : convo ? isDraftContext(convo.cwd, draftsPath) : false;
+  const { status: gitStatus } = useGitStatus(cwd);
+  const branch = branchAttention(gitStatus);
+  const exportable = useMemo<ExportableConversation | null>(
+    () => (convo ? { id: convo.id, title: convo.title, model: convo.model, cwd: convo.cwd, msgs: convo.msgs } : null),
+    [convo],
+  );
+  const setupRequired = Boolean(runtimeSetup?.required);
+  const draftScope = composerDraftScope(convoId, cwd || draftsPath || newChatDefaultCwd);
+
+  // Dropping a file outside the composer's drop zone must not navigate away.
   useEffect(() => {
-    const preventNav = (e) => { e.preventDefault(); };
+    const preventNav = (event: Event): void => event.preventDefault();
     window.addEventListener("dragover", preventNav);
     window.addEventListener("drop", preventNav);
     return () => {
@@ -1071,298 +107,149 @@ export default function ChatArea({ convo, onSend, onCancel, onEdit, sidebarOpen,
     };
   }, []);
 
-  const handleTranscriptAnswer = useCallback((text) => {
-    onSend(text);
-  }, [onSend]);
+  const renderBody = () => {
+    if (runtimeSetup?.required) {
+      return (
+        <Suspense fallback={null}>
+          <RuntimeSetupCard
+            state={runtimeSetup}
+            platform={runtimeSetup.platform}
+            onRunCommand={runtimeSetup.onRunCommand}
+            onRefresh={runtimeSetup.onRefresh}
+            onConfigureOpenCode={runtimeSetup.onConfigureOpenCode}
+          />
+        </Suspense>
+      );
+    }
+    if (showNewChatCard) {
+      return (
+        <Suspense fallback={null}>
+          <NewChatCard
+            key={newChatDefaultCwd || "drafts"}
+            defaultCwd={newChatDefaultCwd}
+            defaultModel={modelId}
+            defaultBranch={props.defaultPrBranch}
+            allCwdRoots={props.allCwdRoots}
+            projects={props.projects}
+            onPickFolder={handlePickFolder}
+            onCreateChat={onCreateChat}
+            onCancel={onCancelNewChat}
+            developerMode={developerMode}
+            extraModels={props.extraModels}
+            effort={props.effort}
+            onEffortChange={onEffortChange}
+            locale={locale}
+          />
+        </Suspense>
+      );
+    }
+    if (!convo || messageIds.length === 0) return <EmptyState model={modelId} />;
+    return (
+      <ChatTranscript
+        key={convo.id}
+        conversationId={convo.id}
+        modelId={modelId}
+        wallpaper={wallpaper}
+        onEdit={onEdit}
+        onAnswer={handleAnswer}
+        onControlChange={onControlChange}
+        canControlTarget={canControlTarget}
+        messageBodyRef={setMessageBodyNode}
+        endRef={endRef}
+        scrollRef={scrollRef}
+        followingRef={followingRef}
+      />
+    );
+  };
 
-  const handlePickFolder = useCallback(() => window.api?.pickFolder?.(), []);
-
-  // Selection toolbar quoting → forward to the composer's imperative handle so
-  // the quoted text is appended to the composer's OWN input state (keeps typing
-  // decoupled from ChatArea's streaming re-renders).
-  const handleQuote = useCallback((text) => {
-    composerApiRef.current?.quote(text);
-  }, []);
-
+  const hasMessages = Boolean(convo) && messageIds.length > 0;
 
   return (
     <div
-      style={{
-        flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10,
-        ...getPaneSurfaceStyle(Boolean(wallpaper?.dataUrl)),
+      style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, position: "relative", zIndex: 10, ...getPaneSurfaceStyle(hasWallpaper) }}
+      onDrop={(event: DragEvent) => {
+        event.stopPropagation();
+        composerApiRef.current?.handleDrop(event);
+        composerApiRef.current?.resetDragState();
       }}
-      onDrop={(e) => { e.stopPropagation(); composerApiRef.current?.handleDrop(e); composerApiRef.current?.resetDragState(); }}
-      onDragEnter={(e) => composerApiRef.current?.handleDragEnter(e)}
-      onDragOver={(e) => composerApiRef.current?.handleDragOver(e)}
-      onDragLeave={(e) => composerApiRef.current?.handleDragLeave(e)}
+      onDragEnter={(event) => composerApiRef.current?.handleDragEnter(event)}
+      onDragOver={(event) => composerApiRef.current?.handleDragOver(event)}
+      onDragLeave={(event) => composerApiRef.current?.handleDragLeave(event)}
     >
-      {/* Drag region. On Windows, shrink right margin so custom controls aren't
-          inside the drag hit-area. On macOS, WindowDragSpacer reserves the
-          sidebar chrome rail as a no-drag zone. */}
-      <div style={{ marginRight: windowControlsVisible ? topTabsRight : 0 }}>
+      {/* Drag region (Windows: keep custom window controls out of it). */}
+      <div style={{ marginRight: windowControlsVisible ? 126 : 0 }}>
         <WindowDragSpacer reserveWindowsHeader={windowControlsVisible && !sidebarOpen} />
       </div>
 
-      {showHeaderTabs && (
-        <div
-          style={{
-            position: "absolute",
-            top: 10,
-            left: topTabsLeft,
-            right: topTabsRight,
-            zIndex: 40,
-            display: "flex",
-            alignItems: "center",
-            minWidth: 0,
-            pointerEvents: "none",
-            WebkitAppRegion: "no-drag",
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-              pointerEvents: "auto",
-            }}
-          >
-            <MemoTabStrip
-              tabs={tabs}
-              activeId={activeTabId}
-              onSelect={onSelectTab}
-              onClose={onCloseTab}
-            />
-          </div>
-        </div>
-      )}
+      <ChatHeader
+        t={t}
+        locale={locale}
+        title={convo ? convo.title : null}
+        messageCount={convo?.msgs.length ?? 0}
+        exportable={exportable}
+        showNewChatCard={showNewChatCard}
+        developerMode={developerMode}
+        isDraftContext={draftContext}
+        sidebarOpen={sidebarOpen}
+        windowControlsVisible={windowControlsVisible}
+        tabs={props.tabs ?? NO_TABS}
+        activeTabId={props.activeTabId ?? null}
+        onSelectTab={onSelectTab}
+        onCloseTab={onCloseTab}
+        cwd={cwd}
+        defaultPrBranch={props.defaultPrBranch}
+        coauthorEnabled={props.coauthorEnabled ?? false}
+        coauthorTrailer={props.coauthorTrailer ?? ""}
+        onCwdChange={onCwdChange}
+        onRefocusTerminal={onRefocusTerminal}
+        modelId={modelId}
+        onModelChange={onModelChange}
+        effort={props.effort}
+        onEffortChange={onEffortChange}
+        extraModels={props.extraModels}
+        onToggleTerminal={onToggleTerminal}
+        terminalOpen={Boolean(props.terminalOpen)}
+        terminalCount={props.terminalCount ?? 0}
+      />
 
-      {/* Top bar — aligns with sidebar header */}
-      <div
-        style={{
-          padding: `${headerContentOffset}px 24px 12px ${headerLeftPadding}px`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "padding .16s ease",
-        }}
-      >
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          width: "100%",
-          maxWidth: "none",
-        }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            WebkitAppRegion: "no-drag",
-            minWidth: 0,
-            flex: 1,
-          }}
-        >
-          {showConversationTitle && (
-            <div style={{ animation: "dropIn .2s ease", minWidth: 0 }}>
-              <div style={{
-                fontSize: s(12.5),
-                color: "var(--text-primary)",
-                fontFamily: "var(--font-ui)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                maxWidth: 360,
-                letterSpacing: "0.01em",
-              }}>
-                {convo.title}
-              </div>
-              <div
-                style={{
-                  fontSize: s(9),
-                  fontFamily: "var(--font-mono)",
-                  color: "var(--text-disabled)",
-                  marginTop: 2,
-                  letterSpacing: ".1em",
-                }}
-              >
-                {t("chatArea.messages", { count: convo.msgs.length })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, WebkitAppRegion: "no-drag" }}>
-          {!showNewChatCard && developerMode && !isDraftContext && (
-            <MemoGitStatusPill
-              cwd={cwd}
-              defaultPrBranch={defaultPrBranch}
-              coauthorEnabled={coauthorEnabled}
-              coauthorTrailer={coauthorTrailer}
-              locale={locale}
-            />
-          )}
-          {!showNewChatCard && developerMode && !isDraftContext && (
-            <MemoBranchSelector
-              cwd={cwd}
-              onCwdChange={onCwdChange}
-              hasMessages={convo?.msgs?.length > 0}
-              onRefocusTerminal={onRefocusTerminal}
-              locale={locale}
-            />
-          )}
-          {!showNewChatCard && <MemoModelPickerWithMultica value={convo?.model || defaultModel || "sonnet"} onChange={onModelChange} extraModels={extraModels} />}
-          {!showNewChatCard && convo?.msgs?.length > 0 && (
-            <MemoExportConversationBtn convo={convo} />
-          )}
-          {!showNewChatCard && developerMode && onToggleTerminal && (
-            <button
-              onClick={onToggleTerminal}
-              title={t("chatArea.toggleTerminal")}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 4,
-                width: terminalCount > 0 ? "auto" : 26,
-                height: 23,
-                padding: terminalCount > 0 ? "0 8px" : 0,
-                borderRadius: 7,
-                background: terminalOpen ? "var(--control-bg-active)" : "var(--control-bg)",
-                border: "1px solid " + (terminalOpen ? "var(--control-border-strong)" : "var(--pane-border)"),
-                color: terminalOpen ? "var(--text-secondary)" : "var(--text-secondary)",
-                cursor: "pointer",
-                transition: "all .2s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--control-bg-active)"; e.currentTarget.style.color = "var(--text-secondary)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = terminalOpen ? "var(--control-bg-active)" : "var(--control-bg)"; e.currentTarget.style.color = "var(--text-secondary)"; }}
-            >
-              <TerminalIcon size={14} strokeWidth={1.5} />
-              {terminalCount > 0 && (
-                <span style={{
-                  fontSize: s(10),
-                  fontFamily: "var(--font-mono)",
-                  color: "inherit",
-                }}>
-                  {terminalCount}
-                </span>
-              )}
-            </button>
-          )}
-        </div>
-        </div>
-      </div>
-
-      {/* Messages */}
       <div
         ref={scrollRef}
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "32px 28px",
-          display: "flex",
-          flexDirection: "column",
-        }}
+        // Prepends compensate scrollTop themselves; native anchoring would double it.
+        style={{ flex: 1, overflowY: "auto", overflowAnchor: "none", padding: "32px 28px", display: "flex", flexDirection: "column" }}
       >
-        <ChatTranscript
-          showNewChatCard={showNewChatCard}
-          convo={convo}
-          defaultModel={defaultModel}
-          defaultPrBranch={defaultPrBranch}
-          newChatDefaultCwd={newChatDefaultCwd}
-          allCwdRoots={allCwdRoots}
-          projects={projects}
-          onPickFolder={handlePickFolder}
-          onCreateChat={onCreateChat}
-          onCancelNewChat={onCancelNewChat}
-          developerMode={developerMode}
-          onEdit={onEdit}
-          onAnswer={handleTranscriptAnswer}
-          onControlChange={onControlChange}
-          canControlTarget={canControlTarget}
-          wallpaper={wallpaper}
-          messageBodyRef={setMessageBodyNode}
-          endRef={endRef}
-          runtimeSetup={runtimeSetup}
-          extraModels={extraModels}
-        />
+        {renderBody()}
       </div>
 
-      {!showNewChatCard && convo?.msgs?.length > 0 && (
-        <MemoSelectionToolbar
-          onQuote={handleQuote}
-          model={convo?.model || defaultModel || "sonnet"}
-          selectionRootRef={messageBodyRef}
-        />
+      {!showNewChatCard && hasMessages && <SelectionToolbar onQuote={handleQuote} model={modelId} selectionRootRef={messageBodyRef} />}
+
+      {!showNewChatCard && hasMessages && (
+        <ScrollToBottomButton visible={showScrollToBottom} label={t("chatArea.scrollToBottom")} hasWallpaper={hasWallpaper} onClick={scrollToBottom} />
       )}
 
-      {/* Scroll to bottom button */}
-      {!showNewChatCard && convo && convo.msgs.length > 0 && (
-        <button
-          onClick={scrollToBottom}
-          aria-label={t("chatArea.scrollToBottom")}
-          title={t("chatArea.scrollToBottom")}
-          style={{
-            position: "absolute",
-            bottom: 108,
-            left: "50%",
-            transform: `translateX(-50%) scale(${showScrollToBottom ? 1 : 0.8})`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            background: "var(--control-bg-subtle)",
-            border: "1px solid var(--control-border)",
-            color: "var(--text-secondary)",
-            cursor: "pointer",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
-            opacity: showScrollToBottom ? 1 : 0,
-            pointerEvents: showScrollToBottom ? "auto" : "none",
-            transition: "opacity .2s ease, transform .2s cubic-bezier(.16,1,.3,1), background .2s ease, border-color .2s ease",
-            zIndex: 20,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--control-bg)";
-            e.currentTarget.style.borderColor = "var(--control-border-strong)";
-            e.currentTarget.style.color = "var(--text-primary)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "var(--control-bg-subtle)";
-            e.currentTarget.style.borderColor = "var(--control-border)";
-            e.currentTarget.style.color = "var(--text-secondary)";
-          }}
-        >
-          <ArrowDown size={16} strokeWidth={1.75} />
-        </button>
-      )}
-
-      {/* Input bar — owns urgent composer state so typing never re-renders the
-          transcript/header and streaming never re-renders the textarea. */}
-      {!showNewChatCard &&
+      {/* Composer owns urgent keystroke state; keyed per draft scope (PR #230). */}
+      {!showNewChatCard && (
         <ChatComposer
+          key={draftScope}
           composerRef={composerApiRef}
+          draftScope={draftScope}
           onSend={onSend}
           onCancel={onCancel}
           isStreaming={isStreaming}
           setupRequired={setupRequired}
-          shellLocation={shellLocation}
-          permissionRequests={permissionRequests}
+          shellLocation={shellLocationLabel(cwd)}
+          permissionRequests={props.permissionRequests}
           onRespondPermission={onRespondPermission}
-          queuedMessages={queuedMessages}
+          queuedMessages={props.queuedMessages}
           onUpdateQueuedMessage={onUpdateQueuedMessage}
           onRemoveQueuedMessage={onRemoveQueuedMessage}
-          isMulticaModel={isMulticaModel}
-          showNewChatCard={showNewChatCard}
-          branchNeedsAttention={branchNeedsAttention}
-          branchHintText={branchHintText}
+          isMulticaModel={isMulticaModelId(modelId)}
+          branchNeedsAttention={branch.needsAttention}
+          branchHintText={t(branch.hintKey)}
           convoId={convoId}
-          hasWallpaper={Boolean(wallpaper?.dataUrl)}
+          hasWallpaper={hasWallpaper}
           t={t}
-          s={s}
-        />}
+        />
+      )}
     </div>
   );
 }
