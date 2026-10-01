@@ -74,6 +74,8 @@ export interface ProjectMeta {
   manual?: boolean;
   /** Extra context appended to the agent system prompt for this project. */
   context?: string;
+  /** Sidebar group collapsed (persisted by the sidebar's collapse toggle). */
+  collapsed?: boolean;
 }
 
 // ── Root ────────────────────────────────────────────────────────────────────

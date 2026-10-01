@@ -1,108 +1,160 @@
-// @ts-nocheck
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Check, FolderClosed, FolderOpen } from "lucide-react";
-import { useFontScale } from "../contexts/FontSizeContext";
+import { Check, ChevronDown, FolderClosed, FolderOpen } from "lucide-react";
+import { useFontScale, type FontScale } from "../contexts/FontSizeContext";
+import { useTranslator } from "../contexts/LocaleContext";
+import { useDismissibleLayer } from "../hooks/useDismissibleLayer";
+import { NO_DRAG } from "./sidebar/appRegion";
+import { getProjectPickerPosition, getViewport, type PickerMenuPosition } from "./sidebar/dropdownPosition";
+import { closeOtherMenus } from "./sidebar/menuEvents";
+import { getProjectDisplayName, listPickerProjectRoots } from "./sidebar/projectGrouping";
+import type { ProjectsMeta } from "./sidebar/types";
 
-const MENU_GAP = 6;
-const VIEWPORT_PADDING = 8;
-const MIN_MENU_WIDTH = 240;
-const MAX_MENU_HEIGHT = 360;
+const HOVER_BG = "color-mix(in srgb, var(--control-bg) 63%, transparent)";
 
-function clamp(value, min, max) {
-  if (max < min) return min;
-  return Math.min(Math.max(value, min), max);
+export interface ProjectPickerProps {
+  /** Selected project root; null = Drafts. */
+  value: string | null;
+  onChange: (cwdRoot: string | null) => void;
+  allCwdRoots?: readonly string[] | null;
+  projects?: ProjectsMeta | null;
+  onBrowse: () => void;
 }
 
-export default function ProjectPicker({ value, onChange, allCwdRoots, projects, onBrowse }) {
-  const s = useFontScale();
-  const [open, set] = useState(false);
-  const ref = useRef(null);
-  const menuRef = useRef(null);
-  const [menuStyle, setMenuStyle] = useState(null);
+function PickerOption({
+  s,
+  selected,
+  onClick,
+  children,
+}: {
+  s: FontScale;
+  selected: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        width: "100%",
+        padding: "8px 12px",
+        background: selected ? "var(--control-bg)" : "transparent",
+        border: "none",
+        borderRadius: 7,
+        color: selected ? "var(--text-primary)" : "var(--text-secondary)",
+        fontSize: s(11),
+        fontFamily: "var(--font-mono)",
+        cursor: "pointer",
+        textAlign: "left",
+        transition: "all .12s",
+      }}
+      onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = HOVER_BG; }}
+      onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = "transparent"; }}
+    >
+      {children}
+    </button>
+  );
+}
 
-  const projectName = value
-    ? (projects?.[value]?.name || value.split("/").pop())
-    : "Drafts";
+const DIVIDER = <div style={{ height: 1, background: "var(--control-bg)", margin: "3px 6px" }} />;
+
+/** Arrow-key focus cycling across the menu's buttons. */
+function moveFocus(menu: HTMLElement | null, direction: 1 | -1) {
+  if (!menu) return;
+  const buttons = [...menu.querySelectorAll("button")];
+  if (!buttons.length) return;
+  const active = document.activeElement;
+  const index = buttons.findIndex((button) => button === active);
+  buttons[(index + direction + buttons.length) % buttons.length]?.focus();
+}
+
+/** New-chat project chooser: Drafts, known projects, or browse for a folder. */
+export default function ProjectPicker({ value, onChange, allCwdRoots, projects, onBrowse }: ProjectPickerProps) {
+  const s = useFontScale();
+  const t = useTranslator();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<PickerMenuPosition | null>(null);
+
+  const projectName = value ? getProjectDisplayName(value, projects) : t("projectPicker.drafts");
 
   const updateMenuPosition = useCallback(() => {
     if (!ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const maxMenuWidth = Math.max(0, viewportWidth - VIEWPORT_PADDING * 2);
-    const menuWidth = Math.min(
-      maxMenuWidth,
-      Math.max(rect.width, Math.min(MIN_MENU_WIDTH, maxMenuWidth))
-    );
-    const maxHeight = Math.min(MAX_MENU_HEIGHT, viewportHeight - VIEWPORT_PADDING * 2);
-    const spaceBelow = viewportHeight - rect.bottom - MENU_GAP - VIEWPORT_PADDING;
-    const spaceAbove = rect.top - MENU_GAP - VIEWPORT_PADDING;
-    const placeAbove = spaceBelow < Math.min(maxHeight, 220) && spaceAbove > spaceBelow;
-    const left = clamp(
-      rect.right - menuWidth,
-      VIEWPORT_PADDING,
-      viewportWidth - menuWidth - VIEWPORT_PADDING
-    );
-    setMenuStyle({
-      top: placeAbove
-        ? Math.max(VIEWPORT_PADDING, rect.top - MENU_GAP - maxHeight)
-        : Math.min(rect.bottom + MENU_GAP, viewportHeight - VIEWPORT_PADDING - maxHeight),
-      left,
-      width: menuWidth,
-      maxHeight,
-    });
+    setMenuStyle(getProjectPickerPosition(ref.current.getBoundingClientRect(), getViewport()));
   }, []);
 
-  useEffect(() => {
-    const h = (e) => {
-      if (ref.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
-      setMenuStyle(null);
-      set(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  const close = useCallback(() => setOpen(false), []);
+  useDismissibleLayer(open, ref, menuRef, close);
 
   useEffect(() => {
-    if (!open || !ref.current) return;
-    const handleResize = () => updateMenuPosition();
-    window.addEventListener("resize", handleResize);
-    window.addEventListener("scroll", handleResize, true);
-    const ro = new ResizeObserver(handleResize);
-    ro.observe(ref.current);
+    const anchor = ref.current;
+    if (!open || !anchor) return undefined;
+    menuRef.current?.querySelector("button")?.focus();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    const ro = new ResizeObserver(updateMenuPosition);
+    ro.observe(anchor);
     return () => {
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("scroll", handleResize, true);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
       ro.disconnect();
     };
   }, [open, updateMenuPosition]);
 
-  const visibleRoots = (allCwdRoots || []).filter(
-    (cwdRoot) => !projects?.[cwdRoot]?.hidden || cwdRoot === value
-  );
+  const choose = (next: string | null) => {
+    onChange(next);
+    setMenuStyle(null);
+    setOpen(false);
+  };
+
+  const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      ref.current?.querySelector("button")?.focus();
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      moveFocus(menuRef.current, event.key === "ArrowDown" ? 1 : -1);
+    }
+    if (event.key === "Tab") close();
+  };
+
+  const visibleRoots = listPickerProjectRoots(allCwdRoots, projects, value);
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
+    <div ref={ref} style={{ position: "relative", minWidth: 0, maxWidth: "100%" }}>
       <button
+        type="button"
+        aria-label={t("projectPicker.choose")}
+        aria-haspopup="menu"
+        aria-expanded={open}
         onClick={() => {
           if (open) {
-            set(false);
+            setOpen(false);
             setMenuStyle(null);
             return;
           }
+          closeOtherMenus();
           updateMenuPosition();
-          set(true);
+          setOpen(true);
         }}
         style={{
           display: "flex",
+          maxWidth: "100%",
           alignItems: "center",
           gap: 6,
           padding: "4px 10px",
           background: "color-mix(in srgb, var(--control-bg) 50%, transparent)",
           border: "1px solid var(--control-bg)",
           borderRadius: 7,
-          color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
+          color: "var(--text-secondary)",
           fontSize: s(10),
           fontFamily: "var(--font-mono)",
           cursor: "pointer",
@@ -122,151 +174,97 @@ export default function ProjectPicker({ value, onChange, allCwdRoots, projects, 
             flexShrink: 0,
           }}
         />
-        {projectName}
+        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{projectName}</span>
         <ChevronDown size={11} strokeWidth={2} />
       </button>
 
-      {open && menuStyle && createPortal(
-        <div
-          ref={menuRef}
-          style={{
-            position: "fixed",
-            top: menuStyle.top,
-            left: menuStyle.left,
-            zIndex: 400,
-            width: menuStyle.width,
-            maxHeight: menuStyle.maxHeight,
-            background: "var(--pane-elevated)",
-            backdropFilter: "blur(48px) saturate(1.2)",
-            border: "1px solid var(--pane-border)",
-            borderRadius: 10,
-            padding: 3,
-            boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-            animation: "dropIn .15s ease",
-            WebkitAppRegion: "no-drag",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {/* Drafts option */}
-          <button
-            onClick={() => { onChange(null); setMenuStyle(null); set(false); }}
+      {open && menuStyle &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            onKeyDown={onMenuKeyDown}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
             style={{
+              position: "fixed",
+              top: menuStyle.top,
+              left: menuStyle.left,
+              zIndex: 400,
+              width: menuStyle.width,
+              maxHeight: menuStyle.maxHeight,
+              background: "var(--pane-elevated)",
+              backdropFilter: "blur(48px) saturate(1.2)",
+              border: "1px solid var(--pane-border)",
+              borderRadius: 10,
+              padding: 3,
+              boxShadow: "var(--shadow-md)",
+              animation: "dropIn .15s ease",
+              ...NO_DRAG,
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              width: "100%",
-              padding: "8px 12px",
-              background: value === null ? "var(--control-bg)" : "transparent",
-              border: "none",
-              borderRadius: 7,
-              color: value === null ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-              fontSize: s(11),
-              fontFamily: "var(--font-mono)",
-              cursor: "pointer",
-              textAlign: "left",
-              transition: "all .12s",
+              flexDirection: "column",
             }}
-            onMouseEnter={(e) => { if (value !== null) e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
-            onMouseLeave={(e) => { if (value !== null) e.currentTarget.style.background = "transparent"; }}
           >
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <FolderOpen size={12} strokeWidth={1.8} />
-              Drafts
-            </span>
-            {value === null && <Check size={12} strokeWidth={2.2} />}
-          </button>
+            <PickerOption s={s} selected={value === null} onClick={() => choose(null)}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <FolderOpen size={12} strokeWidth={1.8} />
+                {t("projectPicker.drafts")}
+              </span>
+              {value === null && <Check size={12} strokeWidth={2.2} />}
+            </PickerOption>
 
-          {/* Divider */}
-          <div style={{ height: 1, background: "var(--control-bg)", margin: "3px 6px" }} />
+            {DIVIDER}
 
-          {/* Project list */}
-          <div style={{ minHeight: 0, overflowY: "auto" }}>
-            {visibleRoots.map((cwdRoot) => {
-              const isSelected = cwdRoot === value;
-              const name = projects?.[cwdRoot]?.name || cwdRoot.split("/").pop();
-              return (
-                <button
-                  key={cwdRoot}
-                  onClick={() => { onChange(cwdRoot); setMenuStyle(null); set(false); }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    width: "100%",
-                    padding: "8px 12px",
-                    background: isSelected ? "var(--control-bg)" : "transparent",
-                    border: "none",
-                    borderRadius: 7,
-                    color: isSelected ? "var(--text-primary)" : "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-                    fontSize: s(11),
-                    fontFamily: "var(--font-mono)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "all .12s",
-                  }}
-                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
-                  onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
-                >
-                  <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <FolderClosed size={12} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {name}
+            <div style={{ minHeight: 0, overflowY: "auto" }}>
+              {visibleRoots.map((cwdRoot) => {
+                const isSelected = cwdRoot === value;
+                return (
+                  <PickerOption key={cwdRoot} s={s} selected={isSelected} onClick={() => choose(cwdRoot)}>
+                    <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <FolderClosed size={12} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {getProjectDisplayName(cwdRoot, projects)}
+                        </span>
+                      </span>
+                      <span
+                        style={{
+                          fontSize: s(9),
+                          color: "var(--text-muted)",
+                          paddingLeft: 20,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {cwdRoot}
                       </span>
                     </span>
-                    <span
-                      style={{
-                        fontSize: s(9),
-                        color: "color-mix(in srgb, var(--text-primary) 22%, transparent)",
-                        paddingLeft: 20,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {cwdRoot}
-                    </span>
-                  </span>
-                  {isSelected && <Check size={12} strokeWidth={2.2} style={{ flexShrink: 0 }} />}
-                </button>
-              );
-            })}
-          </div>
+                    {isSelected && <Check size={12} strokeWidth={2.2} style={{ flexShrink: 0 }} />}
+                  </PickerOption>
+                );
+              })}
+            </div>
 
-          {/* Divider */}
-          <div style={{ height: 1, background: "var(--control-bg)", margin: "3px 6px" }} />
+            {DIVIDER}
 
-          {/* Browse option */}
-          <button
-            onClick={() => { onBrowse(); setMenuStyle(null); set(false); }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              width: "100%",
-              padding: "8px 12px",
-              background: "transparent",
-              border: "none",
-              borderRadius: 7,
-              color: "color-mix(in srgb, var(--text-primary) 43%, transparent)",
-              fontSize: s(11),
-              fontFamily: "var(--font-mono)",
-              cursor: "pointer",
-              textAlign: "left",
-              transition: "all .12s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "color-mix(in srgb, var(--control-bg) 63%, transparent)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-          >
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <FolderOpen size={12} strokeWidth={1.8} />
-              Browse...
-            </span>
-          </button>
-        </div>,
-        document.body
-      )}
+            <PickerOption
+              s={s}
+              selected={false}
+              onClick={() => {
+                onBrowse();
+                setMenuStyle(null);
+                setOpen(false);
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <FolderOpen size={12} strokeWidth={1.8} />
+                {t("projectPicker.browse")}
+              </span>
+            </PickerOption>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
