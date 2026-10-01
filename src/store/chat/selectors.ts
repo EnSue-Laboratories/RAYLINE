@@ -89,11 +89,3 @@ export function useStreamingIds(): readonly string[] {
   return useStore(conversationsStore, selectStreamingIds, shallowEqual);
 }
 
-function selectById(state: ConversationsState): ReadonlyMap<string, ConversationRuntime> {
-  return state.byId;
-}
-
-/** Whole map, synchronously. Only for legacy consumers; see useAgent. */
-export function useConversationsMap(): ReadonlyMap<string, ConversationRuntime> {
-  return useStore(conversationsStore, selectById);
-}

@@ -19,7 +19,9 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Typecheck
         run: npm run typecheck
-      - name: Lint (TypeScript)
-        run: npm run lint:ts
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        run: npm test
       - name: Build renderer + main process
         run: npm run build

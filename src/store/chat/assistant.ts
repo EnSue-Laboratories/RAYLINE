@@ -94,8 +94,14 @@ export function finalizedCopy(message: ChatMessage): ChatMessage {
   return copy;
 }
 
+/**
+ * Stored title of a generic error part. Kept in English in the transcript
+ * (exports, persistence); the renderer shows `chat.errorTitle` instead.
+ */
+export const DEFAULT_ERROR_TITLE = "Error";
+
 /** Collapsible error part; the summary is the first non-empty line (PR #230). */
-export function buildErrorPart(error: string, title = "Error"): ErrorPart {
+export function buildErrorPart(error: string, title = DEFAULT_ERROR_TITLE): ErrorPart {
   const text = error || "An error occurred.";
   const summary = text.split("\n").map((line) => line.trim()).find(Boolean) || title;
   return { type: "error", title, summary, text };

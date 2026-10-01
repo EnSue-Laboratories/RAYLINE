@@ -3,23 +3,9 @@ import { createLogger } from "../../utils/logger";
 import { StoreDraft } from "./draft";
 import { type ConversationRuntime, type ConversationsState, EMPTY_CONVERSATION, type StreamEffect } from "./types";
 
-/**
- * How the latest commit should reach legacy whole-map consumers (`useAgent`'s
- * `conversations`): coalesced mid-stream flushes are `transition`, everything
- * else (user actions, terminal events) is `urgent`. Fine-grained selector
- * subscribers always update synchronously.
- */
-export type CommitPriority = "urgent" | "transition";
-
 export const conversationsStore = createStore<ConversationsState>({ byId: new Map() });
 
-let lastCommitPriority: CommitPriority = "urgent";
-
-export function getLastCommitPriority(): CommitPriority {
-  return lastCommitPriority;
-}
-
-const log = createLogger("useAgent");
+const log = createLogger("useAgent"); // debug scope name kept for existing `rayline:debug` settings
 
 function runEffects(effects: readonly StreamEffect[]): void {
   for (const effect of effects) {
@@ -42,16 +28,12 @@ function runEffects(effects: readonly StreamEffect[]): void {
  * Run `recipe` against ONE copy-on-write draft of the map and commit the
  * result (a no-op when nothing changed). Effects run after the commit.
  */
-export function updateConversations(recipe: (draft: StoreDraft) => void, priority: CommitPriority = "urgent"): void {
+export function updateConversations(recipe: (draft: StoreDraft) => void): void {
   const base = conversationsStore.getState().byId;
   const draft = new StoreDraft(base);
   recipe(draft);
   const next = draft.commit();
-  if (next !== base) {
-    lastCommitPriority = priority;
-    conversationsStore.setState({ byId: next });
-    lastCommitPriority = "urgent";
-  }
+  if (next !== base) conversationsStore.setState({ byId: next });
   if (draft.effects.length > 0) runEffects(draft.effects);
 }
 

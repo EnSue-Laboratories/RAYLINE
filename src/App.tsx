@@ -3,8 +3,8 @@
  *
  * App owns no state: settings, conversation rows, UI flags and derived
  * views live in external stores (src/store, src/app/stores) and every
- * component subscribes to the slices it renders. `useAgent()` lives in
- * <AgentProvider>, so a streamed token re-renders only the active chat view
+ * component subscribes to the slices it renders. The agent IPC bridge is
+ * connected by <AgentProvider>, so a streamed token re-renders only the active chat view
  * (and the cheap derived-store subscribers), never App, the sidebar tree,
  * the composer or historical messages. Handlers are module functions that
  * read live state via `store.getState()`.

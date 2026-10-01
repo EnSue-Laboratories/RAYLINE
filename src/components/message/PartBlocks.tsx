@@ -2,10 +2,16 @@
 import { AlertTriangle, PauseCircle } from "lucide-react";
 import type { ErrorPart, StatusPart } from "@shared/chat/types";
 import { useFontScale } from "../../contexts/FontSizeContext";
+import { useTranslator } from "../../contexts/LocaleContext";
+import { DEFAULT_ERROR_TITLE } from "../../store/chat/assistant";
+import { CODEX_NOTICE_KIND, CODEX_NOTICE_TITLE } from "../../store/chat/codexItems";
 
 export function StatusBlock({ part }: { part: StatusPart }) {
   const s = useFontScale();
+  const t = useTranslator();
   const isPaused = part.kind === "paused";
+  const isGenericNotice = part.kind === CODEX_NOTICE_KIND && (!part.title || part.title === CODEX_NOTICE_TITLE);
+  const title = isGenericNotice ? t("chat.noticeTitle") : part.title || "Status";
   return (
     <div
       data-copy-image-ignore="true"
@@ -32,7 +38,7 @@ export function StatusBlock({ part }: { part: StatusPart }) {
         }}
       >
         {isPaused && <PauseCircle size={14} strokeWidth={1.8} />}
-        <span>{part.title || "Status"}</span>
+        <span>{title}</span>
       </div>
       {part.text && (
         <div style={{ marginTop: 6, fontSize: s(13), lineHeight: 1.65, fontFamily: "var(--font-content)", color: "var(--text-secondary)" }}>{part.text}</div>
@@ -44,9 +50,10 @@ export function StatusBlock({ part }: { part: StatusPart }) {
 /** Collapsible run / provider error (PR #230): title + first line, full text on expand. */
 export function ErrorBlock({ part }: { part: ErrorPart }) {
   const s = useFontScale();
+  const t = useTranslator();
   const text = part.text || "An error occurred.";
-  const summary = part.summary || text.split("\n").map((line) => line.trim()).find(Boolean) || "Error";
-  const title = part.title || "Error";
+  const title = !part.title || part.title === DEFAULT_ERROR_TITLE ? t("chat.errorTitle") : part.title;
+  const summary = part.summary || text.split("\n").map((line) => line.trim()).find(Boolean) || title;
   return (
     <details
       data-copy-image-ignore="true"

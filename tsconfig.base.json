@@ -22,8 +22,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
 
-    "allowJs": true,
-    "checkJs": false,
+    "allowJs": false,
 
     "paths": {
       "@shared/*": ["./shared/*"]

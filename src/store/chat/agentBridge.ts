@@ -123,12 +123,9 @@ export function connectAgentEvents(scheduler: FrameScheduler = browserFrameSched
   if (!window.api) return () => {};
   connections += 1;
   if (connections === 1) {
-    const buffer = createStreamBuffer<AgentStreamPayload>(
-      // Mid-stream flushes are low priority for whole-map consumers; urgent
-      // ones (terminal events, done / error backstops) commit immediately.
-      (items, urgent) => applyStreamPayloads(items, urgent ? "urgent" : "transition"),
-      scheduler,
-    );
+    // Mid-stream events coalesce into one commit per frame; terminal events
+    // (and the done / error backstops) flush immediately.
+    const buffer = createStreamBuffer<AgentStreamPayload>((items) => applyStreamPayloads(items), scheduler);
     const offStream = window.api.onAgentStream((payload) => buffer.push(payload, isImmediateFlushEvent(payload.event)));
     const offDone = window.api.onAgentDone((payload) => handleAgentDone(buffer, payload));
     const offError = window.api.onAgentError((payload) => handleAgentError(buffer, payload));

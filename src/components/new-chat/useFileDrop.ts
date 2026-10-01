@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { useStableCallback } from "../../hooks/useStableCallback";
-import { dataTransferHasFiles } from "./boundaries";
+import { dataTransferHasFiles } from "../../utils/attachments";
 
 export interface FileDrop {
   dragOver: boolean;

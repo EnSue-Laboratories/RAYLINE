@@ -10,7 +10,9 @@ import { createTranslator } from "../../i18n";
 import { clearDraft, readDraft, writeDraft } from "../../utils/composerDrafts";
 import ComposerChips from "./ComposerChips";
 import { BranchSearchDropdown, IssueSearchDropdown, WorktreeInputDropdown } from "./Dropdowns";
-import { ModelPickerWithMultica, ProjectPicker, clipboardItemsToAttachments, fileListToAttachments } from "./boundaries";
+import ProjectPicker from "../ProjectPicker";
+import ModelPickerWithMultica from "../ModelPickerWithMultica";
+import { clipboardItemsToAttachments, fileListToAttachments } from "../../utils/attachments";
 import {
   filterBranches,
   filterIssues,

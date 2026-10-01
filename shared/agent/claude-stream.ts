@@ -1,7 +1,7 @@
 /**
  * Claude Code `--output-format stream-json --verbose --include-partial-messages`
  * event shapes (Claude Code 2.1.x), as read by electron/agent-manager and
- * src/hooks/useAgent. Only fields RayLine reads are required; the CLI emits
+ * src/store/chat. Only fields RayLine reads are required; the CLI emits
  * more, which is why most fields beyond the discriminants are optional.
  */
 

@@ -13,7 +13,7 @@ import {
   startPreparedMessage,
 } from "../actions";
 import { handleAgentDone, handleAgentError } from "../agentBridge";
-import { conversationsStore, getConversation, getLastCommitPriority, resetConversationsStoreForTests } from "../store";
+import { conversationsStore, getConversation, resetConversationsStoreForTests } from "../store";
 import { assistant, convo } from "./helpers";
 
 const api = {
@@ -106,18 +106,13 @@ describe("stream application", () => {
     resetConversationsStoreForTests(new Map([["c1", convo([user])], ["c2", other]]));
     const listener = vi.fn();
     const unsubscribe = conversationsStore.subscribe(listener);
-    const priorities: string[] = [];
-    const unsubscribePriority = conversationsStore.subscribe(() => priorities.push(getLastCommitPriority()));
     const batch: AgentStreamPayload[] = [
       { conversationId: "c1", event: { type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } } } },
       { conversationId: "c1", event: { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "x" } } } },
     ];
-    applyStreamPayloads(batch, "transition");
+    applyStreamPayloads(batch);
     unsubscribe();
-    unsubscribePriority();
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(priorities).toEqual(["transition"]);
-    expect(getLastCommitPriority()).toBe("urgent");
     expect(conversationsStore.getState().byId.get("c2")).toBe(other);
   });
 
