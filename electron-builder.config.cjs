@@ -88,11 +88,15 @@ module.exports = {
     artifactName: "${productName}-${version}.${ext}",
     target: ["AppImage", "deb", "rpm", "tar.gz"],
   },
+  // Anything executed by an external process (shells, system node) must live
+  // outside the asar archive.
   asarUnpack: [
-    "electron/shell-init/**",
-    "electron/vendor/**",
+    "dist-electron/electron/shell-init/**",
+    "dist-electron/electron/vendor/**",
+    "dist-electron/electron/mcp-terminal-server.cjs",
+    "dist-electron/scripts/**",
   ],
-  files: ["dist/**/*", "electron/**/*", "public/**/*"],
+  files: ["dist/**/*", "dist-electron/**/*", "public/**/*"],
   directories: {
     output: "release",
   },

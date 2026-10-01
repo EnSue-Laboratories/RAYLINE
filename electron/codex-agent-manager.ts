@@ -1,0 +1,638 @@
+// @ts-nocheck
+const path = require("path");
+const fs = require("fs");
+const os = require("os");
+const { buildSpawnPath, isExecutable, resolveCliBin, spawnCli } = require("./cli-bin-resolver");
+const { loadSessionMessages } = require("./session-reader");
+const { createLogger } = require("./logger");
+const {
+  appendCodexUpstreamArgs,
+  buildCodexUpstreamEnv,
+  summarizeProviderUpstream,
+} = require("./provider-upstreams");
+const { describeRemoteRuntime, normalizeRemoteRuntime, spawnRemoteCommand } = require("./remote-runtime");
+const { stageRemoteAttachments } = require("./remote-attachments");
+const { startRemoteChannel } = require("./remote-channel");
+
+const activeAgents = new Map();
+const { toUnpackedPath } = require("./paths");
+const TERMINAL_CLI_PATH = toUnpackedPath(path.join(__dirname, "../scripts/claudi-terminal.cjs"));
+const SESSION_SNAPSHOT_RETRY_DELAYS_MS = [0, 150, 500, 1200, 2500];
+const log = createLogger("codex-agent-manager");
+
+function isDirectory(dirPath) {
+  try {
+    return !!dirPath && fs.statSync(dirPath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function shouldEmitStderrError({ stderrBuffer, exitCode, signal, cancelled, sawTurnCompleted }) {
+  if (!stderrBuffer.trim()) return false;
+  if (cancelled) return false;
+  if (sawTurnCompleted && exitCode === 0 && !signal) return false;
+  return exitCode !== 0 || Boolean(signal) || !sawTurnCompleted;
+}
+
+function cleanupRemoteAttachments(state) {
+  const cleanup = state?.remoteAttachmentCleanup;
+  if (!cleanup) return;
+  state.remoteAttachmentCleanup = null;
+  cleanup().catch((err) => log("Remote attachment cleanup failed:", err?.message || err));
+}
+
+function finishRemoteChannel(state) {
+  const channel = state?.remoteChannel;
+  if (!channel) return;
+  state.remoteChannel = null;
+  channel.finish().catch((err) => log("Remote channel finish failed:", err?.message || err));
+}
+
+function disposeRemoteChannel(state) {
+  const channel = state?.remoteChannel;
+  if (!channel) return;
+  state.remoteChannel = null;
+  channel.dispose().catch((err) => log("Remote channel dispose failed:", err?.message || err));
+}
+
+function scheduleSessionSnapshot(webContents, conversationId, threadId, attempt = 0) {
+  if (!threadId) return;
+
+  const delay = SESSION_SNAPSHOT_RETRY_DELAYS_MS[attempt];
+  if (delay == null) return;
+
+  setTimeout(() => {
+    loadSessionMessages(threadId)
+      .then((result) => {
+        const usage = result?.usageSnapshot || null;
+        const rateLimits = result?.rateLimitsSnapshot || null;
+        if (usage || rateLimits) {
+          if (webContents.isDestroyed?.()) return;
+          log("Emitting Codex session snapshot:", {
+            conversationId,
+            threadId,
+            hasUsage: Boolean(usage),
+            hasRateLimits: Boolean(rateLimits),
+          });
+          webContents.send("agent-stream", {
+            conversationId,
+            event: {
+              type: "session_snapshot",
+              provider: "codex",
+              thread_id: threadId,
+              usage,
+              rate_limits: rateLimits,
+            },
+          });
+          return;
+        }
+
+        scheduleSessionSnapshot(webContents, conversationId, threadId, attempt + 1);
+      })
+      .catch(() => {
+        scheduleSessionSnapshot(webContents, conversationId, threadId, attempt + 1);
+      });
+  }, delay);
+}
+
+let cachedCodexBin = null;
+
+function resolveCodexBin() {
+  if (cachedCodexBin && isExecutable(cachedCodexBin)) return cachedCodexBin;
+  cachedCodexBin = resolveCliBin("codex", { envVarName: "CODEX_BIN" });
+  return cachedCodexBin;
+}
+
+function getExecutionFlags() {
+  // RayLine is expected to run Codex without internal CLI sandboxing so it can
+  // use the full local environment. Set CLAUDI_CODEX_BYPASS_SANDBOX=0 to fall
+  // back to Codex's workspace-write sandboxed mode.
+  if (process.env.CLAUDI_CODEX_BYPASS_SANDBOX === "0") {
+    return ["--full-auto"];
+  }
+  return ["--dangerously-bypass-approvals-and-sandbox"];
+}
+
+function readConfiguredMcpServers() {
+  const configPath = global.mcpConfigPath;
+  if (!configPath) {
+    log("No MCP config path available for Codex");
+    return [];
+  }
+  if (!fs.existsSync(configPath)) {
+    log("Codex MCP config path does not exist:", configPath);
+    return [];
+  }
+
+  try {
+    const raw = fs.readFileSync(configPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    return Object.entries(parsed?.mcpServers || {});
+  } catch (error) {
+    log("Failed to load MCP config overrides:", error.message);
+    return [];
+  }
+}
+
+function buildClaudiPrompt(prompt, files, mcpServers, options = {}) {
+  let fullPrompt = prompt;
+
+  if (files && files.length > 0) {
+    const filePaths = files.map((f) => f.path).join("\n");
+    const label = options.remote ? "Attached files uploaded to the remote SSH host" : "Attached files";
+    fullPrompt = `[${label}:\n${filePaths}]\n\n${fullPrompt}`;
+  }
+
+  const hasTerminalSessions = (mcpServers || []).some(
+    ([name, config]) => name === "terminal-sessions" && config?.command && config?.enabled !== false
+  );
+
+  const terminalInstructions = options.remote
+    ? `Terminal sessions:
+You are running on a remote SSH host from RayLine. RayLine's local terminal MCP and $CLAUDI_TERMINAL_CLI are not available on this host.
+Use normal shell commands on the remote host for long-running processes, and tell the user when a command must keep running after your turn.`
+    : hasTerminalSessions
+    ? `Terminal sessions:
+RayLine's terminal means the dedicated terminal window inside the app. Sessions created there are user-visible and remain available across turns.
+Use RayLine's terminal when you want the user to see or interact with a shell, when a process should keep running, or when stdin needs to be sent over time.
+Prefer RayLine's terminal over one-off shell commands for dev servers, watchers, REPLs, or any command the user may want to monitor.
+If MCP terminal tools are unavailable, use the local terminal CLI exposed via $CLAUDI_TERMINAL_CLI.
+CLI examples:
+- node "$CLAUDI_TERMINAL_CLI" list
+- node "$CLAUDI_TERMINAL_CLI" create <name> --cwd <path>
+- node "$CLAUDI_TERMINAL_CLI" send <name> "npm run dev\\n"
+- node "$CLAUDI_TERMINAL_CLI" read <name> --lines 80
+- node "$CLAUDI_TERMINAL_CLI" kill <name>`
+    : `Terminal sessions:
+RayLine's terminal means the dedicated terminal window inside the app. Do not describe it generically; use it when you want a user-visible, long-lived shell inside RayLine itself.
+If terminal-session MCP tools are not exposed, use the local terminal CLI exposed via $CLAUDI_TERMINAL_CLI to control RayLine's terminal window directly.
+CLI examples:
+- node "$CLAUDI_TERMINAL_CLI" list
+- node "$CLAUDI_TERMINAL_CLI" create <name> --cwd <path>
+- node "$CLAUDI_TERMINAL_CLI" send <name> "npm run dev\\n"
+- node "$CLAUDI_TERMINAL_CLI" read <name> --lines 80
+- node "$CLAUDI_TERMINAL_CLI" kill <name>`;
+
+  const remoteChannelInstructions = options.remote && options.remoteChannel?.instructions
+    ? `\n\n${options.remoteChannel.instructions}`
+    : "";
+
+  const claudiInstructions = `System context for this run:
+You are running inside RayLine, a desktop GUI client for coding agents.
+The user is interacting via a chat interface, not a terminal.
+Keep responses concise and conversational.
+Use markdown formatting; the client renders headings, code blocks, tables, lists, and mermaid diagrams.
+To show an image inline, output the raw Markdown image itself, not a code block or a description: ![alt text](https://example.com/image.png). RayLine supports http/https image URLs, data: URLs, file:// URLs, absolute local paths, and ~/ paths like ![a](~/Downloads/a.jpg).
+When showing diagrams, prefer mermaid code blocks.
+Do not ask the user to run terminal commands when you can do the work yourself.
+For math, use LaTeX: $inline$ and $$block$$. Never wrap LaTeX in code blocks.
+
+Interactive render blocks:
+Output fenced code blocks with language tag "render" to display live HTML inline in the chat.
+
+Interactive control blocks:
+Output fenced code blocks with language tag "control" to display structured interactive controls inline in the chat.
+The contents must be a JSON object.
+Supported type:
+- "value_control": a slider-like numeric control
+
+Supported fields:
+- type, label, target
+- mode: "continuous" or "discrete"
+- min, max, step, value
+- options: array of { value, label } for discrete controls
+- unit, help, actionLabel, messageTemplate
+
+Behavior:
+- If target maps to a supported app value, the control may apply directly while the user drags it.
+- Live-bound controls do not require a send button.
+- If there is no live target, the control can fall back to sending a follow-up message.
+
+Example:
+\`\`\`control
+{
+  "type": "value_control",
+  "label": "Image opacity",
+  "target": "wallpaper.imgOpacity",
+  "mode": "continuous",
+  "min": 0,
+  "max": 100,
+  "step": 1,
+  "value": 70,
+  "unit": "%",
+  "messageTemplate": "Set image opacity to {{value}}{{unit}}."
+}
+\`\`\`
+
+When a control is not live-bound and the user submits it, RayLine will send a normal follow-up chat message with the selected value back into the conversation.
+
+${terminalInstructions}${remoteChannelInstructions}
+
+The text below is the actual user prompt.
+--- USER PROMPT ---
+${fullPrompt}`;
+
+  return claudiInstructions;
+}
+
+function appendCodexMcpOverrides(args, mcpServers) {
+  const names = (mcpServers || []).map(([name]) => name);
+  if (names.length === 0) return;
+
+  log("Applying Codex MCP servers:", names);
+
+  for (const [name, config] of mcpServers) {
+    if (!config?.command) continue;
+
+    const commandOverride = `mcp_servers."${name}".command=${JSON.stringify(config.command)}`;
+    args.push("-c", commandOverride);
+    log("Codex MCP override:", commandOverride);
+
+    if (Array.isArray(config.args)) {
+      const argsOverride = `mcp_servers."${name}".args=${JSON.stringify(config.args)}`;
+      args.push("-c", argsOverride);
+      log("Codex MCP override:", argsOverride);
+    }
+
+    if (config.env && typeof config.env === "object") {
+      const envOverride = `mcp_servers."${name}".env=${JSON.stringify(config.env)}`;
+      args.push("-c", envOverride);
+      log("Codex MCP override:", envOverride);
+    }
+
+    if (typeof config.cwd === "string" && config.cwd) {
+      const cwdOverride = `mcp_servers."${name}".cwd=${JSON.stringify(config.cwd)}`;
+      args.push("-c", cwdOverride);
+      log("Codex MCP override:", cwdOverride);
+    }
+
+    const enabledOverride = `mcp_servers."${name}".enabled=${config.enabled !== false}`;
+    args.push("-c", enabledOverride);
+    log("Codex MCP override:", enabledOverride);
+  }
+}
+
+async function startCodexAgent({ conversationId, prompt, model, effort, cwd, images, files, sessionId, resumeSessionId, providerUpstreamConfig, remoteRuntime }, webContents) {
+  cancelCodexAgent(conversationId);
+
+  const args = ["exec"];
+  const launchModel = model;
+  const remote = normalizeRemoteRuntime(remoteRuntime);
+
+  // Resume an existing thread if requested
+  if (resumeSessionId) {
+    args.push("resume", resumeSessionId);
+  }
+
+  args.push("--json", ...getExecutionFlags());
+
+  if (launchModel) {
+    args.push("-m", launchModel);
+  }
+
+  if (effort) {
+    args.push("-c", `model_reasoning_effort="${effort}"`);
+  }
+
+  const mcpServers = remote ? [] : readConfiguredMcpServers();
+  appendCodexMcpOverrides(args, mcpServers);
+  const upstreamSummary = summarizeProviderUpstream(providerUpstreamConfig, "codex");
+  let upstreamRuntime = null;
+  try {
+    upstreamRuntime = await appendCodexUpstreamArgs(args, providerUpstreamConfig, launchModel, { bridge: !remote });
+  } catch (error) {
+    log("Failed to prepare codex upstream:", error?.message || error);
+    webContents.send("agent-error", { conversationId, error: error?.message || "Failed to prepare Codex upstream" });
+    webContents.send("agent-done", { conversationId, exitCode: -1, provider: "codex" });
+    return null;
+  }
+
+  // Working directory — only pass -C for new sessions (resume doesn't accept it)
+  let launchCwd = process.cwd();
+  if (remote) {
+    launchCwd = remote.cwd || process.cwd();
+  } else if (cwd && isDirectory(cwd)) {
+    launchCwd = cwd;
+    if (!resumeSessionId) {
+      args.push("-C", cwd);
+    }
+  } else if (cwd) {
+    const error = `Invalid working directory: ${cwd}`;
+    log(error);
+    webContents.send("agent-error", { conversationId, error });
+    webContents.send("agent-done", { conversationId, exitCode: -1 });
+    return null;
+  }
+
+  const state = {
+    conversationId,
+    webContents,
+    child: null,
+    cancelled: false,
+    sawTurnCompleted: false,
+    lastErrorMessage: null,
+    threadId: null,
+    remoteAttachmentCleanup: null,
+    remoteChannel: null,
+  };
+  activeAgents.set(conversationId, state);
+
+  let stagedRemoteAttachments = null;
+  if (remote) {
+    try {
+      stagedRemoteAttachments = await stageRemoteAttachments(remote, { images, files });
+    } catch (error) {
+      if (state.cancelled || activeAgents.get(conversationId) !== state) return null;
+      const message = `Failed to upload attachments to the remote SSH host: ${error?.message || error}`;
+      log(message);
+      activeAgents.delete(conversationId);
+      webContents.send("agent-error", { conversationId, error: message });
+      webContents.send("agent-done", { conversationId, exitCode: -1, provider: "codex" });
+      return null;
+    }
+    if (state.cancelled || activeAgents.get(conversationId) !== state) {
+      await stagedRemoteAttachments?.cleanup?.().catch(() => {});
+      return null;
+    }
+    state.remoteAttachmentCleanup = stagedRemoteAttachments?.cleanup || null;
+
+    try {
+      state.remoteChannel = await startRemoteChannel({ conversationId, provider: "codex" });
+      log("Started RayLine SSH channel:", state.remoteChannel.describe());
+    } catch (error) {
+      log("RayLine SSH channel unavailable:", error?.message || error);
+      state.remoteChannel = null;
+    }
+
+    if (state.cancelled || activeAgents.get(conversationId) !== state) {
+      disposeRemoteChannel(state);
+      return null;
+    }
+  }
+
+  // Handle images — decode base64 data URLs to temp files, pass via -i
+  if (remote && stagedRemoteAttachments?.images?.length > 0) {
+    for (const remoteImagePath of stagedRemoteAttachments.images) {
+      args.push("-i", remoteImagePath);
+    }
+  } else if (!remote && images && images.length > 0) {
+    for (let i = 0; i < images.length; i++) {
+      const dataUrl = typeof images[i] === "string" ? images[i] : images[i]?.dataUrl;
+      if (typeof dataUrl !== "string") continue;
+      const match = dataUrl.match(/^data:image\/([\w+.-]+);base64,(.+)$/);
+      if (match) {
+        const ext = match[1] === "jpeg" ? "jpg" : match[1];
+        const tmpPath = path.join(os.tmpdir(), `ensue-codex-img-${Date.now()}-${i}.${ext}`);
+        fs.writeFileSync(tmpPath, Buffer.from(match[2], "base64"));
+        args.push("-i", tmpPath);
+      }
+    }
+  }
+
+  // `--image` is variadic in the Codex CLI, so terminate option parsing
+  // before the prompt or the prompt may be consumed as another image path.
+  const fullPrompt = buildClaudiPrompt(
+    prompt,
+    remote ? stagedRemoteAttachments?.files : files,
+    mcpServers,
+    { remote: Boolean(remote), remoteChannel: state.remoteChannel }
+  );
+  args.push("--", fullPrompt);
+
+  const codexBin = remote ? (remote.commandPath || "codex") : resolveCodexBin();
+  if (!remote && !codexBin) {
+    const error = "Unable to locate the Codex CLI binary";
+    log(error);
+    if (activeAgents.get(conversationId) === state) activeAgents.delete(conversationId);
+    webContents.send("agent-error", { conversationId, error });
+    webContents.send("agent-done", { conversationId, exitCode: -1 });
+    return null;
+  }
+
+  log("Starting codex agent:", { conversationId, model: launchModel, requestedModel: model, effort, cwd: launchCwd, resumeSessionId, upstream: upstreamSummary, remote: describeRemoteRuntime(remote) });
+  log("Full args:", args.filter(a => a !== fullPrompt).join(" "));
+  log("Prompt:", fullPrompt.slice(0, 100));
+
+  const codexEnv = buildCodexUpstreamEnv(providerUpstreamConfig, upstreamRuntime);
+  let child;
+  try {
+    child = remote
+      ? spawnRemoteCommand(remote, codexBin, args, {
+          cwd: process.cwd(),
+          env: { ...process.env, FORCE_COLOR: "0", PATH: buildSpawnPath() },
+          // Codex stalls before the first network request when stdin is /dev/null.
+          // Give it a pipe and immediately close it so it observes EOF correctly.
+          stdio: ["pipe", "pipe", "pipe"],
+        }, {
+          env: { FORCE_COLOR: "0", ...codexEnv, ...(state.remoteChannel?.env || {}) },
+          cwd: remote.cwd,
+          sshArgs: state.remoteChannel?.sshArgs,
+        })
+      : spawnCli(codexBin, args, {
+          cwd: launchCwd,
+          env: {
+            ...process.env,
+            FORCE_COLOR: "0",
+            PATH: buildSpawnPath(),
+            ...codexEnv,
+            CLAUDI_TERMINAL_CLI: TERMINAL_CLI_PATH,
+            CLAUDI_TERMINAL_PORT: global.terminalWsPort ? String(global.terminalWsPort) : "",
+            CLAUDI_TERMINAL_MCP_CONFIG: global.mcpConfigPath || "",
+          },
+          // Codex stalls before the first network request when stdin is /dev/null.
+          // Give it a pipe and immediately close it so it observes EOF correctly.
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+  } catch (error) {
+    cleanupRemoteAttachments(state);
+    disposeRemoteChannel(state);
+    if (activeAgents.get(conversationId) === state) activeAgents.delete(conversationId);
+    webContents.send("agent-error", { conversationId, error: error.message || String(error) });
+    webContents.send("agent-done", { conversationId, exitCode: -1, provider: "codex" });
+    return null;
+  }
+  state.child = child;
+  child.stdin?.on("error", () => {});
+  child.stdin?.end();
+
+  log("Spawned PID:", child.pid);
+  if (upstreamRuntime?.bridge) {
+    child.once("exit", () => upstreamRuntime.bridge.close());
+    child.once("error", () => upstreamRuntime.bridge.close());
+  }
+
+  let buffer = "";
+  let stderrBuffer = "";
+
+  const parseLine = (line) => {
+    if (!line.trim()) return;
+    try {
+      const event = JSON.parse(line);
+      if (event.type === "thread.started" && typeof event.thread_id === "string" && event.thread_id) {
+        state.threadId = event.thread_id;
+      } else if (event.type === "session_meta" && typeof event.payload?.id === "string" && event.payload.id) {
+        state.threadId = event.payload.id;
+      }
+      if (
+        event.type === "turn.completed" ||
+        (event.type === "event_msg" && event.payload?.type === "task_complete")
+      ) {
+        state.sawTurnCompleted = true;
+      }
+      if (event.type === "error" && typeof event.message === "string" && event.message.trim()) {
+        state.lastErrorMessage = event.message.trim();
+      } else if (event.type === "turn.failed") {
+        const message =
+          (typeof event.error?.message === "string" && event.error.message.trim()) ||
+          (typeof event.message === "string" && event.message.trim()) ||
+          null;
+        if (message) state.lastErrorMessage = message;
+      }
+      log("Parsed event type:", event.type);
+      webContents.send("agent-stream", { conversationId, event });
+    } catch (e) {
+      log("Failed to parse JSON line:", line.slice(0, 200), "error:", e.message);
+    }
+  };
+
+  child.stdout.on("data", (chunk) => {
+    if (activeAgents.get(conversationId) !== state) return;
+    const raw = chunk.toString();
+    log("stdout chunk:", raw.slice(0, 300));
+    buffer += raw;
+    const lines = buffer.split("\n");
+    buffer = lines.pop();
+
+    for (const line of lines) parseLine(line);
+  });
+
+  child.stderr.on("data", (chunk) => {
+    if (activeAgents.get(conversationId) !== state && !state.cancelled) return;
+    const text = chunk.toString();
+    log("stderr:", text);
+    stderrBuffer += text;
+  });
+
+  child.on("close", (exitCode, signal) => {
+    const isCurrentState = activeAgents.get(conversationId) === state;
+
+    log("Process closed, exitCode:", exitCode, "signal:", signal, "cancelled:", state.cancelled, "current:", isCurrentState);
+
+    if (isCurrentState && buffer.trim()) {
+      log("Flushing remaining buffer:", buffer.slice(0, 200));
+      parseLine(buffer);
+    }
+    cleanupRemoteAttachments(state);
+    finishRemoteChannel(state);
+
+    if (state.cancelled) {
+      if (isCurrentState) {
+        activeAgents.delete(conversationId);
+        webContents.send("agent-done", {
+          conversationId,
+          exitCode,
+          signal,
+          provider: "codex",
+          threadId: state.threadId,
+        });
+      }
+      return;
+    }
+
+    if (!isCurrentState) {
+      log("Stale codex run closed after replacement; ignoring");
+      return;
+    }
+
+    if (state.lastErrorMessage || shouldEmitStderrError({
+      stderrBuffer,
+      exitCode,
+      signal,
+      cancelled: state.cancelled,
+      sawTurnCompleted: state.sawTurnCompleted,
+    })) {
+      const error = state.lastErrorMessage || stderrBuffer.trim();
+      log("Codex process error:", error);
+      if (stderrBuffer.trim() && error !== stderrBuffer.trim()) {
+        log("Full stderr:", stderrBuffer);
+      }
+      webContents.send("agent-error", { conversationId, error });
+    }
+
+    scheduleSessionSnapshot(webContents, conversationId, state.threadId);
+
+    activeAgents.delete(conversationId);
+    webContents.send("agent-done", {
+      conversationId,
+      exitCode,
+      signal,
+      provider: "codex",
+      threadId: state.threadId,
+    });
+  });
+
+  child.on("error", (err) => {
+    const isCurrentState = activeAgents.get(conversationId) === state;
+    log("Spawn error:", err.message);
+    cleanupRemoteAttachments(state);
+    disposeRemoteChannel(state);
+    if (isCurrentState) activeAgents.delete(conversationId);
+    webContents.send("agent-error", { conversationId, error: err.message });
+    if (isCurrentState) {
+      webContents.send("agent-done", { conversationId, exitCode: -1 });
+    }
+  });
+
+  return child;
+}
+
+function cancelCodexAgent(conversationId) {
+  const state = activeAgents.get(conversationId);
+  if (!state) return;
+
+  log("Cancelling codex agent:", conversationId);
+  state.cancelled = true;
+  cleanupRemoteAttachments(state);
+  finishRemoteChannel(state);
+
+  if (state.child) {
+    state.child.kill("SIGTERM");
+    return;
+  }
+
+  activeAgents.delete(conversationId);
+  if (!state.webContents?.isDestroyed?.()) {
+    state.webContents.send("agent-done", {
+      conversationId,
+      exitCode: null,
+      signal: "SIGTERM",
+      provider: "codex",
+      threadId: state.threadId,
+    });
+  }
+}
+
+function cancelAllCodex() {
+  for (const [conversationId, state] of activeAgents) {
+    state.cancelled = true;
+    cleanupRemoteAttachments(state);
+    finishRemoteChannel(state);
+    if (state.child) {
+      state.child.kill("SIGTERM");
+      continue;
+    }
+    activeAgents.delete(conversationId);
+    if (!state.webContents?.isDestroyed?.()) {
+      state.webContents.send("agent-done", {
+        conversationId,
+        exitCode: null,
+        signal: "SIGTERM",
+        provider: "codex",
+        threadId: state.threadId,
+      });
+    }
+  }
+}
+
+module.exports = { startCodexAgent, cancelCodexAgent, cancelAllCodex, resolveCodexBin };

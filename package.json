@@ -1,7 +1,7 @@
 {
   "name": "ensue",
   "productName": "RayLine",
-  "description": "RayLine — a desktop client for Claude Code",
+  "description": "RayLine \u2014 a desktop client for Claude Code",
   "author": {
     "name": "Ensue Laboratories",
     "email": "contact@ensue.dev"
@@ -10,18 +10,24 @@
   "private": true,
   "version": "0.1.8",
   "type": "module",
-  "main": "electron/main.cjs",
+  "main": "dist-electron/electron/main.cjs",
   "scripts": {
     "dev": "vite",
-    "dev:electron": "concurrently \"vite --port 5199 --strictPort\" \"wait-on http://localhost:5199 && node scripts/dev-electron.cjs 5199\"",
-    "build": "vite build",
-    "build:electron": "vite build && electron-builder --config electron-builder.config.cjs",
-    "build:electron:mac": "vite build && electron-builder --config electron-builder.config.cjs --mac",
-    "build:electron:win": "vite build && electron-builder --config electron-builder.config.cjs --win --config.npmRebuild=false",
+    "dev:electron": "concurrently -k \"vite --port 5199 --strictPort\" \"node scripts/build-electron.mjs --watch\" \"wait-on http://localhost:5199 dist-electron/electron/main.cjs && node scripts/dev-electron.cjs 5199\"",
+    "typecheck": "tsc -p tsconfig.renderer.json && tsc -p tsconfig.electron.json && tsc -p tsconfig.node.json",
+    "test": "vitest run",
+    "build:renderer": "vite build",
+    "build:main": "node scripts/build-electron.mjs",
+    "build": "npm run build:renderer && npm run build:main",
+    "build:electron": "npm run build && electron-builder --config electron-builder.config.cjs",
+    "build:electron:mac": "npm run build && electron-builder --config electron-builder.config.cjs --mac",
+    "build:electron:win": "npm run build && electron-builder --config electron-builder.config.cjs --win --config.npmRebuild=false",
     "lint": "eslint .",
+    "lint:ts": "node scripts/ts-migration.ts lint",
     "verify:theme-tokens": "node scripts/verify-theme-tokens.mjs",
     "preview": "vite preview",
-    "rebuild": "electron-rebuild -f -w node-pty"
+    "rebuild": "electron-rebuild -f -w node-pty",
+    "ts:progress": "node scripts/ts-migration.ts report"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -48,17 +54,25 @@
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
     "@eslint/js": "^9.39.4",
+    "@types/katex": "^0.16.8",
+    "@types/node": "^22.20.4",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/ws": "^8.18.2",
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^9.2.1",
     "electron": "^41.2.0",
     "electron-builder": "^26.8.1",
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
+    "typescript": "~6.0",
+    "typescript-eslint": "^8.71.0",
     "vite": "^8.0.4",
+    "vitest": "^5.0.3",
     "wait-on": "^9.0.5"
   }
 }
