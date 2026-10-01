@@ -12,7 +12,6 @@ import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 import { useFontScale } from "../../contexts/FontSizeContext";
 import { CLOSE_MENUS_EVENT, useDismissibleLayer } from "../../hooks/useDismissibleLayer";
-import type { AppRegionStyle } from "../settings/styles";
 import {
   computeAnchoredMenuPosition,
   edgeActiveIndex,
@@ -203,7 +202,7 @@ export function MenuSelect<V extends string>({
     ...triggerStyle,
   };
 
-  const menuStyle: AppRegionStyle | undefined = position
+  const menuStyle: CSSProperties | undefined = position
     ? {
         position: "fixed",
         top: position.top,
@@ -213,6 +212,9 @@ export function MenuSelect<V extends string>({
         overflowY: "auto",
         zIndex: menuZIndex,
         background: "var(--surface-glass)",
+        // Small, short-lived popover: the blur is cheap and keeps text behind it from bleeding through.
+        backdropFilter: "blur(24px) saturate(1.2)",
+        WebkitBackdropFilter: "blur(24px) saturate(1.2)",
         border: "1px solid var(--pane-border)",
         borderRadius: 10,
         padding: 4,

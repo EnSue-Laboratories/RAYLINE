@@ -84,7 +84,6 @@ export function ModelMenu({
     cursor: "pointer",
     fontSize: s(11),
   };
-  // Solid surface: a backdrop blur here would re-run on every streamed frame underneath.
   const style: CSSProperties = {
     ...position,
     position: "fixed",
@@ -92,6 +91,9 @@ export function ModelMenu({
     display: "flex",
     flexDirection: "column",
     background: "var(--surface-glass)",
+        // Small, short-lived popover: the blur is cheap and keeps text behind it from bleeding through.
+        backdropFilter: "blur(24px) saturate(1.2)",
+        WebkitBackdropFilter: "blur(24px) saturate(1.2)",
     border: "1px solid var(--pane-border)",
     borderRadius: 10,
     padding: 4,
