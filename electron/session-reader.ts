@@ -12,6 +12,10 @@ const reader = createSessionReader({
   codexDir: path.join(os.homedir(), ".codex"),
 });
 
+/** Delay before the background index build, so it doesn't compete with startup. */
+const WARM_DELAY_MS = 1_500;
+setTimeout(() => reader.warm(), WARM_DELAY_MS).unref();
+
 /** Sessions recorded for `cwd`, newest first. */
 export const listSessions = reader.listSessions;
 /** Last {@link MAX_MESSAGES} messages of a session (empty when not found). */
@@ -28,7 +32,7 @@ export const moveSessionAsync = reader.moveSessionAsync;
 /** cwd recorded in a Claude session. Sync for the agent launch path. */
 export const findSessionCwd = reader.findSessionCwd;
 export const findSessionCwdAsync = reader.findSessionCwdAsync;
-/** Build the sessionId → file index in the background (call after startup). */
+/** Build the sessionId → file index now (it is also warmed automatically shortly after load). */
 export const warmSessionIndex = reader.warm;
 
 export { MAX_MESSAGES } from "./services/sessions/reader";
