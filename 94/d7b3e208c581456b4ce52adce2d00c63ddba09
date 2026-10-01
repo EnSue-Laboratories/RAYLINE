@@ -1,0 +1,27 @@
+electron/multica-manager.ts
+  s_d0fb9aefa2e5fb::t_2019ea794c9270 1-18,21-25
+electron/providers/multica/session.ts
+  s_d0fb9aefa2e5fb::t_9a28e0f0ee6a76 1-90
+electron/providers/multica/ws-messages.ts
+  s_d0fb9aefa2e5fb::t_2841547acff031 1-11,14-20,22-90
+electron/providers/multica/api.ts
+  s_d0fb9aefa2e5fb::t_724b9840fde683 1-32,42-71,73-125
+electron/providers/multica/ws-pool.ts
+  s_d0fb9aefa2e5fb::t_8b2551d54b59f4 1-188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "94d7b3e208c581456b4ce52adce2d00c63ddba09",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
