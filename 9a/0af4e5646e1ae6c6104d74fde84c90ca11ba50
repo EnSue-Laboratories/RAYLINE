@@ -1,0 +1,35 @@
+src/components/model-picker/ModelOptionRow.tsx
+  s_d0fb9aefa2e5fb::t_a3db0420735031 34,38-39,41,43-53,57-58,60,82-84,86
+  s_d0fb9aefa2e5fb::t_b6d212828abc96 5
+src/components/model-picker/EffortSelect.tsx
+  s_d0fb9aefa2e5fb::t_36a668fede9dc9 1-2,5,13,18,22-24,33,35-41,45-55
+src/components/settings/AdvancedSection.tsx
+  s_d0fb9aefa2e5fb::t_b59ea6e2a20f5e 8
+  s_d0fb9aefa2e5fb::t_3ce47051e69119 1,80-81,83-85,87-88
+src/components/ui/MenuSelect.tsx
+  s_d0fb9aefa2e5fb::t_bfd15b71140421 1-47,54-75,78-172,174-182,187-191,196-201,203-205,208-222,226-243,245-258,260-282,285-305
+  s_d0fb9aefa2e5fb::t_a3db0420735031 173
+  s_d0fb9aefa2e5fb::t_36a668fede9dc9 48-53,76-77,183-186,192-195,202,244,283-284
+src/components/ui/menuSelectLogic.ts
+  s_d0fb9aefa2e5fb::t_6c711ba467a4af 1-87
+src/pm-components/CreateForm.tsx
+  s_d0fb9aefa2e5fb::t_3ce47051e69119 1,81-88
+src/components/settings/controls.tsx
+  s_d0fb9aefa2e5fb::t_3ce47051e69119 6,364-370
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9a0af4e5646e1ae6c6104d74fde84c90ca11ba50",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
