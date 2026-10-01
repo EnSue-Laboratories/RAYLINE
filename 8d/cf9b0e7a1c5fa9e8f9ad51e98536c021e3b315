@@ -1,0 +1,21 @@
+src/utils/exportHelpers.ts
+  s_d0fb9aefa2e5fb::t_2c50b933e69ea1 1-14,28,33,42,54-67,76-78,83-84,87-89,91-96,99-104,122-123,125,129,131,137-139,143,147,150,157,175-192,194,200-201,205-216,218,225,229-234
+src/components/CopyImageBtn.tsx
+  s_d0fb9aefa2e5fb::t_229b131c2c7807 1,4,6,8-14,17,23-51,54-55,59,71,78-83,89-90,92,94,98,113,128,141-142,147-148,169-170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "8dcf9b0e7a1c5fa9e8f9ad51e98536c021e3b315",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
