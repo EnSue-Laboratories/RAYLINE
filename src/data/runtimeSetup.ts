@@ -1,0 +1,212 @@
+/**
+ * Runtime (agent CLI) install / sign-in helpers for the setup card. Pure data
+ * plus two lookups; the commands run in a RayLine terminal session.
+ */
+
+/** CLIs the setup card can install. */
+export type RuntimeSetupProviderId = "claude" | "codex" | "opencode" | "grok";
+
+export type RuntimeSetupAction = "install" | "signin";
+
+export interface RuntimeSetupProvider {
+  readonly id: RuntimeSetupProviderId;
+  readonly name: string;
+  readonly eyebrow: string;
+  readonly description: string;
+  /** Primary providers are shown first, as large cards. */
+  readonly primary: boolean;
+  readonly installNote: string;
+}
+
+type RuntimeSetupCommands = Readonly<Record<RuntimeSetupProviderId, Readonly<Record<RuntimeSetupAction, string>>>>;
+
+export function isRuntimeSetupProviderId(value: unknown): value is RuntimeSetupProviderId {
+  return value === "claude" || value === "codex" || value === "opencode" || value === "grok";
+}
+
+export const RUNTIME_SETUP_DOCS: Readonly<Record<RuntimeSetupProviderId, string>> = {
+  claude: "https://code.claude.com/docs/en/setup",
+  codex: "https://developers.openai.com/codex/cli",
+  opencode: "https://opencode.ai/docs",
+  grok: "https://docs.x.ai/docs/grok-code",
+};
+
+export const RUNTIME_SETUP_PROVIDERS: readonly RuntimeSetupProvider[] = [
+  {
+    id: "codex",
+    name: "Codex",
+    eyebrow: "OpenAI",
+    description: "Use your ChatGPT account with the Codex CLI.",
+    primary: true,
+    installNote: "Official install path uses npm.",
+  },
+  {
+    id: "claude",
+    name: "Claude Code",
+    eyebrow: "Anthropic",
+    description: "Use your Anthropic account with the native Claude Code installer.",
+    primary: true,
+    installNote: "Native installer, no Node dependency.",
+  },
+  {
+    id: "opencode",
+    name: "OpenCode",
+    eyebrow: "Optional",
+    description: "Bring your own provider or API key.",
+    primary: false,
+    installNote: "Provider setup is still required after install.",
+  },
+  {
+    id: "grok",
+    name: "Grok",
+    eyebrow: "xAI",
+    description: "Use the local Grok Build CLI with RayLine projects.",
+    primary: false,
+    installNote: "Install or update with the Grok CLI setup path.",
+  },
+];
+
+const UNIX_COMMANDS: RuntimeSetupCommands = {
+  codex: {
+    install: `printf '\\033[1mRayLine Codex setup\\033[0m\\n'
+if ! command -v npm >/dev/null 2>&1; then
+  echo "Codex CLI's official install path uses npm."
+  echo "Install Node.js/npm first, or open the Codex docs from RayLine."
+  exit 1
+fi
+if npm i -g @openai/codex; then
+  hash -r 2>/dev/null || true
+  echo
+  echo "Starting Codex sign-in..."
+  if command -v codex >/dev/null 2>&1; then
+    codex
+  else
+    echo "Codex installed, but it is not on PATH in this shell yet."
+    echo "Open a new terminal or add npm's global bin directory to PATH."
+  fi
+fi`,
+    signin: "codex",
+  },
+  claude: {
+    install: `printf '\\033[1mRayLine Claude Code setup\\033[0m\\n'
+set -o pipefail
+if curl -fsSL https://claude.ai/install.sh | bash; then
+  hash -r 2>/dev/null || true
+  echo
+  echo "Starting Claude Code sign-in..."
+  if command -v claude >/dev/null 2>&1; then
+    claude
+  else
+    echo "Claude Code installed, but it is not on PATH in this shell yet."
+    echo "Open a new terminal and run: claude"
+  fi
+fi`,
+    signin: "claude",
+  },
+  opencode: {
+    install: `printf '\\033[1mRayLine OpenCode setup\\033[0m\\n'
+set -o pipefail
+if curl -fsSL https://opencode.ai/install | bash; then
+  hash -r 2>/dev/null || true
+  echo
+  echo "Starting OpenCode..."
+  if command -v opencode >/dev/null 2>&1; then
+    opencode
+  else
+    echo "OpenCode installed, but it is not on PATH in this shell yet."
+    echo "Open a new terminal and run: opencode"
+  fi
+fi`,
+    signin: "opencode",
+  },
+  grok: {
+    install: `printf '\\033[1mRayLine Grok setup\\033[0m\\n'
+if command -v grok >/dev/null 2>&1; then
+  echo "Grok is already installed. Starting sign-in or setup..."
+  grok login || grok
+else
+  echo "Grok CLI is not on PATH in this shell."
+  echo "Open the Grok docs from RayLine and install the local CLI, then refresh runtime setup."
+fi`,
+    signin: "grok login",
+  },
+};
+
+const WINDOWS_COMMANDS: RuntimeSetupCommands = {
+  codex: {
+    install: `Write-Host "RayLine Codex setup"
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+  Write-Host "Codex CLI's official install path uses npm."
+  Write-Host "Install Node.js/npm first, or open the Codex docs from RayLine."
+  exit 1
+}
+npm i -g @openai/codex
+if ($LASTEXITCODE -eq 0) {
+  Write-Host ""
+  Write-Host "Starting Codex sign-in..."
+  if (Get-Command codex -ErrorAction SilentlyContinue) {
+    codex
+  } else {
+    Write-Host "Codex installed, but it is not on PATH in this shell yet."
+    Write-Host "Open a new terminal or add npm's global bin directory to PATH."
+  }
+}`,
+    signin: "codex",
+  },
+  claude: {
+    install: `Write-Host "RayLine Claude Code setup"
+try {
+  irm https://claude.ai/install.ps1 | iex
+  $raylineClaudeInstalled = $true
+} catch {
+  Write-Error $_
+  $raylineClaudeInstalled = $false
+}
+if ($raylineClaudeInstalled) {
+  Write-Host ""
+  Write-Host "Starting Claude Code sign-in..."
+  if (Get-Command claude -ErrorAction SilentlyContinue) {
+    claude
+  } else {
+    Write-Host "Claude Code installed, but it is not on PATH in this shell yet."
+    Write-Host "Open a new terminal and run: claude"
+  }
+}`,
+    signin: "claude",
+  },
+  opencode: {
+    install: `Write-Host "RayLine OpenCode setup"
+if (Get-Command npm -ErrorAction SilentlyContinue) {
+  npm i -g opencode-ai
+  if ($LASTEXITCODE -eq 0 -and (Get-Command opencode -ErrorAction SilentlyContinue)) {
+    opencode
+  }
+} else {
+  Write-Host "OpenCode's automatic Windows setup currently expects npm or WSL."
+  Write-Host "Open the OpenCode docs from RayLine for the official Windows guidance."
+}`,
+    signin: "opencode",
+  },
+  grok: {
+    install: `Write-Host "RayLine Grok setup"
+if (Get-Command grok -ErrorAction SilentlyContinue) {
+  grok login
+} else {
+  Write-Host "Grok CLI is not on PATH in this shell. Open the Grok docs from RayLine, install it, then refresh runtime setup."
+}`,
+    signin: "grok login",
+  },
+};
+
+/** Shell script for `providerId`/`action` on `platform`; "" for unknown providers. */
+export function getRuntimeSetupCommand(providerId: unknown, action: RuntimeSetupAction = "install", platform = ""): string {
+  if (!isRuntimeSetupProviderId(providerId)) return "";
+  const table = platform === "win32" ? WINDOWS_COMMANDS : UNIX_COMMANDS;
+  return table[providerId][action] || "";
+}
+
+/** Windows runs setup scripts in PowerShell; elsewhere the default shell. */
+export function getRuntimeSetupShell(platform = ""): string | undefined {
+  if (platform !== "win32") return undefined;
+  return "powershell.exe";
+}

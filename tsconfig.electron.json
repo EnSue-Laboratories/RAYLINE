@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "tsBuildInfoFile": "node_modules/.cache/tsc/electron.tsbuildinfo"
+  },
+  "include": ["electron", "shared"],
+  "exclude": ["electron/vendor", "electron/shell-init"]
+}

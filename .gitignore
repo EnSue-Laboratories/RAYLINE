@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-electron/
 release/
 .DS_Store
 *.log
@@ -15,3 +16,11 @@ ARCH.md
 .bash_history
 .histfile
 .claude/worktrees
+
+# Local generated artifacts and UI verification
+outputs/
+output/
+.playwright-cli/
+
+# node_modules may be a symlink in review worktrees (a dir-only pattern misses symlinks).
+/node_modules

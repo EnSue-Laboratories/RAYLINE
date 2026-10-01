@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    // Scripts run directly on Node's type stripping, which needs explicit
+    // `.ts` import specifiers (requires noEmit, set in the base config).
+    "allowImportingTsExtensions": true
+  },
+  "include": ["scripts", "*.config.ts"]
+}
