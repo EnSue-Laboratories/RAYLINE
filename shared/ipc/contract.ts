@@ -105,6 +105,7 @@ import type {
   RemoteRuntimeCheckResult,
   UpstreamProviderId,
 } from "../providers/types";
+import type { RuntimeModelCatalog } from "../models/types";
 import type { PersistedAppIndex, PersistedAppState, StateSaveRequest } from "../state/types";
 import type { ShellRunRequest, ShellRunResult, SystemInfo } from "../system/types";
 import type {
@@ -125,7 +126,7 @@ import type {
   TerminalSurfacePreference,
   TerminalWindowStatePayload,
 } from "../terminal/types";
-import type { UpdaterStatus } from "../updater/types";
+import type { AppBuildInfo, UpdaterStatus } from "../updater/types";
 
 /** `sync-provider-upstreams` argument (`config: null` clears). */
 export interface SyncProviderUpstreamsRequest {
@@ -190,6 +191,13 @@ export interface InvokeChannels {
   // System / providers
   "system-info": { args: []; result: SystemInfo };
   "check-cli-installed": { args: [options?: CheckCliInstalledOptions]; result: CliInstalledSnapshot };
+  /**
+   * Installed CLIs' model catalogs (Codex models_cache.json, `grok models`,
+   * `agy models`), cached ~60s in main. Metadata only; empty arrays when a
+   * CLI is missing or discovery fails. Never rejects. Feed to
+   * `buildRuntimeModels` (after `normalizeRuntimeModelCatalog`).
+   */
+  "model-catalog": { args: []; result: RuntimeModelCatalog };
   "opencode-status": { args: []; result: OpenCodeStatus };
   /** Rejects on invalid provider/model id. */
   "opencode-save-config": { args: [input: OpenCodeSaveConfigInput]; result: OpenCodeStatusSnapshot };
@@ -276,6 +284,8 @@ export interface InvokeChannels {
 
   // Auto-updater (progress on `updater-status`)
   "get-app-version": { args: []; result: string };
+  /** Version, packaged flag and build source (commit / release repository). */
+  "get-app-build": { args: []; result: AppBuildInfo };
   "updater-check": { args: []; result: void };
   "updater-download": { args: []; result: void };
   "updater-install": { args: []; result: void };
@@ -340,7 +350,7 @@ export interface InvokeChannels {
 export interface SendChannels {
   /** Starts a run; results arrive on agent-stream / agent-done / agent-error. */
   "agent-start": { args: [request: AgentStartRequest] };
-  /** Cancels any provider's run for the conversation. */
+  /** Cancels the conversation's run, whichever provider runs it. */
   "agent-cancel": { args: [request: AgentCancelRequest] };
   /** Resume + fork the native session with an edited prompt. */
   "agent-edit-resend": { args: [request: AgentEditResendRequest] };

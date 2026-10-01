@@ -2,7 +2,8 @@
  * Main → renderer agent events (`agent-stream`, `agent-done`, `agent-error`).
  *
  * `agent-stream` carries provider-native events *verbatim* (Claude stream-json,
- * Codex exec --json, OpenCode run/serve JSON, Multica WS frames) plus a few
+ * Codex exec --json, OpenCode run/serve JSON, Multica WS frames), Grok / AGY
+ * events normalized into the OpenCode shapes (`provider: "grok" | "agy"`), plus a few
  * RayLine-synthesized events. `AgentStreamEvent` is the discriminated union of
  * all of them, keyed by `type`; the renderer reducer (src/hooks/useAgent)
  * switches on it.
@@ -74,7 +75,7 @@ export interface AgentStreamPayload {
  *  - launch failures: `exitCode: -1`
  *  - cancellation: `exitCode: null, signal: "SIGTERM"`
  *  - Multica (no process): 0 completed, 1 failed, null cancelled
- * Codex / OpenCode also send `threadId` (their native session id).
+ * Codex / OpenCode / Grok / AGY also send `threadId` (their native session id).
  */
 export interface AgentDonePayload {
   conversationId: string;
