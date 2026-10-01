@@ -290,4 +290,6 @@ export interface DispatchModelPayload {
   effort?: EffortLevel;
   thinking?: boolean;
   openCodeConfig?: OpenCodeRuntimeConfig;
+  /** Set for SSH-hosted models; main rejects these as planner models. */
+  remoteRuntime?: RemoteRuntimeConfig;
 }

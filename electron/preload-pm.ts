@@ -1,46 +1,47 @@
-// @ts-nocheck
-const { contextBridge, ipcRenderer } = require("electron");
+/** Project Manager window preload → `window.ghApi`. */
 
-contextBridge.exposeInMainWorld("ghApi", {
-  checkAuth: () => ipcRenderer.invoke("gh-check-auth"),
-  listAuthAccounts: () => ipcRenderer.invoke("gh-list-auth-accounts"),
-  switchAccount: (user) => ipcRenderer.invoke("gh-switch-account", user),
-  listUserRepos: (limit) => ipcRenderer.invoke("gh-list-user-repos", limit),
-  listIssues: (repo, state) => ipcRenderer.invoke("gh-list-issues", repo, state),
-  listPRs: (repo, state) => ipcRenderer.invoke("gh-list-prs", repo, state),
-  getIssue: (repo, number) => ipcRenderer.invoke("gh-get-issue", repo, number),
-  getPR: (repo, number) => ipcRenderer.invoke("gh-get-pr", repo, number),
-  listComments: (repo, number) => ipcRenderer.invoke("gh-list-comments", repo, number),
-  addComment: (repo, number, body) => ipcRenderer.invoke("gh-add-comment", repo, number, body),
-  listCollaborators: (repo) => ipcRenderer.invoke("gh-list-collaborators", repo),
-  assignIssue: (repo, number, assignees) => ipcRenderer.invoke("gh-assign-issue", repo, number, assignees),
-  unassignIssue: (repo, number, assignees) => ipcRenderer.invoke("gh-unassign-issue", repo, number, assignees),
-  checkoutPR: (repo, prNumber) => ipcRenderer.invoke("gh-checkout-pr", repo, prNumber),
-  closeIssue: (repo, number) => ipcRenderer.invoke("gh-close-issue", repo, number),
-  mergePR: (repo, number) => ipcRenderer.invoke("gh-merge-pr", repo, number),
-  reopenIssue: (repo, number) => ipcRenderer.invoke("gh-reopen-issue", repo, number),
-  createIssue: (repo, title, body) => ipcRenderer.invoke("gh-create-issue", repo, title, body),
-  createPR: (repo, title, body, head, base) => ipcRenderer.invoke("gh-create-pr", repo, title, body, head, base),
-  listBranches: (repo) => ipcRenderer.invoke("gh-list-branches", repo),
-  getLinkedPRs: (repo, number) => ipcRenderer.invoke("gh-linked-prs", repo, number),
-  getCurrentBranch: () => ipcRenderer.invoke("gh-current-branch"),
-  getRepoDefaultBranch: (repo) => ipcRenderer.invoke("gh-repo-default-branch", repo),
-  uploadImage: (repo, base64Data, filename) => ipcRenderer.invoke("gh-upload-image", repo, base64Data, filename),
-  loadPmState: () => ipcRenderer.invoke("gh-load-pm-state"),
-  savePmState: (state) => ipcRenderer.invoke("gh-save-pm-state", state),
-  loadAppState: () => ipcRenderer.invoke("load-state"),
-  readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
-  getSystemInfo: () => ipcRenderer.invoke("system-info"),
-  setWindowBackgroundColor: (color) => ipcRenderer.invoke("set-window-background-color", color),
-  windowMinimize: () => ipcRenderer.invoke("window-minimize"),
-  windowToggleMaximize: () => ipcRenderer.invoke("window-toggle-maximize"),
-  windowClose: () => ipcRenderer.invoke("window-close"),
-  authStart: () => ipcRenderer.invoke("gh-auth-start"),
-  authCancel: () => ipcRenderer.invoke("gh-auth-cancel"),
-  authLogout: () => ipcRenderer.invoke("gh-auth-logout"),
-  onAuthEvent: (handler) => {
-    const listener = (_e, payload) => handler(payload);
-    ipcRenderer.on("gh-auth-event", listener);
-    return () => ipcRenderer.removeListener("gh-auth-event", listener);
-  },
-});
+import { contextBridge } from "electron";
+import type { GithubApi } from "@shared/ipc/renderer-api";
+import { invoker, subscriber } from "./preload/ipc";
+
+const ghApi = {
+  checkAuth: invoker("gh-check-auth"),
+  listAuthAccounts: invoker("gh-list-auth-accounts"),
+  switchAccount: invoker("gh-switch-account"),
+  listUserRepos: invoker("gh-list-user-repos"),
+  listIssues: invoker("gh-list-issues"),
+  listPRs: invoker("gh-list-prs"),
+  getIssue: invoker("gh-get-issue"),
+  getPR: invoker("gh-get-pr"),
+  listComments: invoker("gh-list-comments"),
+  addComment: invoker("gh-add-comment"),
+  listCollaborators: invoker("gh-list-collaborators"),
+  assignIssue: invoker("gh-assign-issue"),
+  unassignIssue: invoker("gh-unassign-issue"),
+  checkoutPR: invoker("gh-checkout-pr"),
+  closeIssue: invoker("gh-close-issue"),
+  mergePR: invoker("gh-merge-pr"),
+  reopenIssue: invoker("gh-reopen-issue"),
+  createIssue: invoker("gh-create-issue"),
+  createPR: invoker("gh-create-pr"),
+  listBranches: invoker("gh-list-branches"),
+  getLinkedPRs: invoker("gh-linked-prs"),
+  getCurrentBranch: invoker("gh-current-branch"),
+  getRepoDefaultBranch: invoker("gh-repo-default-branch"),
+  uploadImage: invoker("gh-upload-image"),
+  loadPmState: invoker("gh-load-pm-state"),
+  savePmState: invoker("gh-save-pm-state"),
+  loadAppState: invoker("load-state"),
+  readImage: invoker("read-image"),
+  getSystemInfo: invoker("system-info"),
+  setWindowBackgroundColor: invoker("set-window-background-color"),
+  windowMinimize: invoker("window-minimize"),
+  windowToggleMaximize: invoker("window-toggle-maximize"),
+  windowClose: invoker("window-close"),
+  authStart: invoker("gh-auth-start"),
+  authCancel: invoker("gh-auth-cancel"),
+  authLogout: invoker("gh-auth-logout"),
+  onAuthEvent: subscriber("gh-auth-event"),
+} satisfies GithubApi;
+
+contextBridge.exposeInMainWorld("ghApi", ghApi);

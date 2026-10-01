@@ -1,192 +1,198 @@
-// @ts-nocheck
-const { contextBridge, ipcRenderer, webUtils } = require("electron");
+/** Main + terminal window preload → `window.api`. */
 
-// Inlined logger: sandboxed preload cannot require relative files.
+import { contextBridge, webUtils } from "electron";
+import type { PlatformFile, RaylineApi } from "@shared/ipc/renderer-api";
+import { invoke, invoker, sender, subscriber, syncSender } from "./preload/ipc";
+
+// Inlined logger: the sandboxed preload cannot require main-process modules.
 const VERBOSE_PRELOAD_LOGS = (() => {
   const truthy = /^(1|true|yes|on)$/i;
-  const debug = String(process.env.RAYLINE_DEBUG || "").trim();
-  if (truthy.test(String(process.env.RAYLINE_VERBOSE_LOGS || ""))) return true;
+  const debug = (process.env.RAYLINE_DEBUG ?? "").trim();
+  if (truthy.test(process.env.RAYLINE_VERBOSE_LOGS ?? "")) return true;
   if (truthy.test(debug)) return true;
   return debug
     .split(/[\s,]+/)
     .filter(Boolean)
     .some((t) => t === "rayline:*" || t === "rayline:checkpoint-preload" || t === "checkpoint-preload");
 })();
-const logCheckpoint = (...args) => {
+
+const logCheckpoint = (...args: unknown[]): void => {
   if (VERBOSE_PRELOAD_LOGS) console.log("[checkpoint-preload]", ...args);
 };
 
-contextBridge.exposeInMainWorld("api", {
-  agentStart: (opts) => ipcRenderer.send("agent-start", opts),
-  agentCancel: (id) => ipcRenderer.send("agent-cancel", id),
-  agentEditAndResend: (opts) => ipcRenderer.send("agent-edit-resend", opts),
-  onAgentStream: (cb) => {
-    const handler = (_e, data) => cb(data);
-    ipcRenderer.on("agent-stream", handler);
-    return () => ipcRenderer.removeListener("agent-stream", handler);
-  },
-  onAgentDone: (cb) => {
-    const handler = (_e, data) => cb(data);
-    ipcRenderer.on("agent-done", handler);
-    return () => ipcRenderer.removeListener("agent-done", handler);
-  },
-  onAgentError: (cb) => {
-    const handler = (_e, data) => cb(data);
-    ipcRenderer.on("agent-error", handler);
-    return () => ipcRenderer.removeListener("agent-error", handler);
-  },
-  agentPermissionRespond: (opts) => ipcRenderer.send("agent-permission-respond", opts),
-  onAgentPermissionRequest: (cb) => {
-    const handler = (_e, data) => cb(data);
-    ipcRenderer.on("agent-permission-request", handler);
-    return () => ipcRenderer.removeListener("agent-permission-request", handler);
-  },
-  onAgentPermissionCancelled: (cb) => {
-    const handler = (_e, data) => cb(data);
-    ipcRenderer.on("agent-permission-cancelled", handler);
-    return () => ipcRenderer.removeListener("agent-permission-cancelled", handler);
-  },
-  pickFolder: () => ipcRenderer.invoke("folder-pick"),
-  selectWallpaper: (previousPath) => ipcRenderer.invoke("select-wallpaper", previousPath),
-  deleteWallpaper: (filePath) => ipcRenderer.invoke("delete-wallpaper", filePath),
-  readImage: (filePath) => ipcRenderer.invoke("read-image", filePath),
-  storeMessageImage: (input) => ipcRenderer.invoke("store-message-image", input),
-  listSessions: (cwd) => ipcRenderer.invoke("list-sessions", cwd),
-  loadSession: (sessionId) => ipcRenderer.invoke("load-session", sessionId),
-  loadSessionSearchText: (sessionId) => ipcRenderer.invoke("load-session-search-text", sessionId),
-  moveSession: (sessionId, newCwd) => ipcRenderer.invoke("move-session", sessionId, newCwd),
-  rewindFiles: (opts) => ipcRenderer.invoke("rewind-files", opts),
-  checkpointCreate: async (cwdPath) => {
-    logCheckpoint("checkpointCreate", { cwdPath });
-    return ipcRenderer.invoke("checkpoint-create", cwdPath);
-  },
-  checkpointRestore: async (cwdPath, ref) => {
-    logCheckpoint("checkpointRestore", { cwdPath, ref });
-    return ipcRenderer.invoke("checkpoint-restore", cwdPath, ref);
-  },
-  saveState: (state) => ipcRenderer.invoke("save-state", state),
-  saveStateSync: (state) => ipcRenderer.sendSync("save-state-sync", state),
-  loadState: () => ipcRenderer.invoke("load-state"),
-  getFilePath: (file) => {
-    try { return webUtils.getPathForFile(file); } catch { return null; }
-  },
-  quickExplain: (opts) => ipcRenderer.invoke("quick-explain", opts),
-  dispatchPlan: (opts) => ipcRenderer.invoke("dispatch-plan", opts),
-  getSystemInfo: () => ipcRenderer.invoke("system-info"),
-  getDraftsPath: () => ipcRenderer.invoke("get-drafts-path"),
-  pathExists: (p) => ipcRenderer.invoke("path-exists", p),
-  checkCliInstalled: (options) => ipcRenderer.invoke("check-cli-installed", options),
-  opencodeStatus: () => ipcRenderer.invoke("opencode-status"),
-  opencodeSaveConfig: (input) => ipcRenderer.invoke("opencode-save-config", input),
-  opencodeGetProviderConfig: (providerId) => ipcRenderer.invoke("opencode-get-provider-config", providerId),
-  syncProviderUpstreams: (provider, config) => ipcRenderer.invoke("sync-provider-upstreams", { provider, config }),
-  shellRun: ({ command, cwd }) => ipcRenderer.invoke("shell-run", { command, cwd }),
-  remoteRuntimeCheck: ({ sshCommand }) => ipcRenderer.invoke("remote-runtime-check", { sshCommand }),
+// Main only sends terminal output to windows that listen; announce the first
+// listener / last unsubscribe of this window.
+const terminalOutputSubscriber = subscriber("terminal-output");
+const announceTerminalOutput = sender("terminal-output-subscribe");
+let terminalOutputListeners = 0;
 
-  // Git operations
-  gitBranches: (cwd) => ipcRenderer.invoke("git-branches", cwd),
-  gitCreateBranch: (cwd, name) => ipcRenderer.invoke("git-create-branch", cwd, name),
-  gitCheckout: (cwd, name) => ipcRenderer.invoke("git-checkout", cwd, name),
-  gitWorktreeList: (cwd) => ipcRenderer.invoke("git-worktree-list", cwd),
-  gitWorktreeAdd: (cwd, path, branch, options) => ipcRenderer.invoke("git-worktree-add", cwd, path, branch, options),
-  gitDeleteBranch: (cwd, name) => ipcRenderer.invoke("git-delete-branch", cwd, name),
-  gitWorktreeRemove: (cwd, path) => ipcRenderer.invoke("git-worktree-remove", cwd, path),
-  gitWorktreePromote: (mainRepoPath, worktreePath, branchName) => ipcRenderer.invoke("git-worktree-promote", mainRepoPath, worktreePath, branchName),
-  gitStatus: (cwd) => ipcRenderer.invoke("git-status", cwd),
-  gitRemoteSlug: (cwd) => ipcRenderer.invoke("git-remote-slug", cwd),
-  gitFetch: (cwd) => ipcRenderer.invoke("git-fetch", cwd),
-  gitDiff: (cwd) => ipcRenderer.invoke("git-diff", cwd),
-  gitStage: (cwd, paths) => ipcRenderer.invoke("git-stage", cwd, paths),
-  gitUnstage: (cwd, paths) => ipcRenderer.invoke("git-unstage", cwd, paths),
-  gitRevert: (cwd, path, untracked) => ipcRenderer.invoke("git-revert", cwd, path, untracked),
-  gitIgnore: (cwd, path) => ipcRenderer.invoke("git-ignore", cwd, path),
-  gitCommit: (cwd, message, coauthor) => ipcRenderer.invoke("git-commit", cwd, message, coauthor),
-  gitPush: (cwd) => ipcRenderer.invoke("git-push", cwd),
-  gitPull: (cwd) => ipcRenderer.invoke("git-pull", cwd),
-  gitPrStatus: (cwd) => ipcRenderer.invoke("git-pr-status", cwd),
-  gitCreatePr: (cwd, base) => ipcRenderer.invoke("git-create-pr", cwd, base),
-  gitMergePr: (cwd) => ipcRenderer.invoke("git-merge-pr", cwd),
-  gitGenCommitMessage: (cwd) => ipcRenderer.invoke("git-gen-commit-message", cwd),
+const subscribeTerminalOutput: RaylineApi["onTerminalOutput"] = (listener) => {
+  const unsubscribe = terminalOutputSubscriber(listener);
+  terminalOutputListeners += 1;
+  if (terminalOutputListeners === 1) announceTerminalOutput(true);
+  let active = true;
+  return () => {
+    if (!active) return;
+    active = false;
+    unsubscribe();
+    terminalOutputListeners -= 1;
+    if (terminalOutputListeners === 0) announceTerminalOutput(false);
+  };
+};
+
+const api = {
+  // Agent runs
+  agentStart: sender("agent-start"),
+  agentCancel: sender("agent-cancel"),
+  agentEditAndResend: sender("agent-edit-resend"),
+  onAgentStream: subscriber("agent-stream"),
+  onAgentDone: subscriber("agent-done"),
+  onAgentError: subscriber("agent-error"),
+  agentPermissionRespond: sender("agent-permission-respond"),
+  onAgentPermissionRequest: subscriber("agent-permission-request"),
+  onAgentPermissionCancelled: subscriber("agent-permission-cancelled"),
+
+  // Dialogs, files, images
+  pickFolder: invoker("folder-pick"),
+  selectWallpaper: invoker("select-wallpaper"),
+  deleteWallpaper: invoker("delete-wallpaper"),
+  readImage: invoker("read-image"),
+  storeMessageImage: invoker("store-message-image"),
+
+  // Sessions & checkpoints
+  listSessions: invoker("list-sessions"),
+  loadSession: invoker("load-session"),
+  loadSessionSearchText: invoker("load-session-search-text"),
+  moveSession: invoker("move-session"),
+  rewindFiles: invoker("rewind-files"),
+  checkpointCreate: (cwdPath) => {
+    logCheckpoint("checkpointCreate", { cwdPath });
+    return invoke("checkpoint-create", cwdPath);
+  },
+  checkpointRestore: (cwdPath, ref) => {
+    logCheckpoint("checkpointRestore", { cwdPath, ref });
+    return invoke("checkpoint-restore", cwdPath, ref);
+  },
+
+  // App state (legacy whole-state + v2 split persistence)
+  saveState: invoker("save-state"),
+  saveStateSync: syncSender("save-state-sync"),
+  loadState: invoker("load-state"),
+  stateLoad: invoker("state:load"),
+  stateLoadConversation: invoker("state:load-conversation"),
+  stateSave: invoker("state:save"),
+  stateSaveSync: syncSender("state:save-sync"),
+  getFilePath(file: PlatformFile): string | null {
+    try {
+      // A renderer `File` arrives here; PlatformFile is its DOM-free view.
+      return webUtils.getPathForFile(file as unknown as File);
+    } catch {
+      return null;
+    }
+  },
+
+  // One-shot helpers & system
+  quickExplain: invoker("quick-explain"),
+  dispatchPlan: invoker("dispatch-plan"),
+  getSystemInfo: invoker("system-info"),
+  getDraftsPath: invoker("get-drafts-path"),
+  pathExists: invoker("path-exists"),
+  checkCliInstalled: invoker("check-cli-installed"),
+  getModelCatalog: invoker("model-catalog"),
+  opencodeStatus: invoker("opencode-status"),
+  opencodeSaveConfig: invoker("opencode-save-config"),
+  opencodeGetProviderConfig: invoker("opencode-get-provider-config"),
+  syncProviderUpstreams: (provider, config) => invoke("sync-provider-upstreams", { provider, config }),
+  shellRun: ({ command, cwd }) => invoke("shell-run", { command, cwd }),
+  remoteRuntimeCheck: ({ sshCommand }) => invoke("remote-runtime-check", { sshCommand }),
+
+  // Git
+  gitBranches: invoker("git-branches"),
+  gitCreateBranch: invoker("git-create-branch"),
+  gitCheckout: invoker("git-checkout"),
+  gitWorktreeList: invoker("git-worktree-list"),
+  gitWorktreeAdd: invoker("git-worktree-add"),
+  gitDeleteBranch: invoker("git-delete-branch"),
+  gitWorktreeRemove: invoker("git-worktree-remove"),
+  gitWorktreePromote: invoker("git-worktree-promote"),
+  gitStatus: invoker("git-status"),
+  gitRemoteSlug: invoker("git-remote-slug"),
+  gitFetch: invoker("git-fetch"),
+  gitDiff: invoker("git-diff"),
+  gitStage: invoker("git-stage"),
+  gitUnstage: invoker("git-unstage"),
+  gitRevert: invoker("git-revert"),
+  gitIgnore: invoker("git-ignore"),
+  gitCommit: invoker("git-commit"),
+  gitPush: invoker("git-push"),
+  gitPull: invoker("git-pull"),
+  gitPrStatus: invoker("git-pr-status"),
+  gitCreatePr: invoker("git-create-pr"),
+  gitMergePr: invoker("git-merge-pr"),
+  gitGenCommitMessage: invoker("git-gen-commit-message"),
 
   // Terminal sessions
-  terminalCreate: (opts) => ipcRenderer.invoke("terminal-create", opts),
-  terminalSend: ({ name, text }) => ipcRenderer.invoke("terminal-send", { name, text }),
-  terminalRead: ({ name, lines }) => ipcRenderer.invoke("terminal-read", { name, lines }),
-  terminalKill: ({ name }) => ipcRenderer.invoke("terminal-kill", { name }),
-  terminalList: () => ipcRenderer.invoke("terminal-list"),
-  terminalResize: ({ name, cols, rows }) => ipcRenderer.invoke("terminal-resize", { name, cols, rows }),
-  terminalMetadata: () => ipcRenderer.invoke("terminal-metadata"),
-  terminalConsumePreferredSession: () => ipcRenderer.invoke("terminal-consume-preferred-session"),
-  terminalSavedMetadata: () => ipcRenderer.invoke("terminal-saved-metadata"),
-  terminalDebugLog: (payload) => ipcRenderer.send("terminal-debug-log", payload),
-  onTerminalOutput: (cb) => {
-    const handler = (_e, data) => cb(data);
-    ipcRenderer.on("terminal-output", handler);
-    return () => ipcRenderer.removeListener("terminal-output", handler);
-  },
-  openTerminalWindow: () => ipcRenderer.invoke("open-terminal-window"),
-  closeTerminalWindow: () => ipcRenderer.invoke("close-terminal-window"),
-  isTerminalWindowOpen: () => ipcRenderer.invoke("is-terminal-window-open"),
-  setTerminalSurfacePreference: (state) => ipcRenderer.invoke("terminal-surface-preference", state),
-  terminalWindowReady: () => ipcRenderer.send("terminal-window-ready"),
-  closeCurrentWindow: () => ipcRenderer.invoke("window-close-current"),
-  onTerminalWindowState: (cb) => {
-    const handler = (_e, data) => cb(data);
-    ipcRenderer.on("terminal-window-state", handler);
-    return () => ipcRenderer.removeListener("terminal-window-state", handler);
-  },
-  onTerminalSidebarRevealRequest: (cb) => {
-    const handler = (_e, data) => cb(data);
-    ipcRenderer.on("terminal-sidebar-reveal-request", handler);
-    return () => ipcRenderer.removeListener("terminal-sidebar-reveal-request", handler);
-  },
-  onTerminalSessionsState: (cb) => {
-    const handler = (_e, data) => cb(data);
-    ipcRenderer.on("terminal-sessions-state", handler);
-    return () => ipcRenderer.removeListener("terminal-sessions-state", handler);
-  },
+  terminalCreate: invoker("terminal-create"),
+  terminalSend: ({ name, text }) => invoke("terminal-send", { name, text }),
+  terminalRead: ({ name, lines }) => invoke("terminal-read", { name, lines }),
+  terminalKill: ({ name }) => invoke("terminal-kill", { name }),
+  terminalList: invoker("terminal-list"),
+  terminalResize: ({ name, cols, rows }) => invoke("terminal-resize", { name, cols, rows }),
+  terminalMetadata: invoker("terminal-metadata"),
+  terminalConsumePreferredSession: invoker("terminal-consume-preferred-session"),
+  terminalSavedMetadata: invoker("terminal-saved-metadata"),
+  terminalDebugLog: sender("terminal-debug-log"),
+  onTerminalOutput: subscribeTerminalOutput,
+  openTerminalWindow: invoker("open-terminal-window"),
+  closeTerminalWindow: invoker("close-terminal-window"),
+  isTerminalWindowOpen: invoker("is-terminal-window-open"),
+  setTerminalSurfacePreference: invoker("terminal-surface-preference"),
+  terminalWindowReady: sender("terminal-window-ready"),
+  closeCurrentWindow: invoker("window-close-current"),
+  onTerminalWindowState: subscriber("terminal-window-state"),
+  onTerminalSidebarRevealRequest: subscriber("terminal-sidebar-reveal-request"),
+  onTerminalSessionsState: subscriber("terminal-sessions-state"),
 
   // File operations
-  openPath: (dirPath) => ipcRenderer.invoke("open-path", dirPath),
-  selectFiles: () => ipcRenderer.invoke("select-files"),
+  openPath: invoker("open-path"),
+  selectFiles: invoker("select-files"),
 
-  // GitHub operations
-  ghGetIssue: (repo, number) => ipcRenderer.invoke("gh-get-issue", repo, number),
-  ghListIssues: (repo, state) => ipcRenderer.invoke("gh-list-issues", repo, state),
-  ghGetRepoName: (cwd) => ipcRenderer.invoke("gh-get-repo-name", cwd),
+  // GitHub (subset available in the main window)
+  ghGetIssue: invoker("gh-get-issue"),
+  ghListIssues: invoker("gh-list-issues"),
+  ghGetRepoName: invoker("gh-get-repo-name"),
 
   // Project Manager
-  openProjectManager: () => ipcRenderer.send("open-project-manager"),
-  cloneRepo: ({ url, parentDir }) => ipcRenderer.invoke("project-clone", { url, parentDir }),
+  openProjectManager: sender("open-project-manager"),
+  cloneRepo: ({ url, parentDir }) => invoke("project-clone", { url, parentDir }),
 
-  // Window appearance
-  setWindowOpacity: (opacity) => ipcRenderer.invoke("set-window-opacity", opacity),
-  setWindowBackgroundColor: (color) => ipcRenderer.invoke("set-window-background-color", color),
-  windowMinimize: () => ipcRenderer.invoke("window-minimize"),
-  windowToggleMaximize: () => ipcRenderer.invoke("window-toggle-maximize"),
-  windowClose: () => ipcRenderer.invoke("window-close"),
-  writeClipboardImage: (dataUrl) => ipcRenderer.invoke("clipboard-write-image", dataUrl),
-  writeClipboardText: (text) => ipcRenderer.invoke("clipboard-write-text", text),
-  readClipboardText: () => ipcRenderer.invoke("clipboard-read-text"),
+  // Window appearance & clipboard
+  setWindowOpacity: invoker("set-window-opacity"),
+  setWindowBackgroundColor: invoker("set-window-background-color"),
+  windowMinimize: invoker("window-minimize"),
+  windowToggleMaximize: invoker("window-toggle-maximize"),
+  windowClose: invoker("window-close"),
+  writeClipboardImage: invoker("clipboard-write-image"),
+  writeClipboardText: invoker("clipboard-write-text"),
+  readClipboardText: invoker("clipboard-read-text"),
 
   // Auto-updater
-  getAppVersion:    () => ipcRenderer.invoke("get-app-version"),
-  checkForUpdates:  () => ipcRenderer.invoke("updater-check"),
-  downloadUpdate:   () => ipcRenderer.invoke("updater-download"),
-  installUpdate:    () => ipcRenderer.invoke("updater-install"),
-  onUpdaterStatus: (cb) => {
-    const handler = (_e, data) => cb(data);
-    ipcRenderer.on("updater-status", handler);
-    return () => ipcRenderer.removeListener("updater-status", handler);
-  },
+  getAppVersion: invoker("get-app-version"),
+  getAppBuild: invoker("get-app-build"),
+  checkForUpdates: invoker("updater-check"),
+  downloadUpdate: invoker("updater-download"),
+  installUpdate: invoker("updater-install"),
+  onUpdaterStatus: subscriber("updater-status"),
 
-  // multica
-  multicaSendCode: (args) => ipcRenderer.invoke("multica-send-code", args),
-  multicaVerifyCode: (args) => ipcRenderer.invoke("multica-verify-code", args),
-  multicaListWorkspaces: (args) => ipcRenderer.invoke("multica-list-workspaces", args),
-  multicaListAgents: (args) => ipcRenderer.invoke("multica-list-agents", args),
-  multicaEnsureSession: (args) => ipcRenderer.invoke("multica-ensure-session", args),
-  multicaSendMessage: (args) => ipcRenderer.invoke("multica-send-message", args),
-  multicaListMessages: (args) => ipcRenderer.invoke("multica-list-messages", args),
-  multicaSubscribe: (args) => ipcRenderer.invoke("multica-subscribe", args),
-});
+  // Multica
+  multicaSendCode: invoker("multica-send-code"),
+  multicaVerifyCode: invoker("multica-verify-code"),
+  multicaListWorkspaces: invoker("multica-list-workspaces"),
+  multicaListAgents: invoker("multica-list-agents"),
+  multicaEnsureSession: invoker("multica-ensure-session"),
+  multicaSendMessage: invoker("multica-send-message"),
+  multicaListMessages: invoker("multica-list-messages"),
+  multicaSubscribe: invoker("multica-subscribe"),
+} satisfies RaylineApi;
+
+contextBridge.exposeInMainWorld("api", api);
