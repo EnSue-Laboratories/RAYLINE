@@ -1,0 +1,23 @@
+src/components/model-picker/strings.ts
+  s_d0fb9aefa2e5fb::t_a60c3364838b6d 1,5,7,10
+src/i18n/locales/en-US.ts
+  s_d0fb9aefa2e5fb::t_7b2226fbc5d93b 554-570
+src/i18n/locales/zh-CN.ts
+  s_d0fb9aefa2e5fb::t_7b2226fbc5d93b 551-567
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "3db975d112c7c872e1e5010185f784af016bf320",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
