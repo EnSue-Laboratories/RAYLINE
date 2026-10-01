@@ -15,8 +15,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # Native modules / Electron binary are not needed for static checks.
+      # Skip install scripts (no Electron binary download), then build only the
+      # native module the terminal tests load under Node.
       - run: npm ci --ignore-scripts
+      - run: npm rebuild node-pty
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
