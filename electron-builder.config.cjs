@@ -1,3 +1,19 @@
+const { execFileSync } = require("node:child_process");
+
+// Forks can publish to their own repository; packaged builds record where they
+// came from (surfaced to the renderer through the get-app-build IPC).
+const releaseRepository = process.env.RAYLINE_RELEASE_REPOSITORY || process.env.GITHUB_REPOSITORY || "EnSue-Laboratories/RAYLINE";
+if (!/^[\w.-]+\/[\w.-]+$/.test(releaseRepository)) throw new Error(`Invalid release repository: ${releaseRepository}`);
+const [releaseOwner, releaseRepo] = releaseRepository.split("/");
+
+function readBuildCommit() {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: __dirname, encoding: "utf8" }).trim();
+  } catch {
+    return null;
+  }
+}
+
 const isCi = String(process.env.CI || "").toLowerCase() === "true";
 
 function normalizeMacIdentity(identity) {
@@ -44,10 +60,14 @@ if (enableMacCodesign) {
 module.exports = {
   appId: "com.ensue.rayline",
   productName: "RayLine",
+  extraMetadata: {
+    main: "dist-electron/electron/main.cjs",
+    raylineBuild: { commit: readBuildCommit(), repository: releaseRepository },
+  },
   publish: {
     provider: "github",
-    owner: "EnSue-Laboratories",
-    repo: "RAYLINE",
+    owner: releaseOwner,
+    repo: releaseRepo,
     releaseType: "release",
   },
   win: {
