@@ -1,6 +1,6 @@
 /** Agent session history (Claude / Codex session files), rewind and checkpoints. */
 
-import { agentManager } from "../app/boundaries";
+import { rewindFiles } from "../agent-manager";
 import * as checkpoint from "../checkpoint";
 import * as sessionReader from "../session-reader";
 import { createLogger } from "../logger";
@@ -26,7 +26,7 @@ export function registerSessionIpc(): void {
   handle("load-session", (_event, sessionId) => sessionReader.loadSessionMessages(sessionId));
   handle("load-session-search-text", (_event, sessionId) => sessionReader.loadSessionSearchText(sessionId));
   handle("move-session", (_event, sessionId, newCwd) => sessionReader.moveSessionAsync(sessionId, newCwd));
-  handle("rewind-files", (_event, request) => agentManager.rewindFiles(request));
+  handle("rewind-files", (_event, request) => rewindFiles(request));
 
   handle("checkpoint-create", (_event, cwdPath) =>
     timed("checkpoint-create", { cwdPath }, async () => checkpoint.createCheckpoint(cwdPath)));

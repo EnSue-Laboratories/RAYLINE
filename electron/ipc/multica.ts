@@ -1,7 +1,7 @@
 /** Multica setup REST passthroughs and stream re-subscription. */
 
-import { multicaManager } from "../app/boundaries";
-import { providerSink } from "./agent";
+import { webContentsSink } from "../agent-sink";
+import * as multicaManager from "../multica-manager";
 import { handle } from "./typed";
 
 export function registerMulticaIpc(): void {
@@ -13,6 +13,6 @@ export function registerMulticaIpc(): void {
   handle("multica-send-message", (_event, args) => multicaManager.multicaSendMessage(args));
   handle("multica-list-messages", (_event, args) => multicaManager.multicaListMessages(args));
   handle("multica-subscribe", async (event, args) => {
-    await multicaManager.subscribeMulticaAgent(args, providerSink(event.sender));
+    await multicaManager.subscribeMulticaAgent(args, webContentsSink(event.sender));
   });
 }

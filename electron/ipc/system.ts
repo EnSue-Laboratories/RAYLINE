@@ -2,8 +2,8 @@
 
 import os from "node:os";
 import type { AppContext } from "../app/context";
-import { providerUpstreams } from "../app/boundaries";
-import { getModelCatalog } from "../app/model-catalog";
+import { getModelCatalog } from "../providers/model-catalog";
+import * as providerUpstreams from "../provider-upstreams";
 import { quickExplain } from "../services/claude-oneshot";
 import { getCliInstalledSnapshot } from "../services/cli-status";
 import { runDispatchPlanner } from "../services/dispatch-planner";

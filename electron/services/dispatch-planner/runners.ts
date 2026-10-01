@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import type { DispatchModelPayload } from "@shared/models/types";
 import { buildSpawnPath, resolveCliBinAsync, spawnCli } from "../../cli-bin-resolver";
-import { openCodeAgentManager } from "../../app/boundaries";
+import * as openCodeAgentManager from "../../opencode-agent-manager";
+import { resolveCodexModelChoice } from "../../providers/codex/args";
 import { collectChildOutput } from "../child-output";
 import { resolveOpenCodeBinAsync } from "../opencode-status";
 import { DISPATCH_PLANNER_SYSTEM_PROMPT } from "./prompt";
@@ -71,15 +72,18 @@ export async function runCodexDispatchPlanner({ prompt, plannerModel, cwd }: Pla
     os.tmpdir(),
     `rayline-dispatch-plan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.json`,
   );
+  // Legacy ids / efforts resolve exactly like agent runs (providers' registry lookup + clamping).
+  const choice = resolveCodexModelChoice(plannerModel.cliFlag || plannerModel.id || "gpt-5.4", plannerModel.effort, false);
+  // Read-only, ephemeral and `-o` (verified on codex-cli 0.153.4) — the planner only answers.
   const args = [
     "exec",
     "--ephemeral",
     "--sandbox", "read-only",
     "--skip-git-repo-check",
-    "-m", plannerModel.cliFlag || plannerModel.id || "gpt-5.4",
+    "-m", choice.model || plannerModel.cliFlag || plannerModel.id || "gpt-5.4",
     "-o", outputPath,
   ];
-  if (plannerModel.effort) args.push("-c", `model_reasoning_effort="${plannerModel.effort}"`);
+  if (choice.effort) args.push("-c", `model_reasoning_effort="${choice.effort}"`);
   args.push("--", `${DISPATCH_PLANNER_SYSTEM_PROMPT}\n\n${prompt}`);
 
   const child = spawnCli(codexBin, args, {
