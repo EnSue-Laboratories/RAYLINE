@@ -1,0 +1,31 @@
+src/components/sidebar/tabStrip.ts
+  s_d0fb9aefa2e5fb::t_9a11ffc53e4daa 1-43
+src/components/Tab.tsx
+  s_d0fb9aefa2e5fb::t_a1dc947abcb41f 1,5-8,14-28,31,37,48,89,122-123
+src/components/ProjectPicker.tsx
+  s_d0fb9aefa2e5fb::t_5d6558877545d8 1,3-11,13,15-21,24-76,78-82,84,88,91-92,95-101,103-104,109-129,132,134-137,140,144,146,150,157,177,181-188,190-203,205,208-214,216,218-240,243-247,249,251-267
+src/components/TabStrip.tsx
+  s_d0fb9aefa2e5fb::t_64604380ed8c8f 1-2,4,6-32,35,50-51,55-56,58-63,67,71-72
+src/components/WindowControls.tsx
+  s_d0fb9aefa2e5fb::t_0e4e20fe2b5749 3,5-7,13,20,23-28,31-32,36,38-47,49,51-57,59-62,64-66,68-72,75-78,81-99
+src/components/SidebarChromeRail.tsx
+  s_d0fb9aefa2e5fb::t_806155e6a12bdc 1,3,10,12-20,27-28,43-47,54,58,63-82,84-85,89-94,105-106,109,117,121,124,128-133
+src/components/SidebarWindowsHeader.tsx
+  s_d0fb9aefa2e5fb::t_f2239f1fe84db1 1,3,5,10-17,23,32-40,42,52-62,70-71,87,92,94-96,101-110,120-130,136,139-140,142-146,149-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0b6003e6674f6a9d6e951317dd285635dd7b5bf9",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
