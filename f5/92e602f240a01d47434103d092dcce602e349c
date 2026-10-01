@@ -1,0 +1,29 @@
+electron/services/github/repos.ts
+  s_d0fb9aefa2e5fb::t_fcf8b6ea488b6d 1-198
+electron/github-manager.ts
+  s_d0fb9aefa2e5fb::t_d4c5727182255e 2-3,6-8,16-18,20-28,30
+electron/services/github/__tests__/github.test.ts
+  s_d0fb9aefa2e5fb::t_59b63d06f8ac39 1-103
+electron/services/github/auth-output.ts
+  s_d0fb9aefa2e5fb::t_08837ddf7f7ea5 1-106
+electron/services/github/web-auth.ts
+  s_d0fb9aefa2e5fb::t_1eacec7062dda3 1-191
+electron/services/github/auth.ts
+  s_d0fb9aefa2e5fb::t_00e2b0ff3b4191 1-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f592e602f240a01d47434103d092dcce602e349c",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
