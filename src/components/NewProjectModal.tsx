@@ -40,7 +40,7 @@ export default function NewProjectModal(props: NewProjectModalProps) {
   return <NewProjectDialog {...props} />;
 }
 
-function NewProjectDialog({ onClose, onCloned, onPickedLocalFolder, locale = "en-US" }: NewProjectModalProps) {
+function NewProjectDialog({ onClose, onCloned, onPickedLocalFolder, locale }: NewProjectModalProps) {
   const t = useLocaleTranslator(locale);
   const [url, setUrl] = useState("");
   const [parentDir, setParentDir] = useState("");

@@ -133,3 +133,17 @@ export function formatCwdShort(cwd: string | null | undefined): string | null {
   }
   return parts.filter(Boolean).slice(-2).join("/");
 }
+
+/** Display name of a project root: its custom name, else the folder name. */
+export function getProjectDisplayName(cwdRoot: string, projectsMeta: ProjectsMeta | null | undefined): string {
+  return projectsMeta?.[cwdRoot]?.name || basename(cwdRoot);
+}
+
+/** Project picker entries: deduped, hidden projects omitted unless currently selected. */
+export function listPickerProjectRoots(
+  allCwdRoots: readonly string[] | null | undefined,
+  projectsMeta: ProjectsMeta | null | undefined,
+  selected: string | null | undefined,
+): string[] {
+  return [...new Set(allCwdRoots ?? [])].filter((root) => !projectsMeta?.[root]?.hidden || root === selected);
+}

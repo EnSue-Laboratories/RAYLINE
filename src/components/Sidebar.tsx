@@ -88,7 +88,7 @@ function Sidebar({
   multicaModels = NO_MODELS,
   isOpen = true,
   windowsChrome = false,
-  locale = "en-US",
+  locale,
 }: SidebarProps) {
   const s = useFontScale();
   const t = useLocaleTranslator(locale);

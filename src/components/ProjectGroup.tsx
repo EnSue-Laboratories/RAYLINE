@@ -46,7 +46,7 @@ function ProjectGroup({
   onEditContext,
   searchActive,
   multicaModels = NO_MODELS,
-  locale = "en-US",
+  locale,
 }: ProjectGroupProps) {
   const s = useFontScale();
   const t = useLocaleTranslator(locale);

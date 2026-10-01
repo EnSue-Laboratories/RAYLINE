@@ -38,7 +38,7 @@ export default function ProjectContextModal(props: ProjectContextModalProps) {
   return <ProjectContextDialog {...props} />;
 }
 
-function ProjectContextDialog({ projectName, initialValue, onClose, onSave, locale = "en-US" }: ProjectContextModalProps) {
+function ProjectContextDialog({ projectName, initialValue, onClose, onSave, locale }: ProjectContextModalProps) {
   const t = useLocaleTranslator(locale);
   const [value, setValue] = useState(initialValue || "");
 

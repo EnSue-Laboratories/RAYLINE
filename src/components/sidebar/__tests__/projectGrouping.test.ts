@@ -3,9 +3,11 @@ import {
   applyCollapsedOverrides,
   formatCwdShort,
   getMainRepoRoot,
+  getProjectDisplayName,
   groupConvosByProject,
   isDraftConversation,
   isProjectGroupListed,
+  listPickerProjectRoots,
 } from "../projectGrouping";
 import type { SidebarConversation } from "../types";
 
@@ -93,5 +95,15 @@ describe("formatCwdShort", () => {
     expect(formatCwdShort("/Users/me/code/app")).toBe("code/app");
     expect(formatCwdShort("C:\\code\\app")).toBe("code/app");
     expect(formatCwdShort(null)).toBeNull();
+  });
+});
+
+describe("project picker helpers", () => {
+  it("dedupes roots and hides hidden projects unless selected", () => {
+    const meta = { "/a": { hidden: true }, "/b": { name: "Bee" } };
+    expect(listPickerProjectRoots(["/a", "/b", "/b", "/c"], meta, null)).toEqual(["/b", "/c"]);
+    expect(listPickerProjectRoots(["/a", "/b"], meta, "/a")).toEqual(["/a", "/b"]);
+    expect(getProjectDisplayName("/b", meta)).toBe("Bee");
+    expect(getProjectDisplayName("/x/c", meta)).toBe("c");
   });
 });

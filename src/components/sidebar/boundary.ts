@@ -1,8 +1,8 @@
 /**
- * Typed views of renderer modules that are still `// @ts-nocheck` (owned by
- * other migration packages). Each cast is done once here so the sidebar/git
- * components never see inferred `any`s. Delete an entry once its owner lands
- * real types and import the module directly instead.
+ * Typed views of renderer modules that other migration packages have not
+ * converted yet. Each cast is done once here so the sidebar/git components
+ * only see declared types. Delete an entry once its owner lands real types
+ * and import the module directly instead.
  */
 import useGitStatusUntyped from "../../hooks/useGitStatus";
 import type { GitStatus } from "@shared/git/types";

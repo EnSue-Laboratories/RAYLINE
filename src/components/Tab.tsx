@@ -1,24 +1,40 @@
-// @ts-nocheck
-import { useState } from "react";
+import { memo, useState } from "react";
 import { X } from "lucide-react";
 import { useFontScale } from "../contexts/FontSizeContext";
 
-const DOT_COLORS = {
+/** `computeTabState` (utils/tabs): running, finished-but-unseen, or seen. */
+export type TabState = "streaming" | "done" | "seen";
+
+const DOT_COLORS: Readonly<Record<TabState, string>> = {
   streaming: "var(--accent)",
   done: "var(--accent)",
   seen: "transparent",
 };
 
-export default function Tab({ title, state, active, onSelect, onClose }) {
+export interface TabProps {
+  id: string;
+  title: string;
+  state: TabState;
+  active: boolean;
+  /** Called with the tab id; pass a stable function so tabs can skip re-rendering. */
+  onSelect: (id: string) => void;
+  onClose?: (id: string) => void;
+}
+
+/**
+ * One pinned-conversation tab. The `tabDotPulse` keyframes are defined once
+ * by TabStrip.
+ */
+function Tab({ id, title, state, active, onSelect, onClose }: TabProps) {
   const s = useFontScale();
   const [hover, setHover] = useState(false);
-  const dotColor = DOT_COLORS[state] || "transparent";
+  const dotColor = DOT_COLORS[state];
   const pulse = state === "streaming";
   const showClose = active || hover;
 
   return (
     <div
-      onClick={onSelect}
+      onClick={() => onSelect(id)}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       title={title}
@@ -29,11 +45,7 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
         width: "100%",
         height: 28,
         padding: "0 9px 0 11px",
-        background: active
-          ? "var(--bg-tertiary)"
-          : hover
-            ? "var(--hover-overlay)"
-            : "transparent",
+        background: active ? "var(--bg-tertiary)" : hover ? "var(--hover-overlay)" : "transparent",
         border: "none",
         borderRadius: 7,
         cursor: "pointer",
@@ -74,7 +86,7 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onClose?.();
+          onClose?.(id);
         }}
         aria-label="Close tab"
         style={{
@@ -104,12 +116,8 @@ export default function Tab({ title, state, active, onSelect, onClose }) {
       >
         <X size={10} strokeWidth={1.75} />
       </button>
-      <style>{`
-        @keyframes tabDotPulse {
-          0%, 100% { transform: scale(0.8); opacity: 0.7; }
-          50%      { transform: scale(1.15); opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }
+
+export default memo(Tab);
