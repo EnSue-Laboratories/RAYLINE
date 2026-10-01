@@ -1,0 +1,19 @@
+src/components/settings/deps.ts
+  s_d0fb9aefa2e5fb::t_61907684d04369 2-4,7-8,11-28,31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0101854a6ec37d7cf7744ea85dcb6269e5124ebd",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
