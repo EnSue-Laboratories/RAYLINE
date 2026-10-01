@@ -81,6 +81,7 @@ export function useRepoItems<T extends ListItemCore>({
   if (freshItem !== seenFresh) {
     setSeenFresh(freshItem);
     if (freshItem && freshItemMatchesScope(freshItem, { stateFilter, repoFilter, repos })) {
+      // Omit<T, "number"> & { number: number } is T, but TS cannot prove it for a generic T.
       const fresh = freshItem as unknown as T;
       setItems((prev) => insertFreshItem(prev, fresh));
     }

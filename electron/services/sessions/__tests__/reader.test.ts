@@ -142,7 +142,7 @@ describe("listSessions", () => {
     await writeJsonl(claudeSessionPath(roots, PROJECT, "old"), [user("Old question", { cwd: CWD })], 1_000_000);
     await writeJsonl(
       claudeSessionPath(roots, PROJECT, "new"),
-      [user("<system-reminder>x</system-reminder>  "), user([{ type: "text", text: "Newest question" }] as unknown as string)],
+      [user("<system-reminder>x</system-reminder>  "), user([{ type: "text", text: "Newest question" }])],
       3_000_000,
     );
     await writeJsonl(codexRolloutPath(roots, THREAD), [codexMeta(THREAD, CWD), codexUser("# AGENTS"), codexUser("Codex question")], 2_000_000);

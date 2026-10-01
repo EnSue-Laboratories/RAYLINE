@@ -13,6 +13,7 @@ const DRAFTS = "/home/u/Drafts";
 
 describe("conversation paths", () => {
   it("effective cwd: null = drafts, undefined = app cwd", () => {
+    // Persisted drafts store `cwd: null`, which Conversation["cwd"] does not model.
     expect(getEffectiveConversationCwd({ cwd: null as unknown as undefined }, "/app", DRAFTS)).toBe(DRAFTS);
     expect(getEffectiveConversationCwd({}, "/app", DRAFTS)).toBe("/app");
     expect(getEffectiveConversationCwd({ cwd: "/repo" }, "/app", DRAFTS)).toBe("/repo");

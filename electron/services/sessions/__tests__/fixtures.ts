@@ -36,9 +36,10 @@ export function codexRolloutPath(roots: SessionRoots, threadId: string, day = "2
   return path.join(roots.codexDir, "sessions", day, `rollout-2026-09-30T10-00-00-${threadId}.jsonl`);
 }
 
-export const user = (text: string, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+/** `content` is a prompt string or Claude content blocks. */
+export const user = (content: string | unknown[], extra: Record<string, unknown> = {}): Record<string, unknown> => ({
   type: "user",
-  message: { role: "user", content: text },
+  message: { role: "user", content },
   ...extra,
 });
 
