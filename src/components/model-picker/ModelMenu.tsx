@@ -84,7 +84,6 @@ export function ModelMenu({
     cursor: "pointer",
     fontSize: s(11),
   };
-  // Solid surface: a backdrop blur here would re-run on every streamed frame underneath.
   const style: CSSProperties = {
     ...position,
     position: "fixed",
@@ -92,6 +91,9 @@ export function ModelMenu({
     display: "flex",
     flexDirection: "column",
     background: "var(--surface-glass)",
+        // Small, short-lived popover: the blur is cheap and keeps text behind it from bleeding through.
+        backdropFilter: "blur(24px) saturate(1.2)",
+        WebkitBackdropFilter: "blur(24px) saturate(1.2)",
     border: "1px solid var(--pane-border)",
     borderRadius: 10,
     padding: 4,
@@ -147,11 +149,21 @@ export function ModelMenu({
         />
       </div>
       <div id={listId} role="listbox" aria-label={label} style={{ overflowY: "auto", minHeight: 0 }}>
-        {groups.map(({ provider, models }) => {
+        {groups.map(({ provider, models }, groupIndex) => {
           const groupLabel = providerGroupLabel(provider, t("dispatch.inheritGroup"));
           return (
             <div key={provider} role="group" aria-label={groupLabel}>
-              <div style={{ padding: "9px 10px 4px", fontSize: s(9), color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+              {groupIndex > 0 && <div style={{ height: 1, background: "var(--control-bg)", margin: "4px 8px" }} />}
+              <div
+                style={{
+                  padding: groupIndex === 0 ? "6px 10px 2px" : "4px 10px 2px",
+                  fontSize: s(8),
+                  color: "color-mix(in srgb, var(--text-primary) 22%, transparent)",
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                  fontFamily: "var(--font-mono)",
+                }}
+              >
                 {groupLabel}
               </div>
               {models.map((option) => (

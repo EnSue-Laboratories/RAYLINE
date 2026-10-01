@@ -249,7 +249,7 @@ function ModelPickerControl({
         <ChevronDown size={11} strokeWidth={2} style={{ flexShrink: 0 }} />
       </button>
       {showEffort && selected && onEffortChange && (
-        <EffortSelect s={s} t={t} model={selected} effort={effort} onEffortChange={onEffortChange} compact={compact} disabled={disabled} />
+        <EffortSelect s={s} t={t} model={selected} effort={effort} onEffortChange={onEffortChange} compact={compact} disabled={disabled} menuZIndex={menuZIndex} />
       )}
       {open && position && (
         <ModelMenu
