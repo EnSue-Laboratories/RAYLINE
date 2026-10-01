@@ -76,6 +76,7 @@ export const enUS = {
   "newChat.creating": "Creating...",
   "newChat.enterToCreate": "Enter to create",
   "newChat.searchIssues": "Search issues...",
+  "chat.loadingConversation": "Loading conversation…",
   "newChat.loading": "Loading...",
   "newChat.noIssuesFound": "No issues found",
   "newChat.pickBaseBranch": "Pick a base branch...",

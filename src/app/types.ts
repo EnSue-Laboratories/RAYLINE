@@ -4,90 +4,10 @@
  * the still-unconverted components.
  */
 
-import type {
-  AgentPermissionRequest,
-  Attachment,
-  ChatMessage,
-  ConversationData,
-  DispatchRowInput,
-  DispatchRowResult,
-  FileAttachment,
-  ImagePayload,
-} from "@shared/chat/types";
+import type { AgentPermissionRequest, Attachment, DispatchRowInput, DispatchRowResult } from "@shared/chat/types";
 import type { EffortLevel } from "@shared/models/types";
-import type {
-  ModelProviderId,
-  MulticaContext,
-  OpenCodeRuntimeConfig,
-  ProviderUpstreamConfig,
-  RemoteRuntimeConfig,
-  RuntimeProviderId,
-} from "@shared/providers/types";
 
-// ── useAgent (chat-core) ────────────────────────────────────────────────────
-
-export interface PrepareMessageInput {
-  conversationId: string;
-  prompt: string;
-  images?: ImagePayload[];
-  files?: FileAttachment[];
-}
-
-/** Fields common to `startPreparedMessage` and `editAndResend`. */
-export interface AgentRunOptions {
-  model?: string;
-  provider: ModelProviderId;
-  runtimeProvider?: RuntimeProviderId;
-  effort?: EffortLevel;
-  thinking?: boolean;
-  openCodeConfig?: OpenCodeRuntimeConfig;
-  providerUpstreamConfig?: ProviderUpstreamConfig;
-  remoteRuntime?: RemoteRuntimeConfig;
-  cwd?: string;
-  projectContext?: string;
-  multicaContext?: MulticaContext;
-  multicaToken?: string;
-  /** Grok only: `--continue` when no native session exists yet. */
-  grokContinue?: boolean;
-}
-
-export interface StartPreparedMessageInput extends AgentRunOptions {
-  conversationId: string;
-  pendingId?: string;
-  sessionId?: string;
-  resumeSessionId?: string;
-  forkSession?: boolean;
-  prompt: string;
-  images?: (string | ImagePayload)[];
-  files?: FileAttachment[];
-}
-
-export interface EditAndResendInput extends AgentRunOptions {
-  conversationId: string;
-  sessionId?: string;
-  messageIndex: number;
-  newText: string;
-  wirePrompt?: string;
-}
-
-type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
-
-/** A message to append locally; `useAgent` assigns an id when missing. */
-export type LocalMessageInput = DistributiveOmit<ChatMessage, "id"> & { id?: string };
-
-/** Return shape of `useAgent()` (kept by chat-core's store rewrite). */
-export interface AgentApi {
-  conversations: ReadonlyMap<string, ConversationData>;
-  getConversation: (id: string) => ConversationData;
-  prepareMessage: (input: PrepareMessageInput) => string;
-  appendLocalMessages: (conversationId: string, messages: LocalMessageInput[]) => void;
-  startPreparedMessage: (input: StartPreparedMessageInput) => boolean;
-  cancelMessage: (conversationId: string) => void;
-  editAndResend: (input: EditAndResendInput) => boolean;
-  loadMessages: (conversationId: string, messages: ChatMessage[]) => void;
-  replaceMessages: (conversationId: string, messages: LocalMessageInput[]) => void;
-  markMulticaConnected: (conversationId: string) => void;
-}
+// Live chat state and its actions: src/store/conversations (chat-core).
 
 // ── useTerminal (terminal-pm-ui) ────────────────────────────────────────────
 

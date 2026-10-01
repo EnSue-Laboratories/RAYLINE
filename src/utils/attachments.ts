@@ -1,72 +1,59 @@
-// @ts-nocheck
-function basename(filePath) {
+/** Composer attachments from dropped / pasted files. */
+import type { Attachment, FileAttachment, ImageAttachment } from "@shared/chat/types";
+
+function basename(filePath: string | null | undefined): string {
   if (typeof filePath !== "string" || filePath.length === 0) return "";
   const parts = filePath.split(/[/\\]/);
   return parts[parts.length - 1] || filePath;
 }
 
-function resolveFilePath(file) {
-  return window.api?.getFilePath?.(file) || file?.path || null;
+function resolveFilePath(file: File): string | null {
+  return window.api?.getFilePath?.(file) || null;
 }
 
-function readFileAsDataUrl(file) {
+function readFileAsDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (event) => resolve(typeof event.target?.result === "string" ? event.target.result : "");
-    reader.onerror = () => reject(reader.error || new Error("Failed to read attachment."));
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(reader.error ?? new Error("Failed to read attachment."));
     reader.readAsDataURL(file);
   });
 }
 
-async function fileToAttachment(file) {
-  if (!file) return null;
-
+async function fileToAttachment(file: File): Promise<Attachment | null> {
   const filePath = resolveFilePath(file);
   const fallbackFileName = file.name || basename(filePath) || "file";
 
   if (file.type?.startsWith("image/")) {
     const dataUrl = await readFileAsDataUrl(file);
     if (!dataUrl) return null;
-    let stored = null;
-    if (window.api?.storeMessageImage) {
+    let stored: Awaited<ReturnType<typeof window.api.storeMessageImage>> = null;
+    if (typeof window.api?.storeMessageImage === "function") {
       try {
-        stored = await window.api.storeMessageImage({
-          dataUrl,
-          name: file.name || basename(filePath) || "",
-          path: filePath || "",
-        });
+        stored = await window.api.storeMessageImage({ dataUrl, name: file.name || basename(filePath) || "", path: filePath || "" });
       } catch {
         stored = null;
       }
     }
-
-    return {
-      type: "image",
-      dataUrl,
-      name: file.name || basename(filePath) || `image-${Date.now()}.png`,
-      ...(filePath ? { path: filePath } : {}),
-      ...(stored?.storagePath ? { storagePath: stored.storagePath } : {}),
-      ...(stored?.mime ? { mime: stored.mime } : {}),
-    };
+    const image: ImageAttachment = { type: "image", dataUrl, name: file.name || basename(filePath) || `image-${Date.now()}.png` };
+    if (filePath) image.path = filePath;
+    if (stored?.storagePath) image.storagePath = stored.storagePath;
+    if (stored?.mime) image.mime = stored.mime;
+    return image;
   }
 
-  return {
-    type: "file",
-    name: fallbackFileName,
-    path: filePath || fallbackFileName,
-  };
+  const attachment: FileAttachment = { type: "file", name: fallbackFileName, path: filePath || fallbackFileName };
+  return attachment;
 }
 
-export function dataTransferHasFiles(dataTransfer) {
+export function dataTransferHasFiles(dataTransfer: DataTransfer | null | undefined): boolean {
   if (!dataTransfer) return false;
-  const types = Array.from(dataTransfer.types || []);
-  return types.includes("Files") || Array.from(dataTransfer.files || []).length > 0;
+  return Array.from(dataTransfer.types || []).includes("Files") || (dataTransfer.files?.length ?? 0) > 0;
 }
 
-export async function fileListToAttachments(fileList) {
-  const files = Array.from(fileList || []).filter(Boolean);
+export async function fileListToAttachments(fileList: FileList | readonly File[] | null | undefined): Promise<Attachment[]> {
+  const files = Array.from(fileList ?? []).filter(Boolean);
   if (files.length === 0) return [];
-
   const attachments = await Promise.all(
     files.map(async (file) => {
       try {
@@ -74,17 +61,26 @@ export async function fileListToAttachments(fileList) {
       } catch {
         return null;
       }
-    })
+    }),
   );
-
-  return attachments.filter(Boolean);
+  return attachments.filter((attachment): attachment is Attachment => attachment !== null);
 }
 
-export async function clipboardItemsToAttachments(items) {
-  const files = Array.from(items || [])
+export async function clipboardItemsToAttachments(items: DataTransferItemList | readonly DataTransferItem[] | null | undefined): Promise<Attachment[]> {
+  const files = Array.from(items ?? [])
     .filter((item) => item?.kind === "file")
     .map((item) => item.getAsFile?.())
-    .filter(Boolean);
-
+    .filter((file): file is File => Boolean(file));
   return fileListToAttachments(files);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/** Guard for attachments read back from storage (composer drafts). */
+export function isAttachment(value: unknown): value is Attachment {
+  if (!isRecord(value)) return false;
+  if (value.type === "image") return typeof value.dataUrl === "string";
+  return value.type === "file";
 }

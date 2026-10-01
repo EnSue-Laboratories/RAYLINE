@@ -73,6 +73,7 @@ export const zhCN = {
   "newChat.creating": "创建中...",
   "newChat.enterToCreate": "回车创建",
   "newChat.searchIssues": "搜索 Issue...",
+  "chat.loadingConversation": "正在加载对话…",
   "newChat.loading": "加载中...",
   "newChat.noIssuesFound": "未找到 Issue",
   "newChat.pickBaseBranch": "选择基准分支...",

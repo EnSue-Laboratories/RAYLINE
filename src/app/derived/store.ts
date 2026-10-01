@@ -6,7 +6,7 @@
 
 import { createStore, useStore } from "../../store/createStore";
 import { convoListStore } from "../../store/convoList";
-import { getLiveConversation, liveConversationsStore } from "../stores/live";
+import { conversationsStore, getConversation } from "../../store/conversations";
 import { isTranscriptPending, transcriptStatusStore } from "../stores/transcripts";
 import { buildSidebarRows, createSidebarRowCache, SIDEBAR_PREVIEW_THROTTLE_MS, type SidebarRow } from "./sidebarRows";
 import { buildPinnedTabs, tabsSignature, type TabDescriptor } from "./tabs";
@@ -30,7 +30,7 @@ let lastTabsSignature = "";
 function recomputeSidebarRows(): void {
   const { convos, activeId } = convoListStore.getState();
   const { rows, pendingFlush } = buildSidebarRows(
-    { convos, activeId, getLive: getLiveConversation, isTranscriptPending, now: Date.now() },
+    { convos, activeId, getLive: getConversation, isTranscriptPending, now: Date.now() },
     rowCache,
   );
   sidebarRowsStore.setState(rows);
@@ -46,7 +46,7 @@ function recomputeSidebarRows(): void {
 }
 
 function recomputeTabs(): void {
-  const pinned = buildPinnedTabs(convoListStore.getState().convos, getLiveConversation);
+  const pinned = buildPinnedTabs(convoListStore.getState().convos, getConversation);
   const signature = tabsSignature(pinned);
   if (signature === lastTabsSignature) return;
   lastTabsSignature = signature;
@@ -64,7 +64,7 @@ export function startDerivedStores(): () => void {
   recompute();
   const unsubscribers = [
     convoListStore.subscribe(recompute),
-    liveConversationsStore.subscribe(recompute),
+    conversationsStore.subscribe(recompute),
     transcriptStatusStore.subscribe(recomputeSidebarRows),
   ];
   return () => {

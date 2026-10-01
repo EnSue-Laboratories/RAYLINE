@@ -11,7 +11,7 @@ import { getAppSettings } from "../../store/appSettings";
 import { convoListStore, setConvos } from "../../store/convoList";
 import { playChime } from "../../utils/chime";
 import { countPinnedTabs, pinTabPatch, runEndedPatch, withTabPatch } from "../../utils/tabs";
-import { getLiveConversation, liveConversationsStore } from "../stores/live";
+import { conversationsStore, getConversation } from "../../store/conversations";
 
 export type TabRoundState = "idle" | "active" | "dismissed";
 
@@ -78,7 +78,7 @@ export function dismissTabRound(): void {
 }
 
 function run(): void {
-  const transition = computeStreamingTransition(convoListStore.getState().convos, getLiveConversation, prevStreaming, round);
+  const transition = computeStreamingTransition(convoListStore.getState().convos, getConversation, prevStreaming, round);
   // Update bookkeeping first: setConvos below re-enters this listener.
   prevStreaming = transition.next;
   round = transition.round;
@@ -94,7 +94,7 @@ function run(): void {
 }
 
 export function startStreamingTabs(): () => void {
-  const unsubscribers = [liveConversationsStore.subscribe(run), convoListStore.subscribe(run)];
+  const unsubscribers = [conversationsStore.subscribe(run), convoListStore.subscribe(run)];
   run();
   return () => {
     for (const unsubscribe of unsubscribers) unsubscribe();

@@ -8,7 +8,7 @@ import { getEffectiveConversationCwd, getProjectRootOrUndefined } from "../conve
 import { getActiveConversationSession, normalizeConversationState, upsertConversationSession } from "../conversation/sessions";
 import { deriveConversationTitle } from "../conversation/titles";
 import { formatShellResult, runShellCommand } from "../shell/shellCommand";
-import { getAgentApi, getLiveConversation } from "../stores/live";
+import { appendLocalMessages, getConversation } from "../../store/conversations";
 import { resolveModel } from "../stores/models";
 import { enqueueMessage, sendInFlight } from "../stores/queue";
 import { getUi, patchUi } from "../stores/ui";
@@ -37,11 +37,10 @@ async function runShellInConversation(convoId: string, convo: Conversation, trim
   const normalized = normalizeConversationState(convo);
   const activeSession = getActiveConversationSession(normalized);
   const currentProvider = resolveModel(normalized.model).provider;
-  const currentMessageCount = getLiveConversation(convoId).messages.length;
-  const agent = getAgentApi();
+  const currentMessageCount = getConversation(convoId).messages.length;
 
   if (currentMessageCount === 0) updateConvo(convoId, (c) => ({ ...c, title: trimmed.slice(0, 50) }));
-  agent.appendLocalMessages(convoId, [{ role: "user", text: command, mode: "shell-command", localOnly: true }]);
+  appendLocalMessages(convoId, [{ role: "user", text: command, mode: "shell-command", localOnly: true }]);
 
   const result = await runShellCommand(command, effectiveCwd);
 
@@ -59,7 +58,7 @@ async function runShellInConversation(convoId: string, convo: Conversation, trim
       { activate: true, preferPendingActive: true },
     ),
   );
-  agent.appendLocalMessages(convoId, [
+  appendLocalMessages(convoId, [
     {
       role: "system",
       text: formatShellResult(result),
@@ -79,7 +78,7 @@ export async function sendFromComposer(text: string, attachments?: Attachment[])
   if (handleSlashCommand(trimmed)) return;
 
   const active = getActiveId();
-  if (active && (getLiveConversation(active).isStreaming || sendInFlight.has(active))) {
+  if (active && (getConversation(active).isStreaming || sendInFlight.has(active))) {
     enqueueMessage({ conversationId: active, text, attachments });
     return;
   }

@@ -30,7 +30,7 @@ import {
   type SnapshotEntry,
 } from "../app/persist/snapshot";
 import { normalizeConversationState } from "../app/conversation/sessions";
-import { getLiveConversation, liveConversationsStore } from "../app/stores/live";
+import { conversationsStore, getConversation } from "./conversations";
 import { queueStore } from "../app/stores/queue";
 import { getTranscriptStatus, isTranscriptPending, setTranscriptStatus, transcriptStatusStore } from "../app/stores/transcripts";
 import { errorMessage, getApi } from "../app/lib/api";
@@ -59,7 +59,7 @@ export function getPersistenceMode(): PersistenceMode | null {
 
 function collect(): SnapshotEntry[] {
   return collectPersistableConversations(
-    { convos: convoListStore.getState().convos, getLive: getLiveConversation, isTranscriptPending },
+    { convos: convoListStore.getState().convos, getLive: getConversation, isTranscriptPending },
     snapshotCache,
   );
 }
@@ -158,7 +158,7 @@ export function startPersistence(nextMode: PersistenceMode, initial: SaveBaselin
   const unsubscribers = [
     convoListStore.subscribe(scheduleSave),
     appSettingsStore.subscribe(scheduleSave),
-    liveConversationsStore.subscribe(scheduleSave),
+    conversationsStore.subscribe(scheduleSave),
     queueStore.subscribe(scheduleSave),
     transcriptStatusStore.subscribe(scheduleSave),
   ];

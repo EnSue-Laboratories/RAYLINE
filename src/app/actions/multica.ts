@@ -17,7 +17,7 @@ import {
 import { buildMulticaSetupBlock, getMulticaContextForAgent, normalizeMulticaContext, withMulticaContext } from "../conversation/multica";
 import { normalizeConversationState } from "../conversation/sessions";
 import { errorMessage, getApi } from "../lib/api";
-import { getAgentApi, getLiveConversation } from "../stores/live";
+import { appendLocalMessages, getConversation, markMulticaConnected, replaceMessages } from "../../store/conversations";
 
 export interface EnsureMulticaContextInput {
   conversationId: string;
@@ -159,11 +159,10 @@ export async function reconnectMulticaConversation(conversationId: string, multi
   const { token } = loadMulticaState();
   if (!token) throw new Error("Multica not authenticated (no token)");
   const { serverUrl, workspaceId, workspaceSlug, sessionId } = multicaCtx;
-  const agent = getAgentApi();
 
   try {
     await api.multicaSubscribe({ conversationId, _multica: multicaCtx, token });
-    agent.markMulticaConnected(conversationId);
+    markMulticaConnected(conversationId);
 
     const remote = await api.multicaListMessages({ serverUrl, token, workspaceId, workspaceSlug, sessionId });
     const list = Array.isArray(remote) ? remote : remote.messages || remote.data || [];
@@ -174,7 +173,7 @@ export async function reconnectMulticaConversation(conversationId: string, multi
       .filter(isNonEmptyArchivedMessage);
     if (mapped.length === 0) return;
 
-    const liveMessages = getLiveConversation(conversationId).messages;
+    const liveMessages = getConversation(conversationId).messages;
     const stored = findConvo(conversationId);
     const persistedMessages = stored ? normalizeConversationState(stored).archivedMessages : [];
     const baseMessages = liveMessages.length > 0 ? liveMessages : persistedMessages;
@@ -185,10 +184,10 @@ export async function reconnectMulticaConversation(conversationId: string, multi
     if (areArchivedMessageListsEqual(liveMessages, merged)) return;
     if (liveMessages.length > 0 && isArchivedMessagePrefix(liveMessages, merged)) {
       const tail = merged.slice(liveMessages.length);
-      if (tail.length > 0) agent.appendLocalMessages(conversationId, tail);
+      if (tail.length > 0) appendLocalMessages(conversationId, tail);
       return;
     }
-    agent.replaceMessages(conversationId, merged);
+    replaceMessages(conversationId, merged);
   } catch (err) {
     const status = authStatus(err);
     if (status === 401 || status === 403) {

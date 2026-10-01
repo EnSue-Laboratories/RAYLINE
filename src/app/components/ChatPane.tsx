@@ -1,4 +1,4 @@
-import { memo, useContext, useMemo } from "react";
+import { memo } from "react";
 import { useAppSetting } from "../../store/appSettings";
 import { useActiveConvo } from "../../store/convoList";
 import { cancelActiveRun, changeCwd, changeEffort, changeModel, closeTab } from "../actions/conversations";
@@ -8,11 +8,9 @@ import { editAndResendMessage } from "../actions/edit";
 import { selectConversation } from "../actions/navigation";
 import { applyControlChange, canControlTarget } from "../actions/settings";
 import { refocusTerminal, resolveTerminalCwd, toggleTerminal } from "../actions/terminal";
-import { ChatArea, type ChatAreaConversation } from "../componentBoundaries";
 import { useProjectsDerived } from "../derived/projects";
 import { useVisibleTabs } from "../derived/store";
 import { useRuntimeSetup } from "../hooks/useRuntimeSetup";
-import { LiveConversationsContext, selectLiveConversation } from "../stores/live";
 import { useModelsField } from "../stores/models";
 import { respondPermission, usePermissionRequestsFor } from "../stores/permissions";
 import { removeQueuedMessage, updateQueuedMessage, useQueuedMessagesFor } from "../stores/queue";
@@ -20,26 +18,19 @@ import { useTerminalSessionCount, useTerminalWindowOpen } from "../stores/termin
 import { useTranscriptLoading } from "../stores/transcripts";
 import { useUi } from "../stores/ui";
 import { useTranslator } from "../../contexts/LocaleContext";
+import ChatArea from "../../components/ChatArea";
 
 const MemoChatArea = memo(ChatArea);
 
 /**
- * Active conversation view. Reads live data from the agent context (so it
- * renders inside the stream's transition) and hands ChatArea a `convo`
- * object whose identity only changes when the active conversation changes;
+ * Active conversation view. ChatArea reads live messages and stream status
+ * from the conversations store by id (narrow selectors), so this pane does
+ * not re-render on stream flushes; `convo` is the sidebar row itself and
  * every handler is a stable module function.
  */
 export const ChatPane = memo(function ChatPane() {
-  const live = useContext(LiveConversationsContext);
   const activeConvo = useActiveConvo();
   const activeId = activeConvo?.id ?? null;
-  const data = selectLiveConversation(live, activeId);
-  const { messages, isStreaming, error } = data;
-
-  const convo = useMemo<ChatAreaConversation | null>(
-    () => (activeConvo ? { ...activeConvo, msgs: messages, isStreaming, error } : null),
-    [activeConvo, messages, isStreaming, error],
-  );
 
   const sidebarOpen = useUi("sidebarOpen");
   const draftsPath = useUi("draftsPath");
@@ -72,14 +63,14 @@ export const ChatPane = memo(function ChatPane() {
   return (
     <>
       <MemoChatArea
-        convo={convo}
+        convo={activeConvo}
         onSend={sendFromComposer}
         onCancel={cancelActiveRun}
         onEdit={editAndResendMessage}
         sidebarOpen={sidebarOpen}
         onModelChange={changeModel}
         defaultModel={defaultModel}
-        effort={activeConvo ? activeConvo.effort ?? null : newChatEffort}
+        effort={activeConvo && !showNewChatCard ? activeConvo.effort ?? null : newChatEffort}
         onEffortChange={changeEffort}
         queuedMessages={queuedMessages}
         onUpdateQueuedMessage={updateQueuedMessage}
@@ -122,7 +113,6 @@ export const ChatPane = memo(function ChatPane() {
 
 /** Shown while a lazily loaded transcript is read from disk. */
 function TranscriptLoadingNotice() {
-  // TODO(i18n): a dedicated "chat.loadingConversation" key (requested from data-i18n).
   const t = useTranslator();
   return (
     <div
@@ -142,7 +132,7 @@ function TranscriptLoadingNotice() {
         pointerEvents: "none",
       }}
     >
-      {t("newChat.loading")}
+      {t("chat.loadingConversation")}
     </div>
   );
 }

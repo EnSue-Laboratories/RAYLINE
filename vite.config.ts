@@ -33,7 +33,9 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             { name: 'react-vendor', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 30 },
-            { name: 'markdown', test: /node_modules[\\/](react-markdown|remark-[^\\/]+|rehype-[^\\/]+|unified|micromark[^\\/]*|mdast-[^\\/]+|hast-[^\\/]+|unist-[^\\/]+|vfile[^\\/]*)[\\/]/, priority: 20 },
+            // Math (remark-math / rehype-katex / KaTeX) and raw HTML (rehype-raw / parse5 /
+            // rehype-sanitize) are excluded: chat-core loads them on demand.
+            { name: 'markdown', test: /node_modules[\\/](react-markdown|remark-(?!math)[^\\/]+|rehype-(?!katex|raw|sanitize)[^\\/]+|unified|micromark(?!-extension-math)[^\\/]*|mdast-(?!util-math)[^\\/]+|hast-(?!util-(?:raw|sanitize|from-parse5|to-parse5|from-html|from-dom|to-text))[^\\/]+|unist-[^\\/]+|vfile[^\\/]*)[\\/]/, priority: 20 },
             { name: 'xterm', test: /node_modules[\\/]@xterm[\\/]/, priority: 20 },
           ],
         },

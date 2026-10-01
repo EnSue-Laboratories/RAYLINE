@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StateSaveRequest } from "@shared/state/types";
 import { convoListStore } from "../../store/convoList";
 import { createV2Baseline, ensureTranscriptLoaded, flushSave, startPersistence } from "../../store/persistence";
-import { liveConversationsStore } from "../stores/live";
+import { conversationsStore } from "../../store/conversations";
 import { getTranscriptStatus, markTranscriptsUnloaded } from "../stores/transcripts";
 import { convo, live, user } from "./fixtures";
 
@@ -36,7 +36,7 @@ describe("persistence scheduler (v2)", () => {
       removeEventListener: () => {},
     });
     convoListStore.setState({ convos: [convo({ id: "a" }), convo({ id: "b" })], activeId: "a" });
-    liveConversationsStore.setState(new Map());
+    conversationsStore.setState({ byId: new Map() });
     markTranscriptsUnloaded(["a", "b"]);
     stop = startPersistence("v2", createV2Baseline(["a", "b"]));
   });
@@ -68,7 +68,7 @@ describe("persistence scheduler (v2)", () => {
 
     // Stream flushes every 30 ms keep resetting the debounce; max-wait still saves.
     for (let t = 0; t < 10_500; t += 30) {
-      liveConversationsStore.setState(new Map([["a", live([user("u1", "from disk"), user("u2", `tick ${t}`)], true)]]));
+      conversationsStore.setState({ byId: new Map([["a", live([user("u1", "from disk"), user("u2", `tick ${t}`)], true)]]) });
       vi.advanceTimersByTime(30);
     }
     expect(saves.length).toBeGreaterThanOrEqual(1);
