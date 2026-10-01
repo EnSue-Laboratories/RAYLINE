@@ -1,0 +1,26 @@
+src/components/model-picker/ModelMenu.tsx
+  s_d0fb9aefa2e5fb::t_cad247620fb183 94-96
+src/components/ui/__tests__/menuSelectLogic.test.ts
+  s_d0fb9aefa2e5fb::t_10a7ea22a76cce 1-60
+src/components/ui/MenuSelect.tsx
+  s_d0fb9aefa2e5fb::t_97b82d220bf219 205
+  s_d0fb9aefa2e5fb::t_cad247620fb183 215-217
+src/components/ModelPicker.tsx
+  s_d0fb9aefa2e5fb::t_1043de17b78e1f 252
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "df8a6517079befc7829c30eebeb15fa62921f3b3",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
