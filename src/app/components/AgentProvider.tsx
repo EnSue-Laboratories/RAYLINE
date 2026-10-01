@@ -1,25 +1,13 @@
-import { useLayoutEffect, type ReactNode } from "react";
-import { useAgent } from "../boundaries";
-import { LiveConversationsContext, liveConversationsStore, publishAgentApi } from "../stores/live";
+import { useEffect, type ReactNode } from "react";
+import { connectAgentEvents } from "../../store/conversations";
 
 /**
- * Owns `useAgent()`. Its state updates (coalesced stream flushes, in a
- * transition) re-render only this provider and the context consumers; the
- * `children` element is created by App and bails out. After each commit the
- * conversations map is published to `liveConversationsStore` for derived
- * stores, persistence and handlers.
+ * Connects `agent-stream` / `agent-done` / `agent-error` to the conversations
+ * store for the lifetime of the app (ref-counted; StrictMode safe). Live chat
+ * state lives in src/store/conversations: components subscribe with its
+ * selectors and handlers call its actions, so nothing re-renders from here.
  */
 export function AgentProvider({ children }: { children: ReactNode }) {
-  const agent = useAgent();
-  const { conversations } = agent;
-
-  useLayoutEffect(() => {
-    publishAgentApi(agent);
-  });
-
-  useLayoutEffect(() => {
-    liveConversationsStore.setState(conversations);
-  }, [conversations]);
-
-  return <LiveConversationsContext.Provider value={conversations}>{children}</LiveConversationsContext.Provider>;
+  useEffect(() => connectAgentEvents(), []);
+  return children;
 }

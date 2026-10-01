@@ -18,8 +18,7 @@ import { createLogger } from "../../utils/logger";
 import { type CommitPriority, getConversation, updateConversations } from "./store";
 import type { ConversationRuntime } from "./types";
 
-// TODO(ts-boundary): drop the cast once utils/logger is converted.
-const log = createLogger("useAgent") as (...args: unknown[]) => void;
+const log = createLogger("useAgent");
 
 /** A message without an id yet (one is assigned on insert). */
 export type ChatMessageInput = ChatMessage extends infer M ? (M extends ChatMessage ? Omit<M, "id"> & { id?: string } : never) : never;

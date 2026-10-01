@@ -8,7 +8,7 @@ import { getLastMessagePreview, mergeArchivedMessages, serializeMessagesForState
 import { getPreferredLoadSessionId, normalizeConversationState, upsertConversationSession } from "../conversation/sessions";
 import { getApi } from "../lib/api";
 import { logSessionState } from "../log";
-import { getAgentApi, getLiveConversation } from "../stores/live";
+import { getConversation, loadMessages } from "../../store/conversations";
 import { isTranscriptPending } from "../stores/transcripts";
 import { patchUi } from "../stores/ui";
 import {
@@ -86,9 +86,8 @@ export async function selectConversation(id: string): Promise<void> {
   await ensureTranscriptLoaded(id);
   const loaded = findConvo(id);
   if (!loaded) return;
-  const agent = getAgentApi();
-  if (getLiveConversation(id).messages.length === 0 && loaded.archivedMessages.length > 0) {
-    agent.loadMessages(id, loaded.archivedMessages);
+  if (getConversation(id).messages.length === 0 && loaded.archivedMessages.length > 0) {
+    loadMessages(id, loaded.archivedMessages);
   }
 
   try {
@@ -102,8 +101,8 @@ export async function selectConversation(id: string): Promise<void> {
       lastProvider: loaded.lastProvider || null,
       providerSessions: loaded.providerSessions,
     });
-    if (meta.msgs.length > 0 && getLiveConversation(id).messages.length === 0) {
-      agent.loadMessages(id, meta.msgs);
+    if (meta.msgs.length > 0 && getConversation(id).messages.length === 0) {
+      loadMessages(id, meta.msgs);
     }
     await applyLoadedSession(id, sessionIdToLoad, meta, "select");
   } catch (e) {

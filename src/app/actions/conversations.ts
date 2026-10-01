@@ -11,15 +11,15 @@ import { neighbourTabId } from "../derived/tabs";
 import { dismissTabRound } from "../effects/streamingTabs";
 import { getApi } from "../lib/api";
 import { logSessionState } from "../log";
-import { getAgentApi, getLiveConversation } from "../stores/live";
+import { cancelMessage, getConversation } from "../../store/conversations";
 import { resolveModel } from "../stores/models";
-import { patchUi } from "../stores/ui";
+import { getUi, patchUi } from "../stores/ui";
 import { selectConversation } from "./navigation";
 
 /** Sidebar delete. */
 export function deleteConversation(id: string, event?: { stopPropagation: () => void }): void {
   event?.stopPropagation();
-  getAgentApi().cancelMessage(id);
+  cancelMessage(id);
   const pinnedTabs = getPinnedTabs();
   const remaining = getConvos().filter((c) => c.id !== id);
   const next = resetPinnedTabs(remaining);
@@ -49,7 +49,7 @@ export function closeTab(id: string): void {
 
 export function cancelActiveRun(): void {
   const active = getActiveId();
-  if (active) getAgentApi().cancelMessage(active);
+  if (active) cancelMessage(active);
 }
 
 /** Model picker: set the active conversation's model and the default model. */
@@ -70,8 +70,8 @@ export function changeModel(modelId: string): void {
     providerSessions: normalized?.providerSessions || null,
     activeSessionId: normalized?.activeSessionId || null,
   });
-  if (active && getLiveConversation(active).isStreaming && currentProvider === "multica" && modelId !== normalized?.model) {
-    getAgentApi().cancelMessage(active);
+  if (active && getConversation(active).isStreaming && currentProvider === "multica" && modelId !== normalized?.model) {
+    cancelMessage(active);
   }
   if (active) updateConvo(active, (c) => (c.model === modelId ? c : { ...c, model: modelId }));
   setAppSetting("defaultModel", modelId);
@@ -83,7 +83,8 @@ export function changeModel(modelId: string): void {
  */
 export function changeEffort(effort: EffortLevel | null): void {
   const active = getActiveId();
-  if (!active) {
+  // The new-chat card picks the effort for the chat it is about to create.
+  if (!active || getUi().showNewChatCard) {
     patchUi({ newChatEffort: effort });
     return;
   }

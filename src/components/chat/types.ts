@@ -1,4 +1,4 @@
-import type { AgentPermissionRequest, Attachment, ChatMessage, Conversation, PermissionBehavior, PermissionScope, QueuedMessage } from "@shared/chat/types";
+import type { AgentPermissionRequest, Attachment, Conversation, PermissionBehavior, PermissionScope, QueuedMessage } from "@shared/chat/types";
 import type { EffortLevel, ModelDefinition } from "@shared/models/types";
 import type { ProjectMeta, Wallpaper } from "@shared/state/types";
 import type { RuntimeSetupCardProps, RuntimeSetupState } from "../RuntimeSetupCard";
@@ -6,16 +6,19 @@ import type { NewChatRequest } from "../NewChatCard";
 import type { TabStripTab } from "../sidebar/tabStrip";
 import type { CanControlTarget, ControlChangeHandler, EditHandler } from "../message/types";
 
-/** The active conversation as App hands it to ChatArea (sidebar row + live state). */
+/**
+ * The active conversation row. Live messages and stream status are read from
+ * the conversations store by `id`, so App never re-renders ChatArea per
+ * stream flush.
+ */
 export interface ChatAreaConversation extends Partial<Omit<Conversation, "id" | "title" | "model">> {
   id: string;
   title: string;
   model: string;
-  /** Live messages (from the conversations store). */
-  msgs: readonly ChatMessage[];
-  isStreaming?: boolean;
-  error?: string | null;
 }
+
+/** NewChatCard's request plus the effort picked for the new chat. */
+export type CreateChatRequest = NewChatRequest & { effort?: EffortLevel | null };
 
 export interface PermissionResponseInput {
   requestId: string;
@@ -58,7 +61,7 @@ export interface ChatAreaProps {
   onCwdChange?: (cwd: string) => void;
   onRefocusTerminal?: () => void;
   showNewChatCard?: boolean;
-  onCreateChat: (request: NewChatRequest) => Promise<unknown> | void;
+  onCreateChat: (request: CreateChatRequest) => Promise<unknown> | void;
   onCancelNewChat?: () => void;
   allCwdRoots?: readonly string[];
   projects?: Readonly<Record<string, ProjectMeta>>;

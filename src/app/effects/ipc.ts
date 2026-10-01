@@ -4,7 +4,7 @@ import { convoListStore } from "../../store/convoList";
 import { getApi } from "../lib/api";
 import { isQueuedMessageReleaseBoundary } from "../conversation/queue";
 import { addPermissionRequest, clearPermissionRequestsFor, removePermissionRequest } from "../stores/permissions";
-import { getAgentApi } from "../stores/live";
+import { cancelMessage } from "../../store/conversations";
 import { getQueue, queueInterruptRequested } from "../stores/queue";
 import { patchUi, uiStore } from "../stores/ui";
 import type { Unsubscribe } from "@shared/ipc/contract";
@@ -33,7 +33,7 @@ export function startIpcListeners(): () => void {
       if (!getQueue().some((item) => item.conversationId === conversationId)) return;
       if (!isQueuedMessageReleaseBoundary(event)) return;
       queueInterruptRequested.add(conversationId);
-      getAgentApi().cancelMessage(conversationId);
+      cancelMessage(conversationId);
     }));
     offs.push(api.onAgentDone(({ conversationId }) => {
       if (!conversationId) return;

@@ -11,10 +11,10 @@ import { useTranslator } from "../contexts/LocaleContext";
 import { useStableCallback } from "../hooks/useStableCallback";
 import { isMulticaModelId } from "../data/models";
 import { createTranslator } from "../i18n";
-import { useConversationStatus, useMessageIds } from "../store/conversations";
+import { getConversation, useConversationStatus, useMessageIds } from "../store/conversations";
 import { getPaneSurfaceStyle } from "../utils/paneSurface";
 import type { ExportableConversation } from "../utils/exportHelpers";
-import { useGitStatus } from "./chat/boundary";
+import useGitStatus from "../hooks/useGitStatus";
 import ChatComposer, { type ComposerHandle } from "./chat/ChatComposer";
 import ChatHeader from "./chat/ChatHeader";
 import ChatTranscript from "./chat/ChatTranscript";
@@ -22,6 +22,7 @@ import { composerDraftScope } from "./chat/composerDraft";
 import { branchAttention, isDraftContext, shellLocationLabel } from "./chat/logic";
 import ScrollToBottomButton from "./chat/ScrollToBottomButton";
 import type { ChatAreaProps } from "./chat/types";
+import type { NewChatRequest } from "./NewChatCard";
 import type { TabStripTab } from "./sidebar/tabStrip";
 import { useOptionalStableCallback } from "./chat/useOptionalStableCallback";
 import { useScrollManager } from "./chat/useScrollManager";
@@ -29,7 +30,7 @@ import EmptyState from "./EmptyState";
 import SelectionToolbar from "./SelectionToolbar";
 import WindowDragSpacer from "./WindowDragSpacer";
 
-export type { ChatAreaConversation, ChatAreaProps, ChatRuntimeSetup, PermissionResponseInput, SendHandler } from "./chat/types";
+export type { ChatAreaConversation, ChatAreaProps, ChatRuntimeSetup, CreateChatRequest, PermissionResponseInput, SendHandler } from "./chat/types";
 
 // Only shown on first run / for a new chat: keep them out of the startup bundle.
 const NewChatCard = lazy(() => import("./NewChatCard"));
@@ -66,7 +67,9 @@ export default function ChatArea(props: ChatAreaProps) {
   const onSend = useStableCallback(props.onSend);
   const onCancel = useStableCallback(props.onCancel);
   const onModelChange = useStableCallback(props.onModelChange);
-  const onCreateChat = useStableCallback(props.onCreateChat);
+  // The effort picked in the card reaches createChat through onEffortChange
+  // (App consumes it once when creating), so the request is passed through.
+  const onCreateChat = useStableCallback((request: NewChatRequest) => props.onCreateChat(request));
   const onEdit = useOptionalStableCallback(props.onEdit);
   const onControlChange = useOptionalStableCallback(props.onControlChange);
   const canControlTargetProxy = useStableCallback((target: string) => Boolean(props.canControlTarget?.(target)));
@@ -89,10 +92,21 @@ export default function ChatArea(props: ChatAreaProps) {
   const draftContext = showNewChatCard ? newChatDefaultCwd == null : convo ? isDraftContext(convo.cwd, draftsPath) : false;
   const { status: gitStatus } = useGitStatus(cwd);
   const branch = branchAttention(gitStatus);
-  const exportable = useMemo<ExportableConversation | null>(
-    () => (convo ? { id: convo.id, title: convo.title, model: convo.model, cwd: convo.cwd, msgs: convo.msgs } : null),
-    [convo],
-  );
+  // Messages are read when exporting (getter), so streaming never re-renders
+  // the header; the object changes only when messages are added / removed.
+  const exportable = useMemo<ExportableConversation | null>(() => {
+    if (!convo || messageIds.length === 0) return null;
+    const id = convo.id;
+    return {
+      id,
+      title: convo.title,
+      model: convo.model,
+      cwd: convo.cwd,
+      get msgs() {
+        return getConversation(id).messages;
+      },
+    };
+  }, [convo, messageIds]);
   const setupRequired = Boolean(runtimeSetup?.required);
   const draftScope = composerDraftScope(convoId, cwd || draftsPath || newChatDefaultCwd);
 
@@ -185,7 +199,7 @@ export default function ChatArea(props: ChatAreaProps) {
         t={t}
         locale={locale}
         title={convo ? convo.title : null}
-        messageCount={convo?.msgs.length ?? 0}
+        messageCount={convo ? messageIds.length : 0}
         exportable={exportable}
         showNewChatCard={showNewChatCard}
         developerMode={developerMode}

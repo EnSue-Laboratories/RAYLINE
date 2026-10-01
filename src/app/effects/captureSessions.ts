@@ -9,7 +9,7 @@ import { getRuntimeProviderForProvider, type ModelProviderId, type RuntimeProvid
 import { convoListStore, updateConvo } from "../../store/convoList";
 import { getActiveConversationSession, normalizeConversationState, upsertConversationSession } from "../conversation/sessions";
 import { logSessionState } from "../log";
-import { getLiveConversation, liveConversationsStore } from "../stores/live";
+import { conversationsStore, getConversation } from "../../store/conversations";
 
 type NativeIdField = "_claudeSessionId" | "_codexThreadId" | "_opencodeSessionId" | "_grokSessionId" | "_agySessionId";
 
@@ -83,7 +83,7 @@ function run(): void {
   if (!activeId) return;
   const convo = convos.find((c) => c.id === activeId);
   if (!convo) return;
-  const data = getLiveConversation(activeId);
+  const data = getConversation(activeId);
   const ids = capturedIds(data);
   if (lastChecked?.row === convo && lastChecked.ids === ids) return;
   lastChecked = { row: convo, ids };
@@ -108,7 +108,7 @@ function run(): void {
 }
 
 export function startSessionCapture(): () => void {
-  const unsubscribers = [liveConversationsStore.subscribe(run), convoListStore.subscribe(run)];
+  const unsubscribers = [conversationsStore.subscribe(run), convoListStore.subscribe(run)];
   run();
   return () => {
     for (const unsubscribe of unsubscribers) unsubscribe();

@@ -345,7 +345,8 @@ export interface Conversation {
   grokContinue?: boolean;
   /** Creation / last-activity epoch ms. */
   ts: number;
-  cwd?: string;
+  /** Project / worktree directory; `null` marks a drafts conversation. */
+  cwd?: string | null;
 
   sessions: ConversationSession[];
   activeSessionId: string | null;

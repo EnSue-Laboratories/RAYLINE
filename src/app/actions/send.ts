@@ -34,7 +34,7 @@ import {
   getRuntimeProviderForModel,
 } from "../models/runtime";
 import { getModels, resolveModel } from "../stores/models";
-import { getAgentApi, getLiveConversation } from "../stores/live";
+import { getConversation, prepareMessage, startPreparedMessage } from "../../store/conversations";
 import { sendInFlight } from "../stores/queue";
 import { isRuntimeProviderAvailable, refreshCliInstalled } from "../stores/runtime";
 import { getUi } from "../stores/ui";
@@ -153,7 +153,7 @@ export async function sendMessageToConversation({
 
     const { cwd: appCwd } = getAppSettings();
     const effectiveCwd = recovery ? recovery.cwd ?? undefined : getEffectiveConversationCwd(base, appCwd, getUi().draftsPath);
-    const liveMessages = getLiveConversation(conversationId).messages;
+    const liveMessages = getConversation(conversationId).messages;
     const normalized = normalizeConversationState(base);
     const activeSession = getActiveConversationSession(normalized);
     const isFirstMessage = liveMessages.length === 0;
@@ -293,9 +293,7 @@ export async function sendMessageToConversation({
             : null,
       multicaSessionPolluted,
     });
-
-    const agent = getAgentApi();
-    const pendingId = agent.prepareMessage({
+    const pendingId = prepareMessage({
       conversationId,
       prompt: text,
       images: imageAttachments.length ? imageAttachments : undefined,
@@ -307,7 +305,7 @@ export async function sendMessageToConversation({
     if (effectiveCwd) await createCheckpoint(effectiveCwd, conversationId, messageIndex, sendStartedAt);
 
     const effortSource = findConvo(conversationId) ?? normalized;
-    const started = agent.startPreparedMessage({
+    const started = startPreparedMessage({
       conversationId,
       pendingId,
       sessionId: initialSessionId,

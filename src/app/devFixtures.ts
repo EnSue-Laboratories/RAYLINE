@@ -6,7 +6,7 @@
  */
 
 import { getActiveId } from "../store/convoList";
-import { getAgentApi, getLiveConversation } from "./stores/live";
+import { getConversation, replaceMessages } from "../store/conversations";
 
 interface DevWindow extends Window {
   __raylineDevAddImageDemo?: (conversationId?: string) => void;
@@ -23,8 +23,8 @@ function addImageDemo(conversationId?: string): void {
     return;
   }
   const now = Date.now();
-  getAgentApi().replaceMessages(targetId, [
-    ...getLiveConversation(targetId).messages,
+  replaceMessages(targetId, [
+    ...getConversation(targetId).messages,
     { id: `dev-img-user-${now}`, role: "user", text: "Show me an image rendering demo.", localOnly: true },
     {
       id: `dev-img-assistant-${now}`,

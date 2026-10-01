@@ -19,8 +19,7 @@ export function getLastCommitPriority(): CommitPriority {
   return lastCommitPriority;
 }
 
-// TODO(ts-boundary): drop the cast once utils/logger is converted (data-i18n / app-shell).
-const log = createLogger("useAgent") as (...args: unknown[]) => void;
+const log = createLogger("useAgent");
 
 function runEffects(effects: readonly StreamEffect[]): void {
   for (const effect of effects) {

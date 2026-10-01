@@ -16,7 +16,7 @@ import {
   getRemoteRuntimeConfigForModel,
   getRuntimeProviderForModel,
 } from "../models/runtime";
-import { getAgentApi, getLiveConversation } from "../stores/live";
+import { editAndResend, getConversation } from "../../store/conversations";
 import { getModels, resolveModel } from "../stores/models";
 import { getUi } from "../stores/ui";
 import type { MulticaContext } from "@shared/providers/types";
@@ -34,7 +34,7 @@ export async function editAndResendMessage(messageIndex: number, newText: string
   const normalized = normalizeConversationState(getActiveConvo() ?? activeConvo);
   const m = resolveModel(normalized.model);
   const convoCwd = getEffectiveConversationCwd(normalized, getAppSettings().cwd, getUi().draftsPath);
-  const currentMessages = getLiveConversation(active).messages;
+  const currentMessages = getConversation(active).messages;
   const api = getApi();
 
   // Restore the git checkpoint taken before this message.
@@ -110,7 +110,7 @@ export async function editAndResendMessage(messageIndex: number, newText: string
   }
   const wirePrompt = currentProvider === "multica" ? await buildMulticaBootstrapPrompt(convoCwd, primedPrompt) : primedPrompt;
 
-  const started = getAgentApi().editAndResend({
+  const started = editAndResend({
     conversationId: active,
     sessionId: resumeSessionId,
     messageIndex,

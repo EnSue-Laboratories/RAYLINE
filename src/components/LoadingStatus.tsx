@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { RateLimits, RateLimitWindow, TokenUsage } from "@shared/agent/usage";
-import { getMOrMulticaFallback, isOpenCodeModelId } from "@shared/models";
+import { isOpenCodeModelId } from "@shared/models";
 import { useFontScale } from "../contexts/FontSizeContext";
+import { useModelCatalog } from "./model-picker/useModelCatalog";
 import { deriveUsageStats, formatCompact, formatCost, formatDuration, formatPercent, formatResetIn, hasQuota, remoteBaseModelId } from "./message/usageStats";
 
 // Rotating status phrases while the agent works.
@@ -107,10 +108,10 @@ export default function LoadingStatus({ startedAt, elapsedMs: frozenElapsedMs, u
   // A persisted elapsed value wins after the turn (Date.now() - _startedAt drifts across sessions).
   const elapsedMs = isStreaming ? (startedAt ? now - startedAt : 0) : (frozenElapsedMs ?? (startedAt ? now - startedAt : 0));
 
-  // TODO(ts-boundary): resolve through settings' useModelCatalog().getModel (runtime
-  // catalog) once it lands; built-in + fallback models until then.
+  // Runtime catalog (discovered context windows); remote-ssh ids resolve their base model.
+  const { getModel } = useModelCatalog();
   const remoteId = remoteBaseModelId(modelId);
-  const model = modelId && !isOpenCodeModelId(modelId) ? getMOrMulticaFallback(remoteId || modelId) : null;
+  const model = modelId && !isOpenCodeModelId(modelId) ? getModel(remoteId || modelId) : null;
   const stats = deriveUsageStats(usage, model);
   const hasUsage = stats.hasTokenUsage || stats.hasCost;
   const fiveHour = finiteWindow(rateLimits?.five_hour);

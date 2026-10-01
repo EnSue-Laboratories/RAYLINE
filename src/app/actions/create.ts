@@ -47,9 +47,8 @@ export function createConversationDraft({ id, title, modelId, effort, ts, cwd, d
     model: modelId,
     ...(effort ? { effort } : {}),
     ts,
-    // `cwd: null` marks a drafts conversation (persisted as such), but
-    // `Conversation.cwd` is typed `string | undefined` in shared/chat/types.
-    cwd: cwd as string | undefined,
+    // `cwd: null` marks a drafts conversation (persisted as such).
+    cwd,
     sessions: [seedSession],
     activeSessionId: seedSession.id,
     providerSessions: {},

@@ -11,7 +11,7 @@ import { convoListStore, updateConvo } from "../../store/convoList";
 import { getLastMessagePreview, serializeMessagesForState } from "../conversation/archive";
 import { normalizeMulticaContext } from "../conversation/multica";
 import { getActiveConversationSession, markConversationSessionSynced, normalizeConversationState } from "../conversation/sessions";
-import { liveConversationsStore, getLiveConversation } from "../stores/live";
+import { conversationsStore, getConversation } from "../../store/conversations";
 import { getQueue, queueInterruptRequested, queueStore, sendInFlight, setQueue } from "../stores/queue";
 import { isTranscriptPending, transcriptStatusStore } from "../stores/transcripts";
 import { uiStore } from "../stores/ui";
@@ -25,7 +25,7 @@ let lastSynced: { id: string; messages: ChatMessage[] } | null = null;
 function syncActiveArchive(): void {
   const { activeId } = convoListStore.getState();
   if (!activeId) return;
-  const data = getLiveConversation(activeId);
+  const data = getConversation(activeId);
   if (data.isStreaming || data.messages.length === 0) return;
   if (lastSynced?.id === activeId && lastSynced.messages === data.messages) return;
   lastSynced = { id: activeId, messages: data.messages };
@@ -47,7 +47,7 @@ let queueCheckScheduled = false;
 function releaseQueuedMessage(): void {
   queueCheckScheduled = false;
   const { activeId } = convoListStore.getState();
-  if (!activeId || getLiveConversation(activeId).isStreaming || sendInFlight.has(activeId)) return;
+  if (!activeId || getConversation(activeId).isStreaming || sendInFlight.has(activeId)) return;
   const queue = getQueue();
   const next = queue.find((item) => item.conversationId === activeId);
   if (!next) return;
@@ -79,7 +79,7 @@ function maybeReconnectMultica(): void {
     lastReconnectKey = "";
     return;
   }
-  const data = getLiveConversation(activeId);
+  const data = getConversation(activeId);
   const connected = Boolean(data.multicaConnected);
   const hydrated =
     !isTranscriptPending(activeId) && (data.messages.length > 0 || convo.archivedMessages.length === 0);
@@ -103,7 +103,7 @@ function onChange(): void {
 
 export function startActiveConversationEffects(): () => void {
   const unsubscribers = [
-    liveConversationsStore.subscribe(onChange),
+    conversationsStore.subscribe(onChange),
     convoListStore.subscribe(onChange),
     queueStore.subscribe(scheduleQueueRelease),
     uiStore.subscribe(maybeReconnectMultica),
