@@ -1,12 +1,7 @@
 /**
  * Dependencies shared by Settings, the model picker, MulticaSetupModal and
- * RuntimeSetupCard. Typed modules are re-exported as-is; the two modules that
- * are still `// @ts-nocheck` get a single typed cast each (ts-boundary).
+ * RuntimeSetupCard, re-exported from their typed owners.
  */
-
-import type { ComponentType } from "react";
-import { playChime as rawPlayChime, CHIME_SOUNDS as RAW_CHIME_SOUNDS } from "../../utils/chime";
-import RawWindowDragSpacer from "../WindowDragSpacer";
 
 export { createTranslator, isMessageKey, type MessageKey, type Translator } from "../../i18n";
 export { useFontScale, type FontScale } from "../../contexts/FontSizeContext";
@@ -29,20 +24,5 @@ export {
 
 export type FontOptionGroup = "ui" | "content" | "mono";
 
-export interface ChimeSound {
-  id: string;
-  label: string;
-  src: string;
-}
-
-// TODO(ts-boundary): drop once src/utils/chime is converted
-export const CHIME_SOUNDS = RAW_CHIME_SOUNDS as readonly ChimeSound[];
-// TODO(ts-boundary): drop once src/utils/chime is converted
-export const playChime = rawPlayChime as (id: string) => void;
-
-export interface WindowDragSpacerProps {
-  reserveSidebarRail?: boolean;
-  reserveWindowsHeader?: boolean;
-}
-// TODO(ts-boundary): drop once WindowDragSpacer is converted (app-shell)
-export const WindowDragSpacer = RawWindowDragSpacer as ComponentType<WindowDragSpacerProps>;
+export { CHIME_SOUNDS, playChime, type ChimeSound } from "../../utils/chime";
+export { default as WindowDragSpacer, type WindowDragSpacerProps } from "../WindowDragSpacer";
