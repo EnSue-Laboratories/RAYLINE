@@ -1,4 +1,3 @@
-// @ts-nocheck
 import applyBootstrapTheme from "./utils/themeBootstrap";
 applyBootstrapTheme();
 
@@ -16,5 +15,5 @@ if (!container) {
 createRoot(container).render(
   <ThemeProvider>
     <TerminalWindow />
-  </ThemeProvider>
+  </ThemeProvider>,
 );
