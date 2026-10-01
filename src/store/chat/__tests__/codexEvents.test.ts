@@ -16,28 +16,64 @@ describe("Codex exec events", () => {
     expect(lastAssistant(result)).toMatchObject({ role: "assistant", parts: [], isStreaming: true });
   });
 
-  it("command items start running and complete in place", () => {
+  it("command items start running, update and complete in place", () => {
     const { result } = run(
       convo([user]),
       { type: "item.started", item: { id: "i1", type: "command_execution", command: "ls", aggregated_output: "" } },
-      { type: "item.completed", item: { id: "i1", type: "command_execution", command: "ls", aggregated_output: "a\nb" } },
+      { type: "item.updated", item: { id: "i1", type: "command_execution", command: "ls", aggregated_output: "a" } },
+      { type: "item.completed", item: { id: "i1", type: "command_execution", command: "ls", aggregated_output: "a\nb", exit_code: 0 } },
       { type: "item.completed", item: { id: "i2", type: "command_execution", command: "pwd", aggregated_output: "/x" } },
       { type: "item.completed", item: { id: "m1", type: "agent_message", text: "done" } },
-      { type: "item.updated", item: { id: "i3", type: "command_execution", command: "x", aggregated_output: "" } },
     );
     expect(parts(result)).toEqual([
       { type: "tool", id: "i1", name: "ls", args: { command: "ls" }, result: "a\nb", status: "done" },
       { type: "tool", id: "i2", name: "pwd", args: { command: "pwd" }, result: "/x", status: "done" },
-      { type: "text", text: "done" },
+      { type: "text", id: "m1", text: "done" },
     ]);
   });
 
+  it("renders every exec item type", () => {
+    const { result } = run(
+      convo([user]),
+      { type: "item.started", item: { id: "r1", type: "reasoning", text: "plan" } },
+      { type: "item.completed", item: { id: "r1", type: "reasoning", text: "plan more" } },
+      { type: "item.completed", item: { id: "f1", type: "file_change", changes: [{ path: "src/a.ts", kind: "update" }, { path: "b.md", kind: "add" }], status: "completed" } },
+      { type: "item.started", item: { id: "p1", type: "mcp_tool_call", server: "gh", tool: "search", arguments: { q: "x" }, status: "in_progress" } },
+      { type: "item.completed", item: { id: "p1", type: "mcp_tool_call", server: "gh", tool: "search", arguments: { q: "x" }, result: { hits: 1 }, status: "completed" } },
+      { type: "item.started", item: { id: "c1", type: "collab_tool_call", prompt: "review" } },
+      { type: "item.completed", item: { id: "w1", type: "web_search", query: "vite glob" } },
+      { type: "item.updated", item: { id: "t1", type: "todo_list", items: [{ text: "a", completed: true }, { text: "b", completed: false }] } },
+    );
+    const message = lastAssistant(result);
+    expect(message.isThinking).toBe(false);
+    expect(parts(result)).toEqual([
+      { type: "thinking", id: "r1", text: "plan more" },
+      { type: "tool", id: "f1", name: "Edit", args: { file_path: "src/a.ts", changes: [{ path: "src/a.ts", kind: "update" }, { path: "b.md", kind: "add" }] }, result: "update src/a.ts\nadd b.md", status: "done" },
+      { type: "tool", id: "p1", name: "mcp__gh__search", args: { q: "x" }, result: { hits: 1 }, status: "done" },
+      { type: "tool", id: "c1", name: "Agent", args: { description: "review" }, result: null, status: "running" },
+      { type: "tool", id: "w1", name: "WebSearch", args: { query: "vite glob" }, result: null, status: "done" },
+      { type: "tool", id: "t1", name: "TodoWrite", args: { todos: [{ content: "a", status: "completed" }, { content: "b", status: "pending" }] }, result: null, status: "running" },
+    ]);
+  });
+
+  it("error items are muted notices, not failures (deduped)", () => {
+    const notice = { type: "item.completed" as const, item: { id: "e1", type: "error" as const, message: "Skill descriptions were shortened" } };
+    const { result } = run(convo([user]), notice, notice);
+    expect(parts(result)).toEqual([{ type: "status", kind: "notice", title: "Notice", text: "Skill descriptions were shortened" }]);
+    expect(result?.isStreaming).toBe(true);
+    expect(result?.error).toBeNull();
+    expect(lastAssistant(result).isStreaming).toBe(true);
+  });
+
   it("turn.completed merges fallback usage and finalizes", () => {
-    const { result } = run(convo([user, assistant()]), { type: "turn.completed", usage: { input_tokens: 5, cached_input_tokens: 2, output_tokens: 7 } });
+    const { result } = run(convo([user, assistant()]), {
+      type: "turn.completed",
+      usage: { input_tokens: 5, cached_input_tokens: 2, cache_write_input_tokens: 3, output_tokens: 7, reasoning_output_tokens: 4 },
+    });
     const message = lastAssistant(result);
     expect(result?.isStreaming).toBe(false);
     expect(message.isStreaming).toBe(false);
-    expect(message._usage).toMatchObject({ input_tokens: 5, output_tokens: 7, cache_read_input_tokens: 2 });
+    expect(message._usage).toMatchObject({ input_tokens: 5, output_tokens: 7, cache_read_input_tokens: 2, cache_creation_input_tokens: 3, reasoning_tokens: 4 });
   });
 
   it("turn.failed only materializes the entry", () => {

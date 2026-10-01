@@ -4,7 +4,6 @@
  */
 import type {
   CodexEventMsgEvent,
-  CodexItemEvent,
   CodexResponseContentItem,
   CodexResponseItemEvent,
   CodexTurnCompletedEvent,
@@ -95,42 +94,6 @@ export function applyCodexEventMsg(draft: ConversationDraft, event: CodexEventMs
     }
     default:
       return;
-  }
-}
-
-function upsertCommandTool(draft: ConversationDraft, event: CodexItemEvent): void {
-  const item = event.item;
-  if (item.type !== "command_execution") return;
-  const message = editLastAssistant(draft);
-  if (event.type === "item.started") {
-    const tool: ToolPart = { type: "tool", id: item.id || uid(), name: item.command || "command", args: { command: item.command }, result: null, status: "running" };
-    draft.editParts(message).push(draft.own(tool));
-    return;
-  }
-  const existing = findToolPartIndex(message.parts ?? [], item.id);
-  const part = asToolPart(existing >= 0 ? draft.editPart(message, existing) : undefined);
-  if (part) {
-    part.result = item.aggregated_output;
-    part.status = "done";
-    return;
-  }
-  const tool: ToolPart = { type: "tool", id: item.id || uid(), name: item.command || "command", args: { command: item.command }, result: item.aggregated_output, status: "done" };
-  draft.editParts(message).push(draft.own(tool));
-}
-
-export function applyCodexItem(draft: ConversationDraft, event: CodexItemEvent): void {
-  draft.touch();
-  const item: CodexItemEvent["item"] | undefined = event.item;
-  if (!item) return;
-  if (event.type === "item.started") {
-    upsertCommandTool(draft, event);
-  } else if (event.type === "item.completed") {
-    if (item.type === "agent_message") {
-      const message = editLastAssistant(draft);
-      draft.editParts(message).push(draft.own({ type: "text", text: item.text || "" }));
-    } else {
-      upsertCommandTool(draft, event);
-    }
   }
 }
 

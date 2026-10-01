@@ -131,7 +131,7 @@ describe("agent-done / agent-error", () => {
   it("done finalizes live assistants only and keeps finished ones by identity", () => {
     const finished: ChatMessage = { id: "old", role: "assistant", parts: [], isStreaming: false, isThinking: false, _elapsedMs: 5 };
     resetConversationsStoreForTests(new Map([["c1", convo([finished, user, assistant()])]]));
-    handleAgentDone(null, { conversationId: "c1", exitCode: 0 });
+    handleAgentDone(null, { conversationId: "c1", provider: "claude", exitCode: 0 });
     const data = getConversation("c1");
     expect(data.isStreaming).toBe(false);
     expect(data.messages[0]).toBe(finished);
@@ -141,7 +141,7 @@ describe("agent-done / agent-error", () => {
   it("done with a Codex thread schedules usage hydration when usage is missing", async () => {
     api.loadSession.mockResolvedValue({ messages: [], cwd: null, provider: "codex", usageSnapshot: { input_tokens: 9 }, rateLimitsSnapshot: null });
     resetConversationsStoreForTests(new Map([["c1", convo([user, assistant()])]]));
-    handleAgentDone(null, { conversationId: "c1", provider: "codex", threadId: "th" });
+    handleAgentDone(null, { conversationId: "c1", provider: "codex", exitCode: 0, threadId: "th" });
     expect(getConversation("c1")._codexThreadId).toBe("th");
     await vi.waitFor(() => expect(getConversation("c1").messages[1]).toMatchObject({ _usage: { input_tokens: 9 } }));
   });
@@ -156,11 +156,11 @@ describe("agent-done / agent-error", () => {
 
   it("done stores Grok / AGY / OpenCode native ids from threadId", () => {
     resetConversationsStoreForTests(new Map([["c1", convo([user, assistant()])]]));
-    handleAgentDone(null, { conversationId: "c1", provider: "grok", threadId: "g-9" });
+    handleAgentDone(null, { conversationId: "c1", provider: "grok", exitCode: 0, threadId: "g-9" });
     expect(getConversation("c1")._grokSessionId).toBe("g-9");
-    handleAgentDone(null, { conversationId: "c1", provider: "agy", threadId: "a-9" });
+    handleAgentDone(null, { conversationId: "c1", provider: "agy", exitCode: 0, threadId: "a-9" });
     expect(getConversation("c1")._agySessionId).toBe("a-9");
-    handleAgentDone(null, { conversationId: "c1", provider: "opencode", threadId: "o-9" });
+    handleAgentDone(null, { conversationId: "c1", provider: "opencode", exitCode: 0, threadId: "o-9" });
     expect(getConversation("c1")._opencodeSessionId).toBe("o-9");
   });
 

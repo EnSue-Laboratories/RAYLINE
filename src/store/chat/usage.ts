@@ -54,6 +54,8 @@ export function mergeUsage(prev: TokenUsage | null | undefined, incoming: TokenU
 interface CodexUsageLike extends CodexRawTokenUsage {
   cache_read_input_tokens?: number;
   cache_creation_input_tokens?: number;
+  /** `turn.completed.usage` (exec --json) spelling of cache creation. */
+  cache_write_input_tokens?: number;
 }
 
 export function normalizeCodexUsage(usage: CodexUsageLike | null | undefined, contextWindow?: number): TokenUsage | null {
@@ -63,8 +65,9 @@ export function normalizeCodexUsage(usage: CodexUsageLike | null | undefined, co
     output_tokens: usage.output_tokens ?? 0,
     total_tokens: usage.total_tokens ?? null,
     cache_read_input_tokens: usage.cached_input_tokens ?? usage.cache_read_input_tokens ?? 0,
-    cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+    cache_creation_input_tokens: usage.cache_creation_input_tokens ?? usage.cache_write_input_tokens ?? 0,
   };
+  if (isFiniteNumber(usage.reasoning_output_tokens)) out.reasoning_tokens = usage.reasoning_output_tokens;
   if (isFiniteNumber(contextWindow)) out.context_window = contextWindow;
   return out;
 }

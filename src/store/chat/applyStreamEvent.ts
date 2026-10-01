@@ -7,7 +7,8 @@
 import { type AgentStreamEvent, getMulticaInnerType, isMulticaStreamEvent } from "@shared/agent/events";
 import { ensureAssistantIndex, findLatestAssistantIndex, isRecord } from "./assistant";
 import { applyClaudeAssistant, applyClaudeResult, applyClaudeStreamEnvelope, applyClaudeSystem, applyClaudeUser } from "./claudeEvents";
-import { applyCodexEventMsg, applyCodexItem, applyCodexResponseItem, applyCodexTurnCompleted } from "./codexEvents";
+import { applyCodexEventMsg, applyCodexResponseItem, applyCodexTurnCompleted } from "./codexEvents";
+import { applyCodexItem } from "./codexItems";
 import type { ConversationDraft } from "./draft";
 import { applyMulticaEvent } from "./multicaEvents";
 import { applyOpenCodeEvent } from "./openCodeEvents";
