@@ -12,7 +12,8 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { FileAttachment } from "@shared/chat/types";
 import type { NormalizedRemoteRuntime } from "@shared/providers/types";
-import { buildSpawnPath, normalizeRemoteRuntime, spawnRemoteCommand } from "./providers/common/boundary";
+import { buildSpawnPath } from "./cli-bin-resolver";
+import { normalizeRemoteRuntime, spawnRemoteCommand } from "./remote-runtime";
 import type { ImageInput } from "./providers/common/images";
 import {
   REMOTE_ATTACHMENT_DIR_PREFIX,

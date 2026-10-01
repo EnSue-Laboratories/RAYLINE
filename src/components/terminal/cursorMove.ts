@@ -67,6 +67,7 @@ export function getBufferService(term: unknown): BufferServiceLike | null {
   if (!isRecord(term) || !isRecord(term._core)) return null;
   const service = term._core._bufferService;
   if (!isRecord(service) || typeof service.cols !== "number" || !isRecord(service.buffer)) return null;
+  // Private xterm API: only the fields checked above are verified at runtime.
   return service as unknown as BufferServiceLike;
 }
 

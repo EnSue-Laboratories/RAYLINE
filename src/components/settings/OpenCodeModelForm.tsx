@@ -4,7 +4,7 @@ import { ToggleSwitch } from "./controls";
 import type { FontScale, Translator } from "./deps";
 import type { OpenCodeDraft } from "./helpers";
 import { OpenCodeProviderCombobox } from "./OpenCodeProviderCombobox";
-import { getSettingsStyles, type AppRegionStyle } from "./styles";
+import { getSettingsStyles } from "./styles";
 import type { OpenCodeEditorMode } from "./useOpenCodeEditor";
 
 interface OpenCodeModelFormProps {
@@ -22,7 +22,7 @@ interface OpenCodeModelFormProps {
 
 const GRID_TWO: CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 8 };
 
-function dialogStyle(hasWallpaper: boolean): AppRegionStyle {
+function dialogStyle(hasWallpaper: boolean): CSSProperties {
   return {
     position: "absolute",
     zIndex: 60,

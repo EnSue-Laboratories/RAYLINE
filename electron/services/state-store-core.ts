@@ -143,6 +143,7 @@ export class StateStoreCore {
 
   /** v2: pmRepos is owned by the Project Manager (`gh-save-pm-state`); main's copy wins. */
   protected prepareIndex(raw: Record<string, unknown>): PersistedAppIndex {
+    // Parsed on-disk index; sanitizeIndex normalizes `convos` and keeps the other stored fields.
     const index = sanitizeIndex(raw as unknown as PersistedAppIndex);
     return this.pmRepos !== undefined ? { ...index, pmRepos: this.pmRepos } : index;
   }

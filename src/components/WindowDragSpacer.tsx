@@ -6,7 +6,7 @@ import {
   SIDEBAR_CHROME_RAIL_WIDTH,
   WINDOW_DRAG_HEIGHT,
 } from "../windowChrome";
-import { DRAG, NO_DRAG } from "./sidebar/appRegion";
+import { DRAG, NO_DRAG } from "../utils/appRegion";
 
 const RAIL_HIT_PADDING = 8;
 /** Width of the Windows fixed header overlay (SidebarWindowsHeader). */

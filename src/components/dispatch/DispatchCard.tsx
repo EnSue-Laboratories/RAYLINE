@@ -13,7 +13,7 @@ import { useTranslator } from "../../contexts/LocaleContext";
 import AutoTab from "./AutoTab";
 import CustomTab from "./CustomTab";
 import DispatchLoadingDots from "./DispatchLoadingDots";
-import DispatchModelPicker from "./DispatchModelPicker";
+import ModelPicker from "../ModelPicker";
 import {
   buildDispatchPayload,
   buildModelPayload,
@@ -257,7 +257,7 @@ export default function DispatchCard({
 
         {tab === "custom" && (
           <footer style={footerStyle}>
-            <DispatchModelPicker
+            <ModelPicker
               extraModels={pickerModels}
               ariaLabel={t("dispatch.defaultModel")}
               value={globalModel}

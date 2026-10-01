@@ -1,7 +1,7 @@
 /** Async `gh` CLI runner (resolved binary, PATH fix-ups, stdin variants). */
 
-import { createLogger } from "../terminal/deps";
-import { buildSpawnPath, execFileCli, isExecutable, resolveCliBin, spawnCli } from "./deps";
+import { createLogger } from "../../logger";
+import { buildSpawnPath, execFileCli, isExecutable, resolveCliBin, spawnCli } from "../../cli-bin-resolver";
 
 export const log = createLogger("github-manager");
 

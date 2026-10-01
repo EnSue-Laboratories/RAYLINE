@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { CSSProperties } from "react";
-import { NO_DRAG } from "../sidebar/appRegion";
+import { NO_DRAG } from "../../utils/appRegion";
 import { useHoverStyle } from "./useHoverStyle";
 
 const iconBtnStyle: CSSProperties = {

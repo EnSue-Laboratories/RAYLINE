@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import type { GitWorktree } from "@shared/git/types";
 import { useStableCallback } from "../hooks/useStableCallback";
-import { NO_DRAG } from "./sidebar/appRegion";
+import { NO_DRAG } from "../utils/appRegion";
 import { useFontScale } from "../contexts/FontSizeContext";
 import { useLocaleTranslator } from "./sidebar/useLocaleTranslator";
 import { getBranchMenuPosition, getViewport, type SizedMenuPosition } from "./sidebar/dropdownPosition";

@@ -2,7 +2,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import type { AgentEventSink } from "../../agent-sink";
-import { createLogger } from "../common/boundary";
+import { createLogger } from "../../logger";
 import { donePayload } from "../common/done";
 import { errorMessage } from "../common/json";
 import type { OpenCodeServerStreamState } from "./parser";

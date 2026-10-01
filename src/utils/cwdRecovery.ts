@@ -100,8 +100,9 @@ export function buildMissingCwdReminder({ originalCwd, recoveredCwd, recoveryRea
   return `<system-reminder>\n[cwd-recovery] ${explanation}\n</system-reminder>`;
 }
 
-/** Prepend a reminder block to a prompt. Safe to call with null. */
-export function decoratePromptWithReminder(prompt: string, reminder: string | null | undefined): string {
-  if (!reminder) return prompt;
-  return `${reminder}\n\n${prompt}`;
+/** Prepend a reminder block to a prompt. Safe to call with a null prompt or reminder. */
+export function decoratePromptWithReminder(prompt: string | null | undefined, reminder: string | null | undefined): string {
+  const base = prompt ?? "";
+  if (!reminder) return base;
+  return `${reminder}\n\n${base}`;
 }

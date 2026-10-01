@@ -2,7 +2,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import net from "node:net";
-import type { Logger } from "../common/boundary";
+import type { Logger } from "../../logger";
 import { safeJsonParse } from "../common/json";
 import { extractSseData } from "./parser";
 

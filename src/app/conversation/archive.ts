@@ -86,6 +86,7 @@ function serializeMessageImageForState(image: MessageImage | null | undefined): 
 
 /** Field-by-field copy of a part (drops stream bookkeeping like `_streamKey`/`argsJson`). */
 function serializePart(part: MessagePart): MessagePart {
+  // Read every variant's optional fields uniformly; the union has no index signature.
   const src = part as unknown as Record<string, unknown>;
   const out: Record<string, unknown> = { type: part.type };
   if (src.id) out.id = src.id;
@@ -104,6 +105,7 @@ function serializePart(part: MessagePart): MessagePart {
       if (typeof src[key] === "string") out[key] = src[key];
     }
   }
+  // `out` copies a subset of `part`'s own fields (always including `type`).
   return out as unknown as MessagePart;
 }
 
@@ -111,6 +113,7 @@ function serializePart(part: MessagePart): MessagePart {
 export function serializeMessagesForState(messages: readonly ChatMessage[] | null | undefined): ChatMessage[] {
   if (!messages) return [];
   return messages.map((message) => {
+    // Read role-specific optional fields uniformly; the union has no index signature.
     const src = message as unknown as Record<string, unknown>;
     const next: Record<string, unknown> = { id: message.id, role: message.role };
     if (typeof src.text === "string") next.text = src.text;
@@ -137,6 +140,7 @@ export function serializeMessagesForState(messages: readonly ChatMessage[] | nul
       if (message._usage) next._usage = message._usage;
       if (message._elapsedMs != null) next._elapsedMs = message._elapsedMs;
     }
+    // `next` copies a subset of `message`'s own fields (always including id/role).
     return next as unknown as ChatMessage;
   });
 }

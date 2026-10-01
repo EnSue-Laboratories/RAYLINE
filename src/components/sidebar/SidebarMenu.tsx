@@ -1,6 +1,6 @@
 import { memo, useState, type ReactNode } from "react";
 import { FolderPlus, Plus, Search, Workflow } from "lucide-react";
-import { NO_DRAG } from "./appRegion";
+import { NO_DRAG } from "../../utils/appRegion";
 import { applyPaneInteractionStyle, getPaneInteractionStyle } from "../../utils/paneSurface";
 import type { FontScale, Translator } from "./types";
 

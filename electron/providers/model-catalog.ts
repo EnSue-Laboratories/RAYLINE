@@ -26,7 +26,7 @@ import {
   type CodexModelDefinition,
   type RuntimeModelCatalog,
 } from "@shared/models";
-import { execFileCli, type ExecFileCallback } from "./common/boundary";
+import { execFileCli, type ExecFileCliCallback } from "../cli-bin-resolver";
 import { isRecord, readNumber, safeJsonParse } from "./common/json";
 import { baseCliEnv } from "./common/runtime-env";
 import { resolveAgyBin } from "./agy/session";
@@ -39,7 +39,7 @@ const AGY_CACHE_TTL_MS = 5 * 60_000;
 const CATALOG_TTL_MS = 60_000;
 
 /** `execFile`-compatible runner (injectable for tests). */
-export type CliRunner = (bin: string, args: readonly string[], options: ExecFileOptions, callback: ExecFileCallback) => void;
+export type CliRunner = (bin: string, args: readonly string[], options: ExecFileOptions, callback: ExecFileCliCallback) => void;
 
 const defaultRunner: CliRunner = (bin, args, options, callback) => {
   execFileCli(bin, args, options, callback);

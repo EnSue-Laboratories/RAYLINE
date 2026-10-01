@@ -1,24 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useEffect, useMemo, type ComponentType } from "react";
+import { useEffect, useMemo } from "react";
 import { multicaAgentToModel, type ModelDefinition, type MulticaModelDefinition } from "@shared/models";
 import type { MulticaStoreState } from "@shared/providers/types";
 import { createStore, useStore, type Store } from "../store/createStore";
 import { getMulticaStore, isMulticaConfigured, loadMulticaState, normalizeMulticaAgents, saveMulticaState } from "../multica/store";
 import { useOpenCodeModels } from "./openCodeModels";
 import { createRefresher } from "./createRefresher";
-import ModelPickerUntyped from "../components/ModelPicker";
-
-interface ModelPickerProps {
-  value: string;
-  onChange: (modelId: string) => void;
-  extraModels?: readonly ModelDefinition[];
-  extraError?: unknown;
-  extraLoading?: boolean;
-}
-
-// TODO(ts-boundary): drop once src/components/ModelPicker.tsx is converted
-// (its inferred props are `extraModels: never[]`, `extraError: null`).
-const ModelPicker = ModelPickerUntyped as unknown as ComponentType<ModelPickerProps>;
+import ModelPicker from "../components/ModelPicker";
 
 export { multicaAgentToModel } from "@shared/models";
 

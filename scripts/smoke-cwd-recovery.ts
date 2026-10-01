@@ -5,28 +5,12 @@
 // Exits non-zero on any failure. Runs directly on Node's type stripping
 // (erasable TypeScript only, explicit `.ts` import specifiers).
 
-import * as cwdRecoveryModule from "../src/utils/cwdRecovery.ts";
-
-type RecoveryReason = "worktree-root" | "app-cwd" | "none";
-
-interface CwdRecovery {
-  readonly getMainRepoRoot: (dir: string | null | undefined) => string | null | undefined;
-  readonly resolveSafeCwd: (args: {
-    cwd: string | null;
-    appCwd: string | null;
-    exists: (p: string) => boolean;
-  }) => { cwd: string | null; wasMissing: boolean; originalCwd: string | null; recoveryReason: RecoveryReason };
-  readonly buildMissingCwdReminder: (args: {
-    originalCwd: string | null;
-    recoveredCwd: string | null;
-    recoveryReason: RecoveryReason;
-  }) => string | null;
-  readonly decoratePromptWithReminder: (prompt: string | null, reminder: string | null) => string;
-}
-
-// TODO(ts-boundary): drop once src/utils/cwdRecovery.ts is converted (app-shell)
-const { getMainRepoRoot, resolveSafeCwd, buildMissingCwdReminder, decoratePromptWithReminder } =
-  cwdRecoveryModule as unknown as CwdRecovery;
+import {
+  buildMissingCwdReminder,
+  decoratePromptWithReminder,
+  getMainRepoRoot,
+  resolveSafeCwd,
+} from "../src/utils/cwdRecovery.ts";
 
 let failures = 0;
 function check(name: string, cond: boolean | undefined, detail?: string): void {

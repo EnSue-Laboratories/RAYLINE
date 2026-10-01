@@ -7,7 +7,7 @@ import type { FileAttachment } from "@shared/chat/types";
 import type { NormalizedRemoteRuntime, RemoteRuntimeProviderId } from "@shared/providers/types";
 import { stageRemoteAttachments, type StagedRemoteAttachments } from "../../remote-attachments";
 import { startRemoteChannel, type RemoteChannel } from "../../remote-channel";
-import type { Logger } from "./boundary";
+import type { Logger } from "../../logger";
 import type { ImageInput } from "./images";
 import { errorMessage } from "./json";
 
