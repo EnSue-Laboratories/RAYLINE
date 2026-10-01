@@ -1,7 +1,7 @@
 /**
  * Multica WebSocket events. electron/multica-manager forwards every WS message
  * relevant to a conversation as `{ type: "multica:<ws type>", payload }` on
- * `agent-stream` (any WS type is forwarded, not just the known ones), and
+ * `agent-stream` (every WS type is forwarded, not just the known ones), and
  * main emits `multica:error` itself when a launch fails.
  */
 

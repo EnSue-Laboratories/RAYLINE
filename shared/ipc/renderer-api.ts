@@ -90,6 +90,7 @@ export interface RaylineApi {
   getDraftsPath: Invoker<"get-drafts-path">;
   pathExists: Invoker<"path-exists">;
   checkCliInstalled: Invoker<"check-cli-installed">;
+  getModelCatalog: Invoker<"model-catalog">;
   opencodeStatus: Invoker<"opencode-status">;
   opencodeSaveConfig: Invoker<"opencode-save-config">;
   opencodeGetProviderConfig: Invoker<"opencode-get-provider-config">;
@@ -174,6 +175,7 @@ export interface RaylineApi {
 
   // Auto-updater
   getAppVersion: Invoker<"get-app-version">;
+  getAppBuild: Invoker<"get-app-build">;
   checkForUpdates: Invoker<"updater-check">;
   downloadUpdate: Invoker<"updater-download">;
   installUpdate: Invoker<"updater-install">;

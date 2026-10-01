@@ -255,6 +255,10 @@ export interface ConversationData {
   _claudeSessionId?: string;
   _codexThreadId?: string;
   _opencodeSessionId?: string;
+  /** Grok native session id (from stream `sessionId` / `agent-done.threadId`). */
+  _grokSessionId?: string;
+  /** Antigravity native conversation id (`conversation_id`). */
+  _agySessionId?: string;
 }
 
 // ── Conversations (sidebar / persisted) ─────────────────────────────────────
@@ -279,7 +283,7 @@ export interface ConversationSession {
   /** RayLine ledger id (`session-<provider>-<ts>-<rand>`). */
   id: string;
   provider: ModelProviderId | null;
-  /** Claude session uuid / Codex thread id / OpenCode session id. */
+  /** Claude session uuid / Codex thread id / OpenCode, Grok or AGY session id. */
   nativeSessionId: string | null;
   model: string | null;
   /** How many archived messages this native session already contains. */
@@ -321,6 +325,13 @@ export interface Conversation {
    * default. Introduced with the effort-agnostic model id scheme.
    */
   effort?: EffortLevel | null;
+  /**
+   * Grok only: start the first turn with `grok --continue` (resume the CLI's
+   * most recent session for the cwd) when no native session id exists yet.
+   * Replaces the PR #230 `grok-46-continue` model id (see
+   * `normalizeModelSelection`, which reports it as `grokContinue`).
+   */
+  grokContinue?: boolean;
   /** Creation / last-activity epoch ms. */
   ts: number;
   cwd?: string;
@@ -392,6 +403,12 @@ export interface AgentStartRequest {
   /** Existing native session to resume. */
   resumeSessionId?: string;
   forkSession?: boolean;
+  /**
+   * Grok only: pass `--continue` when there is no native session to resume
+   * (ignored when `sessionId` / `resumeSessionId` is set). AGY rejects
+   * `forkSession` and image payloads.
+   */
+  grokContinue?: boolean;
   /** Multica only. */
   _multica?: MulticaContext;
   _multicaToken?: string;
