@@ -1,0 +1,27 @@
+electron/providers/codex/mcp.ts
+  s_d0fb9aefa2e5fb::t_247f821aff16a3 1-75
+electron/providers/codex/args.ts
+  s_d0fb9aefa2e5fb::t_78cfd508575b8d 1-88
+electron/codex-agent-manager.ts
+  s_d0fb9aefa2e5fb::t_df132b4a1462b4 1-11
+electron/providers/codex/parser.ts
+  s_d0fb9aefa2e5fb::t_ce8d281eb0659a 1-155
+electron/providers/codex/session.ts
+  s_d0fb9aefa2e5fb::t_298fdba03134b4 1-338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e7a8e19a7207e4dad47c030345640d4bef4f5324",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
