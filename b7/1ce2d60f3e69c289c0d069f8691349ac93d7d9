@@ -1,0 +1,25 @@
+scripts/claudi-terminal.ts
+  s_d0fb9aefa2e5fb::t_f1bd931b8968c5 2-6,8-10,12,17,29,34-36,38-39,41-44,53,56-57,59-61,64-67,70,77,81-82,85,88,98-100,104-105,111-146,149,158,160-167,171-172
+electron/mcp-terminal-server.ts
+  s_d0fb9aefa2e5fb::t_f5bb93bd126319 3-10,13,15,17-21,23,25-26,29-30
+electron/services/terminal/ws-client.ts
+  s_d0fb9aefa2e5fb::t_5cb687b55fbb84 1-26,30,32-142
+electron/services/terminal/__tests__/mcp-e2e.test.ts
+  s_d0fb9aefa2e5fb::t_65b06a39d5ab94 1-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b71ce2d60f3e69c289c0d069f8691349ac93d7d9",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
