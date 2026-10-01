@@ -16,6 +16,7 @@ import { errorMessage } from "../common/json";
 import { LineSplitter } from "../common/line-splitter";
 import { cleanupRemoteAttachments, disposeRemoteChannel, finishRemoteChannel, prepareRemoteRun, type RemoteRunResources } from "../common/remote-run";
 import { baseCliEnv, createCliBinResolver, getMcpConfigPath, isDirectory, terminalEnv } from "../common/runtime-env";
+import { findDiscoveredCodexModel } from "../model-catalog";
 import { buildCodexArgs, codexSandboxModeFromEnv, resolveCodexModelChoice } from "./args";
 import { buildCodexMcpOverrides, hasTerminalSessionsServer, readConfiguredMcpServers } from "./mcp";
 import { inspectCodexEvent, parseCodexLine, shouldEmitCodexStderr } from "./parser";
@@ -254,7 +255,9 @@ export async function startCodexAgent(request: AgentStartRequest, sink: AgentEve
     }
 
     const mcpServers = remote ? [] : await readConfiguredMcpServers(getMcpConfigPath());
-    const choice = resolveCodexModelChoice(request.model, request.effort, Boolean(state.upstream));
+    const upstreamActive = Boolean(state.upstream);
+    const discovered = upstreamActive || remote ? null : await findDiscoveredCodexModel(request.model);
+    const choice = resolveCodexModelChoice(request.model, request.effort, upstreamActive, discovered);
     const prompt = buildCodexPrompt(request.prompt, files, {
       remote: Boolean(remote),
       hasTerminalSessions: hasTerminalSessionsServer(mcpServers),

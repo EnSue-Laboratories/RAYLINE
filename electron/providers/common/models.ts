@@ -63,17 +63,25 @@ export interface RunEffortInput {
   legacyEffort?: EffortLevel | null;
   /** A provider upstream (custom base URL) is active: never send effort. */
   upstreamActive?: boolean;
+  /**
+   * What to do when the model is unknown to the registry: `omit` (Claude —
+   * aliases are fixed) or `passthrough` the requested level (Codex — a slug
+   * discovered by the installed CLI may support it; the CLI validates).
+   */
+  unknownModel?: "omit" | "passthrough";
 }
 
 /**
  * Effort flag to send, or null to omit it (CLI / config default applies).
- * Only sent when the user chose one (explicitly or via a legacy id), the
- * model is a known built-in, and the registry says the model accepts effort
- * (clamped by `resolveEffort`). Arbitrary upstream backends never get it.
+ * Only sent when the user chose one (explicitly or via a legacy id) and the
+ * registry says the model accepts effort (clamped by `resolveEffort`);
+ * unknown models follow `unknownModel`. Arbitrary upstream backends never
+ * get it.
  */
-export function resolveRunEffort({ definition, requested, legacyEffort, upstreamActive }: RunEffortInput): EffortLevel | null {
-  if (upstreamActive || !definition) return null;
+export function resolveRunEffort({ definition, requested, legacyEffort, upstreamActive, unknownModel = "omit" }: RunEffortInput): EffortLevel | null {
+  if (upstreamActive) return null;
   const chosen = isEffortLevel(requested) ? requested : (legacyEffort ?? null);
   if (!chosen) return null;
+  if (!definition) return unknownModel === "passthrough" ? chosen : null;
   return resolveEffort(definition, chosen);
 }

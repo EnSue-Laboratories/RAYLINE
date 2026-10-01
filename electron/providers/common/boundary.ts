@@ -12,7 +12,7 @@
  * logger, remote-runtime) and electron-services (session-reader) land.
  */
 
-import type { ChildProcess, SpawnOptions } from "node:child_process";
+import type { ChildProcess, ExecFileOptions, SpawnOptions } from "node:child_process";
 import type { LoadedSession } from "@shared/chat/types";
 import type { NormalizedRemoteRuntime } from "@shared/providers/types";
 import * as untypedCliBinResolver from "../../cli-bin-resolver";
@@ -27,11 +27,15 @@ export interface ResolveCliBinOptions {
   extraDirs?: string[];
 }
 
+/** `execFile`-style completion callback (stdout decoded as UTF-8). */
+export type ExecFileCallback = (error: Error | null, stdout: string | Buffer, stderr: string | Buffer) => void;
+
 interface CliBinResolverModule {
   buildSpawnPath: (extraDirs?: string[]) => string;
   isExecutable: (filePath: string) => boolean;
   resolveCliBin: (commandName: string, options?: ResolveCliBinOptions) => string | null;
   spawnCli: (binPath: string, args: readonly string[], options?: SpawnOptions) => ChildProcess;
+  execFileCli: (binPath: string, args: readonly string[], options: ExecFileOptions, callback: ExecFileCallback) => ChildProcess;
 }
 
 interface LoggerModule {
@@ -89,6 +93,11 @@ export function resolveCliBin(commandName: string, options?: ResolveCliBinOption
 
 export function spawnCli(binPath: string, args: readonly string[], options?: SpawnOptions): ChildProcess {
   return cliBinResolver.spawnCli(binPath, args, options);
+}
+
+/** `execFile` that handles Windows .cmd shims like `spawnCli`. */
+export function execFileCli(binPath: string, args: readonly string[], options: ExecFileOptions, callback: ExecFileCallback): ChildProcess {
+  return cliBinResolver.execFileCli(binPath, args, options, callback);
 }
 
 // ── logger ──────────────────────────────────────────────────────────────────

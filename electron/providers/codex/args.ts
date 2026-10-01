@@ -13,7 +13,7 @@
  *  - Effort: `-c model_reasoning_effort="<level>"` (low…xhigh, max, ultra).
  */
 
-import type { CodexEffortLevel } from "@shared/models";
+import type { CodexEffortLevel, CodexModelDefinition } from "@shared/models";
 import { resolveCliModel, resolveRunEffort } from "../common/models";
 
 /** `bypass` = no Codex sandbox (RayLine default); `workspace-write` = sandboxed. */
@@ -79,10 +79,22 @@ export interface CodexModelChoice {
  * Registry slug for `-m` (legacy ids like `gpt54-high` map to their current
  * model) and the effort clamped to what that model accepts.
  */
-export function resolveCodexModelChoice(model: string | null | undefined, effort: unknown, upstreamActive: boolean): CodexModelChoice {
+export function resolveCodexModelChoice(
+  model: string | null | undefined,
+  effort: unknown,
+  upstreamActive: boolean,
+  /** Definition from the installed CLI's models cache, for slugs the static registry lacks. */
+  discovered?: Pick<CodexModelDefinition, "efforts" | "defaultEffort"> | null,
+): CodexModelChoice {
   const resolved = resolveCliModel("codex", model);
   return {
     model: resolved.cliFlag,
-    effort: resolveRunEffort({ definition: resolved.definition, requested: effort, legacyEffort: resolved.legacyEffort, upstreamActive }),
+    effort: resolveRunEffort({
+      definition: resolved.definition ?? discovered ?? null,
+      requested: effort,
+      legacyEffort: resolved.legacyEffort,
+      upstreamActive,
+      unknownModel: "passthrough",
+    }),
   };
 }
