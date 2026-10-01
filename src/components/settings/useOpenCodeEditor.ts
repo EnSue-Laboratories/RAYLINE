@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { OpenCodeModelEntry } from "@shared/providers/types";
 import { useStableCallback } from "../../hooks/useStableCallback";
-import type { OpenCodeModelsHook, Translate } from "./deps";
+import type { UseOpenCodeModelsResult, Translator } from "./deps";
 import {
   clearOpenCodeDraft,
   INITIAL_OPENCODE_DRAFT,
@@ -45,8 +45,8 @@ function errorMessage(error: unknown): string {
 
 /** Add / edit / duplicate state machine for user-configured OpenCode models. */
 export function useOpenCodeEditor(
-  t: Translate,
-  { rawModels, saveModel, removeModel, refresh }: Pick<OpenCodeModelsHook, "rawModels" | "saveModel" | "removeModel" | "refresh">,
+  t: Translator,
+  { rawModels, saveModel, removeModel, refresh }: Pick<UseOpenCodeModelsResult, "rawModels" | "saveModel" | "removeModel" | "refresh">,
 ): OpenCodeEditor {
   const [mode, setMode] = useState<OpenCodeEditorMode>(CLOSED);
   const [draft, setDraft] = useState<OpenCodeDraft>(INITIAL_OPENCODE_DRAFT);

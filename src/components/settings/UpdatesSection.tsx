@@ -1,6 +1,6 @@
 import { memo, useEffect, useState, type CSSProperties } from "react";
 import { SectionLabel } from "./controls";
-import type { FontScale, Translate } from "./deps";
+import type { FontScale, Translator } from "./deps";
 import {
   applyUpdaterStatus,
   beginUpdateCheck,
@@ -11,7 +11,7 @@ import {
 
 interface AppVersionInfoProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   version: string | null;
 }
 
@@ -52,7 +52,7 @@ function useUpdater(): [UpdaterViewState, () => void] {
 
 interface UpdatesSectionProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   version: string | null;
 }
 

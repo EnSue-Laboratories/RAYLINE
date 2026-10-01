@@ -1,7 +1,7 @@
 import { memo, useState } from "react";
 import { Terminal } from "lucide-react";
 import { SettingHeader } from "./controls";
-import type { FontScale, Translate } from "./deps";
+import type { FontScale, Translator } from "./deps";
 import {
   IDLE_REMOTE_SSH_STATUS,
   remoteSshResultToStatus,
@@ -13,7 +13,7 @@ import { getSettingsStyles } from "./styles";
 
 interface RemoteSshSectionProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   command: string;
   onCommandChange: (command: string) => void;
   /** Absent when the host can't probe SSH runtimes. */

@@ -1,16 +1,16 @@
 import { memo } from "react";
 import type { Locale } from "@shared/state/types";
-import type { FontScale, Translate } from "./deps";
+import type { FontScale, MessageKey, Translator } from "./deps";
 import { getSettingsStyles } from "./styles";
 
-const LANGUAGES: readonly { locale: Locale; labelKey: string }[] = [
+const LANGUAGES: readonly { locale: Locale; labelKey: MessageKey }[] = [
   { locale: "en-US", labelKey: "settings.languageEnglish" },
   { locale: "zh-CN", labelKey: "settings.languageChinese" },
 ];
 
 interface LanguageSectionProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   locale: string;
   onLocaleChange: (locale: Locale) => void;
 }

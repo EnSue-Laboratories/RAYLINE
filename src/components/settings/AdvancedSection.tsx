@@ -1,14 +1,14 @@
 import { memo } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { SectionLabel, SettingHeader, ToggleSetting } from "./controls";
-import { CHIME_SOUNDS, playChime, type FontScale, type Translate } from "./deps";
+import { CHIME_SOUNDS, playChime, type FontScale, type Translator } from "./deps";
 import { getSettingsStyles, selectChevronStyle, TEXT_STRONG } from "./styles";
 
 const DIMMER_DESCRIPTION = "color-mix(in srgb, var(--text-primary) 30%, transparent)";
 
 interface AdvancedSectionProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   developerMode: boolean;
   onDeveloperModeChange: (value: boolean) => void;
   sidebarTerminalEnabled: boolean;

@@ -17,6 +17,7 @@ import type {
   AppearanceTypographyKey,
   ThemeMode,
 } from "@shared/state/types";
+import type { Translator } from "../../i18n";
 
 // ── Provider upstreams ──────────────────────────────────────────────────────
 
@@ -132,9 +133,7 @@ export interface RemoteSshStatus {
 
 export const IDLE_REMOTE_SSH_STATUS: RemoteSshStatus = Object.freeze({ kind: "idle", text: "" });
 
-type TranslateFn = (key: string, vars?: Readonly<Record<string, string | number>>) => string;
-
-export function remoteSshResultToStatus(result: RemoteSshConnectResult | null | undefined, t: TranslateFn): RemoteSshStatus {
+export function remoteSshResultToStatus(result: RemoteSshConnectResult | null | undefined, t: Translator): RemoteSshStatus {
   if (result?.ok) {
     const runtimes = [result.claude ? "Claude Code" : "", result.codex ? "Codex" : ""].filter(Boolean).join(", ");
     if (!runtimes) return { kind: "warning", text: t("settings.remoteSshConnectedNoRuntime") };

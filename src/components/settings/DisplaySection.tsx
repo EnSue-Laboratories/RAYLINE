@@ -1,11 +1,11 @@
 import { memo } from "react";
 import { RangeSetting, SectionLabel } from "./controls";
-import type { FontScale, Translate } from "./deps";
+import type { FontScale, Translator } from "./deps";
 import { sliderPct } from "./styles";
 
 interface DisplaySectionProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   appBlur: number;
   onAppBlurChange: (value: number) => void;
   appOpacity: number;

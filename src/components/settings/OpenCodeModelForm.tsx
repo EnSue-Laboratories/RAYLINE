@@ -1,7 +1,7 @@
 import { memo, type CSSProperties } from "react";
 import { Check } from "lucide-react";
 import { ToggleSwitch } from "./controls";
-import type { FontScale, Translate } from "./deps";
+import type { FontScale, Translator } from "./deps";
 import type { OpenCodeDraft } from "./helpers";
 import { OpenCodeProviderCombobox } from "./OpenCodeProviderCombobox";
 import { getSettingsStyles, type AppRegionStyle } from "./styles";
@@ -9,7 +9,7 @@ import type { OpenCodeEditorMode } from "./useOpenCodeEditor";
 
 interface OpenCodeModelFormProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   mode: Exclude<OpenCodeEditorMode, { kind: "closed" }>;
   draft: OpenCodeDraft;
   saving: boolean;

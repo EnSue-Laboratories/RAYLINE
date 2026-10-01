@@ -2,7 +2,7 @@ import { memo, useMemo, type CSSProperties } from "react";
 import { Copy, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import type { OpenCodeModelEntry } from "@shared/providers/types";
 import { ToggleSwitch } from "./controls";
-import { useOpenCodeModels, type FontScale, type Translate } from "./deps";
+import { useOpenCodeModels, type FontScale, type Translator } from "./deps";
 import { buildOpenCodeProviderOptions, isOpenCodeReady } from "./helpers";
 import { OpenCodeModelForm } from "./OpenCodeModelForm";
 import { getSettingsStyles, smallIconButtonStyle } from "./styles";
@@ -10,7 +10,7 @@ import { useOpenCodeEditor } from "./useOpenCodeEditor";
 
 interface OpenCodeSectionProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   hasWallpaper: boolean;
 }
 
@@ -157,7 +157,7 @@ const BADGE_BASE: CSSProperties = {
 
 interface OpenCodeModelRowProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   model: OpenCodeModelEntry;
   onToggle: (model: OpenCodeModelEntry) => void;
   onEdit: (model: OpenCodeModelEntry) => void;

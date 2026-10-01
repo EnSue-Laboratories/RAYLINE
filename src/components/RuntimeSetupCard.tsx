@@ -40,7 +40,7 @@ export default function RuntimeSetupCard({ state, platform, onRunCommand, onRefr
   const [confirmProvider, setConfirmProvider] = useState<RuntimeSetupProviderId | null>(null);
   const [copiedProvider, setCopiedProvider] = useState<RuntimeSetupProviderId | null>(null);
   const confirmMeta = confirmProvider ? RUNTIME_SETUP_PROVIDERS.find((provider) => provider.id === confirmProvider) ?? null : null;
-  const confirmCommand = confirmProvider ? getRuntimeSetupCommand(confirmProvider, "install", platform) : "";
+  const confirmCommand = confirmProvider ? getRuntimeSetupCommand(confirmProvider, "install", platform ?? undefined) : "";
   const checking = Boolean(state?.checking);
 
   const openDocs = useStableCallback((providerId: RuntimeSetupProviderId) => {
@@ -49,7 +49,7 @@ export default function RuntimeSetupCard({ state, platform, onRunCommand, onRefr
   });
 
   const copyCommand = useStableCallback(async (providerId: RuntimeSetupProviderId) => {
-    const command = getRuntimeSetupCommand(providerId, "install", platform);
+    const command = getRuntimeSetupCommand(providerId, "install", platform ?? undefined);
     if (!command) return;
     try {
       await navigator.clipboard?.writeText(command);
@@ -65,7 +65,7 @@ export default function RuntimeSetupCard({ state, platform, onRunCommand, onRefr
   });
 
   const runSignIn = useStableCallback((providerId: RuntimeSetupProviderId) => {
-    const command = getRuntimeSetupCommand(providerId, "signin", platform);
+    const command = getRuntimeSetupCommand(providerId, "signin", platform ?? undefined);
     if (command) onRunCommand?.({ providerId, action: "signin", command });
   });
 

@@ -15,14 +15,15 @@ import {
   useTheme,
   type FontOptionGroup,
   type FontScale,
-  type ThemeModeSetting,
-  type Translate,
+  type MessageKey,
+  type ThemePreference,
+  type Translator,
 } from "./deps";
 import { resetAppearanceProfile, updateAppearanceProfile } from "./helpers";
 import { AppearancePreview, type AppearancePreviewLabels } from "./AppearancePreview";
 import { getSettingsStyles, iconActionStyle } from "./styles";
 
-const PALETTE_FIELDS: readonly { key: AppearancePaletteKey; labelKey: string }[] = [
+const PALETTE_FIELDS: readonly { key: AppearancePaletteKey; labelKey: MessageKey }[] = [
   { key: "accent", labelKey: "settings.appearanceAccent" },
   { key: "background", labelKey: "settings.appearanceBackground" },
   { key: "pane", labelKey: "settings.appearancePane" },
@@ -35,7 +36,7 @@ const PALETTE_FIELDS: readonly { key: AppearancePaletteKey; labelKey: string }[]
   { key: "warning", labelKey: "settings.appearanceWarning" },
 ];
 
-const TYPOGRAPHY_FIELDS: readonly { key: AppearanceTypographyKey; labelKey: string; group: FontOptionGroup }[] = [
+const TYPOGRAPHY_FIELDS: readonly { key: AppearanceTypographyKey; labelKey: MessageKey; group: FontOptionGroup }[] = [
   { key: "uiFont", labelKey: "settings.appearanceUiFont", group: "ui" },
   { key: "contentFont", labelKey: "settings.appearanceContentFont", group: "content" },
   { key: "monoFont", labelKey: "settings.appearanceMonoFont", group: "mono" },
@@ -43,7 +44,7 @@ const TYPOGRAPHY_FIELDS: readonly { key: AppearanceTypographyKey; labelKey: stri
 
 interface ThemeSectionProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   appearance: Appearance | null | undefined;
   onAppearanceChange: (next: Appearance) => void;
 }
@@ -58,7 +59,7 @@ export const ThemeSection = memo(function ThemeSection({ s, t, appearance, onApp
   const normalized = useMemo(() => normalizeAppearance(appearance), [appearance]);
   const profile = normalized.profiles[editingTheme];
 
-  const themeOptions = useMemo<readonly ChoiceOption<ThemeModeSetting>[]>(() => [
+  const themeOptions = useMemo<readonly ChoiceOption<ThemePreference>[]>(() => [
     { value: "auto", label: t("settings.themeAuto") },
     { value: "light", label: t("settings.themeLight") },
     { value: "dark", label: t("settings.themeDark") },

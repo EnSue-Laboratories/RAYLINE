@@ -3,11 +3,11 @@ import { Check } from "lucide-react";
 import type { ProviderUpstreamSettings, UpstreamProviderId } from "@shared/providers/types";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { SettingHeader } from "./controls";
-import { useProviderUpstreams, type FontScale, type Translate } from "./deps";
+import { useProviderUpstreams, type FontScale, type MessageKey, type Translator } from "./deps";
 import { getUpstreamStatus, normalizeUpstreamDraft, UPSTREAM_PROVIDERS } from "./helpers";
 import { getSettingsStyles, glassSwitchKnobStyle, glassSwitchStyle } from "./styles";
 
-const PROVIDER_LABEL_KEYS: Readonly<Record<UpstreamProviderId, string>> = {
+const PROVIDER_LABEL_KEYS: Readonly<Record<UpstreamProviderId, MessageKey>> = {
   claude: "settings.upstreamClaude",
   codex: "settings.upstreamCodex",
 };
@@ -25,7 +25,7 @@ function without<T extends object>(record: T, key: keyof T): T {
 
 interface UpstreamsSectionProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
 }
 
 /** Custom base URL / API key / model list per CLI. */
@@ -89,7 +89,7 @@ export const UpstreamsSection = memo(function UpstreamsSection({ s, t }: Upstrea
 
 interface UpstreamCardProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   provider: UpstreamProviderId;
   draft: ProviderUpstreamSettings;
   message: string;

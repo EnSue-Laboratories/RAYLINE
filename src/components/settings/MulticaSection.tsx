@@ -6,7 +6,7 @@ import {
   normalizeMulticaServerUrl,
   saveMulticaState,
   type FontScale,
-  type Translate,
+  type Translator,
 } from "./deps";
 import { getMulticaStatusKey, isMulticaConnected, MULTICA_SESSION_RESET } from "./helpers";
 import { getSettingsStyles } from "./styles";
@@ -17,7 +17,7 @@ const SECONDARY_TEXT = "color-mix(in srgb, var(--text-primary) 46%, transparent)
 
 interface MulticaSectionProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
 }
 
 /** Multica server URL + connection status; setup itself lives in MulticaSetupModal. */

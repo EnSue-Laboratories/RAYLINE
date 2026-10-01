@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { OpenCodeModelEntry } from "@shared/providers/types";
 import type { Appearance, AppearanceProfile } from "@shared/state/types";
+import type { Translator } from "../../../i18n";
 import {
   buildOpenCodeProviderOptions,
   clearOpenCodeDraft,
@@ -26,8 +27,7 @@ import {
 import { sliderPct } from "../styles";
 import { applyUpdaterStatus, beginUpdateCheck, INITIAL_UPDATER_STATE } from "../updater";
 
-const t = (key: string, vars?: Readonly<Record<string, string | number>>) =>
-  vars ? `${key}(${Object.values(vars).join(",")})` : key;
+const t: Translator = (key, vars) => (vars ? `${key}(${Object.values(vars).map(String).join(",")})` : key);
 
 function entry(overrides: Partial<OpenCodeModelEntry> = {}): OpenCodeModelEntry {
   return {

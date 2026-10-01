@@ -3,19 +3,19 @@ import { Image } from "lucide-react";
 import type { Wallpaper } from "@shared/state/types";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { RangeSetting, SettingHeader } from "./controls";
-import { DEFAULT_WALLPAPER, normalizeWallpaper, type FontScale, type Translate } from "./deps";
+import { DEFAULT_WALLPAPER, normalizeWallpaper, type FontScale, type Translator } from "./deps";
 import { wallpaperPathHint } from "./helpers";
 import { getSettingsStyles, sliderPct } from "./styles";
 
 interface WallpaperSectionProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   wallpaper: Wallpaper | null | undefined;
   onWallpaperChange: (next: Wallpaper | null) => void;
 }
 
 function toLocal(wallpaper: Wallpaper | null | undefined): Wallpaper {
-  return normalizeWallpaper(wallpaper) ?? { ...DEFAULT_WALLPAPER };
+  return (wallpaper ? normalizeWallpaper({ ...wallpaper }) : null) ?? { ...DEFAULT_WALLPAPER };
 }
 
 /** Wallpaper picker plus image blur / opacity. Slider drags only re-render this section. */

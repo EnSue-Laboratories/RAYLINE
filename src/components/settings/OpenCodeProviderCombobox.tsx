@@ -1,12 +1,12 @@
 import { memo, useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { Check, ChevronDown } from "lucide-react";
-import type { FontScale, Translate } from "./deps";
+import type { FontScale, Translator } from "./deps";
 import { filterOpenCodeProviderOptions, moveHighlight } from "./helpers";
 import { getSettingsStyles } from "./styles";
 
 interface OpenCodeProviderComboboxProps {
   s: FontScale;
-  t: Translate;
+  t: Translator;
   value: string;
   options: readonly string[];
   onChange: (providerId: string) => void;
