@@ -1,0 +1,35 @@
+electron/providers/multica/__tests__/multica.test.ts
+  s_d0fb9aefa2e5fb::t_dc1e31a3f88516 1-70
+electron/providers/grok/__tests__/grok.test.ts
+  s_d0fb9aefa2e5fb::t_98f1c0088d13ba 1-147
+electron/providers/claude/__tests__/claude.test.ts
+  s_d0fb9aefa2e5fb::t_f881ac15b05972 1-165
+electron/providers/agy/__tests__/agy.test.ts
+  s_d0fb9aefa2e5fb::t_942875ed6a7fca 1-123
+electron/providers/codex/__tests__/codex.test.ts
+  s_d0fb9aefa2e5fb::t_5186fa1f566355 1-208
+electron/providers/claude/__tests__/usage.test.ts
+  s_d0fb9aefa2e5fb::t_7bc9e98e7692f0 1-33
+electron/providers/opencode/__tests__/opencode.test.ts
+  s_d0fb9aefa2e5fb::t_f44b9ff42f8896 1-83,85-136
+electron/providers/common/__tests__/common.test.ts
+  s_d0fb9aefa2e5fb::t_000df589402366 1-86
+electron/providers/upstreams/__tests__/upstreams.test.ts
+  s_d0fb9aefa2e5fb::t_6d4a103b2655d4 1-160,163-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b893a9c4809dae63d8b3c5c65e894febd2f2ac11",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
