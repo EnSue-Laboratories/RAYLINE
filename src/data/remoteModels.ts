@@ -1,77 +1,64 @@
-// @ts-nocheck
-import { MODELS } from "./models";
+/**
+ * SSH-remote model helpers for the renderer. Model building, id formats and
+ * provider mapping live in @shared/models / @shared/providers; this module
+ * binds them to the built-in catalogue and accepts the loosely-typed values
+ * App still passes around.
+ */
 
-export const REMOTE_PROVIDER_BY_PROVIDER = {
-  "remote-claude": "claude",
-  "remote-codex": "codex",
-};
+import {
+  buildRemoteModels as buildSharedRemoteModels,
+  getRemoteRuntimeConfig as getSharedRemoteRuntimeConfig,
+  MODELS,
+  type ModelDefinition,
+  type RemoteModelDefinition,
+} from "@shared/models";
+import {
+  getRuntimeProviderForProvider as getSharedRuntimeProviderForProvider,
+  isModelProviderId,
+  isRemoteModelProviderId,
+  REMOTE_PROVIDER_BY_PROVIDER,
+  type ModelProviderId,
+  type RemoteModelProviderId,
+  type RemoteRuntimeConfig,
+  type RemoteSshRuntimeState,
+  type RuntimeProviderId,
+} from "@shared/providers/types";
 
-const SSH_COMMAND_PATTERN = /^\s*ssh(?:\s|$)/i;
+export { REMOTE_PROVIDER_BY_PROVIDER };
 
-function normalizeSshCommand(value) {
-  return typeof value === "string" ? value.trim().slice(0, 2000) : "";
+export function isRemoteModelProvider(provider: unknown): provider is RemoteModelProviderId {
+  return isRemoteModelProviderId(provider);
 }
 
-export function isRemoteModelProvider(provider) {
-  return Object.prototype.hasOwnProperty.call(REMOTE_PROVIDER_BY_PROVIDER, provider);
+/** `remote-claude` → `claude`; other values are returned unchanged. */
+export function getRuntimeProviderForProvider(provider: ModelProviderId): RuntimeProviderId;
+export function getRuntimeProviderForProvider<T>(provider: T): T | RuntimeProviderId;
+export function getRuntimeProviderForProvider(provider: unknown): unknown {
+  return isModelProviderId(provider) ? getSharedRuntimeProviderForProvider(provider) : provider;
 }
 
-export function getRuntimeProviderForProvider(provider) {
-  return REMOTE_PROVIDER_BY_PROVIDER[provider] || provider;
+type ModelLike = Pick<ModelDefinition, "provider"> & { runtimeProvider?: RuntimeProviderId };
+
+/** Backend that actually runs `model` (`runtimeProvider` for remote models). */
+export function getRuntimeProviderForModel(model: ModelLike | null | undefined): RuntimeProviderId | undefined {
+  if (!model) return undefined;
+  return model.runtimeProvider || getSharedRuntimeProviderForProvider(model.provider);
 }
 
-export function getRuntimeProviderForModel(model) {
-  return model?.runtimeProvider || getRuntimeProviderForProvider(model?.provider);
+function isRemoteModel(model: ModelDefinition): model is RemoteModelDefinition {
+  return isRemoteModelProviderId(model.provider);
 }
 
-export function getRemoteRuntimeConfig(model) {
-  const runtime = model?.remoteRuntime;
-  if (!runtime || runtime.type !== "ssh") return undefined;
-  const sshCommand = normalizeSshCommand(runtime.sshCommand);
-  if (!SSH_COMMAND_PATTERN.test(sshCommand)) return undefined;
-  return {
-    type: "ssh",
-    sshCommand,
-    provider: runtime.provider || getRuntimeProviderForModel(model),
-    commandPath: typeof runtime.commandPath === "string" ? runtime.commandPath.trim() : "",
-  };
+/** `remoteRuntime` to send with `agent-start`, or undefined for local models. */
+export function getRemoteRuntimeConfig(model: ModelDefinition | null | undefined): RemoteRuntimeConfig | undefined {
+  if (!model || !isRemoteModel(model)) return undefined;
+  return getSharedRemoteRuntimeConfig(model);
 }
 
-function getRemoteProviderAvailability(runtime, provider, sshCommand) {
-  if (!runtime || runtime.connected !== true) return null;
-  if (normalizeSshCommand(runtime.sshCommand) !== sshCommand) return null;
-  if (runtime[provider] !== true) return null;
-  return {
-    commandPath: typeof runtime[`${provider}Path`] === "string" ? runtime[`${provider}Path`].trim() : "",
-  };
-}
-
-export function buildRemoteModels(sshCommand, runtime = null) {
-  const normalized = normalizeSshCommand(sshCommand);
-  if (!SSH_COMMAND_PATTERN.test(normalized)) return [];
-
-  return MODELS
-    .filter((model) => model.provider === "claude" || model.provider === "codex")
-    .map((model) => {
-      const availability = getRemoteProviderAvailability(runtime, model.provider, normalized);
-      return availability ? { model, availability } : null;
-    })
-    .filter(Boolean)
-    .map((model) => {
-      const provider = `remote-${model.model.provider}`;
-      return {
-        ...model.model,
-        id: `remote-ssh:${model.model.provider}:${model.model.id}`,
-        name: `Remote ${model.model.name}`,
-        tag: `SSH ${model.model.tag}`,
-        provider,
-        runtimeProvider: model.model.provider,
-        remoteRuntime: {
-          type: "ssh",
-          sshCommand: normalized,
-          provider: model.model.provider,
-          commandPath: model.availability.commandPath,
-        },
-      };
-    });
+/** SSH copies of the built-in Claude/Codex models the last probe found on the host. */
+export function buildRemoteModels(
+  sshCommand: string,
+  runtime: RemoteSshRuntimeState | null = null,
+): RemoteModelDefinition[] {
+  return buildSharedRemoteModels(sshCommand, runtime, MODELS);
 }

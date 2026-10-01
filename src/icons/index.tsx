@@ -1,4 +1,3 @@
-// @ts-nocheck
 export {
   Plus,
   ArrowRight as Arrow,
