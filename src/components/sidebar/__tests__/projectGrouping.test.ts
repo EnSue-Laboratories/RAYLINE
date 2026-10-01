@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyCollapsedOverrides,
+  excludeHiddenProjectRows,
   formatCwdShort,
   getMainRepoRoot,
   getProjectDisplayName,
@@ -9,7 +10,7 @@ import {
   isProjectGroupListed,
   listPickerProjectRoots,
 } from "../projectGrouping";
-import type { SidebarConversation } from "../types";
+import type { ProjectsMeta, SidebarConversation } from "../types";
 
 function row(id: string, cwd: string | null | undefined, ts = 1): SidebarConversation {
   return { id, title: id, model: "sonnet", ts, cwd };
@@ -105,5 +106,39 @@ describe("project picker helpers", () => {
     expect(listPickerProjectRoots(["/a", "/b"], meta, "/a")).toEqual(["/a", "/b"]);
     expect(getProjectDisplayName("/b", meta)).toBe("Bee");
     expect(getProjectDisplayName("/x/c", meta)).toBe("c");
+  });
+});
+
+describe("excludeHiddenProjectRows", () => {
+  const rows = [
+    row("visible", "/w/alpha"),
+    row("hidden", "/w/secret"),
+    row("hidden-worktree", "/w/secret/.worktrees/feat"),
+    row("draft", null),
+    row("draft-folder", "/drafts/x"),
+  ];
+  const projects: ProjectsMeta = { "/w/secret": { hidden: true }, "/w/alpha": { hidden: false } };
+
+  it("drops rows whose main repo root is a hidden project, keeping drafts", () => {
+    expect(excludeHiddenProjectRows(rows, projects, "/drafts").map((r) => r.id)).toEqual([
+      "visible",
+      "draft",
+      "draft-folder",
+    ]);
+  });
+
+  it("returns the same array when no project is hidden", () => {
+    expect(excludeHiddenProjectRows(rows, null, "/drafts")).toBe(rows);
+    expect(excludeHiddenProjectRows(rows, { "/w/alpha": { collapsed: true } }, "/drafts")).toBe(rows);
+  });
+
+  it("keeps the search hit count equal to the rows that actually render", () => {
+    // Pretend every row matched the query: the hit count is the searchable row count.
+    const hits = excludeHiddenProjectRows(rows, projects, "/drafts");
+    const { projectGroups, drafts } = groupConvosByProject(hits, projects, "/drafts");
+    const rendered = projectGroups
+      .filter((group) => !group.hidden && isProjectGroupListed(group, true, projects))
+      .reduce((sum, group) => sum + group.convos.length, drafts.length);
+    expect(rendered).toBe(hits.length);
   });
 });

@@ -113,6 +113,24 @@ export function applyCollapsedOverrides(
   });
 }
 
+/**
+ * Drops rows that belong to a hidden project (by main repo root). Hidden
+ * project groups never render, so their rows must not reach search either:
+ * they would inflate the hit count and load transcripts nobody can see.
+ * Drafts always stay. Returns `rows` itself when nothing is hidden.
+ */
+export function excludeHiddenProjectRows(
+  rows: readonly SidebarConversation[],
+  projectsMeta: ProjectsMeta | null | undefined,
+  draftsPath: string | null | undefined,
+): readonly SidebarConversation[] {
+  if (!projectsMeta || !Object.values(projectsMeta).some((meta) => meta.hidden)) return rows;
+  const visible = rows.filter(
+    (row) => isDraftConversation(row, draftsPath) || !row.cwd || !projectsMeta[getMainRepoRoot(row.cwd)]?.hidden,
+  );
+  return visible.length === rows.length ? rows : visible;
+}
+
 /** While searching only groups with hits show; otherwise empty groups show only if manual. */
 export function isProjectGroupListed(
   group: ProjectGroupData,
