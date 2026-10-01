@@ -1,204 +1,75 @@
-// @ts-nocheck
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { ExternalLink, RefreshCw, Terminal } from "lucide-react";
+import { useStableCallback } from "../hooks/useStableCallback";
 import {
-  CheckCircle2,
-  Copy,
-  ExternalLink,
-  RefreshCw,
-  Settings,
-  Terminal,
-} from "lucide-react";
-import { useFontScale } from "../contexts/FontSizeContext";
-import {
+  getRuntimeSetupCommand,
   RUNTIME_SETUP_DOCS,
   RUNTIME_SETUP_PROVIDERS,
-  getRuntimeSetupCommand,
-} from "../data/runtimeSetup";
+  useFontScale,
+  type RuntimeSetupProviderId,
+} from "./settings/deps";
+import { RuntimeProviderRow } from "./settings/RuntimeProviderRow";
+import type { RuntimeSetupCommandRequest, RuntimeSetupState } from "./settings/runtimeSetup";
+import {
+  RUNTIME_ACTIVE,
+  RUNTIME_BORDER,
+  RUNTIME_MUTED,
+  RUNTIME_PRIMARY,
+  RUNTIME_SECONDARY,
+  RUNTIME_UI_FONT,
+  runtimeIconButtonStyle,
+} from "./settings/runtimeSetupStyles";
 
-const PRIMARY = "rgba(255,255,255,0.88)";
-const SECONDARY = "rgba(255,255,255,0.48)";
-const MUTED = "rgba(255,255,255,0.28)";
-const BORDER = "rgba(255,255,255,0.065)";
-const FILL = "rgba(255,255,255,0.025)";
-const ACTIVE = "rgba(255,255,255,0.08)";
-const UI_FONT = "system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
+export type { RuntimeSetupCommandRequest, RuntimeSetupState } from "./settings/runtimeSetup";
 
-function providerStatusLabel(provider, state) {
-  const installed = state?.installed?.[provider.id] === true;
-  if (provider.id === "opencode" && installed && !state?.opencodeConfigured) return "Installed, needs provider";
-  if (installed) return "Installed";
-  return "Not installed";
+export interface RuntimeSetupCardProps {
+  state: RuntimeSetupState | null | undefined;
+  platform?: string | null;
+  onRunCommand?: (request: RuntimeSetupCommandRequest) => void;
+  onRefresh?: () => void;
+  onConfigureOpenCode?: (providerId: RuntimeSetupProviderId) => void;
 }
 
-function getPrimaryAction(provider, state) {
-  const installed = state?.installed?.[provider.id] === true;
-  if (provider.id === "opencode" && installed && !state?.opencodeConfigured) return "configure";
-  return installed ? "signin" : "install";
-}
+const COPIED_FEEDBACK_MS = 1400;
+const PRIMARY_PROVIDERS = RUNTIME_SETUP_PROVIDERS.filter((provider) => provider.primary);
+const ADVANCED_PROVIDERS = RUNTIME_SETUP_PROVIDERS.filter((provider) => !provider.primary);
 
-function primaryActionLabel(action, provider) {
-  if (action === "configure") return "Configure";
-  if (action === "signin") return "Sign in";
-  if (provider.id === "opencode") return "Install";
-  return "Install and sign in";
-}
-
-function ProviderRow({ provider, state, copiedProvider, onCopy, onConfirmInstall, onRunSignIn, onOpenDocs, onConfigure }) {
+/** First-run screen shown when no agent CLI is installed. */
+export default function RuntimeSetupCard({ state, platform, onRunCommand, onRefresh, onConfigureOpenCode }: RuntimeSetupCardProps) {
   const s = useFontScale();
-  const installed = state?.installed?.[provider.id] === true;
-  const action = getPrimaryAction(provider, state);
-  const isAdvanced = !provider.primary;
+  const [confirmProvider, setConfirmProvider] = useState<RuntimeSetupProviderId | null>(null);
+  const [copiedProvider, setCopiedProvider] = useState<RuntimeSetupProviderId | null>(null);
+  const confirmMeta = confirmProvider ? RUNTIME_SETUP_PROVIDERS.find((provider) => provider.id === confirmProvider) ?? null : null;
+  const confirmCommand = confirmProvider ? getRuntimeSetupCommand(confirmProvider, "install", platform) : "";
+  const checking = Boolean(state?.checking);
 
-  return (
-    <div
-      style={{
-        border: `1px solid ${BORDER}`,
-        borderRadius: 8,
-        background: isAdvanced ? "rgba(255,255,255,0.012)" : FILL,
-        padding: 12,
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) auto",
-        gap: 12,
-        alignItems: "center",
-      }}
-    >
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-          <span
-            style={{
-              fontSize: s(8),
-              fontFamily: UI_FONT,
-              letterSpacing: "0",
-              color: installed ? "rgba(180,255,210,0.58)" : MUTED,
-            }}
-          >
-            {provider.eyebrow}
-          </span>
-          {installed && <CheckCircle2 size={12} color="rgba(180,255,210,0.62)" strokeWidth={1.7} />}
-        </div>
-        <div style={{ color: PRIMARY, fontSize: s(14), fontWeight: 600, letterSpacing: "0" }}>
-          {provider.name}
-        </div>
-        <div style={{ color: SECONDARY, fontSize: s(11), lineHeight: 1.45, marginTop: 4 }}>
-          {provider.description}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
-            marginTop: 8,
-            color: MUTED,
-            fontSize: s(11),
-            fontFamily: UI_FONT,
-            letterSpacing: "0",
-          }}
-        >
-          <span>{providerStatusLabel(provider, state)}</span>
-          <span>{provider.installNote}</span>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
-        <button
-          onClick={() => {
-            if (action === "configure") onConfigure(provider.id);
-            else if (action === "signin") onRunSignIn(provider.id);
-            else onConfirmInstall(provider.id);
-          }}
-          style={{
-            height: 30,
-            padding: "0 11px",
-            borderRadius: 7,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: action === "configure" ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.84)",
-            color: action === "configure" ? "rgba(255,255,255,0.78)" : "#08080a",
-            cursor: "pointer",
-            fontSize: s(12),
-            fontFamily: UI_FONT,
-            letterSpacing: "0",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          {action === "configure" ? <Settings size={12} /> : <Terminal size={12} />}
-          {primaryActionLabel(action, provider)}
-        </button>
-        <button
-          onClick={() => onCopy(provider.id)}
-          title={`Copy ${provider.name} install command`}
-          style={iconButtonStyle(s)}
-        >
-          <Copy size={13} />
-          {copiedProvider === provider.id && <span style={{ fontSize: s(9) }}>Copied</span>}
-        </button>
-        <button
-          onClick={() => onOpenDocs(provider.id)}
-          title={`Open ${provider.name} docs`}
-          style={iconButtonStyle(s)}
-        >
-          <ExternalLink size={13} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function iconButtonStyle(s) {
-  return {
-    height: 30,
-    minWidth: 30,
-    padding: "0 9px",
-    borderRadius: 7,
-    border: `1px solid ${BORDER}`,
-    background: "transparent",
-    color: SECONDARY,
-    cursor: "pointer",
-    fontSize: s(12),
-    fontFamily: UI_FONT,
-    letterSpacing: "0",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  };
-}
-
-export default function RuntimeSetupCard({
-  state,
-  platform,
-  onRunCommand,
-  onRefresh,
-  onConfigureOpenCode,
-}) {
-  const s = useFontScale();
-  const [confirmProvider, setConfirmProvider] = useState(null);
-  const [copiedProvider, setCopiedProvider] = useState(null);
-  const confirmProviderMeta = useMemo(
-    () => RUNTIME_SETUP_PROVIDERS.find((provider) => provider.id === confirmProvider) || null,
-    [confirmProvider]
-  );
-  const confirmCommand = confirmProvider
-    ? getRuntimeSetupCommand(confirmProvider, "install", platform)
-    : "";
-
-  const openDocs = (providerId) => {
+  const openDocs = useStableCallback((providerId: RuntimeSetupProviderId) => {
     const url = RUNTIME_SETUP_DOCS[providerId];
     if (url) window.open(url, "_blank", "noopener,noreferrer");
-  };
+  });
 
-  const copyCommand = async (providerId) => {
+  const copyCommand = useStableCallback(async (providerId: RuntimeSetupProviderId) => {
     const command = getRuntimeSetupCommand(providerId, "install", platform);
     if (!command) return;
     try {
       await navigator.clipboard?.writeText(command);
       setCopiedProvider(providerId);
-      window.setTimeout(() => setCopiedProvider((current) => current === providerId ? null : current), 1400);
+      window.setTimeout(() => setCopiedProvider((current) => (current === providerId ? null : current)), COPIED_FEEDBACK_MS);
     } catch {
       setConfirmProvider(providerId);
     }
-  };
+  });
+
+  const handleCopy = useStableCallback((providerId: RuntimeSetupProviderId) => {
+    void copyCommand(providerId);
+  });
+
+  const runSignIn = useStableCallback((providerId: RuntimeSetupProviderId) => {
+    const command = getRuntimeSetupCommand(providerId, "signin", platform);
+    if (command) onRunCommand?.({ providerId, action: "signin", command });
+  });
+
+  const configure = useStableCallback((providerId: RuntimeSetupProviderId) => onConfigureOpenCode?.(providerId));
 
   const runInstall = () => {
     if (!confirmProvider || !confirmCommand) return;
@@ -206,11 +77,20 @@ export default function RuntimeSetupCard({
     setConfirmProvider(null);
   };
 
-  const runSignIn = (providerId) => {
-    const command = getRuntimeSetupCommand(providerId, "signin", platform);
-    if (!command) return;
-    onRunCommand?.({ providerId, action: "signin", command });
-  };
+  const renderRows = (providers: typeof RUNTIME_SETUP_PROVIDERS) =>
+    providers.map((provider) => (
+      <RuntimeProviderRow
+        key={provider.id}
+        provider={provider}
+        state={state}
+        copied={copiedProvider === provider.id}
+        onCopy={handleCopy}
+        onConfirmInstall={setConfirmProvider}
+        onRunSignIn={runSignIn}
+        onOpenDocs={openDocs}
+        onConfigure={configure}
+      />
+    ));
 
   return (
     <div
@@ -222,7 +102,7 @@ export default function RuntimeSetupCard({
         justifyContent: "center",
         padding: "20px 0",
         userSelect: "none",
-        fontFamily: UI_FONT,
+        fontFamily: RUNTIME_UI_FONT,
       }}
     >
       <div style={{ width: "min(720px, 100%)" }}>
@@ -236,95 +116,55 @@ export default function RuntimeSetupCard({
         <div style={{ animation: "runtime-setup-rise 360ms cubic-bezier(.16,1,.3,1) both" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
             <div>
-              <div
-                style={{
-                  color: SECONDARY,
-                  fontSize: s(12),
-                  fontFamily: UI_FONT,
-                  letterSpacing: "0",
-                  marginBottom: 7,
-                }}
-              >
+              <div style={{ color: RUNTIME_SECONDARY, fontSize: s(12), fontFamily: RUNTIME_UI_FONT, letterSpacing: "0", marginBottom: 7 }}>
                 Runtime setup
               </div>
               <h2
                 style={{
-                  color: PRIMARY,
+                  color: RUNTIME_PRIMARY,
                   fontSize: s(25),
                   lineHeight: 1.08,
                   fontWeight: 650,
                   margin: 0,
                   letterSpacing: "0",
-                  fontFamily: UI_FONT,
+                  fontFamily: RUNTIME_UI_FONT,
                 }}
               >
                 Choose an agent runtime
               </h2>
-              <p style={{ color: SECONDARY, fontSize: s(12), lineHeight: 1.55, margin: "9px 0 0", maxWidth: 520 }}>
-                RayLine needs one local coding-agent CLI before it can start a chat. Pick Codex or Claude Code for the shortest path; OpenCode is available for custom provider setups.
+              <p style={{ color: RUNTIME_SECONDARY, fontSize: s(12), lineHeight: 1.55, margin: "9px 0 0", maxWidth: 520 }}>
+                RayLine needs one local coding-agent CLI before it can start a chat. Pick Codex or Claude Code for the shortest path;
+                OpenCode and Grok are available for additional local runtimes.
               </p>
             </div>
             <button
+              type="button"
               onClick={onRefresh}
               style={{
-                ...iconButtonStyle(s),
+                ...runtimeIconButtonStyle(s),
                 height: 32,
-                color: state?.checking ? MUTED : SECONDARY,
-                cursor: state?.checking ? "default" : "pointer",
+                color: checking ? RUNTIME_MUTED : RUNTIME_SECONDARY,
+                cursor: checking ? "default" : "pointer",
               }}
-              disabled={state?.checking}
+              disabled={checking}
             >
-              <RefreshCw size={13} style={{ animation: state?.checking ? "spin 900ms linear infinite" : "none" }} />
+              <RefreshCw size={13} style={{ animation: checking ? "spin 900ms linear infinite" : "none" }} />
               Refresh
             </button>
           </div>
 
-          <div style={{ display: "grid", gap: 8 }}>
-            {RUNTIME_SETUP_PROVIDERS.filter((provider) => provider.primary).map((provider) => (
-              <ProviderRow
-                key={provider.id}
-                provider={provider}
-                state={state}
-                copiedProvider={copiedProvider}
-                onCopy={copyCommand}
-                onConfirmInstall={setConfirmProvider}
-                onRunSignIn={runSignIn}
-                onOpenDocs={openDocs}
-                onConfigure={onConfigureOpenCode}
-              />
-            ))}
-          </div>
+          <div style={{ display: "grid", gap: 8 }}>{renderRows(PRIMARY_PROVIDERS)}</div>
 
           <div style={{ marginTop: 14 }}>
-            <div
-              style={{
-                color: MUTED,
-                fontSize: s(12),
-                fontFamily: UI_FONT,
-                letterSpacing: "0",
-                margin: "0 0 7px 2px",
-              }}
-            >
+            <div style={{ color: RUNTIME_MUTED, fontSize: s(12), fontFamily: RUNTIME_UI_FONT, letterSpacing: "0", margin: "0 0 7px 2px" }}>
               Advanced
             </div>
-            {RUNTIME_SETUP_PROVIDERS.filter((provider) => !provider.primary).map((provider) => (
-              <ProviderRow
-                key={provider.id}
-                provider={provider}
-                state={state}
-                copiedProvider={copiedProvider}
-                onCopy={copyCommand}
-                onConfirmInstall={setConfirmProvider}
-                onRunSignIn={runSignIn}
-                onOpenDocs={openDocs}
-                onConfigure={onConfigureOpenCode}
-              />
-            ))}
+            {renderRows(ADVANCED_PROVIDERS)}
           </div>
         </div>
       </div>
 
-      {confirmProviderMeta && (
+      {confirmMeta && (
         <div
           style={{
             position: "fixed",
@@ -343,19 +183,20 @@ export default function RuntimeSetupCard({
           }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Install ${confirmMeta.name}`}
             style={{
               width: "min(620px, 100%)",
-              border: `1px solid ${BORDER}`,
+              border: `1px solid ${RUNTIME_BORDER}`,
               borderRadius: 10,
               background: "rgba(13,13,16,0.94)",
               boxShadow: "0 24px 80px rgba(0,0,0,0.55)",
               padding: 18,
             }}
           >
-            <div style={{ color: PRIMARY, fontSize: s(16), fontWeight: 650, marginBottom: 6 }}>
-              Install {confirmProviderMeta.name}
-            </div>
-            <div style={{ color: SECONDARY, fontSize: s(12), lineHeight: 1.5, marginBottom: 12 }}>
+            <div style={{ color: RUNTIME_PRIMARY, fontSize: s(16), fontWeight: 650, marginBottom: 6 }}>Install {confirmMeta.name}</div>
+            <div style={{ color: RUNTIME_SECONDARY, fontSize: s(12), lineHeight: 1.5, marginBottom: 12 }}>
               RayLine will run this official setup command in a visible terminal. Review it before continuing.
             </div>
             <pre
@@ -363,7 +204,7 @@ export default function RuntimeSetupCard({
                 margin: 0,
                 maxHeight: 220,
                 overflow: "auto",
-                border: `1px solid ${BORDER}`,
+                border: `1px solid ${RUNTIME_BORDER}`,
                 borderRadius: 8,
                 background: "rgba(0,0,0,0.24)",
                 color: "rgba(255,255,255,0.74)",
@@ -377,43 +218,42 @@ export default function RuntimeSetupCard({
               {confirmCommand}
             </pre>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 14 }}>
-              <button
-                onClick={() => openDocs(confirmProviderMeta.id)}
-                style={{ ...iconButtonStyle(s), height: 32 }}
-              >
+              <button type="button" onClick={() => openDocs(confirmMeta.id)} style={{ ...runtimeIconButtonStyle(s), height: 32 }}>
                 <ExternalLink size={13} />
                 Official docs
               </button>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
+                  type="button"
                   onClick={() => setConfirmProvider(null)}
                   style={{
                     height: 32,
                     padding: "0 12px",
                     borderRadius: 7,
-                    border: `1px solid ${BORDER}`,
+                    border: `1px solid ${RUNTIME_BORDER}`,
                     background: "transparent",
-                    color: SECONDARY,
+                    color: RUNTIME_SECONDARY,
                     cursor: "pointer",
                     fontSize: s(12),
-                    fontFamily: UI_FONT,
+                    fontFamily: RUNTIME_UI_FONT,
                     letterSpacing: "0",
                   }}
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={runInstall}
                   style={{
                     height: 32,
                     padding: "0 12px",
                     borderRadius: 7,
                     border: "1px solid rgba(255,255,255,0.12)",
-                    background: ACTIVE,
-                    color: PRIMARY,
+                    background: RUNTIME_ACTIVE,
+                    color: RUNTIME_PRIMARY,
                     cursor: "pointer",
                     fontSize: s(12),
-                    fontFamily: UI_FONT,
+                    fontFamily: RUNTIME_UI_FONT,
                     letterSpacing: "0",
                     display: "inline-flex",
                     alignItems: "center",
