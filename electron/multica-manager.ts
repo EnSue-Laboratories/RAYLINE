@@ -13,7 +13,12 @@
  *  - providers/multica/session.ts      start / cancel / subscribe
  */
 
-export { cancelMulticaAgent, startMulticaAgent, subscribeMulticaAgent } from "./providers/multica/session";
+import { acceptingEventTarget } from "./providers/common/sink";
+import { startMulticaAgent as startMultica, subscribeMulticaAgent as subscribeMultica } from "./providers/multica/session";
+
+export { cancelMulticaAgent } from "./providers/multica/session";
+export const startMulticaAgent = acceptingEventTarget(startMultica);
+export const subscribeMulticaAgent = acceptingEventTarget(subscribeMultica);
 export {
   multicaEnsureSession,
   multicaListAgents,

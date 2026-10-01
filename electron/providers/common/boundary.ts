@@ -1,24 +1,20 @@
 /**
- * Typed facade over main-process modules owned by other packages that are
- * still `// @ts-nocheck` CommonJS (cli-bin-resolver, logger, remote-runtime,
- * session-reader). Each module is cast exactly once here; providers import
- * the typed wrappers below instead of the raw modules.
+ * Typed facade over main-process modules owned by other packages. Those still
+ * `// @ts-nocheck` CommonJS (cli-bin-resolver, logger, remote-runtime) are
+ * cast exactly once here; providers import the typed wrappers below instead
+ * of the raw modules. The wrappers keep working (and type-checking) once the
+ * owning package converts those files to ESM.
  *
- * The wrappers are written so they keep working (and type-checking) once the
- * owning packages convert those files to ESM — including if `moveSession` /
- * `findSessionCwd` become async (callers always `await` them).
- *
- * TODO(ts-boundary): drop the casts once electron-shell (cli-bin-resolver,
- * logger, remote-runtime) and electron-services (session-reader) land.
+ * TODO(ts-boundary): drop the casts once electron-shell converts
+ * cli-bin-resolver, logger and remote-runtime.
  */
 
 import type { ChildProcess, ExecFileOptions, SpawnOptions } from "node:child_process";
-import type { LoadedSession } from "@shared/chat/types";
 import type { NormalizedRemoteRuntime } from "@shared/providers/types";
 import * as untypedCliBinResolver from "../../cli-bin-resolver";
 import * as untypedLogger from "../../logger";
 import * as untypedRemoteRuntime from "../../remote-runtime";
-import * as untypedSessionReader from "../../session-reader";
+import { findSessionCwdAsync, loadSessionMessages as loadSessionMessagesTyped, moveSessionAsync } from "../../session-reader";
 
 export type Logger = (...args: unknown[]) => void;
 
@@ -66,16 +62,9 @@ interface RemoteRuntimeModule {
   describeRemoteRuntime: (remoteRuntime: NormalizedRemoteRuntime | null) => RemoteRuntimeDescription | null;
 }
 
-interface SessionReaderModule {
-  findSessionCwd: (sessionId: string) => string | null | Promise<string | null>;
-  moveSession: (sessionId: string, newCwd: string) => boolean | Promise<boolean>;
-  loadSessionMessages: (sessionId: string) => Promise<LoadedSession>;
-}
-
 const cliBinResolver = untypedCliBinResolver as unknown as CliBinResolverModule;
 const logger = untypedLogger as unknown as LoggerModule;
 const remoteRuntime = untypedRemoteRuntime as unknown as RemoteRuntimeModule;
-const sessionReader = untypedSessionReader as unknown as SessionReaderModule;
 
 // ── cli-bin-resolver ────────────────────────────────────────────────────────
 
@@ -126,16 +115,14 @@ export function describeRemoteRuntime(remote: NormalizedRemoteRuntime | null): R
   return remoteRuntime.describeRemoteRuntime(remote);
 }
 
-// ── session-reader ──────────────────────────────────────────────────────────
+// ── session-reader (typed; async variants keep fs off the main thread) ─────
 
-export async function findSessionCwd(sessionId: string): Promise<string | null> {
-  return (await sessionReader.findSessionCwd(sessionId)) || null;
+export function findSessionCwd(sessionId: string): Promise<string | null> {
+  return findSessionCwdAsync(sessionId);
 }
 
-export async function moveSession(sessionId: string, newCwd: string): Promise<boolean> {
-  return Boolean(await sessionReader.moveSession(sessionId, newCwd));
+export function moveSession(sessionId: string, newCwd: string): Promise<boolean> {
+  return moveSessionAsync(sessionId, newCwd);
 }
 
-export function loadSessionMessages(sessionId: string): Promise<LoadedSession> {
-  return sessionReader.loadSessionMessages(sessionId);
-}
+export const loadSessionMessages = loadSessionMessagesTyped;

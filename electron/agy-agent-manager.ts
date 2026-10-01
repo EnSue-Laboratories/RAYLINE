@@ -7,4 +7,8 @@
  *  - providers/agy/session.ts  process lifecycle (startup watchdog, kill escalation)
  */
 
-export { cancelAgyAgent, cancelAllAgy, resolveAgyBin, startAgyAgent } from "./providers/agy/session";
+import { acceptingEventTarget } from "./providers/common/sink";
+import { startAgyAgent as startAgy } from "./providers/agy/session";
+
+export { cancelAgyAgent, cancelAllAgy, resolveAgyBin } from "./providers/agy/session";
+export const startAgyAgent = acceptingEventTarget(startAgy);

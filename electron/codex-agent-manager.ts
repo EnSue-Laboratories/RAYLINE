@@ -8,4 +8,8 @@
  *  - providers/codex/session.ts       process lifecycle
  */
 
-export { cancelAllCodex, cancelCodexAgent, resolveCodexBin, startCodexAgent } from "./providers/codex/session";
+import { acceptingEventTarget } from "./providers/common/sink";
+import { startCodexAgent as startCodex } from "./providers/codex/session";
+
+export { cancelAllCodex, cancelCodexAgent, resolveCodexBin } from "./providers/codex/session";
+export const startCodexAgent = acceptingEventTarget(startCodex);

@@ -7,4 +7,8 @@
  *  - providers/grok/session.ts  process lifecycle
  */
 
-export { cancelAllGrok, cancelGrokAgent, resolveGrokBin, startGrokAgent } from "./providers/grok/session";
+import { acceptingEventTarget } from "./providers/common/sink";
+import { startGrokAgent as startGrok } from "./providers/grok/session";
+
+export { cancelAllGrok, cancelGrokAgent, resolveGrokBin } from "./providers/grok/session";
+export const startGrokAgent = acceptingEventTarget(startGrok);

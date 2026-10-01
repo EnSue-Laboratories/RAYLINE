@@ -10,7 +10,11 @@
  *  - providers/opencode/registry.ts       active runs, finish, cancel
  */
 
-export { resolveOpenCodeBin, startOpenCodeAgent } from "./providers/opencode/run-session";
+import { acceptingEventTarget } from "./providers/common/sink";
+import { startOpenCodeAgent as startOpenCode } from "./providers/opencode/run-session";
+
+export { resolveOpenCodeBin } from "./providers/opencode/run-session";
+export const startOpenCodeAgent = acceptingEventTarget(startOpenCode);
 export { cancelAllOpenCode, cancelOpenCodeAgent } from "./providers/opencode/registry";
 export { buildOpenCodeEnv, createOpenCodeRuntimeEnv } from "./providers/opencode/runtime-env";
 export { shouldEnableThinking } from "./providers/opencode/config";
