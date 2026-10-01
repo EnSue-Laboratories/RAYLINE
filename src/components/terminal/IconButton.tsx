@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import type { AppRegionStyle } from "./theme";
+import type { CSSProperties } from "react";
+import { NO_DRAG } from "../sidebar/appRegion";
 import { useHoverStyle } from "./useHoverStyle";
 
-const iconBtnStyle: AppRegionStyle = {
+const iconBtnStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -14,7 +15,7 @@ const iconBtnStyle: AppRegionStyle = {
   color: "var(--text-muted)",
   cursor: "pointer",
   flexShrink: 0,
-  WebkitAppRegion: "no-drag",
+  ...NO_DRAG,
   transition: "background .15s, color .15s",
 };
 

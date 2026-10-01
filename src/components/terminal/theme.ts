@@ -1,9 +1,5 @@
-import type { CSSProperties } from "react";
 import type { ITheme, Terminal } from "@xterm/xterm";
 import type { Wallpaper } from "@shared/state/types";
-
-/** Electron's `-webkit-app-region`, which React's CSSProperties doesn't know. */
-export type AppRegionStyle = CSSProperties & { WebkitAppRegion?: "drag" | "no-drag" };
 
 export type TerminalThemeMode = "light" | "dark";
 

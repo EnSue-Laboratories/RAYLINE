@@ -5,7 +5,8 @@ import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../../windowCh
 import { useFontScale } from "../../contexts/FontSizeContext";
 import IconButton from "./IconButton";
 import TabBar from "./TabBar";
-import { FONT_FAMILY, type AppRegionStyle } from "./theme";
+import { DRAG, NO_DRAG } from "../sidebar/appRegion";
+import { FONT_FAMILY } from "./theme";
 
 interface TerminalToolbarProps {
   sessions: readonly TerminalSessionInfo[];
@@ -18,9 +19,6 @@ interface TerminalToolbarProps {
   windowControlsVisible: boolean;
   isMac: boolean;
 }
-
-const dragRegion: AppRegionStyle = { WebkitAppRegion: "drag" };
-const noDragRegion: AppRegionStyle = { WebkitAppRegion: "no-drag" };
 
 /** Drawer / window header: title, new + close buttons, and the session tabs. */
 function TerminalToolbar({
@@ -40,7 +38,7 @@ function TerminalToolbar({
       <div style={{ position: "relative" }}>
         <div
           style={{
-            ...dragRegion,
+            ...DRAG,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -48,7 +46,7 @@ function TerminalToolbar({
             padding: windowMode && isMac ? `0 14px 0 ${MAC_TRAFFIC_LIGHT_SAFE_WIDTH + 8}px` : "0 14px",
           }}
         >
-          <div style={{ ...dragRegion, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+          <div style={{ ...DRAG, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
             <TerminalIcon size={13} strokeWidth={1.5} color="var(--text-muted)" />
             <span
               style={{
@@ -64,7 +62,7 @@ function TerminalToolbar({
             </span>
           </div>
 
-          <div style={{ ...noDragRegion, display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ ...NO_DRAG, display: "flex", alignItems: "center", gap: 6 }}>
             <IconButton onClick={onCreate} title="New terminal">
               <Plus size={13} strokeWidth={1.5} />
             </IconButton>

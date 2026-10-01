@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Check, CheckCircle2, Circle, Copy, GitPullRequest } from "lucide-react";
 import { useTranslator } from "../../contexts/LocaleContext";
-import { HoverIconButton } from "../boundary";
+import HoverIconButton from "../../components/HoverIconButton";
 import { repoShortName, timeAgo } from "../format";
 import type { IssueListItem } from "../types";
 import { rowMetaStyle, rowNumberStyle, rowStyle, rowTitleStyle, setRowHover } from "./rowStyles";

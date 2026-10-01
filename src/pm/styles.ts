@@ -1,7 +1,5 @@
 import type { CSSProperties } from "react";
-
-/** Electron's `-webkit-app-region`, which React's CSSProperties doesn't know. */
-export type AppRegionStyle = CSSProperties & { WebkitAppRegion?: "drag" | "no-drag" };
+import { DRAG } from "../components/sidebar/appRegion";
 
 export const MONO_FONT = "'JetBrains Mono', monospace";
 export const SYSTEM_FONT = "system-ui, sans-serif";
@@ -90,11 +88,11 @@ export const retryButtonStyle: CSSProperties = {
   fontSize: 12,
 };
 
-export const dragRegionStyle: AppRegionStyle = {
+export const dragRegionStyle: CSSProperties = {
   position: "fixed",
   top: 0,
   left: 0,
   height: 52,
-  WebkitAppRegion: "drag",
+  ...DRAG,
   zIndex: 100,
 };

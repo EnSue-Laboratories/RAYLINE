@@ -2,7 +2,7 @@ import { memo, useState, type CSSProperties } from "react";
 import { Check, Pencil, Plus, X } from "lucide-react";
 import { useTranslator } from "../../contexts/LocaleContext";
 import { getPaneInteractionStyle, getPaneSurfaceStyle } from "../../utils/paneSurface";
-import { HoverIconButton } from "../boundary";
+import HoverIconButton from "../../components/HoverIconButton";
 
 const iconBtnStyle: CSSProperties = {
   width: 24,
