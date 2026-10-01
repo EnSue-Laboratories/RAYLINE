@@ -1,0 +1,35 @@
+electron/providers/opencode/parser.ts
+  s_d0fb9aefa2e5fb::t_814af7fb25f5b5 1-196
+electron/providers/opencode/config.ts
+  s_d0fb9aefa2e5fb::t_2579ad9ba5fba6 1-23,25-142
+electron/providers/opencode/server-client.ts
+  s_d0fb9aefa2e5fb::t_effc4ebb5e3bd3 1-137
+electron/providers/common/agent-prompt.ts
+  s_d0fb9aefa2e5fb::t_b5813b04e7971c 1-45
+electron/opencode-agent-manager.ts
+  s_d0fb9aefa2e5fb::t_0a300f78d802a3 1-16
+electron/providers/opencode/run-session.ts
+  s_d0fb9aefa2e5fb::t_a4955b21112bf5 1-168
+electron/providers/opencode/registry.ts
+  s_d0fb9aefa2e5fb::t_4a2c398060cf6e 1-103
+electron/providers/opencode/runtime-env.ts
+  s_d0fb9aefa2e5fb::t_fb15d88fdaef94 1-51
+electron/providers/opencode/server-session.ts
+  s_d0fb9aefa2e5fb::t_431947ac8fdf09 1-14,16-57,60-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9f38f43d38c20ae69eace0d67a342dff29e452bc",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
