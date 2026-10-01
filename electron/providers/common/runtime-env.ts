@@ -1,30 +1,22 @@
 /**
- * Process-wide runtime values the main process publishes for agent runs:
- * the terminal MCP config path and the terminal WebSocket port (set on
- * `global` by electron/main), plus the bundled terminal CLI script.
+ * Process-wide runtime values for agent runs: the terminal MCP config path and
+ * the terminal WebSocket port (published by electron/app/terminal-bridge via
+ * `setTerminalBridgeInfo`), plus the bundled terminal CLI script.
  */
 
 import { promises as fsp } from "node:fs";
 import path from "node:path";
 import { toUnpackedPath } from "../../paths";
-import { buildSpawnPath, isExecutable, resolveCliBin } from "./boundary";
-
-interface RaylineGlobals {
-  mcpConfigPath?: unknown;
-  terminalWsPort?: unknown;
-}
-
-// Set by electron/main (`global.mcpConfigPath = …`). Typed view, not `any`.
-const raylineGlobals = globalThis as typeof globalThis & RaylineGlobals;
+import { buildSpawnPath, isExecutable, resolveCliBin } from "../../cli-bin-resolver";
+import { getTerminalBridgeInfo } from "./terminal-bridge-info";
 
 export function getMcpConfigPath(): string | null {
-  const value = raylineGlobals.mcpConfigPath;
-  return typeof value === "string" && value ? value : null;
+  return getTerminalBridgeInfo()?.mcpConfigPath || null;
 }
 
 export function getTerminalWsPort(): string {
-  const value = raylineGlobals.terminalWsPort;
-  return typeof value === "number" || (typeof value === "string" && value) ? String(value) : "";
+  const port = getTerminalBridgeInfo()?.wsPort;
+  return port === undefined ? "" : String(port);
 }
 
 /**

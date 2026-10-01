@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAvailableModels, getM, type ModelDefinition } from "@shared/models";
+import { getAvailableModels, getM, type ModelDefinition, type RemoteModelDefinition } from "@shared/models";
 import type { Translator } from "../../../i18n";
 import { createTranslator } from "../../../i18n";
 import {
@@ -81,7 +81,14 @@ describe("buildPickerOptions", () => {
   });
 
   it("disables non-planner models for the dispatch planner", () => {
-    const remote = { ...getM("sonnet"), id: "remote-ssh:claude:sonnet", provider: "remote-claude" } as unknown as ModelDefinition;
+    const remote: RemoteModelDefinition = {
+      ...getM("sonnet"),
+      id: "remote-ssh:claude:sonnet",
+      provider: "remote-claude",
+      runtimeProvider: "claude",
+      remoteRuntime: { type: "ssh", sshCommand: "ssh host" },
+      baseModelId: "sonnet",
+    };
     expect(getDisabledReason(remote, "planner", null)).toBe("planner");
     expect(getDisabledReason(getM("sonnet"), "planner", null)).toBeNull();
     expect(getDisabledReason({ ...getM("sonnet"), unavailable: true }, "chat", null)).toBe("unavailable");

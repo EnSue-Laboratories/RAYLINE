@@ -116,6 +116,7 @@ function normalizeImage(image: unknown, resolve: DataUrlResolver): MessageImage 
     return stored ? toStoredImage(stored) : image;
   }
   if (!isRecord(image)) return null;
+  // isCanonicalStoredImage verified the type tag, storagePath and allowed keys.
   if (isCanonicalStoredImage(image)) return image as unknown as StoredMessageImage;
 
   const storagePath =
@@ -136,7 +137,7 @@ function normalizeImage(image: unknown, resolve: DataUrlResolver): MessageImage 
     const stored = resolve(image.dataUrl);
     if (stored) return toStoredImage(stored, image);
   }
-  // Unknown shape: keep as-is (it came from the renderer's own state).
+  // Unknown shape: keep as-is (it came from the renderer's own state), so no guard can type it.
   return image as unknown as MessageImage;
 }
 

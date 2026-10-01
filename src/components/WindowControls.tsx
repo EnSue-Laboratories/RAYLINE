@@ -1,6 +1,6 @@
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 import { Minus, Square, X } from "lucide-react";
-import { NO_DRAG } from "./sidebar/appRegion";
+import { NO_DRAG } from "../utils/appRegion";
 
 const IDLE_COLOR = "rgba(255,255,255,0.45)";
 

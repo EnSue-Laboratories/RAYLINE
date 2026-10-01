@@ -1,5 +1,5 @@
 import type { EffortLevel, ModelDefinition } from "@shared/models";
-import DispatchModelPicker from "./DispatchModelPicker";
+import ModelPicker from "../ModelPicker";
 import DispatchLoadingDots from "./DispatchLoadingDots";
 import {
   autoActionsStyle,
@@ -51,7 +51,7 @@ export default function AutoTab({
           <div style={autoTitleStyle}>
             <span>{t("dispatch.autoComposerTitle")}</span>
           </div>
-          <DispatchModelPicker
+          <ModelPicker
             extraModels={pickerModels}
             ariaLabel={t("dispatch.autoPlannerModel")}
             value={plannerModel}

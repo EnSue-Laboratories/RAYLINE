@@ -5,7 +5,7 @@ import { MAC_TRAFFIC_LIGHT_SAFE_WIDTH, WINDOW_DRAG_HEIGHT } from "../../windowCh
 import { useFontScale } from "../../contexts/FontSizeContext";
 import IconButton from "./IconButton";
 import TabBar from "./TabBar";
-import { DRAG, NO_DRAG } from "../sidebar/appRegion";
+import { DRAG, NO_DRAG } from "../../utils/appRegion";
 import { FONT_FAMILY } from "./theme";
 
 interface TerminalToolbarProps {

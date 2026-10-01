@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { Appearance, Locale, Wallpaper } from "@shared/state/types";
 import { useStableCallback } from "../hooks/useStableCallback";
@@ -11,7 +11,6 @@ import { LanguageSection } from "./settings/LanguageSection";
 import { MulticaSection } from "./settings/MulticaSection";
 import { OpenCodeSection } from "./settings/OpenCodeSection";
 import { RemoteSshSection } from "./settings/RemoteSshSection";
-import type { AppRegionStyle } from "./settings/styles";
 import { ThemeSection } from "./settings/ThemeSection";
 import { AppVersionInfo, UpdatesSection } from "./settings/UpdatesSection";
 import { useAppBuild } from "./settings/useAppBuild";
@@ -64,7 +63,7 @@ const SCROLL_STYLE = {
   boxSizing: "border-box",
 } as const;
 
-const HEADER_STYLE: AppRegionStyle = {
+const HEADER_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 12,

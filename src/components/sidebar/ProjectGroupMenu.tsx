@@ -1,6 +1,6 @@
 import type { Ref } from "react";
 import { createPortal } from "react-dom";
-import { NO_DRAG } from "./appRegion";
+import { NO_DRAG } from "../../utils/appRegion";
 import type { MenuPosition } from "./dropdownPosition";
 import type { FontScale, Translator } from "./types";
 

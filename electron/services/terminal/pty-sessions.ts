@@ -16,7 +16,7 @@ import type {
   TerminalSessionsChangeReason,
   TerminalSessionsStatePayload,
 } from "@shared/terminal/types";
-import { createLogger } from "./deps";
+import { createLogger } from "../../logger";
 import { loadNodePty, type IPty } from "./node-pty";
 import { createOutputCoalescer, type OutputCallback, type OutputCoalescer } from "./output-coalescer";
 import { Scrollback, decodeInputEscapes } from "./scrollback";

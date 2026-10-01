@@ -14,7 +14,7 @@ import type {
   GhUser,
 } from "@shared/github/types";
 import type { GitSuccess } from "@shared/git/types";
-import { buildSpawnPath } from "./deps";
+import { buildSpawnPath } from "../../cli-bin-resolver";
 import { gh, ghWithInput, ghWithJson, parseGhJson, parseGhJsonArray } from "./gh-cli";
 import {
   crossReferencedPr,

@@ -1,7 +1,7 @@
 /** Async git runner for checkpoints (never throws on non-zero exit). */
 
 import { execFile } from "node:child_process";
-import { createLogger } from "../terminal/deps";
+import { createLogger } from "../../logger";
 
 export const log = createLogger("checkpoint");
 

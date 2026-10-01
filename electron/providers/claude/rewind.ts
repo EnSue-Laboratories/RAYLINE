@@ -1,7 +1,9 @@
 /** Claude CLI binary resolution, launch-cwd recovery and `--rewind-files`. */
 
 import type { RewindFilesRequest } from "@shared/chat/types";
-import { createLogger, findSessionCwd, spawnCli } from "../common/boundary";
+import { spawnCli } from "../../cli-bin-resolver";
+import { createLogger } from "../../logger";
+import { findSessionCwdAsync } from "../../session-reader";
 import { baseCliEnv, createCliBinResolver, isDirectory } from "../common/runtime-env";
 import { buildClaudeRewindArgs } from "./args";
 
@@ -17,7 +19,7 @@ export async function resolveLaunchCwd(cwd: string | null | undefined, sessionId
   if (!cwd) return process.cwd();
   if (await isDirectory(cwd)) return cwd;
   if (sessionId) {
-    const recovered = await findSessionCwd(sessionId);
+    const recovered = await findSessionCwdAsync(sessionId);
     if (recovered && (await isDirectory(recovered))) {
       log("Recovered invalid cwd from session metadata", { requestedCwd: cwd, recoveredCwd: recovered, sessionId });
       return recovered;

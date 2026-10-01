@@ -7,9 +7,6 @@
 import type { CSSProperties } from "react";
 import type { FontScale } from "./deps";
 
-/** `-webkit-app-region` is Electron-only and missing from React's typings. */
-export type AppRegionStyle = CSSProperties & { WebkitAppRegion?: "drag" | "no-drag" };
-
 export const TEXT_STRONG = "color-mix(in srgb, var(--text-primary) 87%, transparent)";
 export const TEXT_MUTED = "color-mix(in srgb, var(--text-primary) 33%, transparent)";
 

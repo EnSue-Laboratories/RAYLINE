@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { DRAG } from "../components/sidebar/appRegion";
+import { DRAG } from "../utils/appRegion";
 
 export const MONO_FONT = "'JetBrains Mono', monospace";
 export const SYSTEM_FONT = "system-ui, sans-serif";

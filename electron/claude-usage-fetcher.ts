@@ -14,7 +14,7 @@
 
 import https from "node:https";
 import type { RateLimits } from "@shared/agent/events";
-import { createLogger } from "./providers/common/boundary";
+import { createLogger } from "./logger";
 import { safeJsonParse } from "./providers/common/json";
 import {
   CACHE_MAX_AGE_S,

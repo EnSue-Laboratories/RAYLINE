@@ -10,6 +10,7 @@ import type { TerminalSessionsStatePayload } from "@shared/terminal/types";
 import { broadcast, sendTo } from "../ipc/typed";
 import { createLogger } from "../logger";
 import { toUnpackedPath } from "../paths";
+import { setTerminalBridgeInfo } from "../providers/common/terminal-bridge-info";
 import * as terminalManager from "../terminal-manager";
 import type { AppContext, TerminalRuntimeInfo } from "./context";
 import { isTerminalWindowOpen, revealTerminalSurface } from "./terminal-window";
@@ -18,13 +19,6 @@ const log = createLogger("main");
 
 /** One IPC message per session per frame instead of one per PTY chunk (PERF.md). */
 const OUTPUT_BATCH_MS = 16;
-
-declare global {
-  // Read by the (unconverted) agent providers. TODO(ts-boundary): electron-providers
-  // should take the MCP config path / WS port from the launch options instead.
-  var mcpConfigPath: string | undefined;
-  var terminalWsPort: number | undefined;
-}
 
 interface McpServerEntry {
   command: string;
@@ -53,8 +47,7 @@ async function startTerminalServer(ctx: AppContext): Promise<TerminalRuntimeInfo
   await fs.promises.writeFile(ctx.paths.mcpConfigFile, JSON.stringify(mcpConfig, null, 2));
   const info: TerminalRuntimeInfo = { wsPort: port, mcpConfigPath: ctx.paths.mcpConfigFile };
   ctx.terminalRuntime = info;
-  globalThis.mcpConfigPath = info.mcpConfigPath;
-  globalThis.terminalWsPort = info.wsPort;
+  setTerminalBridgeInfo(info);
   return info;
 }
 

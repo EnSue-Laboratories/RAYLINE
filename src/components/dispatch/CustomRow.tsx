@@ -3,7 +3,7 @@ import { Paperclip, X } from "lucide-react";
 import type { Attachment } from "@shared/chat/types";
 import type { EffortLevel, ModelDefinition } from "@shared/models";
 import ImagePreview from "../ImagePreview";
-import DispatchModelPicker from "./DispatchModelPicker";
+import ModelPicker from "../ModelPicker";
 import IssueDropdown from "./IssueDropdown";
 import type { DispatchDropdownOption, DispatchIssue, DispatchRow, DispatchRowPatch, DispatchRowUpdate } from "./plan";
 import { clipboardImageFiles, readImageAttachments } from "./readImages";
@@ -84,7 +84,7 @@ function CustomRow({ row, index, pickerModels, globalModel, issueOptions, issues
           grouped
         />
         <span style={customDividerStyle} aria-hidden />
-        <DispatchModelPicker
+        <ModelPicker
           compact
           extraModels={pickerModels}
           ariaLabel={t("dispatch.modelForSession", { number: index + 1 })}

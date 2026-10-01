@@ -3,7 +3,7 @@
 import type { AgentStartRequest } from "@shared/chat/types";
 import type { MulticaContext, MulticaSubscribeArgs } from "@shared/providers/types";
 import type { AgentEventSink } from "../../agent-sink";
-import { createLogger } from "../common/boundary";
+import { createLogger } from "../../logger";
 import { donePayload } from "../common/done";
 import { errorMessage } from "../common/json";
 import { multicaSendMessage } from "./api";

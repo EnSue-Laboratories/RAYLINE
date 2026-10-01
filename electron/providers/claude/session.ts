@@ -10,7 +10,10 @@ import { ASK_USER_QUESTION_TOOL, type AgentPermissionResponse, type AgentStartRe
 import type { AgentEventSink } from "../../agent-sink";
 import { fetchClaudeUsage } from "../../claude-usage-fetcher";
 import { buildClaudeUpstreamEnv, prepareClaudeUpstream, summarizeProviderUpstream } from "../../provider-upstreams";
-import { createLogger, describeRemoteRuntime, moveSession, normalizeRemoteRuntime, spawnCli, spawnRemoteCommand } from "../common/boundary";
+import { spawnCli } from "../../cli-bin-resolver";
+import { createLogger } from "../../logger";
+import { describeRemoteRuntime, normalizeRemoteRuntime, spawnRemoteCommand } from "../../remote-runtime";
+import { moveSessionAsync } from "../../session-reader";
 import { donePayload, emitCancelled, emitLaunchFailure } from "../common/done";
 import { writeImagesToTemp } from "../common/images";
 import { errorMessage } from "../common/json";
@@ -325,7 +328,7 @@ export async function startAgent(request: AgentStartRequest, sink: AgentEventSin
 
     if (!remote && request.resumeSessionId) {
       try {
-        const prepared = await moveSession(request.resumeSessionId, launchCwd);
+        const prepared = await moveSessionAsync(request.resumeSessionId, launchCwd);
         log("Prepared resume session for launch cwd", { conversationId, resumeSessionId: request.resumeSessionId, cwd: launchCwd, prepared });
       } catch (err) {
         log("Failed to prepare resume session for launch cwd", { conversationId, cwd: launchCwd, error: errorMessage(err) });

@@ -5,7 +5,7 @@ import GitConfirmDialog from "./git/GitConfirmDialog";
 import { getPillBadge, getPillTooltip } from "./git/gitStatusModel";
 import GitStatusPopover from "./git/GitStatusPopover";
 import { useGitPillController } from "./git/useGitPillController";
-import { useGitStatus } from "./sidebar/boundary";
+import useGitStatus from "../hooks/useGitStatus";
 import { anchorDropdown, getViewport, type SizedMenuPosition } from "./sidebar/dropdownPosition";
 import { useLocaleTranslator } from "./sidebar/useLocaleTranslator";
 
