@@ -7,5 +7,5 @@
     // `.ts` import specifiers (requires noEmit, set in the base config).
     "allowImportingTsExtensions": true
   },
-  "include": ["scripts", "vite.config.ts"]
+  "include": ["scripts", "*.config.ts"]
 }
