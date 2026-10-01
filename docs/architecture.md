@@ -97,7 +97,7 @@ Main-process state lives in one typed [`AppContext`](../electron/app/context.ts)
 |---|---|---|
 | Renderer (3 HTML entries) | Vite 8 / Rolldown ([`vite.config.ts`](../vite.config.ts)) | `dist/` |
 | Main, preloads, standalone helpers | esbuild ([`scripts/build-electron.ts`](../scripts/build-electron.ts)) | `dist-electron/`, mirroring the source layout |
-| Packaging | electron-builder ([`electron-builder.config.cjs`](../electron-builder.config.cjs)) | `release/` |
+| Packaging | electron-builder ([`electron-builder.config.ts`](../electron-builder.config.ts)) | `release/` |
 
 `scripts/build-electron.ts` bundles five targets to CommonJS for Node 22:
 

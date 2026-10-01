@@ -32,7 +32,7 @@ This is a record for reviewers of the `refactor/typescript` integration branch. 
   - #241 replaced the native `<select>`s with an app-styled `MenuSelect`.
   - `3db975d` added the picker i18n keys.
 
-Final state: `npm run ts:progress` reports **663/663 files converted, 0 still `@ts-nocheck`**. #242 reported 676 tests passing.
+Final state after [#245](https://github.com/EnSue-Laboratories/RAYLINE/pull/245): **every source and config file is TypeScript** (including `eslint.config.ts` and `electron-builder.config.ts`), `allowJs` is off, there is no `any` / `@ts-ignore` / `@ts-nocheck`, and full-repo `npm run lint` (zero warnings), `typecheck`, `test` (679 tests) and `build` gate CI. The migration tooling (`ts:progress`, `lint:ts`) was removed once nothing was left to migrate.
 
 | PR | Package | Main changes |
 |---|---|---|
@@ -48,6 +48,8 @@ Final state: `npm run ts:progress` reports **663/663 files converted, 0 still `@
 | [#242](https://github.com/EnSue-Laboratories/RAYLINE/pull/242) | chat-core | Conversations store with a copy-on-write stream reducer, windowed transcript, block-split markdown, lazy Prism and KaTeX |
 | [#240](https://github.com/EnSue-Laboratories/RAYLINE/pull/240) | cleanup | Boundary casts and `globalThis` removed; shared `WebkitAppRegion` typing |
 | [#241](https://github.com/EnSue-Laboratories/RAYLINE/pull/241) | UI | `MenuSelect` replaces native selects; effort menu stacks above modals; picker typography restored |
+| [#243](https://github.com/EnSue-Laboratories/RAYLINE/pull/243) | UI | New-chat Create/Back restyled to the mono chip language |
+| [#245](https://github.com/EnSue-Laboratories/RAYLINE/pull/245) | finish | `allowJs` off, TS configs, full-repo lint gate, effort chip in the new-chat card, hidden-project search fix, `useAgent` removed |
 
 ## What changed, by area
 
@@ -73,7 +75,7 @@ Final state: `npm run ts:progress` reports **663/663 files converted, 0 still `@
   - Delta saves from the renderer and lazy transcript loading (#238, #239).
 - **Renderer state.**
   - App owns no state. Settings, conversation rows, UI flags and derived views live in `createStore` stores.
-  - Live chat state moved out of `useAgent` into `src/store/conversations` with narrow selectors (#238, #242).
+  - Live chat state moved out of the old `useAgent` hook (since deleted) into `src/store/conversations` with narrow selectors (#238, #242).
 - **Rendering.**
   - Windowed transcript and tool-call grouping.
   - Incremental block markdown and idle-time highlighting.
@@ -209,13 +211,10 @@ These are collected from the "Behavior changes" sections of the PRs.
 
 ## Known follow-ups
 
-These items were listed as unfinished in the PRs and were still open in the tree when this summary was written. Check before picking one up, because the final cleanup branch may already have addressed some of them.
+These items were listed as unfinished in the PRs and remain open after #245 (which resolved the effort pass-through, the new-chat casts, the unused `useAgent` hook, the missing chat i18n keys, and a pre-existing sidebar bug where hidden-project search hits were counted but never shown).
 
 - **Grok and AGY session discovery.** The session reader only indexes `~/.claude` and `~/.codex`, so Grok and AGY history isn't listed or searchable from disk (#232, #237).
 - **Wallpaper as a `data:` URL.** The renderer still holds the wallpaper this way (PERF.md lower-priority item, #238).
-- **Effort through `ModelPickerWithMultica`.** It doesn't forward `effort` / `onEffortChange`, and `src/components/new-chat/boundaries.ts` still has three `TODO(ts-boundary)` casts (#242).
-- **`useAgent()`** (`src/hooks/useAgent.ts`) is no longer used by the app and can be deleted (#242).
-- **i18n.** `chat.toolCallsGroup` ("{count} tool calls") is missing, and the "Notice"/"Error" block titles are English-only (#242).
 - **Project Manager branch lookup.** `src/pm/create/useBranchOptions.ts` should pass the repo to `getCurrentBranch(repo)` to use the new lookup (#239).
 - **Dispatch planner flags.** It still builds its own read-only `codex exec --ephemeral --sandbox read-only -o` args, because `buildCodexArgs` has no read-only mode (#239).
 - **Claude usage.** The CLI's `rate_limit_event` could replace the OAuth usage fetch, but its utilization scale is unverified (#237).
