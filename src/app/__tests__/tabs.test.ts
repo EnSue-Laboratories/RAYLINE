@@ -48,7 +48,7 @@ describe("streaming transitions", () => {
     expect(t.endedIds).toEqual(["a"]);
     expect(t.round).toBe("idle");
     const next = applyStreamingTransition(rows, t.pinIds, t.endedIds);
-    expect(next[0]?.tab?.runEndedAt).toEqual(expect.any(Number));
+    expect(next[0]?.tab?.runEndedAt).toBeTypeOf("number");
     expect(next[1]).toBe(rows[1]);
   });
 });
