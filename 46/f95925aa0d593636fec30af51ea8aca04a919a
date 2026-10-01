@@ -1,0 +1,37 @@
+electron/providers/runtime-env.ts
+  s_d0fb9aefa2e5fb::t_b5bb97b9e4bb2f 1-57
+electron/providers/agy/session.ts
+  s_d0fb9aefa2e5fb::t_bd3607daf9cedd 1-157
+electron/providers/model-catalog.ts
+  s_d0fb9aefa2e5fb::t_74ee4e783057d1 1-170
+electron/agy-agent-manager.ts
+  s_d0fb9aefa2e5fb::t_13f141c08d56c0 1-10
+electron/providers/grok/parser.ts
+  s_d0fb9aefa2e5fb::t_ac9adbfc2000eb 1-9,11-148
+electron/providers/agy/parser.ts
+  s_d0fb9aefa2e5fb::t_5cfbb0e06e69a2 1-10,18-55,57-90,92-114,116-139
+electron/providers/grok/session.ts
+  s_d0fb9aefa2e5fb::t_d7cc146248866e 1-183
+electron/providers/agy/args.ts
+  s_d0fb9aefa2e5fb::t_639a95693f3d25 1-46
+electron/grok-agent-manager.ts
+  s_d0fb9aefa2e5fb::t_9584f8a16395cf 1-10
+electron/providers/grok/args.ts
+  s_d0fb9aefa2e5fb::t_15cd7e8385cafe 1-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "46f95925aa0d593636fec30af51ea8aca04a919a",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
