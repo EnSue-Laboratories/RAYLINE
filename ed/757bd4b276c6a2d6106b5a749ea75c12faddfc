@@ -1,0 +1,31 @@
+src/components/model-picker/useModelCatalog.ts
+  s_d0fb9aefa2e5fb::t_e5cd15d1c35756 1-111
+src/components/model-picker/strings.ts
+  s_d0fb9aefa2e5fb::t_e7acc8bb347e16 1-98
+src/components/model-picker/__tests__/catalogView.test.ts
+  s_d0fb9aefa2e5fb::t_10ca19df1c35f0 1-169
+src/components/ModelPicker.tsx
+  s_d0fb9aefa2e5fb::t_7c7c9480d2ff19 1,3,5-20,22,24-48,50-51,53-54,57-64,66-69,71-99,101-105,107-114,116-117,119-121,125-137,140-141,143-150,152-157,159-183,185,187-197,199-201,203-206,208-212,215,217-227,232-236,242,245-249,251-277
+src/components/model-picker/ModelOptionRow.tsx
+  s_d0fb9aefa2e5fb::t_1e537ee68462ee 1-97
+src/components/model-picker/EffortSelect.tsx
+  s_d0fb9aefa2e5fb::t_41a311ffa8d1c9 1-83
+src/components/model-picker/ModelMenu.tsx
+  s_d0fb9aefa2e5fb::t_64efa28d8b82ba 1-203
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ed757bd4b276c6a2d6106b5a749ea75c12faddfc",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
