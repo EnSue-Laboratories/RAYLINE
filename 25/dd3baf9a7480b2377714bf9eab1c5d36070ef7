@@ -1,0 +1,31 @@
+docs/reviews/2026-09-30-models-agy.md
+  s_d0fb9aefa2e5fb::t_30e40cee7b703c 1-42
+.gitignore
+  s_d0fb9aefa2e5fb::t_30e40cee7b703c 19-26
+docs/reviews/2026-09-27-ui-consolidation.md
+  s_d0fb9aefa2e5fb::t_30e40cee7b703c 1-63
+docs/reviews/2026-09-30-fork-release.md
+  s_d0fb9aefa2e5fb::t_30e40cee7b703c 1-59
+docs/reviews/2026-09-27-ui-click-freeze.md
+  s_d0fb9aefa2e5fb::t_30e40cee7b703c 1-15
+electron-builder.config.cjs
+  s_d0fb9aefa2e5fb::t_30e40cee7b703c 1-16,63-66,69-70
+docs/reviews/2026-09-30-model-picker-grok.md
+  s_d0fb9aefa2e5fb::t_30e40cee7b703c 1-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "25dd3baf9a7480b2377714bf9eab1c5d36070ef7",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
