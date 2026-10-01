@@ -1,0 +1,37 @@
+src/components/git/useBranchData.ts
+  s_d0fb9aefa2e5fb::t_cb99917ddf079b 1-41
+src/components/git/BranchListPanel.tsx
+  s_d0fb9aefa2e5fb::t_26386f476f7eab 1-137
+src/components/git/menuParts.tsx
+  s_d0fb9aefa2e5fb::t_5706a935fd5e95 1-100
+src/components/git/WorktreeListPanel.tsx
+  s_d0fb9aefa2e5fb::t_c929e10c29a0fd 1-313
+src/components/git/branchModel.ts
+  s_d0fb9aefa2e5fb::t_1dda6548fbc195 1-68
+src/components/git/gitStatusModel.ts
+  s_d0fb9aefa2e5fb::t_1def97a962ac60 1-170
+src/components/BranchSelector.tsx
+  s_d0fb9aefa2e5fb::t_6058321f4354e9 1,3-33,36-37,39-40,42,45-47,49-50,53-55,70,72-75,78-80,83,88-113,122,124,132,134,142,144,148,152,155-156,161,163,165,167-168,173,177,179,181,183,187,189-191,195-198,200,203,206-239,243-256,258-262,267,287,291-310,324-327,333-372,374-404
+src/components/git/useGitPillController.ts
+  s_d0fb9aefa2e5fb::t_fcfb1ec6d3f90a 1-335
+src/components/git/BranchCreateRow.tsx
+  s_d0fb9aefa2e5fb::t_64ccbbd591d9b5 1-147
+src/components/git/IconActionButton.tsx
+  s_d0fb9aefa2e5fb::t_0e6a45b1baae86 1-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ea0d6ebf88d2c6247304799b8f4d898762f2c4be",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
