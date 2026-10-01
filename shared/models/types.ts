@@ -20,7 +20,7 @@ import type {
 } from "../providers/types";
 
 /**
- * Union of every reasoning-effort level any supported CLI accepts.
+ * Union of every reasoning-effort level a supported CLI accepts.
  *  - Claude Code: `--effort low|medium|high|xhigh|max` (also `ultracode`,
  *    which RayLine does not expose).
  *  - Codex: `-c model_reasoning_effort="low|medium|high|xhigh|max|ultra"`.
@@ -84,6 +84,28 @@ export interface ModelDefinitionBase {
   successorId?: string;
   /** Optional one-line description for pickers. */
   description?: string;
+
+  /**
+   * Kept only so persisted selections keep resolving (CLI aliases, retired
+   * variants). `visibleModels` hides it unless it is the current selection.
+   * (PR #230 called this `legacy: true`; our `lifecycle: "legacy"` instead
+   * means "still selectable, being retired".)
+   */
+  hidden?: boolean;
+  /**
+   * The installed CLI's runtime catalog does not list this model (set by
+   * `mergeModelCatalog` on static Grok entries). Shown only when selected,
+   * disabled in pickers.
+   */
+  unavailable?: boolean;
+  /** Built by `buildRuntimeModels` from the installed CLIs' catalogs. */
+  runtimeCatalog?: boolean;
+  /**
+   * Grok only, selection-level like `effort`: set by `getMOrMulticaFallback`
+   * when the persisted id was PR #230's `grok-46-continue`. Send it as
+   * `AgentStartRequest.grokContinue`.
+   */
+  grokContinue?: boolean;
 }
 
 export interface ClaudeModelDefinition extends ModelDefinitionBase {
@@ -138,15 +160,88 @@ export interface RemoteModelDefinition extends ModelDefinitionBase {
   defaultEffort: EffortLevel | null;
 }
 
+/**
+ * xAI Grok Build CLI model. Id = CLI slug (`grok-4.7`), except the
+ * CLI-default entry `grok-default` whose `cliFlag` is "" (omit `--model`).
+ * Grok exposes no reasoning-effort control.
+ */
+export interface GrokModelDefinition extends ModelDefinitionBase {
+  provider: "grok";
+  /** `--model` value; "" = let the CLI choose (no flag). */
+  cliFlag: string;
+  efforts: readonly EffortLevel[];
+  defaultEffort: null;
+}
+
+/**
+ * Google Antigravity CLI model (`agy:<slug>`; `agy:default` = CLI default
+ * with `cliFlag` ""). Dynamic entries come from `agy models` discovery;
+ * context windows are unknown (left unset).
+ */
+export interface AgyModelDefinition extends ModelDefinitionBase {
+  provider: "agy";
+  /** `--model` value; "" = let the CLI choose (no flag). */
+  cliFlag: string;
+  efforts: readonly EffortLevel[];
+  defaultEffort: null;
+}
+
 export type ModelDefinition =
   | ClaudeModelDefinition
   | CodexModelDefinition
   | OpenCodeModelDefinition
   | MulticaModelDefinition
-  | RemoteModelDefinition;
+  | RemoteModelDefinition
+  | GrokModelDefinition
+  | AgyModelDefinition;
 
-/** Built-in catalogue entries only. */
+/**
+ * Built-in Claude/Codex catalogue entries (`MODELS`). Kept to Claude/Codex
+ * because SSH remotes, provider upstreams and `getM` only apply to them.
+ */
 export type BuiltinModelDefinition = ClaudeModelDefinition | CodexModelDefinition;
+
+/** Every static (non-discovered) entry: `STATIC_MODELS`. */
+export type StaticModelDefinition = BuiltinModelDefinition | GrokModelDefinition | AgyModelDefinition;
+
+// ── Runtime model catalog (`model-catalog` IPC) ─────────────────────────────
+
+/** A reasoning level as Codex's models cache spells it (string or `{ effort }`). */
+export interface CodexCatalogReasoningLevel {
+  effort?: string;
+}
+
+/**
+ * One model from `$CODEX_HOME/models_cache.json` (only these metadata fields
+ * cross IPC). Values are whatever the CLI wrote — not yet validated against
+ * `EffortLevel`; `buildRuntimeModels` does that.
+ */
+export interface CodexCatalogRecord {
+  slug: string;
+  display_name?: string;
+  context_window?: number;
+  default_reasoning_level?: string;
+  supported_reasoning_levels?: readonly (string | CodexCatalogReasoningLevel | null)[];
+  /** "hide" entries are dropped. */
+  visibility?: string;
+}
+
+/** One row of `agy models` (`<slug>\t<display name>`). */
+export interface AgyCatalogRecord {
+  slug: string;
+  name: string;
+}
+
+/**
+ * `model-catalog` result: what the installed CLIs report right now. Empty
+ * arrays mean "not installed / discovery failed", never "no models".
+ */
+export interface RuntimeModelCatalog {
+  codex: CodexCatalogRecord[];
+  /** Slugs listed by `grok models` (`grok-4.7`, …). */
+  grok: string[];
+  agy: AgyCatalogRecord[];
+}
 
 /** Parsed `provider-upstream:<provider>:<modelId>` id. */
 export interface ProviderUpstreamModelRef {
@@ -168,10 +263,12 @@ export interface RemoteModelRef {
   baseModelId: string;
 }
 
-/** Legacy id → current id (+ the effort the old id encoded). */
+/** Legacy id → current id (+ the effort / Grok option the old id encoded). */
 export interface LegacyModelAlias {
   id: string;
   effort?: EffortLevel;
+  /** PR #230 `grok-46-continue`. */
+  grokContinue?: boolean;
 }
 
 /** A model id paired with an explicit effort choice. */
@@ -179,6 +276,8 @@ export interface ModelSelection {
   id: string;
   /** null = use the model's `defaultEffort` (i.e. do not pass a flag). */
   effort: EffortLevel | null;
+  /** Present (true) only when a legacy id encoded Grok's `--continue`. */
+  grokContinue?: boolean;
 }
 
 /** Payload shape the Dispatch card sends for planner / target models. */
