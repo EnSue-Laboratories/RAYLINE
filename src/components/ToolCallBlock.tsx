@@ -3,7 +3,7 @@ import { ChevronRight, ChevronDown, Terminal, FileText, Pencil, Search, Code, Lo
 import type { ToolPart } from "@shared/chat/types";
 import { useFontScale, type FontScale } from "../contexts/FontSizeContext";
 import { useTranslator } from "../contexts/LocaleContext";
-import { translateOr } from "./blocks/translateOr";
+import type { MessageKey } from "../i18n";
 import {
   BODY_PREVIEW_LIMIT,
   buildToolBodyView,
@@ -29,11 +29,10 @@ interface ToolBodyProps {
   fontScale: FontScale;
 }
 
-// Keys from #230; English fallbacks until data-i18n adds them.
-const BODY_LABEL_KEYS: Record<ToolBodyProps["label"], { key: string; fallback: string }> = {
-  ARGS: { key: "tool.arguments", fallback: "ARGS" },
-  RESULT: { key: "tool.result", fallback: "RESULT" },
-};
+const BODY_LABEL_KEYS = {
+  ARGS: "tool.arguments",
+  RESULT: "tool.result",
+} as const satisfies Record<ToolBodyProps["label"], MessageKey>;
 
 function ToolBody({ label, value, maxHeight, fontScale }: ToolBodyProps) {
   const t = useTranslator();
@@ -60,7 +59,7 @@ function ToolBody({ label, value, maxHeight, fontScale }: ToolBodyProps) {
         justifyContent: "space-between",
         gap: 8,
       }}>
-        <span>{translateOr(t, BODY_LABEL_KEYS[label].key, BODY_LABEL_KEYS[label].fallback)}</span>
+        <span>{t(BODY_LABEL_KEYS[label])}</span>
         {view.isTrimmed && (
           <button
             onClick={() => setVisibleLimit((prev) => nextVisibleLimit(serialized.length, prev))}
@@ -74,7 +73,7 @@ function ToolBody({ label, value, maxHeight, fontScale }: ToolBodyProps) {
               padding: 0,
             }}
           >
-            {hasMore ? translateOr(t, "tool.showMore", "show more") : translateOr(t, "tool.showLess", "show less")}
+            {t(hasMore ? "tool.showMore" : "tool.showLess")}
           </button>
         )}
       </div>
@@ -93,7 +92,7 @@ function ToolBody({ label, value, maxHeight, fontScale }: ToolBodyProps) {
         overflow: "auto",
       }}>
         {view.text}
-        {hasMore && `\n\n${translateOr(t, "tool.remaining", "… [{count} more chars]", { count: view.remaining })}`}
+        {hasMore && `\n\n${t("tool.remaining", { count: view.remaining })}`}
       </pre>
     </div>
   );
@@ -171,7 +170,7 @@ function ToolCallBlock({ tool }: ToolCallBlockProps) {
             <Loader2 size={10} strokeWidth={2} style={{ color: "var(--text-muted)", animation: "spin 1s linear infinite" }} />
           )}
           {tool.status === "done" && (
-            <span style={{ color: "var(--text-disabled)", fontSize: s(10) }}>{translateOr(t, "tool.done", "done")}</span>
+            <span style={{ color: "var(--text-disabled)", fontSize: s(10) }}>{t("tool.done")}</span>
           )}
           {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>

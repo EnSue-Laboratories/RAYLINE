@@ -19,7 +19,7 @@ import {
   validateRows,
   type DispatchRow,
 } from "../plan";
-import { translateOr, type Translator } from "../translator";
+import type { Translator } from "../translator";
 
 const t: Translator = (key, params) => (params ? `${key}:${JSON.stringify(params)}` : key);
 const NOW = new Date(2026, 9, 1, 9, 5);
@@ -183,9 +183,4 @@ describe("options", () => {
     expect(dynamicModelsOf(models).map((m) => m.id)).toEqual([opencode.id, multica.id]);
   });
 
-  it("falls back to English for missing translation keys", () => {
-    const echo: Translator = (key) => key;
-    expect(translateOr(echo, "x.missing", "Use {value}", { value: "main" })).toBe("Use main");
-    expect(translateOr(() => "Dispatch!", "dispatch.title", "Fallback")).toBe("Dispatch!");
-  });
 });
