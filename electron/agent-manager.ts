@@ -9,9 +9,5 @@
  *  - providers/claude/rewind.ts        bin resolution, cwd recovery, --rewind-files
  */
 
-import { acceptingEventTarget } from "./providers/common/sink";
-import { startAgent as startClaudeAgent } from "./providers/claude/session";
-
-export { cancelAgent, cancelAll, respondPermission } from "./providers/claude/session";
-export const startAgent = acceptingEventTarget(startClaudeAgent);
+export { cancelAgent, cancelAll, respondPermission, startAgent } from "./providers/claude/session";
 export { resolveClaudeBin, rewindFiles } from "./providers/claude/rewind";
