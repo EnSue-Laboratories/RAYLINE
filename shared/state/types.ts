@@ -11,6 +11,7 @@
 
 import type { Conversation, QueuedMessage } from "../chat/types";
 import type { RemoteSshRuntimeState } from "../providers/types";
+import type { EffortLevel } from "../models/types";
 
 export type Locale = "en-US" | "zh-CN";
 
@@ -86,6 +87,8 @@ export interface PersistedAppState {
   active?: string | null;
   cwd?: string | null;
   defaultModel?: string;
+  /** Last reasoning effort picked per model id (restored on new chats / model switches). */
+  effortByModel?: Record<string, EffortLevel>;
   /** A `Locale` when written by current versions; normalize with `normalizeLocale`. */
   locale?: string;
   /** 12–22 */

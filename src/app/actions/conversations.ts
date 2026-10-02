@@ -1,7 +1,9 @@
 /** Conversation-level actions wired to the sidebar, tab strip and chat header. */
 
 import type { EffortLevel } from "@shared/models/types";
-import { setAppSetting } from "../../store/appSettings";
+import { getAppSettings, setAppSetting } from "../../store/appSettings";
+import { rememberEffort } from "../effortMemory";
+import { getRememberedEffort } from "../rememberedEffort";
 import { getActiveConvo, getActiveId, getConvos, setActiveId, setConvos, updateConvo } from "../../store/convoList";
 import { clearDraft } from "../../utils/composerDrafts";
 import { clearPinnedTabs, countPinnedTabs, resetPinnedTabs, unpinTabPatch, withTabPatch } from "../../utils/tabs";
@@ -70,10 +72,18 @@ export function changeModel(modelId: string): void {
     providerSessions: normalized?.providerSessions || null,
     activeSessionId: normalized?.activeSessionId || null,
   });
-  if (active && getConversation(active).isStreaming && currentProvider === "multica" && modelId !== normalized?.model) {
+  // The new-chat card picks for the chat it is about to create; it must not
+  // retarget the conversation behind it.
+  const editingNewChat = !active || getUi().showNewChatCard;
+  if (!editingNewChat && getConversation(active).isStreaming && currentProvider === "multica" && modelId !== normalized?.model) {
     cancelMessage(active);
   }
-  if (active) updateConvo(active, (c) => (c.model === modelId ? c : { ...c, model: modelId }));
+  if (editingNewChat) {
+    // Fall back to the effort remembered for the newly picked model.
+    patchUi({ newChatEffort: null });
+  } else {
+    updateConvo(active, (c) => (c.model === modelId ? c : { ...c, model: modelId, effort: getRememberedEffort(modelId) }));
+  }
   setAppSetting("defaultModel", modelId);
 }
 
@@ -83,8 +93,12 @@ export function changeModel(modelId: string): void {
  */
 export function changeEffort(effort: EffortLevel | null): void {
   const active = getActiveId();
+  const editingNewChat = !active || getUi().showNewChatCard;
+  const modelId = editingNewChat ? getAppSettings().defaultModel : (getActiveConvo()?.model ?? getAppSettings().defaultModel);
+  // Remember it so the next chat / model switch with this model starts here.
+  setAppSetting("effortByModel", (memory) => rememberEffort(memory, modelId, effort));
   // The new-chat card picks the effort for the chat it is about to create.
-  if (!active || getUi().showNewChatCard) {
+  if (editingNewChat) {
     patchUi({ newChatEffort: effort });
     return;
   }

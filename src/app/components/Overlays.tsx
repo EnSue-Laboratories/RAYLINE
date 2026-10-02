@@ -4,15 +4,8 @@ import { dispatchRows } from "../actions/create";
 import { handleClonedRepo, registerManualProject } from "../actions/projects";
 import { useProjectsDerived } from "../derived/projects";
 import { useModelsField } from "../stores/models";
-import { useStore } from "../../store/createStore";
-import { convoListStore, type ConvoListState } from "../../store/convoList";
-import type { EffortLevel } from "@shared/models/types";
+import { useRememberedEffort } from "../rememberedEffort";
 
-/** The default model was last picked in the active chat, so its effort is the default effort. */
-function selectDefaultEffort(state: ConvoListState, defaultModel: string): EffortLevel | null {
-  const active = state.activeId ? state.convos.find((c) => c.id === state.activeId) : undefined;
-  return active?.model === defaultModel ? active.effort ?? null : null;
-}
 import { patchUi, useUi } from "../stores/ui";
 
 // Code-split and mounted only while open.
@@ -29,7 +22,7 @@ const DispatchLayer = memo(function DispatchLayer() {
   const defaultModel = useAppSetting("defaultModel");
   const locale = useAppSetting("locale");
   const availableModels = useModelsField("availableModels");
-  const defaultEffort = useStore(convoListStore, (state) => selectDefaultEffort(state, defaultModel));
+  const defaultEffort = useRememberedEffort(defaultModel);
   return (
     <DispatchCard
       onClose={closeDispatch}
