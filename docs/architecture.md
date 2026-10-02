@@ -109,7 +109,7 @@ The build also copies `electron/vendor/` and `electron/shell-init/` next to the 
 
 Vite builds the `main`, `pm` and `terminal` entries with shared `react-vendor`, `markdown` and `xterm` chunks. Heavy optional libraries (Mermaid, KaTeX, html-to-image, rehype-raw/parse5, Prism grammars) are excluded from those groups and load through `import()` at the point of use.
 
-**`npm run dev:electron`** uses `concurrently` to run three things:
+**`pnpm dev:electron`** uses `concurrently` to run three things:
 
 1. `vite --port 5199 --strictPort`
 2. `node scripts/build-electron.ts --watch` (esbuild watch, inline sourcemaps)
@@ -324,6 +324,6 @@ IPC handlers and agent launch paths use async fs and child processes (#237, #239
 
 ## Testing and CI
 
-- **Unit tests:** Vitest (`npm test`). Tests sit next to the code in `__tests__/` folders or as `*.test.ts`. Most target the pure modules the split produced: parsers, reducers, argv builders, registry and legacy ids, save planning, the state store against temp dirs, git parsers, block splitting and windowing math. Some are end-to-end, such as MCP client → server → WebSocket → real PTY.
-- **Static checks:** `npm run typecheck` runs all three tsconfig projects. `npm run lint` runs ESLint with `typescript-eslint` type-aware rules: `no-explicit-any` and `no-unsafe-*` are errors, and react-hooks rules apply.
+- **Unit tests:** Vitest (`pnpm test`). Tests sit next to the code in `__tests__/` folders or as `*.test.ts`. Most target the pure modules the split produced: parsers, reducers, argv builders, registry and legacy ids, save planning, the state store against temp dirs, git parsers, block splitting and windowing math. Some are end-to-end, such as MCP client → server → WebSocket → real PTY.
+- **Static checks:** `pnpm typecheck` runs all three tsconfig projects. `pnpm lint` runs ESLint with `typescript-eslint` type-aware rules: `no-explicit-any` and `no-unsafe-*` are errors, and react-hooks rules apply.
 - **CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs the static checks and the build on Node 22 for pull requests and pushes to `main` / `refactor/typescript`. See the workflow for the exact steps. [`.github/workflows/package.yml`](../.github/workflows/package.yml) packages macOS, Windows and Linux on tags and releases.

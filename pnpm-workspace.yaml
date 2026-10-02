@@ -1,0 +1,23 @@
+# pnpm settings (pnpm reads only auth/registry from .npmrc).
+
+# electron-builder packages a flat node_modules; pnpm's default isolated
+# (symlinked) layout breaks native-module collection, so use npm-style hoisting.
+nodeLinker: hoisted
+
+# Dependency lifecycle scripts are blocked unless listed here (strictDepBuilds
+# fails the install on anything unreviewed).
+allowBuilds:
+  # Downloads the Electron binary used by `electron .` / dev.
+  electron: true
+  # Native binary for the main-process bundler.
+  esbuild: true
+  # Native PTY for the terminal drawer (rebuilt for Electron via `pnpm rebuild:electron`).
+  node-pty: true
+  # Squirrel.Windows vendor payload; we package Windows with NSIS.
+  electron-winstaller: false
+  # Optional macOS watcher with a prebuilt binary; the install script is only a node-gyp fallback.
+  fsevents: false
+
+# Supply-chain guard: don't resolve versions published in the last 24h
+# (the pnpm 11+ default, kept explicit).
+minimumReleaseAge: 1440
