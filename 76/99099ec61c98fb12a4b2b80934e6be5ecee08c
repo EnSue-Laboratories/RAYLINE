@@ -1,0 +1,46 @@
+src/components/message/partGroups.ts
+  s_d0fb9aefa2e5fb::t_9a3d7681d0cbb5 6,10-22
+src/components/message/__tests__/partGroups.test.ts
+  s_d0fb9aefa2e5fb::t_1835c0c8b2ca15 1-5,8-14,16-22
+  s_d0fb9aefa2e5fb::t_a98c01d559b05a 6-7,15
+src/store/appSettings.ts
+  s_d0fb9aefa2e5fb::t_7861754e66821c 18,30-31,101,138,174,200
+src/app/actions/conversations.ts
+  s_d0fb9aefa2e5fb::t_ee007946e67006 4-6,75-78,81-86,96-99,101
+shared/state/types.ts
+  s_d0fb9aefa2e5fb::t_7861754e66821c 14,90-91
+src/app/__tests__/effortMemory.test.ts
+  s_d0fb9aefa2e5fb::t_1835c0c8b2ca15 1-31
+src/app/effortMemory.ts
+  s_d0fb9aefa2e5fb::t_7861754e66821c 7-8
+  s_d0fb9aefa2e5fb::t_8cab59d17395d8 1-6,9-21,23-50
+  s_d0fb9aefa2e5fb::t_d45e6a419ae232 22
+src/app/actions/create.ts
+  s_d0fb9aefa2e5fb::t_ee007946e67006 16,64-68,71,114
+src/app/actions/compose.ts
+  s_d0fb9aefa2e5fb::t_ee007946e67006 95
+src/app/rememberedEffort.ts
+  s_d0fb9aefa2e5fb::t_ee007946e67006 1-16
+src/app/components/ChatPane.tsx
+  s_d0fb9aefa2e5fb::t_ee007946e67006 22,43,75
+src/components/message/AssistantParts.tsx
+  s_d0fb9aefa2e5fb::t_9a3d7681d0cbb5 16,98-100
+src/app/components/Overlays.tsx
+  s_d0fb9aefa2e5fb::t_ee007946e67006 7,25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7699099ec61c98fb12a4b2b80934e6be5ecee08c",
+  "prompts": {},
+  "sessions": {
+    "s_d0fb9aefa2e5fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "206f65fa-97d5-4594-9f8a-cf16abea9ad6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Kira-Pgr <aieternal@outlook.com>"
+    }
+  }
+}
