@@ -92,7 +92,7 @@ export async function sendFromComposer(text: string, attachments?: Attachment[])
       id: convoId,
       title: deriveConversationTitle(text, attachments),
       modelId: defaultModel,
-      effort: takeNewChatEffort(),
+      effort: takeNewChatEffort(defaultModel),
       ts: Date.now(),
       cwd: getProjectRootOrUndefined(appCwd, getUi().draftsPath),
     });

@@ -15,6 +15,7 @@ import type {
 import type { RemoteSshRuntimeState } from "@shared/providers/types";
 import { DEFAULT_MODEL_ID, normalizeModelId } from "@shared/models/registry";
 import { createStore, useStore } from "./createStore";
+import { normalizeEffortByModel, type EffortByModel } from "../app/effortMemory";
 import { detectDefaultLocale, normalizeLocale } from "../i18n";
 import { normalizeAppearance } from "../utils/appearance";
 import { getPersistedWallpaper, normalizeWallpaper } from "../utils/wallpaper";
@@ -26,6 +27,8 @@ export const DEFAULT_COAUTHOR_TRAILER =
 
 export interface AppSettings {
   defaultModel: string;
+  /** Last reasoning effort picked per model (see app/effortMemory). */
+  effortByModel: EffortByModel;
   /** App-level working directory (folder picker). */
   cwd: string | null;
   locale: Locale;
@@ -95,6 +98,7 @@ export function normalizeRemoteSshRuntime(value: unknown, fallbackCommand = ""):
 export function createDefaultSettings(): AppSettings {
   return {
     defaultModel: DEFAULT_MODEL_ID,
+    effortByModel: {},
     cwd: null,
     locale: detectDefaultLocale(),
     fontSize: DEFAULT_FONT_SIZE,
@@ -131,6 +135,7 @@ export function settingsFromPersisted(
   const next: AppSettings = { ...base };
   if (state.cwd) next.cwd = state.cwd;
   if (state.defaultModel) next.defaultModel = normalizeModelId(state.defaultModel);
+  if (state.effortByModel) next.effortByModel = normalizeEffortByModel(state.effortByModel);
   if (state.locale) next.locale = normalizeLocale(state.locale);
   if (state.appearance) next.appearance = normalizeAppearance(state.appearance);
   if (state.fontSize) next.fontSize = state.fontSize;
@@ -166,6 +171,7 @@ export type PersistedSettings = Pick<
   PersistedAppState,
   | "cwd"
   | "defaultModel"
+  | "effortByModel"
   | "locale"
   | "fontSize"
   | "sidebarActiveOpacity"
@@ -191,6 +197,7 @@ export function toPersistedSettings(settings: AppSettings): PersistedSettings {
   return {
     cwd: settings.cwd,
     defaultModel: settings.defaultModel,
+    effortByModel: settings.effortByModel,
     locale: settings.locale,
     fontSize: settings.fontSize,
     sidebarActiveOpacity: settings.sidebarActiveOpacity,

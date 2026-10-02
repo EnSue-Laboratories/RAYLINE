@@ -13,6 +13,7 @@ import { resolveModel } from "../stores/models";
 import { getUi, patchUi } from "../stores/ui";
 import type { CreateChatOptions, DispatchHandler, DispatchOutcome } from "../types";
 import { sendMessageToConversation } from "./send";
+import { getRememberedEffort } from "../rememberedEffort";
 
 export interface ConversationDraftInput {
   id: string;
@@ -60,11 +61,14 @@ export function createConversationDraft({ id, title, modelId, effort, ts, cwd, d
   });
 }
 
-/** Effort chosen in the composer while no conversation was active (consumed once). */
-export function takeNewChatEffort(): EffortLevel | null {
+/**
+ * Effort for a chat about to be created with `modelId`: the one picked on the
+ * new-chat card (consumed once), else the effort last used with that model.
+ */
+export function takeNewChatEffort(modelId: string = getAppSettings().defaultModel): EffortLevel | null {
   const effort = getUi().newChatEffort;
   if (effort) patchUi({ newChatEffort: null });
-  return effort;
+  return effort ?? getRememberedEffort(modelId);
 }
 
 /** Toolbar / Cmd-N "new chat": open the new-chat card with the contextual project. */
@@ -107,7 +111,7 @@ export async function createChat(opts: CreateChatOptions): Promise<void> {
     id,
     title: opts.title || opts.prompt?.slice(0, 50) || "New chat",
     modelId,
-    effort: opts.effort !== undefined ? opts.effort : takeNewChatEffort(),
+    effort: opts.effort !== undefined ? opts.effort : takeNewChatEffort(modelId),
     ts: Date.now(),
     cwd: effectiveCwd,
     dispatchId: opts.dispatchId,

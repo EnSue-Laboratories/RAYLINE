@@ -19,6 +19,7 @@ import { useTranscriptLoading } from "../stores/transcripts";
 import { useUi } from "../stores/ui";
 import { useTranslator } from "../../contexts/LocaleContext";
 import ChatArea from "../../components/ChatArea";
+import { useRememberedEffort } from "../rememberedEffort";
 
 const MemoChatArea = memo(ChatArea);
 
@@ -39,6 +40,7 @@ export const ChatPane = memo(function ChatPane() {
   const newChatEffort = useUi("newChatEffort");
   const sidebarTerminalOpen = useUi("sidebarTerminalOpen");
   const defaultModel = useAppSetting("defaultModel");
+  const rememberedNewChatEffort = useRememberedEffort(defaultModel);
   const wallpaper = useAppSetting("wallpaper");
   const appCwd = useAppSetting("cwd");
   const defaultPrBranch = useAppSetting("defaultPrBranch");
@@ -70,7 +72,7 @@ export const ChatPane = memo(function ChatPane() {
         sidebarOpen={sidebarOpen}
         onModelChange={changeModel}
         defaultModel={defaultModel}
-        effort={activeConvo && !showNewChatCard ? activeConvo.effort ?? null : newChatEffort}
+        effort={activeConvo && !showNewChatCard ? activeConvo.effort ?? null : newChatEffort ?? rememberedNewChatEffort}
         onEffortChange={changeEffort}
         queuedMessages={queuedMessages}
         onUpdateQueuedMessage={updateQueuedMessage}

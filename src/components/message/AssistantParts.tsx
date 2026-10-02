@@ -13,7 +13,7 @@ import AssistantImage from "./AssistantImage";
 import { AskUserQuestionBlock, ThinkingBlock, ToolCallBlock } from "./blocks";
 import { normalizeAssistantImagePart } from "./images";
 import { ErrorBlock, StatusBlock } from "./PartBlocks";
-import { groupParts } from "./partGroups";
+import { groupParts, visibleParts } from "./partGroups";
 import ToolCallGroup from "./ToolCallGroup";
 import type { MessageCallbacks } from "./types";
 
@@ -95,7 +95,9 @@ interface AssistantPartsProps extends MessageCallbacks {
 }
 
 export default function AssistantParts({ message, onAnswer, onControlChange, canControlTarget }: AssistantPartsProps) {
-  const parts = message.parts ?? EMPTY_PARTS;
+  const allParts = message.parts ?? EMPTY_PARTS;
+  // Codex housekeeping notices are kept in the transcript but not displayed.
+  const parts = useMemo(() => visibleParts(allParts), [allParts]);
   const live = Boolean(message.isStreaming);
   const items = useMemo(() => groupParts(parts, live), [parts, live]);
   const activeThinking = message._streamState?.activeThinking;

@@ -3,8 +3,23 @@
  * carry hundreds of tool parts; a collapsed group mounts none of them.
  */
 import { ASK_USER_QUESTION_TOOL, type MessagePart } from "@shared/chat/types";
+import { CODEX_NOTICE_KIND } from "../../store/chat/codexItems";
 
 export const MIN_TOOL_GROUP_SIZE = 3;
+
+/**
+ * Parts kept in the message but not shown: Codex CLI housekeeping notices
+ * ("loading hooks from both …", "skill descriptions were shortened …").
+ * They stay in stored/exported transcripts.
+ */
+export function isHiddenPart(part: MessagePart): boolean {
+  return part.type === "status" && part.kind === CODEX_NOTICE_KIND;
+}
+
+/** `parts` without hidden ones; the same array when nothing is hidden (memo-friendly). */
+export function visibleParts(parts: readonly MessagePart[]): readonly MessagePart[] {
+  return parts.some(isHiddenPart) ? parts.filter((part) => !isHiddenPart(part)) : parts;
+}
 
 export type PartItem =
   | { kind: "part"; index: number }
